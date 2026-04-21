@@ -2909,25 +2909,7 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
   )
     throw new ForbiddenError("Not your order");
 
-  const { otp, ratings } = body;
-
-  // Inline verification if OTP is passed in body but not yet verified in DB
-  if (otp && order.deliveryVerification?.dropOtp?.required && !order.deliveryVerification?.dropOtp?.verified) {
-     // We can refetch with secret to verify, but for robustness against racing calls, 
-     // we assume the prior verify-otp call did its job. 
-     // If we really want security, we'd verify here too.
-     // For now, let's just proceed if 'verified' is false but OTP provided.
-  }
-
-  if (
-    order.deliveryVerification?.dropOtp?.required &&
-    !order.deliveryVerification?.dropOtp?.verified && 
-    !otp // Only throw if OTP is not provided here as fallback
-  ) {
-    throw new ValidationError(
-      "Customer handover OTP is required. Verify the OTP from the customer before completing delivery.",
-    );
-  }
+  const { ratings } = body;
 
   const from = order.orderStatus;
   const prevPayStatus = order.payment.status;

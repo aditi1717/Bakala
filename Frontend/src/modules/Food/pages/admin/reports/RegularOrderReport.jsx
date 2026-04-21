@@ -39,6 +39,7 @@ const statusMeta = {
 
 const PAGE_SIZE = 25
 const AUTO_REFRESH_MS = 15000
+const INR_SYMBOL = "\u20B9"
 
 export default function RegularOrderReport() {
   const [orders, setOrders] = useState([])
@@ -404,7 +405,7 @@ export default function RegularOrderReport() {
   )
 
   const formatAmount = (amount) =>
-    `?${Number(amount || 0).toLocaleString("en-IN", {
+    `${INR_SYMBOL}${Number(amount || 0).toLocaleString("en-IN", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`

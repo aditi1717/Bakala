@@ -1,19 +1,16 @@
-import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { 
   ChefHat, MapPin, Phone, 
   ChevronDown, ChevronUp, Package, 
-  Navigation, CheckCircle2, Camera, Loader2, Image as ImageIcon
+  Navigation
 } from 'lucide-react';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
-import { uploadAPI } from '@food/api';
-import { toast } from 'sonner';
-import { openCamera } from "@food/utils/imageUploadUtils";
 import { BRAND_THEME } from '@/config/brandTheme';
 
 /**
- * PickupActionModal - Unified White/Green Theme with Slider Actions.
- * Includes Bill Upload feature prior to pickup.
+ * PickupActionModal - Unified White/Green Theme with slider actions.
+ * Flow: Reach pickup -> Picked up (no bill upload).
  */
 export const PickupActionModal = ({ 
   order, 
@@ -26,50 +23,8 @@ export const PickupActionModal = ({
   onMinimize
 }) => {
   const [showItems, setShowItems] = useState(false);
-  const [isUploadingBill, setIsUploadingBill] = useState(false);
-  const [billImageUploaded, setBillImageUploaded] = useState(false);
-  const [billImageUrl, setBillImageUrl] = useState(null);
-  const cameraInputRef = useRef(null);
 
   if (!order) return null;
-
-  const handleBillImageSelect = async (file) => {
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size should be less than 5MB');
-      return;
-    }
-
-    setIsUploadingBill(true);
-    try {
-      const res = await uploadAPI.uploadMedia(file, { folder: 'appzeto/delivery/bills' });
-      if (res?.data?.success && res?.data?.data) {
-        setBillImageUrl(res.data.data.url || res.data.data.secure_url);
-        setBillImageUploaded(true);
-        // toast.success('Bill image uploaded!');
-      } else {
-        throw new Error('Upload failed');
-      }
-    } catch (err) {
-      toast.error('Failed to upload bill image');
-      setBillImageUploaded(false);
-      setBillImageUrl(null);
-    } finally {
-      setIsUploadingBill(false);
-    }
-  };
-
-  const handleTakeCameraPhoto = () => {
-    openCamera({
-      onSelectFile: (file) => handleBillImageSelect(file),
-      fileNamePrefix: `bill-${order.orderId || order._id}`
-    })
-  }
-
-  const handlePickFromGallery = () => {
-    cameraInputRef.current?.click()
-  }
 
   const isAtPickup = status === 'REACHED_PICKUP';
   const restaurantName = order.restaurantName || order.restaurant_name || 'Restaurant';
@@ -161,66 +116,21 @@ export const PickupActionModal = ({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex justify-center items-center gap-3 w-full">
-                 {!billImageUploaded && !isUploadingBill && (
-                   <>
-                      <button
-                        onClick={handleTakeCameraPhoto}
-                        className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white font-bold text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all"
-                        style={{ backgroundColor: BRAND_THEME.colors.neutral.textPrimary }}
-                      >
-                        <Camera className="w-4 h-4" />
-                        <span>Camera</span>
-                      </button>
-                      <button
-                        onClick={handlePickFromGallery}
-                        className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-widest active:scale-95 transition-all border"
-                        style={{ backgroundColor: BRAND_THEME.colors.brand.primarySoft, color: BRAND_THEME.colors.brand.primary, borderColor: BRAND_THEME.colors.brand.primary + '33' }}
-                      >
-                        <ImageIcon className="w-4 h-4" />
-                        <span>Gallery</span>
-                      </button>
-                   </>
-                 )}
-
-                 {isUploadingBill && (
-                    <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-gray-50 text-gray-400 font-bold text-xs uppercase tracking-widest">
-                       <Loader2 className="w-4 h-4 animate-spin" />
-                       <span>Uploading...</span>
-                    </div>
-                 )}
-
-                 {billImageUploaded && (
-                    <div className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-green-100 text-green-700 font-bold text-xs uppercase tracking-widest">
-                       <CheckCircle2 className="w-4 h-4" />
-                       <span>Bill Uploaded</span>
-                    </div>
-                 )}
-
-                 <input
-                   ref={cameraInputRef}
-                   type="file"
-                   accept="image/*"
-                   onChange={(e) => handleBillImageSelect(e.target.files[0])}
-                   className="hidden"
-                 />
-              </div>
-
               <div>
                 <p 
                   className="text-center text-[10px] font-bold uppercase tracking-widest mb-3"
-                  style={{ color: billImageUploaded ? BRAND_THEME.colors.semantic.success : BRAND_THEME.colors.neutral.textMuted }}
+                  style={{ color: BRAND_THEME.colors.semantic.success }}
                 >
-                  {billImageUploaded ? "Check the restaurant logo - Swipe to pick up" : "Capture bill to unlock swipe"}
+                  Swipe to confirm pickup
                 </p>
                 <ActionSlider 
                   key="action-pickup"
                   label="Slide to Pick Up" 
                   successLabel="Picked Up!"
-                  disabled={!billImageUploaded}
-                  onConfirm={() => onPickedUp(billImageUrl)}
-                  containerStyle={{ backgroundColor: billImageUploaded ? BRAND_THEME.colors.brand.primarySoft : BRAND_THEME.colors.neutral.surfaceMuted }}
-                  style={{ background: billImageUploaded ? BRAND_THEME.gradients.primary : '#E5E7EB' }}
+                  disabled={false}
+                  onConfirm={() => onPickedUp()}
+                  containerStyle={{ backgroundColor: BRAND_THEME.colors.brand.primarySoft }}
+                  style={{ background: BRAND_THEME.gradients.primary }}
                 />
               </div>
             </div>

@@ -14,7 +14,6 @@ import { useNavigate } from 'react-router-dom';
 import LiveMap from '@/modules/DeliveryV2/components/map/LiveMap';
 import { NewOrderModal } from '@/modules/DeliveryV2/components/modals/NewOrderModal';
 import { PickupActionModal } from '@/modules/DeliveryV2/components/modals/PickupActionModal';
-import { DeliveryVerificationModal } from '@/modules/DeliveryV2/components/modals/DeliveryVerificationModal';
 import { OrderSummaryModal } from '@/modules/DeliveryV2/components/modals/OrderSummaryModal';
 import ActionSlider from '@/modules/DeliveryV2/components/ui/ActionSlider';
 
@@ -33,7 +32,7 @@ import useNotificationInbox from "@food/hooks/useNotificationInbox";
 import {
   Bell, HelpCircle, AlertTriangle,
   Wallet, History, User as UserIcon, LayoutGrid,
-  Plus, Minus, Navigation2, Target, Play, CheckCircle2, Clock, ChevronDown,
+  Plus, Minus, Navigation2, Target, Play, Clock, ChevronDown,
   Contact, Package, Phone
 } from 'lucide-react';
 
@@ -60,8 +59,14 @@ const normalizeDialPhone = (value) => {
 const extractCustomerContact = (order) => {
   const userObj = order?.user || order?.userId || order?.customer || order?.customerId || {};
   const deliveryAddress = order?.deliveryAddress || order?.address || {};
+  const recipient = order?.recipient || order?.deliveryRecipient || {};
 
   const name = pickFirstText(
+    order?.recipientName,
+    recipient?.name,
+    deliveryAddress?.recipientName,
+    deliveryAddress?.receiverName,
+    deliveryAddress?.contactPersonName,
     order?.userName,
     order?.customerName,
     userObj?.name,
@@ -71,6 +76,11 @@ const extractCustomerContact = (order) => {
   );
 
   const rawPhone = pickFirstText(
+    order?.recipientPhone,
+    recipient?.phone,
+    deliveryAddress?.recipientPhone,
+    deliveryAddress?.receiverPhone,
+    deliveryAddress?.contactPersonPhone,
     order?.userPhone,
     order?.customerPhone,
     userObj?.phone,
@@ -118,7 +128,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const navigate = useNavigate();
   const { isOnline, toggleOnline, activeOrder, tripStatus, setRiderLocation, setActiveOrder, updateTripStatus, clearActiveOrder } = useDeliveryStore();
   const { isWithinRange, distanceToTarget } = useProximityCheck();
-  const { acceptOrder, rejectOrder, reachPickup, pickUpOrder, reachDrop, completeDelivery, resetTrip } = useOrderManager();
+  const { acceptOrder, rejectOrder, reachPickup, pickUpOrder, completeDelivery, resetTrip } = useOrderManager();
   const { newOrder, clearNewOrder, orderStatusUpdate, clearOrderStatusUpdate, isConnected: isSocketConnected, emitLocation } = useDeliveryNotifications();
   const companyName = useCompanyName();
   const { unreadCount: notificationUnreadCount } = useNotificationInbox("delivery", { limit: 20 });
@@ -131,7 +141,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     setCurrentTab(tab);
   }, [tab]);
 
-  const [showVerification, setShowVerification] = useState(false);
   const [showEmergencyPopup, setShowEmergencyPopup] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [emergencyNumbers, setEmergencyNumbers] = useState({
@@ -155,7 +164,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const [simProgress, setSimProgress] = useState(0); // 0 to 1 between points
   const [activePolyline, setActivePolyline] = useState(null);
   const [customerContact, setCustomerContact] = useState(() => ({ name: 'Customer', phone: '', dialPhone: '' }));
-  const [isCustomerContactLoading, setIsCustomerContactLoading] = useState(false);
   const mapRef = useRef(null);
   const lastContactFetchOrderIdRef = useRef(null);
 
@@ -357,13 +365,12 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   // Auto-restore modal when status or content changes
   useEffect(() => {
     setIsModalMinimized(false);
-  }, [tripStatus, showVerification, incomingOrder]);
+  }, [tripStatus, incomingOrder]);
 
   useEffect(() => {
     const orderId = String(activeOrder?.orderId || activeOrder?._id || '').trim();
     if (!orderId) {
       setCustomerContact({ name: 'Customer', phone: '', dialPhone: '' });
-      setIsCustomerContactLoading(false);
       lastContactFetchOrderIdRef.current = null;
       return;
     }
@@ -372,12 +379,11 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     setCustomerContact(localContact);
 
     const shouldFetch =
-      ['PICKED_UP', 'REACHED_DROP'].includes(tripStatus) && !localContact.dialPhone;
+      tripStatus === 'PICKED_UP' && !localContact.dialPhone;
 
     if (!shouldFetch || lastContactFetchOrderIdRef.current === orderId) return;
 
     lastContactFetchOrderIdRef.current = orderId;
-    setIsCustomerContactLoading(true);
 
     let cancelled = false;
     deliveryAPI
@@ -403,23 +409,12 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       })
       .catch((error) => {
         console.warn('[DeliveryHomeV2] Customer contact fetch failed:', error);
-      })
-      .finally(() => {
-        if (!cancelled) setIsCustomerContactLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
   }, [activeOrder, tripStatus]);
-
-  const activeOrderForVerification = activeOrder
-    ? {
-        ...activeOrder,
-        userName: customerContact.name || activeOrder.userName,
-        userPhone: customerContact.phone || activeOrder.userPhone,
-      }
-    : activeOrder;
 
   const deliveryInstructionText = pickFirstText(
     activeOrder?.note,
@@ -477,7 +472,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           if (['delivered', 'completed', 'DELIVERED'].includes(backendStatus)) {
             updateTripStatus('COMPLETED');
           } else if (currentPhase === 'at_drop' || ['reached_drop', 'REACHED_DROP'].includes(backendStatus)) {
-            updateTripStatus('REACHED_DROP');
+            updateTripStatus('PICKED_UP');
           } else if (['picked_up', 'PICKED_UP', 'delivering'].includes(backendStatus)) {
             updateTripStatus('PICKED_UP');
           } else if (currentPhase === 'at_pickup' || ['reached_pickup', 'REACHED_PICKUP'].includes(backendStatus)) {
@@ -548,10 +543,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           lastAutoArrivalRef.current[tripStatus] = true;
           reachPickup().catch(() => { lastAutoArrivalRef.current[tripStatus] = false; });
           // toast.success('Auto-arrived at Restaurant');
-        } else if (tripStatus === 'PICKED_UP') {
-          lastAutoArrivalRef.current[tripStatus] = true;
-          reachDrop().catch(() => { lastAutoArrivalRef.current[tripStatus] = false; });
-          // toast.success('Auto-arrived at Customer');
         }
       }
 
@@ -743,7 +734,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   };
 
   const handleMapClick = (lat, lng) => {
-    if (activeOrder || incomingOrder || showVerification) {
+    if (activeOrder || incomingOrder) {
       setIsModalMinimized(true);
     }
   };
@@ -998,84 +989,72 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                     distanceToTarget={distanceToTarget}
                     eta={eta}
                     onReachedPickup={reachPickup}
-                    onPickedUp={(billImageUrl) => pickUpOrder(billImageUrl)}
+                    onPickedUp={() => pickUpOrder()}
                     onMinimize={() => setIsModalMinimized(true)}
                   />
                 )}
-                {(tripStatus === 'PICKED_UP' || tripStatus === 'REACHED_DROP') && (
+                {tripStatus === 'PICKED_UP' && (
                   <div className="absolute bottom-4 inset-x-0 z-[120] px-4">
-                    {tripStatus === 'PICKED_UP' ? (
-                      <div className="bg-white rounded-[2.5rem] p-6 shadow-[0_-20px_80px_rgba(0,0,0,0.4)] border border-gray-100 flex flex-col items-center">
-                        {/* Handle / Minimize */}
-                        <div className="w-full flex justify-center pb-2 pt-0 -mt-2">
-                          <button onClick={() => setIsModalMinimized(true)} className="p-1 hover:bg-gray-100 active:scale-95 transition-all rounded-full flex flex-col items-center">
-                            <ChevronDown className="w-6 h-6 text-gray-400 stroke-[3]" />
-                          </button>
-                        </div>
-                        <div className="flex justify-between w-full items-center mb-4 px-1 text-left">
-                          <div className="flex items-center gap-3">
-                            <div className="w-14 h-14 rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-                              <img
-                                src={activeOrder?.user?.logo || activeOrder?.user?.profileImage || 'https://cdn-icons-png.flaticon.com/512/1275/1275302.png'}
-                                className="w-full h-full object-cover"
-                                alt="User"
-                              />
-                            </div>
-                            <div>
-                              <h3 className="text-gray-950 text-lg font-bold">Handover Drop</h3>
-                              <p className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${isWithinRange ? 'text-green-600' : 'text-orange-500'}`}>
-                                {isWithinRange ? 'Ready - Confirm Drop Arrival' : `${(distanceToTarget / 1000).toFixed(1)} km • ${eta || '--'} min to drop`}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Customer Instructions Panel */}
-                        {deliveryInstructionText && (
-                          <div className="w-full bg-orange-50 border border-orange-100 rounded-3xl p-3.5 mb-4 flex gap-3 items-start shadow-sm">
-                            <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-orange-500 shadow-sm shrink-0 border border-orange-50">
-                              <Package className="w-4 h-4" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em] mb-1 opacity-80">Delivery Instruction</p>
-                              <p className="text-sm font-bold text-gray-950 leading-relaxed capitalize">"{deliveryInstructionText}"</p>
-                            </div>
-                          </div>
-                        )}
-                        <ActionSlider
-                          label="Slide to Confirm Arrival"
-                          successLabel="Drop Reached"
-                          disabled={!isWithinRange}
-                          onConfirm={reachDrop}
-                          containerStyle={{ backgroundColor: BRAND_THEME.colors.brand.primarySoft }}
-                          style={{ background: BRAND_THEME.gradients.primary }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full bg-white rounded-[2rem] p-5 shadow-[0_-20px_60px_rgba(0,0,0,0.25)] border border-gray-100">
-                        <button
-                          type="button"
-                          onClick={() => setShowVerification(true)}
-                          className="w-full rounded-2xl py-3.5 font-black text-[10px] tracking-[0.2em] uppercase flex items-center justify-center gap-2 transition-all bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 active:scale-95 mb-4"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          Verify & Complete
+                    <div className="bg-white rounded-[2.5rem] p-6 shadow-[0_-20px_80px_rgba(0,0,0,0.4)] border border-gray-100 flex flex-col items-center">
+                      <div className="w-full flex justify-center pb-2 pt-0 -mt-2">
+                        <button onClick={() => setIsModalMinimized(true)} className="p-1 hover:bg-gray-100 active:scale-95 transition-all rounded-full flex flex-col items-center">
+                          <ChevronDown className="w-6 h-6 text-gray-400 stroke-[3]" />
                         </button>
-
                       </div>
-                    )}
+                      <div className="flex justify-between w-full items-center mb-4 px-1 text-left">
+                        <div className="flex items-center gap-3">
+                          <div className="w-14 h-14 rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+                            <img
+                              src={activeOrder?.user?.logo || activeOrder?.user?.profileImage || 'https://cdn-icons-png.flaticon.com/512/1275/1275302.png'}
+                              className="w-full h-full object-cover"
+                              alt="Recipient"
+                            />
+                          </div>
+                          <div>
+                            <h3 className="text-gray-950 text-lg font-bold">Contact Recipient</h3>
+                            <p className="text-[10px] font-bold uppercase tracking-widest mt-0.5 text-orange-500">
+                              Out for delivery
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="w-full rounded-3xl border border-gray-100 bg-gray-50 p-3.5 mb-4">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">Recipient Details</p>
+                        <p className="text-base font-bold text-gray-900">{customerContact.name || 'Customer'}</p>
+                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{customerContact.phone || 'Phone not available'}</p>
+                        {customerContact.dialPhone && (
+                          <button
+                            type="button"
+                            onClick={() => { window.location.href = `tel:${customerContact.dialPhone}`; }}
+                            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold uppercase tracking-widest text-white hover:bg-emerald-700 transition-colors"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                            Call
+                          </button>
+                        )}
+                      </div>
+
+                      {deliveryInstructionText && (
+                        <div className="w-full bg-orange-50 border border-orange-100 rounded-3xl p-3.5 mb-4 flex gap-3 items-start shadow-sm">
+                          <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-orange-500 shadow-sm shrink-0 border border-orange-50">
+                            <Package className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em] mb-1 opacity-80">Delivery Instruction</p>
+                            <p className="text-sm font-bold text-gray-950 leading-relaxed capitalize">"{deliveryInstructionText}"</p>
+                          </div>
+                        </div>
+                      )}
+                      <ActionSlider
+                        label="Slide to Mark Delivered"
+                        successLabel="Delivered"
+                        onConfirm={() => completeDelivery()}
+                        containerStyle={{ backgroundColor: BRAND_THEME.colors.brand.primarySoft }}
+                        style={{ background: BRAND_THEME.gradients.primary }}
+                      />
+                    </div>
                   </div>
-                )}
-                {showVerification && tripStatus !== 'COMPLETED' && (
-                  <DeliveryVerificationModal
-                    order={activeOrderForVerification}
-                    onComplete={async (otp) => {
-                      const res = await completeDelivery(otp);
-                      setShowVerification(false);
-                      return res;
-                    }}
-                    onClose={() => setShowVerification(false)}
-                  />
                 )}
                 {tripStatus === 'COMPLETED' && <OrderSummaryModal order={activeOrder} onDone={resetTrip} />}
               </div>
@@ -1108,7 +1087,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       </BottomPopup>
 
       {/* Floating Minimize/Restore Toggle - Above navbar */}
-      {isModalMinimized && (activeOrder || incomingOrder || showVerification) && (
+      {isModalMinimized && (activeOrder || incomingOrder) && (
         <motion.div
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -1148,4 +1127,5 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     </div>
   );
 }
+
 

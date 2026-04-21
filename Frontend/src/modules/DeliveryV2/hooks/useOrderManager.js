@@ -119,7 +119,7 @@ export const useOrderManager = () => {
   /**
    * Mark "Picked Up" (Confirm order ID & start delivery)
    */
-  const pickUpOrder = async (billImageUrl) => {
+  const pickUpOrder = async () => {
     const orderId = activeOrder?.orderId;
     try {
       // confirmOrderId(orderId, confirmedOrderId, location, data)
@@ -127,7 +127,7 @@ export const useOrderManager = () => {
         orderId, 
         activeOrder.displayOrderId || orderId, 
         riderLocation || {},
-        { billImageUrl }
+        {}
       );
       
       if (response?.data?.success) {
@@ -143,59 +143,22 @@ export const useOrderManager = () => {
   };
 
   /**
-   * Mark "Reached Drop" (Arrival at customer)
+   * Finalize delivery directly (OTP-free flow).
    */
-  const reachDrop = async () => {
+  const completeDelivery = async () => {
     const orderId = activeOrder?.orderId;
     try {
-      const response = await deliveryAPI.confirmReachedDrop(orderId);
-      if (response?.data?.success) {
-        updateTripStatus('REACHED_DROP');
-        // toast.info('Arrived at Customer Location');
-      } else {
-        throw new Error('Confirm drop failed');
-      }
-    } catch (error) {
-      toast.error('Failed to notify arrival');
-      throw error;
-    }
-  };
-
-  /**
-   * Finalize Delivery with OTP Check
-   */
-  const completeDelivery = async (otp) => {
-    const orderId = activeOrder?.orderId;
-    try {
-      // 1. Verify OTP first
-      const verifyRes = await deliveryAPI.verifyDropOtp(orderId, otp);
-      
-      if (verifyRes?.data?.success) {
-        let finalOrder = verifyRes.data?.data?.order || activeOrder;
-        
-        try {
-          // 2. Mark as complete
-          const completeRes = await deliveryAPI.completeDelivery(orderId, { otp, rating: 5 });
-          if (completeRes.data?.success && completeRes.data?.data?.order) {
-            finalOrder = completeRes.data.data.order;
-          }
-        } catch (completeErr) {
-          console.warn('Complete call failed, but OTP was verified.', completeErr);
-          // If already completed, we proceed to show the summary with whatever we have
-        }
-        
-        // Update local order state so Summary Modal shows 'delivered' status
+      const completeRes = await deliveryAPI.completeDelivery(orderId, { rating: 5 });
+      if (completeRes?.data?.success) {
+        const finalOrder = completeRes.data?.data?.order || activeOrder;
         if (finalOrder) setActiveOrder(finalOrder);
-        
         updateTripStatus('COMPLETED');
-        // toast.success('Delivery Success!');
       } else {
-        toast.error('Invalid OTP. Please check with customer.');
-        throw new Error('Invalid OTP');
+        throw new Error('Complete delivery failed');
       }
     } catch (error) {
       console.error('Completion Error:', error);
-      toast.error(error?.response?.data?.message || 'Verification failed');
+      toast.error(error?.response?.data?.message || 'Failed to complete delivery');
       throw error;
     }
   };
@@ -209,7 +172,6 @@ export const useOrderManager = () => {
     rejectOrder,
     reachPickup,
     pickUpOrder,
-    reachDrop,
     completeDelivery,
     resetTrip,
   };
