@@ -1177,7 +1177,7 @@ export default function HubMenu() {
         {/* Tabs */}
       </div>
 
-        <div className="flex items-center gap-2 p-0.5 mt-2 w-auto mx-4 bg-white/80 border border-blue-100 rounded-md">
+        <div className="flex items-center gap-2 p-0.5 mt-2 w-auto mx-4 bg-white/80 border border-brand-100 rounded-md">
           <button
             onClick={() => setActiveTab("all")}
             className="flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors"
@@ -1279,7 +1279,7 @@ export default function HubMenu() {
                         <div className="flex flex-col gap-2">
                           <button
                             onClick={() => handleEditAddon(addon)}
-                            className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                            className="p-2 bg-brand-100 text-brand-600 rounded-lg hover:bg-brand-200 transition-colors"
                             title="Edit add-on"
                           >
                             <Edit className="h-4 w-4" />
@@ -1438,7 +1438,7 @@ export default function HubMenu() {
                               alt={item.name}
                               className="w-20 h-20 rounded-lg object-cover"
                             />
-                            <div className="absolute bottom-1 right-1 bg-blue-900/50 rounded-full p-1">
+                            <div className="absolute bottom-1 right-1 bg-brand-900/50 rounded-full p-1">
                               <div className="flex items-center gap-1">
                                 <Camera className="w-3 h-3 text-white" />
                                 <span className="text-white text-xs font-semibold">{item.photoCount}</span>
@@ -2139,7 +2139,7 @@ export default function HubMenu() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search for food items..."
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     autoFocus
                   />
                   {searchQuery && (

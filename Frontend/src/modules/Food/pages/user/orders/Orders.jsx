@@ -815,7 +815,7 @@ Order again from this restaurant in the ${companyName} app.`
                       )}
                       {order.restaurantId && (
                         <Link to={`/food/user/restaurants/${order.restaurantId}`}>
-                          <button className="text-xs font-medium flex items-center mt-1 hover:text-blue-700 dark:hover:text-blue-400" style={{ color: BRAND_THEME.tokens.orders.primaryText }}>
+                          <button className="text-xs font-medium flex items-center mt-1 hover:text-brand-700 dark:hover:text-brand-400" style={{ color: BRAND_THEME.tokens.orders.primaryText }}>
                             View menu <span className="ml-0.5">&gt;</span>
                           </button>
                         </Link>
@@ -1131,7 +1131,7 @@ Order again from this restaurant in the ${companyName} app.`
                           <Star
                           className={`w-10 h-10 transition-all ${isActive
                               ? "drop-shadow-lg"
-                              : "text-gray-300 hover:text-blue-200"
+                              : "text-gray-300 hover:text-brand-200"
                             }`}
                           style={isActive ? { color: BRAND_THEME.colors.brand.primary, fill: BRAND_THEME.colors.brand.primary } : undefined}
                         />
@@ -1167,7 +1167,7 @@ Order again from this restaurant in the ${companyName} app.`
                           <Star
                             className={`w-10 h-10 transition-all ${isActive
                                 ? "drop-shadow-lg"
-                                : "text-gray-300 hover:text-blue-200"
+                                : "text-gray-300 hover:text-brand-200"
                               }`}
                             style={isActive ? { color: BRAND_THEME.colors.brand.primary, fill: BRAND_THEME.colors.brand.primary } : undefined}
                           />
@@ -1191,7 +1191,7 @@ Order again from this restaurant in the ${companyName} app.`
                 type="button"
                 disabled={ratingSubmitDisabled}
                 onClick={handleSubmitRating}
-                className="w-full rounded-xl text-white text-base font-bold py-3.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
+                className="w-full rounded-xl text-white text-base font-bold py-3.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2"
                 style={{ backgroundImage: BRAND_THEME.tokens.orders.primaryGradient }}
               >
                 {submittingRating ? (
@@ -1283,7 +1283,7 @@ Order again from this restaurant in the ${companyName} app.`
                   onClick={() => openShareTarget("facebook")}
                   className="rounded-2xl border border-gray-200 px-3 py-4 text-xs font-medium text-gray-700 flex flex-col items-center gap-2 hover:bg-gray-50"
                 >
-                  <Share2 className="w-5 h-5 text-blue-600" />
+                  <Share2 className="w-5 h-5 text-brand-600" />
                   Facebook
                 </button>
                 <button
@@ -1299,7 +1299,7 @@ Order again from this restaurant in the ${companyName} app.`
                   onClick={() => openShareTarget("linkedin")}
                   className="rounded-2xl border border-gray-200 px-3 py-4 text-xs font-medium text-gray-700 flex flex-col items-center gap-2 hover:bg-gray-50"
                 >
-                  <Share2 className="w-5 h-5 text-blue-700" />
+                  <Share2 className="w-5 h-5 text-brand-700" />
                   LinkedIn
                 </button>
                 <button

@@ -487,7 +487,7 @@ export default function FoodsList() {
             <button
               type="button"
               onClick={openAddFoodModal}
-              className="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 inline-flex items-center gap-2"
+              className="px-4 py-2.5 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 inline-flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
               <span>Add Food</span>
@@ -549,7 +549,7 @@ export default function FoodsList() {
                 <tr>
                   <td colSpan={6} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
+                      <Loader2 className="w-8 h-8 animate-spin text-brand-600 mb-2" />
                       <p className="text-sm text-slate-500">Loading foods...</p>
                     </div>
                   </td>
@@ -605,7 +605,7 @@ export default function FoodsList() {
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => handleViewDetails(food)}
-                          className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                          className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
                           title="View"
                         >
                           <Eye className="w-4 h-4" />
@@ -995,7 +995,7 @@ export default function FoodsList() {
                 type="button"
                 onClick={handleFoodFormSubmit}
                 disabled={submittingFood}
-                className="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-60 inline-flex items-center gap-2"
+                className="px-4 py-2.5 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60 inline-flex items-center gap-2"
               >
                 {submittingFood ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 <span>{submittingFood ? "Saving..." : foodFormMode === "edit" ? "Update Food" : "Add Food"}</span>

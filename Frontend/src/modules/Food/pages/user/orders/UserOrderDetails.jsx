@@ -434,7 +434,7 @@ export default function UserOrderDetails() {
             <button
               type="button"
               onClick={handleCallRestaurant}
-              className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:bg-blue-50"
+              className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:bg-brand-50"
               style={{ color: BRAND_THEME.tokens.orders.primaryText }}
             >
               <Phone className="w-4 h-4" />
@@ -454,7 +454,7 @@ export default function UserOrderDetails() {
             <span
               className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${sendsCutlery
                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : "bg-blue-50 text-blue-700 border border-blue-200"
+                  : "bg-brand-50 text-brand-700 border border-brand-200"
                 }`}
             >
               {sendsCutlery ? "Send cutlery" : "Don't send cutlery"}
@@ -497,7 +497,7 @@ export default function UserOrderDetails() {
             <button
               type="button"
               onClick={handleDownloadSummary}
-              className="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center hover:bg-blue-100"
+              className="w-7 h-7 rounded-full bg-brand-50 flex items-center justify-center hover:bg-brand-100"
               style={{ color: BRAND_THEME.tokens.orders.primaryText }}
             >
               <Download className="w-4 h-4" />
@@ -558,7 +558,7 @@ export default function UserOrderDetails() {
 
           {/* Savings Banner */}
           {savings > 0 && (
-            <div className="relative bg-blue-50 p-3 pb-4 mt-2">
+            <div className="relative bg-brand-50 p-3 pb-4 mt-2">
               <div className="absolute -top-1.5 left-0 w-full overflow-hidden leading-none">
                 <svg
                   className="relative block w-[calc(100%+1.3px)] h-[8px]"
@@ -691,7 +691,7 @@ export default function UserOrderDetails() {
               debugLog("Navigating to complaint page with orderId:", orderIdString)
               navigate(`/user/complaints/submit/${encodeURIComponent(orderIdString)}`)
             }}
-            className="w-full bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"
+            className="w-full bg-brand-50 border border-brand-200 text-brand-700 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-brand-100 transition-colors"
           >
             <FileText className="w-4 h-4" />
             Restaurant Complaint

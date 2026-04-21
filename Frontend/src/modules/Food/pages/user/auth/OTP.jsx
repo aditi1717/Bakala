@@ -432,7 +432,7 @@ export default function OTP() {
           <div className="text-center space-y-4">
             {showNameInput && (
               <div className="flex justify-center">
-                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center">
+                <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg text-white" style={{ background: BRAND_THEME.gradients.primary }}>
                     <Smartphone className="h-5 w-5" />
                   </div>

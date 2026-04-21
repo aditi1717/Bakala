@@ -118,7 +118,7 @@ export default function MixedSharedCart() {
               title="Food items"
               subtitle="Restaurant delivery items in your shared cart."
               items={foodItems}
-              accentClass="bg-blue-100 text-blue-700"
+              accentClass="bg-brand-100 text-brand-700"
               onIncrement={increment}
               onDecrement={decrement}
             />

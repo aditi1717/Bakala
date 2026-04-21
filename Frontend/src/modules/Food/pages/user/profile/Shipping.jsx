@@ -1,4 +1,4 @@
-﻿import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react"
 import { ArrowLeft, Truck, Loader2 } from "lucide-react"
 import { motion } from "framer-motion"
@@ -43,7 +43,7 @@ export default function Shipping() {
     return (
       <div className="min-h-screen bg-white dark:bg-[#0a0a0a] flex items-center justify-center p-6">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-[#2979FB]" />
+          <Loader2 className="h-10 w-10 animate-spin text-[#005128]" />
           <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">Loading...</p>
         </div>
       </div>
@@ -84,7 +84,7 @@ export default function Shipping() {
                 prose-headings:font-black prose-headings:text-gray-900 dark:prose-headings:text-white
                 prose-p:text-gray-600 dark:prose-p:text-gray-400 prose-p:leading-relaxed
                 prose-strong:text-gray-900 dark:prose-strong:text-white
-                prose-a:text-[#2979FB] dark:prose-a:text-blue-300
+                prose-a:text-[#005128] dark:prose-a:text-brand-300
                 prose-li:text-gray-600 dark:prose-li:text-gray-400"
               dangerouslySetInnerHTML={{ __html: shippingData.content }}
             />
@@ -98,7 +98,7 @@ export default function Shipping() {
 
         <p className="text-center mt-10 text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] leading-relaxed">
           Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} <br />
-          © {new Date().getFullYear()} Iggymet. All Rights Reserved.
+          � {new Date().getFullYear()} Iggymet. All Rights Reserved.
         </p>
       </div>
     </AnimatedPage>

@@ -21,7 +21,7 @@ const TrackingPage = () => {
           <h2 className="text-2xl font-bold mb-3">Order placed</h2>
           <div className="flex items-center justify-center gap-2 w-fit mx-auto px-4 py-2 rounded-full" style={{ backgroundColor: BRAND_THEME.colors.brand.primaryDark }}>
             <span className="text-sm font-medium">Food preparation will begin shortly</span>
-            <RefreshCcw className="w-4 h-4 text-blue-200" />
+            <RefreshCcw className="w-4 h-4 text-brand-200" />
           </div>
         </div>
       </div>

@@ -372,7 +372,7 @@ function TimePickerWheel({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-blue-900/50 z-[9999] flex items-center justify-center p-4"
+        className="fixed inset-0 bg-brand-900/50 z-[9999] flex items-center justify-center p-4"
         onClick={onClose}
       >
         <motion.div
@@ -569,7 +569,7 @@ function TimePickerWheel({
           <div className="border-t border-gray-200 px-4 py-4 flex justify-center">
             <button
               onClick={handleConfirm}
-              className="text-blue-600 hover:text-blue-700 font-medium text-base transition-colors"
+              className="text-brand-600 hover:text-brand-700 font-medium text-base transition-colors"
             >
               Okay
             </button>
@@ -652,7 +652,7 @@ function SimpleCalendar({ selectedDate, onDateSelect, isOpen, onClose }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-blue-900/50 z-[9998] flex items-center justify-center p-4"
+        className="fixed inset-0 bg-brand-900/50 z-[9998] flex items-center justify-center p-4"
         onClick={onClose}
       >
         <motion.div
@@ -2507,7 +2507,7 @@ export default function Inventory() {
                                   }}
                                   className={`rounded-2xl p-2 transition-colors ${
                                     item.isRecommended
-                                      ? "bg-blue-100 text-blue-600"
+                                      ? "bg-brand-100 text-brand-600"
                                       : "bg-white text-gray-400 hover:bg-slate-100"
                                   }`}
                                   title={item.isRecommended ? "Recommended" : "Click to recommend"}
@@ -2550,7 +2550,7 @@ export default function Inventory() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-blue-900/50 z-50"
+              className="fixed inset-0 bg-brand-900/50 z-50"
               onClick={() => setFilterOpen(false)}
             />
             <motion.div
@@ -2592,7 +2592,7 @@ export default function Inventory() {
                             name="filter"
                             checked={selectedFilter === option.value}
                             onChange={() => setSelectedFilter(option.value)}
-                            className="w-5 h-5 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            className="w-5 h-5 text-brand-600 border-gray-300 focus:ring-brand-500"
                           />
                           <span className="text-base text-gray-900">{option.label}</span>
                         </div>
@@ -2638,7 +2638,7 @@ export default function Inventory() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-blue-900/50 z-50"
+              className="fixed inset-0 bg-brand-900/50 z-50"
               onClick={() => setTogglePopupOpen(false)}
             />
             <motion.div
@@ -2703,7 +2703,7 @@ export default function Inventory() {
                         checked={selectedOption === "specific-time"}
                         onChange={() => setSelectedOption("specific-time")}
                         style={{ accentColor: "#000000" }}
-                            className="ml-auto w-5 h-5 !text-blue-600 !border-gray-300 !bg-white !focus:ring-blue-500"
+                            className="ml-auto w-5 h-5 !text-brand-600 !border-gray-300 !bg-white !focus:ring-brand-500"
                       />
                     </div>
                   </label>
@@ -2719,7 +2719,7 @@ export default function Inventory() {
                         checked={selectedOption === "next-business-day"}
                         onChange={() => setSelectedOption("next-business-day")}
                         style={{ accentColor: "#000000" }}
-                        className="ml-auto w-5 h-5 !text-blue-600 !border-gray-300 !bg-white !focus:ring-blue-500"
+                        className="ml-auto w-5 h-5 !text-brand-600 !border-gray-300 !bg-white !focus:ring-brand-500"
                       />
                     </div>
                   </label>
@@ -2770,7 +2770,7 @@ export default function Inventory() {
                           checked={selectedOption === "manual"}
                           onChange={() => setSelectedOption("manual")}
                           style={{ accentColor: "#000000" }}
-                          className="ml-auto w-5 h-5 !text-blue-600 !border-gray-300 !bg-white !focus:ring-blue-500"
+                          className="ml-auto w-5 h-5 !text-brand-600 !border-gray-300 !bg-white !focus:ring-brand-500"
                         />
                       </div>
                       <p className="text-sm text-gray-500">
@@ -2832,7 +2832,7 @@ export default function Inventory() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsAddPopupOpen(false)}
-              className="fixed inset-0 bg-blue-900/50 z-[70]"
+              className="fixed inset-0 bg-brand-900/50 z-[70]"
             />
             <motion.div
               initial={{ y: "100%" }}
@@ -2897,7 +2897,7 @@ export default function Inventory() {
               <>
                 {/* Backdrop */}
                 <motion.div
-                  className="fixed inset-0 bg-blue-900/40 z-30"
+                  className="fixed inset-0 bg-brand-900/40 z-30"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}

@@ -451,9 +451,9 @@ export default function Feedback() {
                       </div>
 
                       {complaint.adminResponse && (
-                        <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
-                          <p className="text-[9px] font-black text-blue-600 uppercase mb-1">Admin Response</p>
-                          <p className="text-sm text-blue-900 font-medium">{complaint.adminResponse}</p>
+                        <div className="bg-brand-50 rounded-xl p-3 border border-brand-100">
+                          <p className="text-[9px] font-black text-brand-600 uppercase mb-1">Admin Response</p>
+                          <p className="text-sm text-brand-900 font-medium">{complaint.adminResponse}</p>
                         </div>
                       )}
                     </div>

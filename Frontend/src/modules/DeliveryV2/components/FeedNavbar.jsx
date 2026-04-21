@@ -562,7 +562,7 @@ export default function FeedNavbar({ className = "" }) {
                   <AlertTriangle className="w-6 h-6 text-orange-600" />
                 )}
                 {option.icon === "police" && (
-                  <Shield className="w-6 h-6 text-blue-600" />
+                  <Shield className="w-6 h-6 text-brand-600" />
                 )}
                 {option.icon === "insurance" && (
                   <ShieldCheck className="w-6 h-6 text-green-600" />

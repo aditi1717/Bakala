@@ -26,7 +26,7 @@ export default function RestaurantFoodCard({
     <div
       ref={cardRef}
       className={`flex gap-4 border-b border-gray-100 p-4 last:border-none relative transition-all duration-300 ${
-        highlighted ? "bg-blue-50 ring-2 ring-inset dark:bg-blue-950/20" : ""
+        highlighted ? "bg-brand-50 ring-2 ring-inset dark:bg-brand-950/20" : ""
       } ${onClick ? "cursor-pointer" : ""}`}
       style={highlighted ? highlightStyle : undefined}
       onClick={onClick}

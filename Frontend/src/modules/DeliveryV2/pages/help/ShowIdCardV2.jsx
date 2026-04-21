@@ -161,7 +161,7 @@ export default function ShowIdCardV2() {
              {/* Partner Details List */}
              <div className="mt-6 text-left space-y-3">
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                   <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                   <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
                       <CreditCard className="w-4 h-4" />
                    </div>
                    <div>

@@ -9,8 +9,8 @@ const StatCard = ({
     trend, 
     trendDirection = 'up',
     description,
-    color = 'text-blue-600',
-    bg = 'bg-blue-50',
+    color = 'text-brand-600',
+    bg = 'bg-brand-50',
     onClick,
     className 
 }) => {

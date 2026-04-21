@@ -174,11 +174,11 @@ export default function Notifications() {
               <div
                 key={item.id}
                 onClick={() => item.source === "broadcast" ? markBroadcastAsRead(item.id) : undefined}
-                className={`border rounded-lg p-3 flex items-start justify-between gap-3 ${item.source === "broadcast" && !item.read ? "border-blue-200 bg-blue-50/40 cursor-pointer" : "border-gray-200"}`}
+                className={`border rounded-lg p-3 flex items-start justify-between gap-3 ${item.source === "broadcast" && !item.read ? "border-brand-200 bg-brand-50/40 cursor-pointer" : "border-gray-200"}`}
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    {item.source === "broadcast" && <Bell className="w-4 h-4 text-blue-600" />}
+                    {item.source === "broadcast" && <Bell className="w-4 h-4 text-brand-600" />}
                     <p className="text-sm font-medium text-gray-900">{item.message}</p>
                   </div>
                   {item.source === "broadcast" ? (

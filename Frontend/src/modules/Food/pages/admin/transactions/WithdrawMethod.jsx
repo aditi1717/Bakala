@@ -94,7 +94,7 @@ export default function WithdrawMethod() {
               >
                 <Settings className="w-5 h-5" />
               </button>
-              <button className="px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all flex items-center gap-2 shadow-md">
+              <button className="px-4 py-2.5 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-all flex items-center gap-2 shadow-md">
                 <Plus className="w-4 h-4" />
                 Add Method
               </button>
@@ -184,7 +184,7 @@ export default function WithdrawMethod() {
                                 <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                                   field.required
                                     ? "bg-red-100 text-red-700"
-                                    : "bg-blue-100 text-blue-700"
+                                    : "bg-brand-100 text-brand-700"
                                 }`}>
                                   {field.required ? "Required" : "Optional"}
                                 </span>
@@ -198,7 +198,7 @@ export default function WithdrawMethod() {
                           <button
                             onClick={() => handleToggleActive(index)}
                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                              method.activeStatus ? "bg-blue-600" : "bg-slate-300"
+                              method.activeStatus ? "bg-brand-600" : "bg-slate-300"
                             }`}
                           >
                             <span
@@ -214,7 +214,7 @@ export default function WithdrawMethod() {
                           <button
                             onClick={() => handleToggleDefault(index)}
                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                              method.defaultMethod ? "bg-blue-600" : "bg-slate-300"
+                              method.defaultMethod ? "bg-brand-600" : "bg-slate-300"
                             }`}
                           >
                             <span
@@ -228,10 +228,10 @@ export default function WithdrawMethod() {
                       {visibleColumns.actions && (
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-2">
-                            <button className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors" title="View">
+                            <button className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors" title="View">
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors" title="Edit">
+                            <button className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors" title="Edit">
                               <Edit className="w-4 h-4" />
                             </button>
                           </div>

@@ -129,7 +129,7 @@ export const ProfileV2 = () => {
              onClick={() => navigate("/food/delivery/history")}
              className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm flex items-center gap-3 active:bg-gray-50 transition-colors"
            >
-             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+             <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
                <Bike className="w-4 h-4" />
              </div>
              <div className="text-left">

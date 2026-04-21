@@ -463,7 +463,7 @@ export default function SignupStep2() {
       <div className="bg-white px-4 py-3 flex items-center gap-4 border-b border-gray-200">
         <button
           onClick={goBack}
-          className="p-2 hover:bg-gradient-to-b from-blue-50 via-white to-blue-100 rounded-full transition-colors"
+          className="p-2 hover:bg-gradient-to-b from-brand-50 via-white to-brand-100 rounded-full transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -494,7 +494,7 @@ export default function SignupStep2() {
             style={
               isSubmitting || !uploadedDocs.profilePhoto || !uploadedDocs.aadharPhoto || !uploadedDocs.panPhoto || !uploadedDocs.drivingLicensePhoto
                 ? undefined
-                : { background: "linear-gradient(135deg, #2979FB 0%, #1E5ED8 100%)", boxShadow: "0 12px 28px -18px #1E5ED8" }
+                : { background: "linear-gradient(135deg, #005128 0%, #003d1e 100%)", boxShadow: "0 12px 28px -18px #003d1e" }
             }
           >
             {isSubmitting ? "Submitting..." : "Complete Signup"}

@@ -326,7 +326,7 @@ export default function ProfessionalSearch() {
                            </div>
                         </div>
                         {r.offer && (
-                           <div className="absolute top-4 left-0 bg-blue-600 text-white text-[10px] font-black px-3 py-1.5 rounded-r-lg shadow-lg flex items-center gap-1 tracking-tighter">
+                           <div className="absolute top-4 left-0 bg-brand-600 text-white text-[10px] font-black px-3 py-1.5 rounded-r-lg shadow-lg flex items-center gap-1 tracking-tighter">
                               <BadgePercent className="w-3 h-3" />
                               {r.offer.toUpperCase()}
                            </div>

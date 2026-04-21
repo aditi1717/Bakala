@@ -309,8 +309,8 @@ export const PocketV2 = () => {
             className="w-full p-4 border-b border-gray-50 flex items-center justify-between active:bg-gray-50 cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center shrink-0 border border-blue-100">
-                <ShieldCheck className="w-4 h-4 text-blue-600" />
+              <div className="w-9 h-9 bg-brand-50 rounded-lg flex items-center justify-center shrink-0 border border-brand-100">
+                <ShieldCheck className="w-4 h-4 text-brand-600" />
               </div>
               <div className="text-left">
                 <span className="text-sm font-bold text-gray-900 block leading-tight">Cash Limit</span>
@@ -362,7 +362,7 @@ export const PocketV2 = () => {
           </div>
 
           <div onClick={() => navigate('/food/delivery/pocket/details')} className="bg-white p-3.5 rounded-xl shadow-sm border border-gray-100 active:bg-gray-50 cursor-pointer flex flex-col justify-between">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 mb-2 border border-blue-100">
+            <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600 mb-2 border border-brand-100">
                <LayoutGrid className="w-4 h-4" />
             </div>
             <p className="text-xs font-bold text-gray-800 leading-tight">Statement</p>
@@ -380,7 +380,7 @@ export const PocketV2 = () => {
               
               <div className="flex items-center justify-between mb-4">
                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100 text-blue-600">
+                    <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center border border-brand-100 text-brand-600">
                       <IndianRupee className="w-5 h-5" />
                     </div>
                     <div>
@@ -419,7 +419,7 @@ export const PocketV2 = () => {
                 <button
                   onClick={handleDeposit}
                   disabled={depositing}
-                  className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm active:scale-95 disabled:bg-gray-300 disabled:shadow-none flex items-center justify-center gap-2 transition-all shadow-[0_2px_10px_rgba(37,99,235,0.3)]"
+                  className="flex-1 py-2.5 bg-brand-600 text-white rounded-lg font-bold text-sm active:scale-95 disabled:bg-gray-300 disabled:shadow-none flex items-center justify-center gap-2 transition-all shadow-[0_2px_10px_rgba(37,99,235,0.3)]"
                 >
                   {depositing && <Loader2 className="w-4 h-4 animate-spin" />}
                   {depositing ? 'Paying...' : 'Verify Pay'}

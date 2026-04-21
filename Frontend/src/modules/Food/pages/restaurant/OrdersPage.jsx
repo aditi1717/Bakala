@@ -371,7 +371,7 @@ export default function OrdersPage() {
       case 'confirmed':
         return "bg-yellow-100 text-yellow-700"
       case 'preparing':
-        return "bg-blue-100 text-blue-700"
+        return "bg-brand-100 text-brand-700"
       case 'ready':
         return "bg-purple-100 text-purple-700"
       case 'out_for_delivery':
@@ -491,7 +491,7 @@ export default function OrdersPage() {
               <p className="text-red-600 text-base md:text-lg mb-2">Error: {error}</p>
               <button 
                 onClick={() => window.location.reload()} 
-                className="text-blue-600 hover:underline"
+                className="text-brand-600 hover:underline"
               >
                 Retry
               </button>
@@ -543,7 +543,7 @@ export default function OrdersPage() {
                   
                   {/* Footer Row */}
                   <div className="flex items-center justify-between pt-2 md:pt-3 border-t border-gray-100 pb-3 md:pb-0">
-                    <span className="text-blue-600 text-xs md:text-sm font-medium">
+                    <span className="text-brand-600 text-xs md:text-sm font-medium">
                       {order.deliveryType}
                     </span>
                     <div className="text-right">

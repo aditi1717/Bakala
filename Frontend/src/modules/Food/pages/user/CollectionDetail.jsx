@@ -57,7 +57,7 @@ export default function CollectionDetail() {
 
   if (collection.items.length === 0) {
     return (
-      <AnimatedPage className="min-h-screen bg-gradient-to-b from-blue-50/30 via-white to-blue-100/20 p-4">
+      <AnimatedPage className="min-h-screen bg-gradient-to-b from-brand-50/30 via-white to-brand-100/20 p-4">
         <div className="max-w-4xl mx-auto space-y-6">
           <ScrollReveal>
             <div className="flex items-center gap-3 sm:gap-4">
@@ -89,7 +89,7 @@ export default function CollectionDetail() {
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-gradient-to-b from-blue-50/30 via-white to-blue-100/20 p-4">
+    <AnimatedPage className="min-h-screen bg-gradient-to-b from-brand-50/30 via-white to-brand-100/20 p-4">
       <div className="max-w-6xl mx-auto space-y-6">
         <ScrollReveal>
           <div className="flex items-center justify-between mb-4">

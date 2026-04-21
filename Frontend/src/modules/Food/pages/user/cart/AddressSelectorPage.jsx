@@ -737,7 +737,7 @@ export default function AddressSelectorPage() {
                           setKeywordAddressSuggestions([])
                           queueReverseGeocode(lat, lng, { immediate: true, force: true })
                         }}
-                        className="w-full px-4 py-3 flex items-start gap-3 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors text-left border-b border-gray-50 dark:border-gray-800 last:border-none"
+                        className="w-full px-4 py-3 flex items-start gap-3 hover:bg-brand-50 dark:hover:bg-brand-900/10 transition-colors text-left border-b border-gray-50 dark:border-gray-800 last:border-none"
                       >
                         <MapPin className="h-4 w-4 text-gray-400 mt-1 flex-shrink-0" />
                         <div className="min-w-0">
@@ -883,7 +883,7 @@ export default function AddressSelectorPage() {
             onClick={handleUseCurrentLocation}
             className="w-full flex items-center gap-4 p-4 bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm hover:shadow-md transition-all group"
           >
-            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center">
               <Navigation className="h-5 w-5" style={{ color: BRAND_THEME.tokens.cart.primaryText }} />
             </div>
             <div className="text-left flex-1">
@@ -919,7 +919,7 @@ export default function AddressSelectorPage() {
                   <button
                     key={getAddressId(addr) || idx}
                     onClick={() => handleSelectSavedAddress(addr)}
-                    className="w-full flex items-start gap-4 p-4 bg-slate-50 dark:bg-[#1a1a1a] rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors text-left group"
+                    className="w-full flex items-start gap-4 p-4 bg-slate-50 dark:bg-[#1a1a1a] rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/10 transition-colors text-left group"
                   >
                     <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
                       <Icon className="h-5 w-5 text-gray-600 dark:text-gray-400" />

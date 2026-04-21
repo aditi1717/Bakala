@@ -244,7 +244,7 @@ export default function AddonsList() {
                 <tr>
                   <td colSpan={6} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center justify-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
+                      <Loader2 className="w-8 h-8 animate-spin text-brand-600 mb-2" />
                       <p className="text-sm text-slate-500">Loading add-ons...</p>
                     </div>
                   </td>
@@ -299,14 +299,14 @@ export default function AddonsList() {
                       <div className="flex items-center justify-center gap-2 flex-wrap">
                         <button
                           onClick={() => handleViewDetails(addon)}
-                          className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                          className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
                           title="View"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleEdit(addon)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors"
                         >
                           <Pencil className="w-4 h-4" />
                           Edit
@@ -462,7 +462,7 @@ export default function AddonsList() {
               type="button"
               onClick={handleSaveEdit}
               disabled={submittingAction}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-md hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submittingAction ? "Saving..." : "Save"}
             </button>

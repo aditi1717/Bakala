@@ -1,4 +1,4 @@
-﻿import { useEffect } from "react"
+import { useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Loader2, CheckCircle, XCircle } from "lucide-react"
 
@@ -30,7 +30,7 @@ export default function AuthCallback() {
           <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600 mb-2">
             <CheckCircle className="w-6 h-6" />
           </div>
-          <p className="text-lg font-semibold text-gray-900">Signing you in…</p>
+          <p className="text-lg font-semibold text-gray-900">Signing you in�</p>
         </>
       ) : (
         <>

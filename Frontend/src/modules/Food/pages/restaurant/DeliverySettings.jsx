@@ -297,7 +297,7 @@ export default function DeliverySettings() {
           transition={{ duration: 0.3, delay: 0.1 }}
           className="mt-4"
         >
-          <Card className="bg-blue-50 border-blue-200 shadow-sm">
+          <Card className="bg-brand-50 border-brand-200 shadow-sm">
             <CardContent className="p-4">
               <p className="text-sm text-gray-700">
                 <strong>Note:</strong> When delivery is turned off, customers won't be able to place delivery orders from your restaurant. You can turn it back on anytime.

@@ -170,7 +170,7 @@ export default function PhoneNumbersPage() {
                 onClick={() => handleEditClick("orderReminder1")}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <Edit className="w-4 h-4 text-blue-600" />
+                <Edit className="w-4 h-4 text-brand-600" />
               </button>
             </div>
 
@@ -184,7 +184,7 @@ export default function PhoneNumbersPage() {
                 onClick={() => handleEditClick("orderReminder2")}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <Edit className="w-4 h-4 text-blue-600" />
+                <Edit className="w-4 h-4 text-brand-600" />
               </button>
             </div>
           </div>
@@ -213,7 +213,7 @@ export default function PhoneNumbersPage() {
                 onClick={() => handleEditClick("restaurantPage")}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <Edit className="w-4 h-4 text-blue-600" />
+                <Edit className="w-4 h-4 text-brand-600" />
               </button>
             </div>
           </div>

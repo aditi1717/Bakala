@@ -204,7 +204,7 @@ export default function EarningAddonHistory() {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      pending: { bg: "bg-blue-100", text: "text-blue-700", label: "Pending", icon: Clock },
+      pending: { bg: "bg-brand-100", text: "text-brand-700", label: "Pending", icon: Clock },
       credited: { bg: "bg-green-100", text: "text-green-700", label: "Credited", icon: CheckCircle },
       failed: { bg: "bg-red-100", text: "text-red-700", label: "Failed", icon: XCircle },
       cancelled: { bg: "bg-gray-100", text: "text-gray-700", label: "Cancelled", icon: XCircle },
@@ -268,7 +268,7 @@ export default function EarningAddonHistory() {
               <button
                 onClick={handleCheckAllCompletions}
                 disabled={isCheckingCompletions}
-                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-[#2979FB] text-white hover:bg-[#1E5ED8] disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
+                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-[#005128] text-white hover:bg-[#003d1e] disabled:bg-brand-300 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
                 title="Check all delivery partners for completed offers"
               >
                 <RefreshCw className={`w-4 h-4 ${isCheckingCompletions ? 'animate-spin' : ''}`} />
@@ -416,7 +416,7 @@ export default function EarningAddonHistory() {
                         {visibleColumns.deliveryman && (
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col">
-                              <span className="text-sm font-medium text-[#2979FB]">
+                              <span className="text-sm font-medium text-[#005128]">
                                 {item.deliveryman || 'Unknown'}
                               </span>
                               {item.deliveryId && (
@@ -525,8 +525,8 @@ export default function EarningAddonHistory() {
               <div className="space-y-3">
                 {/* Deliveryman Info */}
                 <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <User className="w-5 h-5 text-[#2979FB]" />
+                  <div className="p-2 bg-brand-100 rounded-lg">
+                    <User className="w-5 h-5 text-[#005128]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Deliveryman</p>

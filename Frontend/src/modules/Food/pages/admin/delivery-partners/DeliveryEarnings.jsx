@@ -178,7 +178,7 @@ export default function DeliveryEarnings() {
     return (
       <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-[#2979FB]" />
+          <Loader2 className="w-8 h-8 animate-spin text-[#005128]" />
           <p className="text-gray-600">Loading delivery earnings...</p>
         </div>
       </div>
@@ -211,8 +211,8 @@ export default function DeliveryEarnings() {
                 <p className="text-sm text-slate-600 mb-1">Total Delivery Boys</p>
                 <p className="text-2xl font-bold text-slate-900">{summary.totalDeliveryPartners || 0}</p>
               </div>
-              <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-[#2979FB]" />
+              <div className="w-12 h-12 rounded-lg bg-brand-100 flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-[#005128]" />
               </div>
             </div>
           </div>
@@ -248,7 +248,7 @@ export default function DeliveryEarnings() {
               <select
                 value={filters.period}
                 onChange={(e) => handleFilterChange('period', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="all">All Time</option>
                 <option value="today">Today</option>
@@ -261,7 +261,7 @@ export default function DeliveryEarnings() {
               <select
                 value={filters.deliveryPartnerId}
                 onChange={(e) => handleFilterChange('deliveryPartnerId', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">All Delivery Boys</option>
                 {deliveryPartners.map(dp => (
@@ -275,7 +275,7 @@ export default function DeliveryEarnings() {
                 type="date"
                 value={filters.fromDate}
                 onChange={(e) => handleFilterChange('fromDate', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
             <div>
@@ -284,7 +284,7 @@ export default function DeliveryEarnings() {
                 type="date"
                 value={filters.toDate}
                 onChange={(e) => handleFilterChange('toDate', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
           </div>
@@ -303,12 +303,12 @@ export default function DeliveryEarnings() {
                   setSearchQuery(e.target.value)
                   setPagination(prev => ({ ...prev, page: 1 }))
                 }}
-                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="px-4 py-2 bg-[#2979FB] text-white rounded-lg hover:bg-[#1E5ED8] flex items-center gap-2">
+                <button className="px-4 py-2 bg-[#005128] text-white rounded-lg hover:bg-[#003d1e] flex items-center gap-2">
                   <Download className="w-4 h-4" />
                   <span>Export</span>
                   <ChevronDown className="w-4 h-4" />
@@ -379,7 +379,7 @@ export default function DeliveryEarnings() {
                       <td className="px-4 py-3 text-sm text-slate-700">
                         {earning.deliveryPartnerPhone || 'N/A'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-[#2979FB] font-medium">
+                      <td className="px-4 py-3 text-sm text-[#005128] font-medium">
                         {earning.orderId || 'N/A'}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-700">
@@ -437,7 +437,7 @@ export default function DeliveryEarnings() {
                       onClick={() => handlePageChange(pageNum)}
                       className={`px-3 py-1 text-sm rounded border ${
                         pagination.page === pageNum
-                          ? "bg-[#2979FB] border-blue-600 text-white"
+                          ? "bg-[#005128] border-brand-600 text-white"
                           : "border-slate-300 text-slate-700 hover:bg-slate-50"
                       }`}
                     >

@@ -290,7 +290,7 @@ export default function DeliverymanBonus() {
           </button>
 
           <div className="flex items-center gap-3 mb-6">
-            <Wallet className="w-5 h-5 text-[#2979FB]" />
+            <Wallet className="w-5 h-5 text-[#005128]" />
             <h1 className="text-2xl font-bold text-slate-900">Bonus</h1>
           </div>
 
@@ -303,7 +303,7 @@ export default function DeliverymanBonus() {
                 <select
                   value={formData.deliveryPartnerId}
                   onChange={(e) => handleInputChange("deliveryPartnerId", e.target.value)}
-                  className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                  className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm ${
                     formErrors.deliveryPartnerId ? "border-red-500" : "border-slate-300"
                   }`}
                   disabled={submitting}
@@ -328,7 +328,7 @@ export default function DeliverymanBonus() {
                   value={formData.amount}
                   onChange={(e) => handleInputChange("amount", e.target.value)}
                   placeholder="Enter amount"
-                  className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                  className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm ${
                     formErrors.amount ? "border-red-500" : "border-slate-300"
                   }`}
                   disabled={submitting}
@@ -354,7 +354,7 @@ export default function DeliverymanBonus() {
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-[#2979FB] text-white hover:bg-[#1E5ED8] transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-[#005128] text-white hover:bg-[#003d1e] transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 disabled={submitting}
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -412,7 +412,7 @@ export default function DeliverymanBonus() {
           {/* Table */}
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="w-12 h-12 text-[#2979FB] animate-spin mb-4" />
+              <Loader2 className="w-12 h-12 text-[#005128] animate-spin mb-4" />
               <p className="text-sm text-slate-600">Loading transactions...</p>
             </div>
           ) : filteredTransactions.length === 0 ? (

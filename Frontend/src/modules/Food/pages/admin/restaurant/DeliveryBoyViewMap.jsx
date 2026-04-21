@@ -742,13 +742,13 @@ export default function DeliveryBoyViewMap() {
                 placeholder="Search location on map..."
                 value={locationSearch}
                 onChange={(e) => setLocationSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
             <select
               value={selectedZoneId}
               onChange={(event) => setSelectedZoneId(event.target.value)}
-              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               <option value="all">All zones</option>
               {zones
@@ -770,7 +770,7 @@ export default function DeliveryBoyViewMap() {
             {mapLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-slate-100 rounded-lg">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto mb-4"></div>
                   <p className="text-slate-600">Loading map...</p>
                 </div>
               </div>
@@ -779,7 +779,7 @@ export default function DeliveryBoyViewMap() {
             {loading && !mapLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-slate-100 rounded-lg">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto mb-4"></div>
                   <p className="text-slate-600">Loading data...</p>
                 </div>
               </div>
@@ -811,7 +811,7 @@ export default function DeliveryBoyViewMap() {
               <div className="text-xs text-slate-600 space-y-1">
                 {zones.length > 0 && (
                   <p>
-                    Click on any <span className="font-semibold text-blue-600">zone</span> on the map to view details. Total zones: <strong>{zones.length}</strong>
+                    Click on any <span className="font-semibold text-brand-600">zone</span> on the map to view details. Total zones: <strong>{zones.length}</strong>
                   </p>
                 )}
                 {filteredDeliveryBoys.length > 0 && (

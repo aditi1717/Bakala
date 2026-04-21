@@ -81,7 +81,7 @@ export default function Bonus() {
         {/* Bonus Setup Form */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-brand-600 flex items-center justify-center">
               <Wallet className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900">Wallet Bonus Setup</h1>
@@ -95,7 +95,7 @@ export default function Bonus() {
                 onClick={() => setActiveLanguage(tab.key)}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   activeLanguage === tab.key
-                    ? "border-blue-600 text-blue-600"
+                    ? "border-brand-600 text-brand-600"
                     : "border-transparent text-slate-600 hover:text-slate-900"
                 }`}
               >
@@ -115,7 +115,7 @@ export default function Bonus() {
                   value={formData.bonusTitle}
                   onChange={(e) => handleInputChange("bonusTitle", e.target.value)}
                   placeholder="Ex: EID Dhamaka"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                 />
               </div>
 
@@ -128,7 +128,7 @@ export default function Bonus() {
                   value={formData.shortDescription}
                   onChange={(e) => handleInputChange("shortDescription", e.target.value)}
                   placeholder="Ex: EID Dhamaka"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                 />
               </div>
 
@@ -139,7 +139,7 @@ export default function Bonus() {
                 <select
                   value={formData.bonusType}
                   onChange={(e) => handleInputChange("bonusType", e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                 >
                   <option value="Percentage (%)">Percentage (%)</option>
                   <option value="Amount ($)">Amount ($)</option>
@@ -158,7 +158,7 @@ export default function Bonus() {
                   value={formData.bonusAmount}
                   onChange={(e) => handleInputChange("bonusAmount", e.target.value)}
                   placeholder="Ex: 100"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                 />
               </div>
 
@@ -174,7 +174,7 @@ export default function Bonus() {
                   value={formData.minAddMoney}
                   onChange={(e) => handleInputChange("minAddMoney", e.target.value)}
                   placeholder="Ex: 10"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                 />
               </div>
 
@@ -190,7 +190,7 @@ export default function Bonus() {
                   value={formData.maxBonus}
                   onChange={(e) => handleInputChange("maxBonus", e.target.value)}
                   placeholder="Ex: 1000"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                 />
               </div>
 
@@ -203,7 +203,7 @@ export default function Bonus() {
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => handleInputChange("startDate", e.target.value)}
-                    className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                   />
                   <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
@@ -218,7 +218,7 @@ export default function Bonus() {
                     type="date"
                     value={formData.expireDate}
                     onChange={(e) => handleInputChange("expireDate", e.target.value)}
-                    className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                   />
                   <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
@@ -235,7 +235,7 @@ export default function Bonus() {
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md"
+                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-all shadow-md"
               >
                 Submit
               </button>
@@ -304,8 +304,8 @@ export default function Bonus() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => handleToggleStatus(bonus.sl)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                          bonus.status ? "bg-blue-600" : "bg-slate-300"
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
+                          bonus.status ? "bg-brand-600" : "bg-slate-300"
                         }`}
                       >
                         <span
@@ -318,7 +318,7 @@ export default function Bonus() {
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
-                          className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                          className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />

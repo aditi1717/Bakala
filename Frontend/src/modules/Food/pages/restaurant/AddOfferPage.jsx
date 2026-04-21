@@ -230,7 +230,7 @@ export default function AddOfferPage() {
                 <button
                   type="button"
                   onClick={() => setShowProductsModal(true)}
-                  className="w-full rounded-xl border border-gray-200 bg-slate-50 px-3 py-3 text-left text-sm text-gray-700 transition hover:border-blue-300 hover:bg-blue-50"
+                  className="w-full rounded-xl border border-gray-200 bg-slate-50 px-3 py-3 text-left text-sm text-gray-700 transition hover:border-brand-300 hover:bg-brand-50"
                 >
                   {selectedProducts.length > 0
                     ? `${selectedProducts.length} product${selectedProducts.length > 1 ? "s" : ""} selected`
@@ -244,13 +244,13 @@ export default function AddOfferPage() {
                     {selectedProducts.map((product) => (
                       <span
                         key={product.id}
-                        className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700"
+                        className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700"
                       >
                         {product.name}
                         <button
                           type="button"
                           onClick={() => toggleProduct(String(product.id))}
-                          className="text-blue-600"
+                          className="text-brand-600"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -345,7 +345,7 @@ export default function AddOfferPage() {
         <Button
           onClick={handleSubmit}
           disabled={saving}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2"
+          className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2"
         >
           {saving && <Loader2 className="w-4 h-4 animate-spin" />}
           {isEditMode ? "Update Offer" : "Create Offer"}
@@ -390,7 +390,7 @@ export default function AddOfferPage() {
                       <label
                         key={product.id}
                         className={`flex cursor-pointer items-center justify-between rounded-2xl border px-3 py-3 transition ${
-                          checked ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white"
+                          checked ? "border-brand-500 bg-brand-50" : "border-gray-200 bg-white"
                         }`}
                       >
                         <div className="min-w-0 pr-3">
@@ -400,7 +400,7 @@ export default function AddOfferPage() {
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleProduct(String(product.id))}
-                          className="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                         />
                       </label>
                     )
@@ -413,7 +413,7 @@ export default function AddOfferPage() {
               <Button
                 type="button"
                 onClick={() => setShowProductsModal(false)}
-                className="w-full bg-blue-600 text-white hover:bg-blue-700"
+                className="w-full bg-brand-600 text-white hover:bg-brand-700"
               >
                 Done
               </Button>

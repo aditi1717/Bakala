@@ -94,8 +94,8 @@ export default function SubscriptionOrders() {
               <p className="text-sm text-slate-500 mb-1">Total Subscriptions</p>
               <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
             </div>
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <Package className="w-6 h-6 text-blue-600" />
+            <div className="p-3 bg-brand-50 rounded-lg">
+              <Package className="w-6 h-6 text-brand-600" />
             </div>
           </div>
         </div>
@@ -114,10 +114,10 @@ export default function SubscriptionOrders() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500 mb-1">Expired</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.expired}</p>
+              <p className="text-2xl font-bold text-brand-600">{stats.expired}</p>
             </div>
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <Calendar className="w-6 h-6 text-blue-600" />
+            <div className="p-3 bg-brand-50 rounded-lg">
+              <Calendar className="w-6 h-6 text-brand-600" />
             </div>
           </div>
         </div>

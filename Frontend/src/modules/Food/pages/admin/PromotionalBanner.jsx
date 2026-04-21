@@ -80,7 +80,7 @@ export default function PromotionalBanner() {
                 onClick={() => setActiveLanguage(tab.key)}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   activeLanguage === tab.key
-                    ? "border-blue-600 text-blue-600"
+                    ? "border-brand-600 text-brand-600"
                     : "border-transparent text-slate-600 hover:text-slate-900"
                 }`}
               >
@@ -99,7 +99,7 @@ export default function PromotionalBanner() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
               />
             </div>
 
@@ -139,9 +139,9 @@ export default function PromotionalBanner() {
 
               {/* Upload Button */}
               <div className="mt-4">
-                <label className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors cursor-pointer block">
+                <label className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-brand-500 transition-colors cursor-pointer block">
                   <Upload className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-blue-600 mb-1">Click to upload</p>
+                  <p className="text-sm font-medium text-brand-600 mb-1">Click to upload</p>
                   <p className="text-xs text-slate-500">Or drag and drop</p>
                   <input type="file" accept="image/*" onChange={handleBannerUpload} className="hidden" />
                 </label>
@@ -152,7 +152,7 @@ export default function PromotionalBanner() {
             <div className="flex items-center justify-end">
               <button
                 type="submit"
-                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md"
+                className="px-6 py-2.5 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-all shadow-md"
               >
                 Save
               </button>

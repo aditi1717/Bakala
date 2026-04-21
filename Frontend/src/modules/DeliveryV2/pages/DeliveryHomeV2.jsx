@@ -91,7 +91,7 @@ function BottomPopup({ isOpen, onClose, title, children }) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[600] flex items-end">
-      <div className="absolute inset-0 bg-[#2979FB]/30" onClick={onClose} />
+      <div className="absolute inset-0 bg-[#005128]/30" onClick={onClose} />
       <motion.div
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
@@ -348,7 +348,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const emergencyOptions = [
     { title: "Medical Emergency", subtitle: "Call an ambulance", icon: <AlertTriangle className="text-red-600" />, phone: emergencyNumbers.medicalEmergency },
     { title: "Accident Helpline", subtitle: "Report an accident", icon: <AlertTriangle className="text-orange-600" />, phone: emergencyNumbers.accidentHelpline },
-    { title: "Contact Police", subtitle: "Nearest police support", icon: <AlertTriangle className="text-blue-600" />, phone: emergencyNumbers.contactPolice },
+    { title: "Contact Police", subtitle: "Nearest police support", icon: <AlertTriangle className="text-brand-600" />, phone: emergencyNumbers.contactPolice },
     { title: "Insurance", subtitle: "Policy & claim help", icon: <AlertTriangle className="text-green-600" />, phone: emergencyNumbers.insurance },
   ];
 
@@ -941,8 +941,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
             
             <div className="flex items-center gap-2">
               <button onClick={() => setShowEmergencyPopup(true)} className="w-[38px] h-[38px] rounded-full bg-red-50 flex items-center justify-center text-red-500 active:bg-red-100 transition-colors border border-red-100"><AlertTriangle className="w-[18px] h-[18px]" /></button>
-              <button onClick={() => navigate('/food/delivery/help/id-card')} className="w-[38px] h-[38px] rounded-full bg-blue-50 flex items-center justify-center text-blue-600 active:bg-blue-100 transition-colors border border-blue-100"><Contact className="w-[18px] h-[18px]" /></button>
-              <button onClick={() => navigate('/food/delivery/notifications')} className="relative w-[38px] h-[38px] rounded-full bg-blue-50 flex items-center justify-center text-blue-600 active:bg-blue-100 transition-colors border border-blue-100">
+              <button onClick={() => navigate('/food/delivery/help/id-card')} className="w-[38px] h-[38px] rounded-full bg-brand-50 flex items-center justify-center text-brand-600 active:bg-brand-100 transition-colors border border-brand-100"><Contact className="w-[18px] h-[18px]" /></button>
+              <button onClick={() => navigate('/food/delivery/notifications')} className="relative w-[38px] h-[38px] rounded-full bg-brand-50 flex items-center justify-center text-brand-600 active:bg-brand-100 transition-colors border border-brand-100">
                  <Bell className="w-[18px] h-[18px]" />
                  {notificationUnreadCount > 0 && <span className="absolute top-1 right-1 border-2 border-white w-2 h-2 rounded-full bg-red-500" />}
               </button>
@@ -1038,7 +1038,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
             {/* SIMULATION INDICATOR */}
             {isSimMode && (
-              <div className="absolute top-[180px] left-4 right-4 z-[100] bg-[#2979FB]/70 backdrop-blur-md rounded-xl p-4 border border-white/20 flex items-center justify-between shadow-2xl">
+              <div className="absolute top-[180px] left-4 right-4 z-[100] bg-[#005128]/70 backdrop-blur-md rounded-xl p-4 border border-white/20 flex items-center justify-between shadow-2xl">
                 <div className="flex items-center gap-4">
                   <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center animate-pulse">
                     <Play className="w-4 h-4 text-white fill-current" />
@@ -1085,9 +1085,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
               </button>
               <button
                 onClick={() => mapRef.current?.setOptions({ gestureHandling: 'greedy' })}
-                className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 active:scale-90 transition-all"
+                className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-brand-600 border border-gray-100 active:scale-90 transition-all"
               >
-                <div className="w-8 h-8 rounded-full border-2 border-blue-600 flex items-center justify-center"><Navigation2 className="w-4 h-4" /></div>
+                <div className="w-8 h-8 rounded-full border-2 border-brand-600 flex items-center justify-center"><Navigation2 className="w-4 h-4" /></div>
               </button>
               <button
                 onClick={handleCenterMap}
@@ -1188,8 +1188,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                           </div>
                         </div>
 
-                        <div className="w-full mb-4 rounded-3xl border border-blue-100 bg-blue-50/70 p-3.5">
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mb-2">Contact User</p>
+                        <div className="w-full mb-4 rounded-3xl border border-brand-100 bg-brand-50/70 p-3.5">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-600 mb-2">Contact User</p>
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                               <p className="text-sm font-bold text-gray-900 truncate">{customerContact.name || 'Customer'}</p>
@@ -1202,7 +1202,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                               onClick={handleContactUserCall}
                               disabled={!customerContact.dialPhone}
                               className={`shrink-0 inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${customerContact.dialPhone
-                                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 active:scale-95'
+                                  ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 active:scale-95'
                                   : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                                 }`}
                             >
@@ -1422,19 +1422,19 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
       {/* ─── 3. BOTTOM NAV (Clean & Uniform) ─── */}
       <div className="bg-white border-t border-gray-100 flex justify-between items-center z-[200] safe-bottom shadow-sm">
-        <button onClick={() => navigate('/food/delivery/feed')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'feed' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+        <button onClick={() => navigate('/food/delivery/feed')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'feed' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
           <LayoutGrid className="w-5 h-5" /><span className="text-[10px] font-semibold">Feed</span>
         </button>
-        <button onClick={() => navigate('/food/delivery/pocket')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'pocket' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+        <button onClick={() => navigate('/food/delivery/pocket')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'pocket' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
           <Wallet className="w-5 h-5" /><span className="text-[10px] font-semibold">Pocket</span>
         </button>
-        <button onClick={() => navigate('/food/delivery/history')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'history' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+        <button onClick={() => navigate('/food/delivery/history')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'history' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
           <History className="w-5 h-5" /><span className="text-[10px] font-semibold">History</span>
         </button>
-        <button onClick={() => navigate('/food/delivery/shop')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'shop' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+        <button onClick={() => navigate('/food/delivery/shop')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'shop' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
           <Store className="w-5 h-5" /><span className="text-[10px] font-semibold">Shop</span>
         </button>
-        <button onClick={() => navigate('/food/delivery/profile')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'profile' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+        <button onClick={() => navigate('/food/delivery/profile')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'profile' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
           <UserIcon className="w-5 h-5" /><span className="text-[10px] font-semibold">Profile</span>
         </button>
       </div>

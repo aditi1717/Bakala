@@ -2473,7 +2473,7 @@ export default function Home() {
             onClick={() => navigate(homeUnderRoute)}
           >
             <div
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-b-full rounded-t-sm shadow-md border-t-4 border-blue-200 flex flex-col items-center justify-center p-1"
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-b-full rounded-t-sm shadow-md border-t-4 border-brand-200 flex flex-col items-center justify-center p-1"
               style={{ backgroundColor: BRAND_THEME.tokens.homepage.home.promoBadgeBackground }}
             >
               <span className="text-[10px] sm:text-xs font-bold text-white text-center leading-tight">UNDER</span>
@@ -2953,7 +2953,7 @@ export default function Home() {
                 <Button
                   variant="outline"
                   onClick={loadMoreRestaurants}
-                  className="text-sm font-medium border-gray-300 hover:border-[#2979FB] hover:text-[#2979FB]">
+                  className="text-sm font-medium border-gray-300 hover:border-[#005128] hover:text-[#005128]">
                   Load more restaurants
                 </Button>
               )}

@@ -108,7 +108,7 @@ export default function EmployeeList() {
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-brand-600 flex items-center justify-center">
               <Users className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900">Employee List</h1>
@@ -269,7 +269,7 @@ export default function EmployeeList() {
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button
-                              className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                              className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
                               title="Edit"
                             >
                               <Edit className="w-4 h-4" />

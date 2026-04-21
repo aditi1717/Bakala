@@ -160,17 +160,17 @@ export default function RestaurantSignup() {
           </p>
         </div>
 
-        <Card className="rounded-3xl shadow-md border border-blue-100/70 bg-white">
+        <Card className="rounded-3xl shadow-md border border-brand-100/70 bg-white">
           <CardContent className="pt-7 pb-8 px-5 sm:px-7 space-y-6">
             <div className="flex flex-col items-center space-y-2">
-              <span className="px-4 py-1 rounded-full text-[11px] font-semibold text-blue-700 bg-blue-50">
+              <span className="px-4 py-1 rounded-full text-[11px] font-semibold text-brand-700 bg-brand-50">
                 Secure Login
               </span>
               <div className="text-center space-y-1">
                 <h2 className="text-2xl font-bold text-gray-900">Login or Signup</h2>
                 <p className="text-sm text-gray-600">Continue with your phone number.</p>
                 <div className="flex justify-center">
-                  <div className="w-12 h-0.5 bg-blue-600 rounded-full mt-2" />
+                  <div className="w-12 h-0.5 bg-brand-600 rounded-full mt-2" />
                 </div>
                 </div>
               </div>
@@ -227,7 +227,7 @@ export default function RestaurantSignup() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <div className="h-5 w-px bg-blue-100" />
+                  <div className="h-5 w-px bg-brand-100" />
                   <Input
                     id="phone"
                     name="phone"
@@ -248,7 +248,7 @@ export default function RestaurantSignup() {
                 )}
               </div>
 
-              <div className="rounded-xl bg-blue-50 text-blue-700 text-[12px] font-medium px-4 py-3 text-center">
+              <div className="rounded-xl bg-brand-50 text-brand-700 text-[12px] font-medium px-4 py-3 text-center">
                 We will send verification updates via SMS.
               </div>
 
@@ -276,7 +276,7 @@ export default function RestaurantSignup() {
 
         <div className="text-center text-[11px] text-gray-500 font-semibold space-y-1">
           <p>By continuing, you agree to our</p>
-          <div className="flex items-center justify-center gap-1 text-blue-700 font-semibold">
+          <div className="flex items-center justify-center gap-1 text-brand-700 font-semibold">
             <button
               type="button"
               onClick={() => navigate("/food/restaurant/terms")}

@@ -122,7 +122,7 @@ export const PocketDetailsV2 = () => {
               <div className="flex justify-between items-center mb-4">
                  <div>
                     <h2 className="text-2xl font-bold text-white leading-none">₹{summary.grandTotal.toFixed(0)}</h2>
-                    <p className="text-[10px] text-blue-100 mt-1 uppercase tracking-widest font-semibold">Total Payout</p>
+                    <p className="text-[10px] text-brand-100 mt-1 uppercase tracking-widest font-semibold">Total Payout</p>
                  </div>
                  <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center border border-white/10 backdrop-blur-sm">
                     <TrendingUp className="w-5 h-5 text-white" />
@@ -131,12 +131,12 @@ export const PocketDetailsV2 = () => {
               <div className="grid grid-cols-2 gap-3">
                  <div className="bg-white/10 p-2.5 rounded-lg border border-white/5 backdrop-blur-sm relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-1 opacity-20"><Package className="w-8 h-8" /></div>
-                    <p className="text-[9px] font-semibold text-blue-100 uppercase tracking-widest mb-0.5">Trips</p>
+                    <p className="text-[9px] font-semibold text-brand-100 uppercase tracking-widest mb-0.5">Trips</p>
                     <p className="text-sm font-bold text-white relative z-10">₹{summary.totalEarning.toFixed(0)}</p>
                  </div>
                  <div className="bg-white/10 p-2.5 rounded-lg border border-white/5 backdrop-blur-sm relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-1 opacity-20"><Receipt className="w-8 h-8" /></div>
-                    <p className="text-[9px] font-semibold text-blue-100 uppercase tracking-widest mb-0.5">Bonus</p>
+                    <p className="text-[9px] font-semibold text-brand-100 uppercase tracking-widest mb-0.5">Bonus</p>
                     <p className="text-sm font-bold text-white relative z-10">₹{summary.totalBonus.toFixed(0)}</p>
                  </div>
               </div>
@@ -167,8 +167,8 @@ export const PocketDetailsV2 = () => {
                     className="bg-white p-3.5 rounded-xl shadow-sm border border-gray-100 flex items-start justify-between active:bg-gray-50 transition-all"
                   >
                     <div className="flex items-start gap-3">
-                       <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100 shrink-0">
-                          <Package className="w-5 h-5 text-blue-500" />
+                       <div className="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center border border-brand-100 shrink-0">
+                          <Package className="w-5 h-5 text-brand-500" />
                        </div>
                        <div className="pt-0.5">
                           <div className="flex items-center gap-1.5 mb-1">

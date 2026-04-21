@@ -238,7 +238,7 @@ export default function UnifiedOTPFastLogin() {
            <form onSubmit={step === 1 ? handleSendOTP : handleVerifyOTP} className="space-y-4">
              {step === 1 ? (
                <div className="space-y-3">
-                 <div className="rounded-[0.9rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 relative transition-all focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-400/20">
+                 <div className="rounded-[0.9rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 relative transition-all focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/20">
                    <label className="block text-[9px] font-medium uppercase tracking-[0.08em] text-slate-600 dark:text-slate-300 mb-2">
                      Phone Number
                    </label>
@@ -328,7 +328,7 @@ export default function UnifiedOTPFastLogin() {
                              document.getElementById(`otp-${Math.min(pasteData.length, 3)}`)?.focus();
                            }
                          }}
-                         className="w-[3.1rem] h-[3.5rem] sm:w-[3.4rem] sm:h-[3.8rem] text-center text-xl font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-[#2979FB] focus:ring-2 focus:ring-[#2979FB]/20 rounded-xl outline-none transition-all text-gray-900 dark:text-white"
+                         className="w-[3.1rem] h-[3.5rem] sm:w-[3.4rem] sm:h-[3.8rem] text-center text-xl font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-[#005128] focus:ring-2 focus:ring-[#005128]/20 rounded-xl outline-none transition-all text-gray-900 dark:text-white"
                          placeholder="-"
                        />
                      ))}

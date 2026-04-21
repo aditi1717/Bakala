@@ -282,7 +282,7 @@ export default function FeeSettings() {
                           .map(({ range, originalIndex }) => {
                             const isEditing = editingRangeIndex === originalIndex;
                             return (
-                              <tr key={originalIndex} className={`${isEditing ? 'bg-blue-50' : 'hover:bg-slate-50'} transition-colors`}>
+                              <tr key={originalIndex} className={`${isEditing ? 'bg-brand-50' : 'hover:bg-slate-50'} transition-colors`}>
                                 <td className="px-4 py-3 text-sm text-slate-900 border-b border-slate-100">
                                   {isEditing ? (
                                     <div className="flex items-center gap-1">
@@ -291,7 +291,7 @@ export default function FeeSettings() {
                                         type="number"
                                         value={newRange.min}
                                         onChange={(e) => setNewRange({ ...newRange, min: e.target.value })}
-                                        className="w-24 px-2 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                        className="w-24 px-2 py-1 border border-brand-300 rounded focus:ring-2 focus:ring-brand-500 outline-none"
                                       />
                                     </div>
                                   ) : (
@@ -306,7 +306,7 @@ export default function FeeSettings() {
                                         type="number"
                                         value={newRange.max}
                                         onChange={(e) => setNewRange({ ...newRange, max: e.target.value })}
-                                        className="w-24 px-2 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                        className="w-24 px-2 py-1 border border-brand-300 rounded focus:ring-2 focus:ring-brand-500 outline-none"
                                       />
                                     </div>
                                   ) : (
@@ -321,7 +321,7 @@ export default function FeeSettings() {
                                         type="number"
                                         value={newRange.fee}
                                         onChange={(e) => setNewRange({ ...newRange, fee: e.target.value })}
-                                        className="w-24 px-2 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 outline-none text-green-600 font-medium"
+                                        className="w-24 px-2 py-1 border border-brand-300 rounded focus:ring-2 focus:ring-brand-500 outline-none text-green-600 font-medium"
                                       />
                                     </div>
                                   ) : (
@@ -351,7 +351,7 @@ export default function FeeSettings() {
                                       <>
                                         <button
                                           onClick={() => handleEditRange(originalIndex)}
-                                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                          className="p-1.5 text-brand-600 hover:bg-brand-50 rounded transition-colors"
                                           title="Edit"
                                         >
                                           <Edit className="w-4 h-4" />

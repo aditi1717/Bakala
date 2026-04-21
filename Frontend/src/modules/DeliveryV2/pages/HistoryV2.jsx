@@ -414,7 +414,7 @@ export const HistoryV2 = () => {
 
                   {/* Payment Badge */}
                   <div className="mb-3">
-                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isCOD ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isCOD ? 'bg-orange-50 text-orange-600' : 'bg-brand-50 text-brand-600'
                       }`}>
                       {isCOD ? 'COD' : 'Online'}
                     </span>

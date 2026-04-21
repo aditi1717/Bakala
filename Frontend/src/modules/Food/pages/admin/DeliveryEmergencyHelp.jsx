@@ -177,10 +177,10 @@ export default function DeliveryEmergencyHelp() {
           </div>
 
           {/* Info Card */}
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mb-6 p-4 bg-brand-50 border border-brand-200 rounded-lg">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-              <div className="text-sm text-blue-800">
+              <AlertCircle className="w-5 h-5 text-brand-600 mt-0.5 shrink-0" />
+              <div className="text-sm text-brand-800">
                 <p className="font-semibold mb-1">Important Information</p>
                 <p>
                   These phone numbers will be displayed to delivery partners in the emergency help section. 
@@ -207,7 +207,7 @@ export default function DeliveryEmergencyHelp() {
                     placeholder={field.placeholder}
                     inputMode="numeric"
                     maxLength={15}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                       formErrors[field.id]
                         ? "border-red-300 focus:ring-red-500"
                         : "border-slate-300"

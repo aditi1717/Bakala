@@ -3,7 +3,7 @@ import { Eye, Printer, ArrowUpDown, Phone, User, Send, RefreshCw } from "lucide-
 
 const getStatusColor = (status) => {
   const colors = {
-    "Ordered": "bg-blue-100 text-blue-700",
+    "Ordered": "bg-brand-100 text-brand-700",
     "Accepted": "bg-green-100 text-green-700",
     "Rejected": "bg-red-100 text-red-700",
     "Ready for Assignment": "bg-violet-100 text-violet-700",
@@ -224,7 +224,7 @@ export default function OrderDetectDeliveryTable({
                       )}
                       <button 
                         onClick={() => onPrintOrder(order)}
-                        className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                        className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
                         title="Print Order"
                       >
                         <Printer className="w-4 h-4" />

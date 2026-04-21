@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from "framer-motion";
 import { X, SlidersHorizontal, ArrowDownUp, IndianRupee, UtensilsCrossed, Check } from "lucide-react";
 import { Checkbox } from "@food/components/ui/checkbox";
@@ -138,7 +138,7 @@ const FilterSidebar = ({
               </button>
               <button 
                 onClick={onApply}
-                className={`flex-[2] py-3 ${homepage.filters.primaryButton} text-sm font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95`}
+                className={`flex-[2] py-3 ${homepage.filters.primaryButton} text-sm font-bold rounded-xl shadow-lg shadow-brand-500/20 transition-all active:scale-95`}
               >
                 Apply Filters
               </button>

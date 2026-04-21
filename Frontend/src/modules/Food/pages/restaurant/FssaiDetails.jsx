@@ -85,7 +85,7 @@ export default function FssaiDetails() {
           Haven&apos;t renewed your FSSAI?{" "}
           <button
             type="button"
-            className="text-blue-600 underline underline-offset-2"
+            className="text-brand-600 underline underline-offset-2"
             onClick={() => navigate("/restaurant/fssai/update")}
           >
             Apply Now

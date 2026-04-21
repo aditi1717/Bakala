@@ -68,7 +68,7 @@ export default function RushHour() {
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         {/* Informational Banner */}
-        <div className="bg-blue-50 rounded-lg p-4 mb-6 flex items-start gap-4">
+        <div className="bg-brand-50 rounded-lg p-4 mb-6 flex items-start gap-4">
           <div
             className="w-14 h-14 rounded-full flex items-center justify-center shrink-0"
             style={{ backgroundColor: BRAND_THEME.colors.brand.primaryDark }}
@@ -124,7 +124,7 @@ export default function RushHour() {
       <div className="px-4 pb-6 pt-4 bg-white border-t border-gray-200">
         <button
           onClick={handleConfirm}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+          className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
         >
           Confirm
         </button>

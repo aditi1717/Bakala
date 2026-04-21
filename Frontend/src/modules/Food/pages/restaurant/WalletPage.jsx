@@ -337,7 +337,7 @@ export default function WalletPage() {
               <Card className="bg-white shadow-md border-0 py-0 gap-0 h-full w-full">
                 <CardContent className="p-2 relative flex flex-col px-2 h-full justify-between">
                   <div className="absolute right-1 top-1 opacity-10">
-                    <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-blue-500" />
+                    <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-brand-500" />
                   </div>
                   <p className="text-gray-600 text-[9px] md:text-xs mb-0.5 leading-tight">Total Earning</p>
                   <p className="text-gray-900 text-xs md:text-sm font-bold">{formatCurrency(balances.totalEarning)}</p>
@@ -361,7 +361,7 @@ export default function WalletPage() {
                 onClick={() => setActiveTab("withdraw")}
                 className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${
                   activeTab === "withdraw"
-                    ? "text-blue-600"
+                    ? "text-brand-600"
                     : "text-gray-600 hover:text-gray-900"
                 }`}
                 style={activeTab === "withdraw" ? { color: BRAND_THEME.colors.brand.primary } : undefined}
@@ -379,7 +379,7 @@ export default function WalletPage() {
                 onClick={() => setActiveTab("payment")}
                 className={`pb-3 px-2 text-sm md:text-base font-medium transition-colors relative ${
                   activeTab === "payment"
-                    ? "text-blue-600"
+                    ? "text-brand-600"
                     : "text-gray-600 hover:text-gray-900"
                 }`}
                 style={activeTab === "payment" ? { color: BRAND_THEME.colors.brand.primary } : undefined}
@@ -488,7 +488,7 @@ export default function WalletPage() {
                   <div className="text-right">
                     <span className={`inline-block text-xs md:text-sm font-medium px-3 py-1 rounded-full mb-2 ${
                       String(transaction.status).toLowerCase() === "pending" 
-                        ? "bg-blue-100 text-blue-700"
+                        ? "bg-brand-100 text-brand-700"
                         : String(transaction.status).toLowerCase() === "approved"
                         ? "bg-green-100 text-green-700"
                         : "bg-red-100 text-red-700"

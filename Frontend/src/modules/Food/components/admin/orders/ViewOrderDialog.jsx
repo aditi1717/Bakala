@@ -14,8 +14,8 @@ const debugError = (...args) => {}
 const getStatusColor = (orderStatus) => {
   const colors = {
     "Delivered": "bg-emerald-100 text-emerald-700",
-    "Pending": "bg-blue-100 text-blue-700",
-    "Scheduled": "bg-blue-100 text-blue-700",
+    "Pending": "bg-brand-100 text-brand-700",
+    "Scheduled": "bg-brand-100 text-brand-700",
     "Accepted": "bg-green-100 text-green-700",
     "Processing": "bg-orange-100 text-orange-700",
     "Ready": "bg-violet-100 text-violet-700",
@@ -356,7 +356,7 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                     href={order.billImageUrl || order.billImage || order.deliveryState?.billImageUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors shadow-sm"
                   >
                     <Eye className="w-4 h-4" />
                     View Full Size

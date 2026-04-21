@@ -55,7 +55,7 @@ export default function ReportSafetyEmergency() {
 
   const getStatusPill = (status) => {
     const map = {
-      unread: "bg-blue-100 text-blue-700",
+      unread: "bg-brand-100 text-brand-700",
       read: "bg-slate-100 text-slate-700",
       urgent: "bg-red-100 text-red-700",
       resolved: "bg-green-100 text-green-700",
@@ -120,7 +120,7 @@ export default function ReportSafetyEmergency() {
   }
 
   return (
-    <AnimatedPage className="min-h-screen bg-gradient-to-b from-blue-50/60 via-white to-slate-50 dark:from-[#0a0a0a] dark:via-[#0a0a0a] dark:to-[#0a0a0a] pb-24 md:pb-0">
+    <AnimatedPage className="min-h-screen bg-gradient-to-b from-brand-50/60 via-white to-slate-50 dark:from-[#0a0a0a] dark:via-[#0a0a0a] dark:to-[#0a0a0a] pb-24 md:pb-0">
       <div className="max-w-5xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6 lg:py-8">
         {/* Header */}
         <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-6 lg:mb-8">

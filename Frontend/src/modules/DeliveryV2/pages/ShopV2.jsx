@@ -13,7 +13,7 @@ import { BRAND_THEME } from '@/config/brandTheme';
 
 const RUPEE = '₹';
 const statusColor = (s) => {
-  const map = { confirmed: 'bg-blue-50 text-blue-700', delivered: 'bg-green-50 text-green-700', cancelled: 'bg-red-50 text-red-700', pending: 'bg-yellow-50 text-yellow-700' };
+  const map = { confirmed: 'bg-brand-50 text-brand-700', delivered: 'bg-green-50 text-green-700', cancelled: 'bg-red-50 text-red-700', pending: 'bg-yellow-50 text-yellow-700' };
   return map[s] || 'bg-gray-100 text-gray-600';
 };
 
@@ -30,12 +30,12 @@ function ProductCard({ product, onOrder }) {
       className="bg-white rounded-2xl shadow-[0px_4px_16px_rgba(0,0,0,0.06)] border border-gray-200 overflow-hidden active:bg-gray-50 transition-colors cursor-pointer flex flex-col"
       onClick={() => onOrder(product)}
     >
-      <div className="relative h-28 bg-blue-50/50 border-b border-gray-100 shrink-0">
+      <div className="relative h-28 bg-brand-50/50 border-b border-gray-100 shrink-0">
         {product.image ? (
           <img src={product.image} alt={product.name} className="w-full h-full object-cover mix-blend-multiply" onError={e => e.target.style.display = 'none'} />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Package className="w-6 h-6 text-blue-200" />
+            <Package className="w-6 h-6 text-brand-200" />
           </div>
         )}
         {!hasStock && (
@@ -44,7 +44,7 @@ function ProductCard({ product, onOrder }) {
           </div>
         )}
         {product.category && (
-          <span className="absolute top-1.5 left-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white border border-gray-100 text-blue-800 shadow-sm">
+          <span className="absolute top-1.5 left-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white border border-gray-100 text-brand-800 shadow-sm">
             {product.category}
           </span>
         )}
@@ -67,7 +67,7 @@ function ProductCard({ product, onOrder }) {
             onClick={(e) => { e.stopPropagation(); onOrder(product); }}
             disabled={!hasStock}
             className={`shrink-0 flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${
-              hasStock ? 'bg-blue-600 text-white shadow-sm active:bg-blue-700' : 'bg-gray-100 text-gray-400'
+              hasStock ? 'bg-brand-600 text-white shadow-sm active:bg-brand-700' : 'bg-gray-100 text-gray-400'
             }`}
           >
             <ShoppingCart className="w-3.5 h-3.5" />
@@ -180,12 +180,12 @@ function OrderModal({ product, onClose, onSuccess }) {
                     disabled={v.stock === 0}
                     onClick={() => { setSelectedVariant(v); setQuantity(1); }}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition-all ${
-                      selectedVariant?._id === v._id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+                      selectedVariant?._id === v._id ? 'border-brand-500 bg-brand-50' : 'border-gray-200 bg-white hover:bg-gray-50'
                     } disabled:opacity-40 disabled:cursor-not-allowed`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedVariant?._id === v._id ? 'border-blue-500' : 'border-gray-300'}`}>
-                        {selectedVariant?._id === v._id && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                      <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedVariant?._id === v._id ? 'border-brand-500' : 'border-gray-300'}`}>
+                        {selectedVariant?._id === v._id && <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />}
                       </div>
                       <div className="text-left">
                         <p className="font-semibold text-gray-800 text-[13px]">{v.name}</p>
@@ -213,12 +213,12 @@ function OrderModal({ product, onClose, onSuccess }) {
             {/* Payment Method */}
             <div className="pt-2">
               <p className="text-xs font-semibold text-gray-700 mb-2">Payment</p>
-              <div className="w-full flex items-center justify-between p-3 rounded-lg border border-blue-200 bg-blue-50">
+              <div className="w-full flex items-center justify-between p-3 rounded-lg border border-brand-200 bg-brand-50">
                 <div className="flex flex-col text-left">
                   <p className="font-bold text-[13px] text-gray-900">Online Payment</p>
                   <p className="text-[10px] text-gray-500">Razorpay Secured</p>
                 </div>
-                <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                <CheckCircle2 className="w-4 h-4 text-brand-500" />
               </div>
             </div>
           </div>
@@ -233,7 +233,7 @@ function OrderModal({ product, onClose, onSuccess }) {
               <button
                 onClick={handlePlace}
                 disabled={placing}
-                className="flex-1 py-2.5 rounded-lg bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 active:bg-blue-700 transition-colors"
+                className="flex-1 py-2.5 rounded-lg bg-brand-600 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 active:bg-brand-700 transition-colors"
               >
                 {placing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
                 {placing ? 'Processing' : 'Confirm Order'}
@@ -422,18 +422,18 @@ export default function ShopV2() {
                 <p className="text-xs font-semibold text-gray-600">No orders placed</p>
                 <button
                   onClick={() => setActiveTab('browse')}
-                  className="mt-2 text-blue-600 text-[11px] font-bold underline"
+                  className="mt-2 text-brand-600 text-[11px] font-bold underline"
                 >
                   Browse Store
                 </button>
               </div>
             ) : (
               <>
-                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 flex gap-2.5 items-start">
-                   <Store className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <div className="bg-brand-50 border border-brand-100 rounded-lg p-3 flex gap-2.5 items-start">
+                   <Store className="w-4 h-4 text-brand-600 shrink-0 mt-0.5" />
                    <div>
-                     <p className="text-xs font-bold text-blue-900 mb-0.5">Contact Notice</p>
-                     <p className="text-[10px] text-blue-800 leading-snug">
+                     <p className="text-xs font-bold text-brand-900 mb-0.5">Contact Notice</p>
+                     <p className="text-[10px] text-brand-800 leading-snug">
                        Keep your payment proof ready. Admin will contact you regarding delivery.
                      </p>
                    </div>

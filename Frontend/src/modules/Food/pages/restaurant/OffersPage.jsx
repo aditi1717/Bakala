@@ -97,7 +97,7 @@ export default function OffersPage() {
                   </button>
                   <button
                     onClick={() => navigate(`/restaurant/offers/${offer._id || offer.id}/edit`)}
-                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                    className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700"
                   >
                     <Pencil className="w-4 h-4" />
                     Edit
@@ -111,7 +111,7 @@ export default function OffersPage() {
 
       <button
         onClick={() => navigate("/restaurant/offers/new")}
-        className="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center z-40 transition-colors"
+        className="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-14 h-14 bg-brand-600 hover:bg-brand-700 text-white rounded-full shadow-lg flex items-center justify-center z-40 transition-colors"
       >
         <Plus className="w-6 h-6" />
       </button>

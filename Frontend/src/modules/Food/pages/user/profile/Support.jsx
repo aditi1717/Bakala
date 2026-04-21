@@ -108,7 +108,7 @@ export default function Support() {
   const statusClasses = (status) => {
     const s = String(status || "").toLowerCase()
     if (s === "resolved" || s === "closed") return "bg-green-100 text-green-700"
-    if (s === "open") return "bg-blue-100 text-blue-700"
+    if (s === "open") return "bg-brand-100 text-brand-700"
     return "bg-slate-100 text-slate-700"
   }
 

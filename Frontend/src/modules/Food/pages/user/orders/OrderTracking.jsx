@@ -1527,7 +1527,7 @@ export default function OrderTracking() {
         {/* 1-minute cancellation window after admin acceptance */}
         {isAdminAccepted && isEditWindowOpen && (
           <motion.div
-            className="bg-white rounded-xl p-4 shadow-sm border border-blue-100"
+            className="bg-white rounded-xl p-4 shadow-sm border border-brand-100"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
@@ -1536,7 +1536,7 @@ export default function OrderTracking() {
               <p className="text-sm font-semibold text-gray-900">
                 Cancel order
               </p>
-              <span className={`text-sm font-bold px-2 py-1 rounded-md ${isEditWindowOpen ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`text-sm font-bold px-2 py-1 rounded-md ${isEditWindowOpen ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-500'}`}>
                 {isEditWindowOpen ? editWindowText : 'Expired'}
               </span>
             </div>
@@ -1558,14 +1558,14 @@ export default function OrderTracking() {
 
         {customerDeliveryOtp && orderStatus !== 'delivered' && orderStatus !== 'cancelled' && (
           <motion.div
-            className="bg-blue-50 rounded-xl p-4 shadow-sm border border-blue-100"
+            className="bg-brand-50 rounded-xl p-4 shadow-sm border border-brand-100"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.28 }}
           >
-            <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Delivery OTP</p>
-            <p className="text-2xl font-extrabold text-blue-900 mt-1 tracking-widest">{customerDeliveryOtp}</p>
-            <p className="text-xs text-blue-700 mt-1">Share this 4-digit OTP with your delivery partner at drop-off.</p>
+            <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">Delivery OTP</p>
+            <p className="text-2xl font-extrabold text-brand-900 mt-1 tracking-widest">{customerDeliveryOtp}</p>
+            <p className="text-xs text-brand-700 mt-1">Share this 4-digit OTP with your delivery partner at drop-off.</p>
           </motion.div>
         )}
 
@@ -1578,10 +1578,10 @@ export default function OrderTracking() {
         >
           <div className="flex items-center gap-4">
             <div className={`w-14 h-14 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm border border-gray-100 ${
-              currentStatus.iconType === 'rider' ? 'bg-blue-50' : 
+              currentStatus.iconType === 'rider' ? 'bg-brand-50' : 
               currentStatus.iconType === 'cancelled' ? 'bg-red-50' : 
               currentStatus.iconType === 'delivered' ? 'bg-green-50' : 
-              'bg-blue-50'
+              'bg-brand-50'
             }`}>
               {currentStatus.iconType === 'rider' ? (
                 <div 
@@ -1623,7 +1623,7 @@ export default function OrderTracking() {
             transition={{ delay: 0.55 }}
           >
             <div className="flex items-center gap-3 p-4 border-b border-dashed border-gray-200">
-              <div className="w-12 h-12 rounded-full bg-blue-50 overflow-hidden flex items-center justify-center flex-shrink-0 border border-blue-100 p-1">
+              <div className="w-12 h-12 rounded-full bg-brand-50 overflow-hidden flex items-center justify-center flex-shrink-0 border border-brand-100 p-1">
                 {order.deliveryPartner?.avatar ? (
                   <img src={order.deliveryPartner.avatar} alt="Rider" className="w-full h-full object-cover" />
                 ) : (
@@ -1638,18 +1638,18 @@ export default function OrderTracking() {
                 <p className="text-sm text-gray-500">Your delivery partner is arriving</p>
               </div>
               <motion.button
-                className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center"
+                className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center"
                 onClick={handleCallRider}
                 whileTap={{ scale: 0.9 }}
               >
-                <Phone className="w-5 h-5 text-blue-600" />
+                <Phone className="w-5 h-5 text-brand-600" />
               </motion.button>
             </div>
             {order?.note && (
-              <div className="bg-blue-50/50 p-3 mx-4 mb-4 rounded-lg flex items-start gap-2 border border-blue-100">
-                <MessageSquare className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="bg-brand-50/50 p-3 mx-4 mb-4 rounded-lg flex items-start gap-2 border border-brand-100">
+                <MessageSquare className="w-4 h-4 text-brand-500 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-0.5">Instruction for Rider</p>
+                  <p className="text-[10px] font-bold text-brand-600 uppercase tracking-wider mb-0.5">Instruction for Rider</p>
                   <p className="text-xs text-gray-700 leading-relaxed font-medium">"{order.note}"</p>
                 </div>
               </div>
@@ -1675,12 +1675,12 @@ export default function OrderTracking() {
 
         {/* Delivery Details Banner */}
         <motion.div
-          className="bg-blue-50 rounded-xl p-4 text-center border border-blue-100"
+          className="bg-brand-50 rounded-xl p-4 text-center border border-brand-100"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.65 }}
         >
-          <p className="text-blue-800 font-medium">
+          <p className="text-brand-800 font-medium">
             All your delivery details in one place ??
           </p>
         </motion.div>
@@ -1789,7 +1789,7 @@ export default function OrderTracking() {
           transition={{ delay: 0.75 }}
         >
           <div className="flex items-center gap-3 p-4 border-b border-dashed border-gray-200">
-            <div className="w-12 h-12 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-full bg-brand-100 overflow-hidden flex items-center justify-center flex-shrink-0">
               {order?.restaurantLogo || order?.restaurantId?.logo || order?.restaurantId?.profileImage ? (
                 <img
                   src={order?.restaurantLogo || order?.restaurantId?.logo || order?.restaurantId?.profileImage}
@@ -1808,7 +1808,7 @@ export default function OrderTracking() {
               <p className="text-sm text-gray-500">{order.restaurantAddress || 'Restaurant location'}</p>
             </div>
             <motion.button
-              className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center"
+              className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center"
               onClick={handleCallRestaurant}
               whileTap={{ scale: 0.9 }}
             >
@@ -1945,10 +1945,10 @@ export default function OrderTracking() {
 
             {/* Delivery Instructions Section */}
             {order?.note && (
-              <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100 flex gap-3">
-                <MessageSquare className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+              <div className="bg-brand-50/50 rounded-xl p-4 border border-brand-100 flex gap-3">
+                <MessageSquare className="w-5 h-5 text-brand-500 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Delivery Instructions</p>
+                  <p className="text-xs text-brand-600 font-bold uppercase tracking-wider mb-1">Delivery Instructions</p>
                   <p className="text-sm text-gray-800 leading-relaxed font-medium capitalize">
                     {order.note}
                   </p>
@@ -2074,7 +2074,7 @@ export default function OrderTracking() {
               value={deliveryInstructions}
               onChange={(e) => setDeliveryInstructions(e.target.value)}
               placeholder="E.g. Ring the doorbell, leave at the front desk..."
-              className="min-h-[120px] resize-none border-gray-200 focus:ring-blue-500 rounded-xl bg-gray-50 text-base"
+              className="min-h-[120px] resize-none border-gray-200 focus:ring-brand-500 rounded-xl bg-gray-50 text-base"
             />
             <Button 
               onClick={handleUpdateInstructions} 

@@ -116,7 +116,7 @@ export default function StoreOrders() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by partner or product..."
-              className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-700 outline-none transition focus:border-blue-400"
+              className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-700 outline-none transition focus:border-brand-400"
             />
           </div>
         </div>
@@ -125,7 +125,7 @@ export default function StoreOrders() {
       <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex min-h-[360px] flex-col items-center justify-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-brand-600" />
             <p className="text-sm font-medium text-slate-500">Loading store orders...</p>
           </div>
         ) : filteredOrders.length === 0 ? (

@@ -2272,7 +2272,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
             <Button
               onClick={handleUseCurrentLocationForAddress}
               disabled={mapLoading}
-              className="bg-white dark:bg-[#1a1a1a] border-2 hover:bg-blue-50 dark:hover:bg-blue-950/20 shadow-lg disabled:opacity-50 flex items-center gap-2 px-4 py-2"
+              className="bg-white dark:bg-[#1a1a1a] border-2 hover:bg-brand-50 dark:hover:bg-brand-950/20 shadow-lg disabled:opacity-50 flex items-center gap-2 px-4 py-2"
               style={{ borderColor: BRAND_THEME.tokens.location.icon, color: BRAND_THEME.tokens.location.icon }}
             >
               <Crosshair className="h-4 w-4 flex-shrink-0" style={{ color: BRAND_THEME.tokens.location.icon }} strokeWidth={2.5} />

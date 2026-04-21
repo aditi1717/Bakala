@@ -1703,7 +1703,7 @@ export default function RestaurantOnboarding() {
                         Preview unavailable
                       </div>
                     )}
-                    <div className="absolute bottom-0 inset-x-0 bg-blue-900/50 px-2 py-1">
+                    <div className="absolute bottom-0 inset-x-0 bg-brand-900/50 px-2 py-1">
                       <p className="text-[10px] text-white truncate">
                         {imageName}
                       </p>
@@ -2299,7 +2299,7 @@ export default function RestaurantOnboarding() {
                 onClick={() => setIsEditing(true)}
                 variant="outline"
                 size="sm"
-                className="text-xs bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 flex items-center gap-1.5"
+                className="text-xs bg-brand-50 border-brand-300 text-brand-700 hover:bg-brand-100 flex items-center gap-1.5"
                 title="Edit Details"
               >
                 <Sparkles className="w-3 h-3" />

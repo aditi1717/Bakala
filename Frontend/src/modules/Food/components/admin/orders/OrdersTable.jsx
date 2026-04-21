@@ -4,8 +4,8 @@ import { Eye, Printer, ArrowUpDown, Loader2, Check, X, Trash2 } from "lucide-rea
 const getStatusColor = (orderStatus) => {
   const colors = {
     "Delivered": "bg-emerald-100 text-emerald-700",
-    "Pending": "bg-blue-100 text-blue-700",
-    "Scheduled": "bg-blue-100 text-blue-700",
+    "Pending": "bg-brand-100 text-brand-700",
+    "Scheduled": "bg-brand-100 text-brand-700",
     "Accepted": "bg-green-100 text-green-700",
     "Processing": "bg-orange-100 text-orange-700",
     "Ready": "bg-violet-100 text-violet-700",
@@ -385,7 +385,7 @@ export default function OrdersTable({
                       </button>
                       <button 
                         onClick={() => onPrintOrder(order)}
-                        className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                        className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
                         title="Print Order"
                       >
                         <Printer className="w-4 h-4" />
@@ -445,7 +445,7 @@ export default function OrdersTable({
                               className={`px-3 py-1.5 rounded-md text-white text-xs font-medium hover:opacity-90 transition-colors shadow-sm flex items-center gap-1.5 ${
                                 order.paymentType === "Wallet" || order.payment?.method === "wallet"
                                   ? "bg-purple-600 hover:bg-purple-700"
-                                  : "bg-blue-600 hover:bg-blue-700"
+                                  : "bg-brand-600 hover:bg-brand-700"
                               }`}
                               title={order.paymentType === "Wallet" || order.payment?.method === "wallet"
                                 ? "Process Wallet Refund (Add to user wallet)"

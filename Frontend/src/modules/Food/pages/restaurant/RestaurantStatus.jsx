@@ -426,7 +426,7 @@ export default function RestaurantStatus() {
             {!isDayClosed && (
               <button
                 onClick={() => navigate("/restaurant/outlet-timings")}
-                className="flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                className="flex items-center gap-1 text-brand-600 hover:text-brand-700 text-sm font-medium"
               >
                 Details
                 <ChevronRight className="w-4 h-4" />
@@ -472,7 +472,7 @@ export default function RestaurantStatus() {
             </Button>
             <Button
               onClick={handleGoToOutletTimings}
-              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white"
             >
               Go to Outlet Timings
             </Button>
@@ -507,7 +507,7 @@ export default function RestaurantStatus() {
                 setShowOutsideTimingsDialog(false)
                 navigate("/restaurant/outlet-timings")
               }}
-              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white"
             >
               Change Outlet Timings
             </Button>

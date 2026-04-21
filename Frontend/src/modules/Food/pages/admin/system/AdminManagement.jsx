@@ -402,7 +402,7 @@ export default function AdminManagement() {
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium disabled:opacity-60"
+            className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-brand-600 text-white text-sm font-medium disabled:opacity-60"
           >
             {saving ? "Creating..." : "Create Admin"}
           </button>

@@ -163,7 +163,7 @@ export default function Report() {
                   type="date"
                   value={filters.startDate}
                   onChange={(e) => handleFilterChange("startDate", e.target.value)}
-                  className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                 />
                 <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
@@ -178,7 +178,7 @@ export default function Report() {
                   type="date"
                   value={filters.endDate}
                   onChange={(e) => handleFilterChange("endDate", e.target.value)}
-                  className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className="w-full px-4 py-2.5 pr-10 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                 />
                 <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
@@ -191,7 +191,7 @@ export default function Report() {
               <select
                 value={filters.customer}
                 onChange={(e) => handleFilterChange("customer", e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
               >
                 <option value="All">All</option>
                 <option value="jane-doe">Jane Doe</option>
@@ -208,7 +208,7 @@ export default function Report() {
               </button>
               <button 
                 onClick={() => {}} 
-                className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all flex items-center gap-2 relative ${activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""}`}
+                className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-all flex items-center gap-2 relative ${activeFiltersCount > 0 ? "ring-2 ring-brand-300" : ""}`}
               >
                 <Filter className="w-4 h-4" />
                 Filter
@@ -244,14 +244,14 @@ export default function Report() {
             <p className="text-2xl font-bold text-red-900">{totalCredit.toFixed(3)}</p>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-sm border border-blue-200 p-6">
+          <div className="bg-gradient-to-br from-brand-50 to-brand-100 rounded-xl shadow-sm border border-brand-200 p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-blue-800">Balance</h3>
-              <div className="w-10 h-10 rounded-lg bg-blue-200 flex items-center justify-center">
-                <Utensils className="w-5 h-5 text-blue-700" />
+              <h3 className="text-sm font-semibold text-brand-800">Balance</h3>
+              <div className="w-10 h-10 rounded-lg bg-brand-200 flex items-center justify-center">
+                <Utensils className="w-5 h-5 text-brand-700" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-blue-900">{balance}</p>
+            <p className="text-2xl font-bold text-brand-900">{balance}</p>
           </div>
         </div>
 

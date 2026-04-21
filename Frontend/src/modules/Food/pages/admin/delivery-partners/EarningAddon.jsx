@@ -275,7 +275,7 @@ export default function EarningAddon() {
       active: { bg: "bg-green-100", text: "text-green-700", label: "Active" },
       inactive: { bg: "bg-gray-100", text: "text-gray-700", label: "Inactive" },
       expired: { bg: "bg-red-100", text: "text-red-700", label: "Expired" },
-      completed: { bg: "bg-blue-100", text: "text-blue-700", label: "Completed" },
+      completed: { bg: "bg-brand-100", text: "text-brand-700", label: "Completed" },
     }
     const config = statusConfig[status] || statusConfig.inactive
     return (
@@ -472,7 +472,7 @@ export default function EarningAddon() {
                                 className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
                                 title="Edit"
                               >
-                                <Edit className="w-4 h-4 text-blue-500" />
+                                <Edit className="w-4 h-4 text-brand-500" />
                               </button>
                               <button
                                 onClick={() => handleDelete(addon._id)}

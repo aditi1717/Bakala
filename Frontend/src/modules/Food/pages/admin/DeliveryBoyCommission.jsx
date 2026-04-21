@@ -422,11 +422,11 @@ export default function DeliveryBoyCommission() {
           </div>
 
           {/* Info Card */}
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mb-4 p-4 bg-brand-50 border border-brand-200 rounded-lg">
             <div className="flex items-start gap-3">
-              <MapPin className="w-5 h-5 text-blue-600 mt-0.5" />
+              <MapPin className="w-5 h-5 text-brand-600 mt-0.5" />
               <div className="text-sm text-slate-700">
-                <p className="font-semibold text-blue-900 mb-1">Fixed + Extra Distance Commission</p>
+                <p className="font-semibold text-brand-900 mb-1">Fixed + Extra Distance Commission</p>
                 <p className="text-slate-600">
                   Commission is calculated as: <strong>Base payout for 0-{formulaMinDistance} km + Extra per km after {formulaMinDistance} km</strong>.
                   Example: if base is ₹25 and extra is ₹5/km, then 6 km earns ₹25 + (2 x ₹5) = ₹35.
@@ -523,15 +523,15 @@ export default function DeliveryBoyCommission() {
                       )}
                       {visibleColumns.basePayout && (
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-semibold text-blue-700">{"\u20B9"}{commission.basePayout}</span>
+                          <span className="text-sm font-semibold text-brand-700">{"\u20B9"}{commission.basePayout}</span>
                         </td>
                       )}
                       {visibleColumns.status && (
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button
                             onClick={() => handleToggleStatus(commission)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                              commission.status ? "bg-blue-600" : "bg-slate-300"
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
+                              commission.status ? "bg-brand-600" : "bg-slate-300"
                             }`}
                           >
                             <span
@@ -547,7 +547,7 @@ export default function DeliveryBoyCommission() {
                           <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() => handleEdit(commission)}
-                              className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                              className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
                               title="Edit"
                             >
                               <Edit className="w-4 h-4" />
@@ -587,7 +587,7 @@ export default function DeliveryBoyCommission() {
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm ${
                   formErrors.name ? "border-red-500" : "border-slate-300"
                 }`}
                 placeholder={`e.g., Base (0-${formulaMinDistance} km)`}
@@ -604,7 +604,7 @@ export default function DeliveryBoyCommission() {
                 min="0"
                 value={formData.minDistance}
                 onChange={(e) => setFormData({ ...formData, minDistance: e.target.value })}
-                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm ${
                   formErrors.minDistance ? "border-red-500" : "border-slate-300"
                 }`}
                 placeholder="e.g., 4"
@@ -647,7 +647,7 @@ export default function DeliveryBoyCommission() {
                   })
                 }
                 disabled={Boolean(formData.maxDistanceUnlimited)}
-                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm ${
                   formErrors.maxDistance ? "border-red-500" : "border-slate-300"
                 }`}
                 placeholder="e.g., 3 (or enable Unlimited)"
@@ -672,7 +672,7 @@ export default function DeliveryBoyCommission() {
                 min="0"
                 value={formData.commissionPerKm}
                 onChange={(e) => setFormData({ ...formData, commissionPerKm: e.target.value })}
-                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm ${
                   formErrors.commissionPerKm ? "border-red-500" : "border-slate-300"
                 }`}
                 placeholder="e.g., 5"
@@ -689,7 +689,7 @@ export default function DeliveryBoyCommission() {
                 min="0"
                 value={formData.basePayout}
                 onChange={(e) => setFormData({ ...formData, basePayout: e.target.value })}
-                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                className={`w-full px-4 py-2.5 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm ${
                   formErrors.basePayout ? "border-red-500" : "border-slate-300"
                 }`}
                 placeholder="e.g., 25"
@@ -710,7 +710,7 @@ export default function DeliveryBoyCommission() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               {selectedCommission ? "Update" : "Add"}

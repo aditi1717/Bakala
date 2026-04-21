@@ -164,8 +164,8 @@ export default function AdvertisementsPage() {
                         </h3>
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                           ad.status === "Running"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-blue-100 text-blue-700"
+                            ? "bg-brand-100 text-brand-700"
+                            : "bg-brand-100 text-brand-700"
                         }`}>
                           {ad.status}
                         </span>

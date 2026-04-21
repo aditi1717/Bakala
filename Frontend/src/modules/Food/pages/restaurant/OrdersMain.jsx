@@ -2026,7 +2026,7 @@ export default function OrdersMain() {
                   <button
                     onClick={handleReverify}
                     disabled={isReverifying}
-                    className="w-full px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    className="w-full px-6 py-2.5 bg-brand-600 text-white rounded-lg font-semibold text-sm hover:bg-brand-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                     {isReverifying ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -2076,7 +2076,7 @@ export default function OrdersMain() {
         {showNewOrderPopup && (
 
             <motion.div
-              className="fixed inset-0 z-[60] bg-blue-900/50 flex items-end justify-center p-3 pb-20 sm:items-center sm:p-4 sm:pb-4"
+              className="fixed inset-0 z-[60] bg-brand-900/50 flex items-end justify-center p-3 pb-20 sm:items-center sm:p-4 sm:pb-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}>
@@ -2166,11 +2166,11 @@ export default function OrdersMain() {
                   </div>
 
                   {getOrderNoteForRestaurant(popupOrder || newOrder) && (
-                    <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                    <div className="mb-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-700">
                         Restaurant note
                       </p>
-                      <p className="mt-1 text-sm leading-5 text-blue-900">
+                      <p className="mt-1 text-sm leading-5 text-brand-900">
                         {getOrderNoteForRestaurant(popupOrder || newOrder)}
                       </p>
                     </div>
@@ -2435,7 +2435,7 @@ export default function OrdersMain() {
         {showRejectPopup && (
 
             <motion.div
-              className="fixed inset-0 z-[70] bg-blue-900/50 flex items-center justify-center p-4"
+              className="fixed inset-0 z-[70] bg-brand-900/50 flex items-center justify-center p-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -2532,7 +2532,7 @@ export default function OrdersMain() {
         {showCancelPopup && orderToCancel && (
 
             <motion.div
-              className="fixed inset-0 z-[70] bg-blue-900/50 flex items-center justify-center p-4"
+              className="fixed inset-0 z-[70] bg-brand-900/50 flex items-center justify-center p-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

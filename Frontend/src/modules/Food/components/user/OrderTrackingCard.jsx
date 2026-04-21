@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import BRAND_THEME from "@/config/brandTheme";
 
 const CookingAnimation = memo(() => (
-  <div className="relative w-12 h-12 flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 overflow-visible shadow-[0_4px_15px_rgba(41,121,251,0.16)] dark:shadow-none shrink-0">
+  <div className="relative w-12 h-12 flex items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-900/30 overflow-visible shadow-[0_4px_15px_rgba(41,121,251,0.16)] dark:shadow-none shrink-0">
     <div className="absolute -top-3 flex gap-1.5">
-      <motion.div animate={{ opacity: [0, 0.8, 0], y: [0, -8, -12], scale: [0.8, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0, ease: "easeOut" }} className="w-1.5 h-3 bg-blue-400/60 rounded-full blur-[1px]" />
-      <motion.div animate={{ opacity: [0, 0.8, 0], y: [0, -10, -15], scale: [0.8, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.5, ease: "easeOut" }} className="w-1.5 h-3 bg-blue-400/60 rounded-full blur-[1px]" />
-      <motion.div animate={{ opacity: [0, 0.8, 0], y: [0, -8, -12], scale: [0.8, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity, delay: 1, ease: "easeOut" }} className="w-1.5 h-3 bg-blue-400/60 rounded-full blur-[1px]" />
+      <motion.div animate={{ opacity: [0, 0.8, 0], y: [0, -8, -12], scale: [0.8, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0, ease: "easeOut" }} className="w-1.5 h-3 bg-brand-400/60 rounded-full blur-[1px]" />
+      <motion.div animate={{ opacity: [0, 0.8, 0], y: [0, -10, -15], scale: [0.8, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.5, ease: "easeOut" }} className="w-1.5 h-3 bg-brand-400/60 rounded-full blur-[1px]" />
+      <motion.div animate={{ opacity: [0, 0.8, 0], y: [0, -8, -12], scale: [0.8, 1.2, 1] }} transition={{ duration: 1.5, repeat: Infinity, delay: 1, ease: "easeOut" }} className="w-1.5 h-3 bg-brand-400/60 rounded-full blur-[1px]" />
     </div>
     <motion.div animate={{ rotate: [-2, 2, -2] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} className="relative z-10 mt-1">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-sm" style={{ color: BRAND_THEME.colors.brand.primary }}>
@@ -372,14 +372,14 @@ function OrderTrackingCardInner({ hasBottomNav = true }) {
               `/orders/${orderRouteId}`,
             )
           }
-          className="relative bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-xl rounded-[20px] p-4 shadow-[0_8px_30px_rgba(41,121,251,0.16)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] border border-blue-100/70 dark:border-white/10 overflow-visible cursor-pointer group"
+          className="relative bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-xl rounded-[20px] p-4 shadow-[0_8px_30px_rgba(41,121,251,0.16)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] border border-brand-100/70 dark:border-white/10 overflow-visible cursor-pointer group"
         >
           {/* Subtle gradient background mesh */}
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/60 via-white/50 to-white/85 dark:from-blue-900/20 dark:via-transparent dark:to-transparent opacity-70 pointer-events-none rounded-[20px]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-brand-50/60 via-white/50 to-white/85 dark:from-brand-900/20 dark:via-transparent dark:to-transparent opacity-70 pointer-events-none rounded-[20px]" />
           
           <button 
              onClick={(e) => { e.stopPropagation(); setDismissedKey(currentOrderKey); }}
-             className="absolute top-2 right-2 p-1.5 rounded-full bg-blue-50/80 dark:bg-white/10 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-100/80 dark:hover:bg-white/20 transition-colors z-20 shadow-sm"
+             className="absolute top-2 right-2 p-1.5 rounded-full bg-brand-50/80 dark:bg-white/10 text-brand-400 hover:text-brand-600 dark:hover:text-brand-300 hover:bg-brand-100/80 dark:hover:bg-white/20 transition-colors z-20 shadow-sm"
           >
             <X className="w-3.5 h-3.5 pointer-events-none" />
           </button>
@@ -396,7 +396,7 @@ function OrderTrackingCardInner({ hasBottomNav = true }) {
             </div>
 
             <div className="rounded-xl px-4 py-2 shrink-0 flex flex-col items-center justify-center border" style={{ background: BRAND_THEME.gradients.primary, borderColor: `${BRAND_THEME.colors.brand.primary}33`, boxShadow: `0 15px 35px -20px ${BRAND_THEME.colors.brand.primaryDark}` }}>
-              <p className="text-blue-50 text-[10px] font-bold uppercase tracking-wider opacity-95 leading-tight mb-[2px]">
+              <p className="text-brand-50 text-[10px] font-bold uppercase tracking-wider opacity-95 leading-tight mb-[2px]">
                 arriving in
               </p>
               <p className="text-white text-base md:text-[17px] font-black leading-tight drop-shadow-sm">

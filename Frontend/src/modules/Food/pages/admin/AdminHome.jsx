@@ -256,8 +256,8 @@ export default function AdminHome() {
               title="Delivery fee"
               value={formatCurrency(deliveryFeeTotal)}
               helper={`Total delivery fees: ${periodLabel}`}
-              icon={<Truck className="h-5 w-5 text-blue-600" />}
-              accent="bg-blue-200/40"
+              icon={<Truck className="h-5 w-5 text-brand-600" />}
+              accent="bg-brand-200/40"
               path="/admin/food/transaction-report"
             />
             <MetricCard
@@ -280,8 +280,8 @@ export default function AdminHome() {
               title="Total restaurants"
               value={totalRestaurants.toLocaleString("en-IN")}
               helper="Approved restaurants"
-              icon={<Store className="h-5 w-5 text-blue-600" />}
-              accent="bg-blue-200/40"
+              icon={<Store className="h-5 w-5 text-brand-600" />}
+              accent="bg-brand-200/40"
               path="/admin/food/restaurants"
             />
             <MetricCard
@@ -523,7 +523,7 @@ export default function AdminHome() {
                         case "order_cancelled":
                           return <XCircle className="h-4 w-4 text-red-600" />
                         case "restaurant":
-                          return <Store className="h-4 w-4 text-blue-600" />
+                          return <Store className="h-4 w-4 text-brand-600" />
                         case "delivery":
                           return <Truck className="h-4 w-4 text-purple-600" />
                         case "customer":
@@ -542,7 +542,7 @@ export default function AdminHome() {
                         case "order_cancelled":
                           return "bg-red-50"
                         case "restaurant":
-                          return "bg-blue-50"
+                          return "bg-brand-50"
                         case "delivery":
                           return "bg-purple-50"
                         case "customer":

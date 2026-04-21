@@ -11,14 +11,14 @@ import collectionsBanner from "@food/assets/collectionspagebanner.png"
 
 // Gradient colors for collection cards
 const gradientColors = [
-  "bg-gradient-to-br from-blue-400 to-blue-600",
-  "bg-gradient-to-br from-sky-400 to-blue-600",
-  "bg-gradient-to-br from-indigo-500 to-blue-600",
-  "bg-gradient-to-br from-cyan-400 to-blue-600",
-  "bg-gradient-to-br from-blue-400 to-indigo-500",
+  "bg-gradient-to-br from-brand-400 to-brand-600",
+  "bg-gradient-to-br from-sky-400 to-brand-600",
+  "bg-gradient-to-br from-indigo-500 to-brand-600",
+  "bg-gradient-to-br from-cyan-400 to-brand-600",
+  "bg-gradient-to-br from-brand-400 to-indigo-500",
   "bg-gradient-to-br from-sky-400 to-cyan-500",
-  "bg-gradient-to-br from-blue-500 to-sky-600",
-  "bg-gradient-to-br from-indigo-400 to-blue-500",
+  "bg-gradient-to-br from-brand-500 to-sky-600",
+  "bg-gradient-to-br from-indigo-400 to-brand-500",
 ]
 
 export default function Collections() {
@@ -65,7 +65,7 @@ export default function Collections() {
       </button>
 
       {/* Banner Section - Clean without dark overlay */}
-      <div className="relative w-full overflow-hidden min-h-[25vh] md:min-h-[30vh] bg-gradient-to-b from-blue-50 to-white">
+      <div className="relative w-full overflow-hidden min-h-[25vh] md:min-h-[30vh] bg-gradient-to-b from-brand-50 to-white">
         <div className="absolute inset-0 z-0">
           <img
             src={collectionsBanner}
@@ -134,8 +134,8 @@ export default function Collections() {
                           <Store className="h-6 w-6" style={{ color: BRAND_THEME.colors.brand.primary }} />
                         </div>
                         {/* Striped awning */}
-                        <div className="absolute -top-0.5 left-0 right-0 h-2 bg-gradient-to-r from-[#5AA2FF] via-white to-[#5AA2FF]"
-                          style={{ backgroundSize: '8px 100%', backgroundImage: 'repeating-linear-gradient(90deg, #5AA2FF 0px, #5AA2FF 4px, white 4px, white 8px)' }}
+                        <div className="absolute -top-0.5 left-0 right-0 h-2 bg-gradient-to-r from-[#1B7347] via-white to-[#1B7347]"
+                          style={{ backgroundSize: '8px 100%', backgroundImage: 'repeating-linear-gradient(90deg, #1B7347 0px, #1B7347 4px, white 4px, white 8px)' }}
                         />
                       </div>
                     </div>
@@ -157,7 +157,7 @@ export default function Collections() {
               onClick={() => setIsCreateDialogOpen(true)}
               className="bg-white dark:bg-[#1a1a1a] border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl p-4 h-48 flex flex-col items-center justify-center gap-3 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
-              <div className="w-12 h-12 rounded-full bg-[#EAF2FF] dark:bg-blue-950/30 flex items-center justify-center border-2" style={{ borderColor: `${BRAND_THEME.colors.brand.primary}4d` }}>
+              <div className="w-12 h-12 rounded-full bg-[#e6f0eb] dark:bg-brand-950/30 flex items-center justify-center border-2" style={{ borderColor: `${BRAND_THEME.colors.brand.primary}4d` }}>
                 <Plus className="h-6 w-6" style={{ color: BRAND_THEME.colors.brand.primary }} />
               </div>
               <div className="text-center">

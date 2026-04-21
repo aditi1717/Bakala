@@ -368,7 +368,7 @@ export default function RestaurantOTP() {
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate("/food/restaurant/login")}
-            className="p-2 rounded-full bg-white/80 shadow-sm border border-blue-100 text-blue-600 hover:bg-white"
+            className="p-2 rounded-full bg-white/80 shadow-sm border border-brand-100 text-brand-600 hover:bg-white"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
@@ -376,18 +376,18 @@ export default function RestaurantOTP() {
             {logoUrl ? (
               <img src={logoUrl} alt="" className="h-16 w-16 object-contain" />
             ) : (
-              <ShieldCheck className="w-8 h-8 text-blue-600" />
+              <ShieldCheck className="w-8 h-8 text-brand-600" />
             )}
           </div>
           <div className="w-8" />
         </div>
 
-        <Card className="rounded-3xl shadow-md border border-blue-100/70 bg-white">
+        <Card className="rounded-3xl shadow-md border border-brand-100/70 bg-white">
           <CardContent className="pt-6 pb-6 px-4 sm:px-5 space-y-5">
             <div className="text-center space-y-1">
               <h2 className="text-xl font-bold text-gray-900">Verify OTP</h2>
               <p className="text-sm text-gray-600">
-                Sent to <span className="text-blue-600 font-semibold">{contactInfo}</span>
+                Sent to <span className="text-brand-600 font-semibold">{contactInfo}</span>
               </p>
             </div>
 
@@ -410,7 +410,7 @@ export default function RestaurantOTP() {
                     error
                       ? "border-red-500 bg-red-50"
                       : focusedIndex === index
-                        ? "border-blue-600 ring-4 ring-blue-100 bg-white"
+                        ? "border-brand-600 ring-4 ring-brand-100 bg-white"
                         : "border-slate-200"
                   }`}
                 />
@@ -444,14 +444,14 @@ export default function RestaurantOTP() {
               <div className="flex flex-col items-center gap-2">
                 {resendTimer > 0 ? (
                   <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold">
-                    <Timer className="w-4 h-4 text-blue-600" />
-                    Resend in <span className="text-blue-600">{resendTimer}s</span>
+                    <Timer className="w-4 h-4 text-brand-600" />
+                    Resend in <span className="text-brand-600">{resendTimer}s</span>
                   </div>
                 ) : (
                   <button
                     onClick={handleResend}
                     disabled={isLoading}
-                    className="flex items-center gap-2 text-blue-700 font-semibold text-xs hover:underline"
+                    className="flex items-center gap-2 text-brand-700 font-semibold text-xs hover:underline"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Resend code

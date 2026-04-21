@@ -646,7 +646,7 @@ export default function OrderDetectDelivery() {
               <p className="text-sm text-slate-500 mb-1">Total Orders</p>
               <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
             </div>
-            <div className="p-3 bg-blue-50 rounded-lg">
+            <div className="p-3 bg-brand-50 rounded-lg">
               <Package className="w-6 h-6" style={{ color: BRAND_THEME.colors.brand.primary }} />
             </div>
           </div>
@@ -657,7 +657,7 @@ export default function OrderDetectDelivery() {
               <p className="text-sm text-slate-500 mb-1">Ordered</p>
               <p className="text-2xl font-bold" style={{ color: BRAND_THEME.colors.brand.primary }}>{stats.ordered}</p>
             </div>
-            <div className="p-3 bg-blue-50 rounded-lg">
+            <div className="p-3 bg-brand-50 rounded-lg">
               <Clock className="w-6 h-6" style={{ color: BRAND_THEME.colors.brand.primary }} />
             </div>
           </div>

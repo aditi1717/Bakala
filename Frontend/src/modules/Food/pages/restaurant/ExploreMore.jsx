@@ -326,7 +326,7 @@ function TimePickerWheel({
           <div className="border-t border-gray-200 px-4 py-4 flex justify-center">
             <button
               onClick={handleConfirm}
-              className="text-blue-600 hover:text-blue-700 font-medium text-base transition-colors"
+              className="text-brand-600 hover:text-brand-700 font-medium text-base transition-colors"
             >
               Okay
             </button>
@@ -1115,7 +1115,7 @@ export default function ExploreMore() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
-                    className="w-full px-4 py-2 pr-10 bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500"
+                    className="w-full px-4 py-2 pr-10 bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 placeholder-gray-500"
                   />
                   {searchQuery && (
                     <button
@@ -1273,7 +1273,7 @@ export default function ExploreMore() {
                         {userData.email}
                       </p>
                     )}
-                    <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mt-2 bg-blue-50 w-fit px-2 py-0.5 rounded">
+                    <p className="text-xs font-bold text-brand-600 uppercase tracking-wider mt-2 bg-brand-50 w-fit px-2 py-0.5 rounded">
                       {userData.role}
                     </p>
                   </div>
@@ -1653,7 +1653,7 @@ export default function ExploreMore() {
               {/* Content */}
               <div className="px-6 py-6">
                 {/* Status Message */}
-                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="mb-6 p-4 bg-brand-50 rounded-lg border border-brand-200">
                   <p className="text-base font-semibold text-gray-900 mb-1">
                     Restaurant is scheduled off
                   </p>

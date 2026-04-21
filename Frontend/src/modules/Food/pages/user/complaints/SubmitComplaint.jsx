@@ -1,4 +1,4 @@
-﻿import { useState } from "react"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Input } from "@food/components/ui/input"
 import { Textarea } from "@food/components/ui/textarea"
@@ -28,7 +28,7 @@ export default function SubmitComplaint() {
       <div className="w-full max-w-lg bg-white rounded-3xl shadow-xl border border-gray-100 p-8 space-y-6">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-gray-900">Submit a Complaint</h1>
-          <p className="text-sm text-gray-600">Tell us what went wrong. We’ll review and get back to you.</p>
+          <p className="text-sm text-gray-600">Tell us what went wrong. We�ll review and get back to you.</p>
         </div>
 
         <div className="space-y-4">

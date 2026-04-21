@@ -47,7 +47,7 @@ export default function Chattings() {
                     onClick={() => setActiveTab("customer")}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === "customer"
-                        ? "border-blue-600 text-blue-600"
+                        ? "border-brand-600 text-brand-600"
                         : "border-transparent text-slate-600 hover:text-slate-900"
                     }`}
                   >
@@ -57,7 +57,7 @@ export default function Chattings() {
                     onClick={() => setActiveTab("restaurant")}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                       activeTab === "restaurant"
-                        ? "border-blue-600 text-blue-600"
+                        ? "border-brand-600 text-brand-600"
                         : "border-transparent text-slate-600 hover:text-slate-900"
                     }`}
                   >
@@ -82,7 +82,7 @@ export default function Chattings() {
                         key={conversation.id}
                         onClick={() => setSelectedConversation(conversation)}
                         className={`w-full p-4 text-left hover:bg-slate-50 transition-colors ${
-                          selectedConversation?.id === conversation.id ? "bg-blue-50" : ""
+                          selectedConversation?.id === conversation.id ? "bg-brand-50" : ""
                         }`}
                       >
                         <div className="flex items-center gap-3">
@@ -165,9 +165,9 @@ export default function Chattings() {
                       <input
                         type="text"
                         placeholder="Type a message..."
-                        className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                       />
-                      <button className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all">
+                      <button className="px-6 py-2.5 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-all">
                         Send
                       </button>
                     </div>

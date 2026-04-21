@@ -509,7 +509,7 @@ export default function FoodDetailsPage() {
                                 {review.userName}
                               </h4>
                               {review.verified && (
-                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">
                                   Verified
                                 </span>
                               )}

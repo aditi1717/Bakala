@@ -152,7 +152,7 @@ export default function FeedbackExperienceReport() {
     if (rating <= 2) return 'bg-red-100 text-red-700'
     if (rating <= 4) return 'bg-orange-100 text-orange-700'
     if (rating <= 6) return 'bg-yellow-100 text-yellow-700'
-    if (rating <= 8) return 'bg-blue-100 text-blue-700'
+    if (rating <= 8) return 'bg-brand-100 text-brand-700'
     return 'bg-green-100 text-green-700'
   }
 
@@ -210,7 +210,7 @@ export default function FeedbackExperienceReport() {
                       type="date"
                       value={filters.fromDate}
                       onChange={(e) => setFilters(prev => ({ ...prev, fromDate: e.target.value }))}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
                   </div>
                 </div>
@@ -225,7 +225,7 @@ export default function FeedbackExperienceReport() {
                       type="date"
                       value={filters.toDate}
                       onChange={(e) => setFilters(prev => ({ ...prev, toDate: e.target.value }))}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
                   </div>
                 </div>
@@ -239,7 +239,7 @@ export default function FeedbackExperienceReport() {
                   <select
                     value={filters.rating}
                     onChange={(e) => setFilters(prev => ({ ...prev, rating: e.target.value }))}
-                    className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="">All Ratings</option>
                     {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(r => (
@@ -256,7 +256,7 @@ export default function FeedbackExperienceReport() {
                   <select
                     value={filters.experience}
                     onChange={(e) => setFilters(prev => ({ ...prev, experience: e.target.value }))}
-                    className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="">All Experiences</option>
                     <option value="very_bad">Very Bad</option>
@@ -277,7 +277,7 @@ export default function FeedbackExperienceReport() {
                   <select
                     value={filters.module}
                     onChange={(e) => setFilters(prev => ({ ...prev, module: e.target.value }))}
-                    className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
                   >
                     <option value="">All Modules</option>
                     <option value="user">User</option>
@@ -291,15 +291,15 @@ export default function FeedbackExperienceReport() {
               <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={handleReset}
-                  className="px-6 py-2.5 text-sm font-medium rounded-lg border border-blue-500 text-blue-600 bg-white hover:bg-blue-50 transition-all flex items-center gap-2"
+                  className="px-6 py-2.5 text-sm font-medium rounded-lg border border-brand-500 text-brand-600 bg-white hover:bg-brand-50 transition-all flex items-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Reset
                 </button>
                 <button 
                   onClick={fetchFeedbackExperiences}
-                  className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${
-                    activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
+                  className={`px-6 py-2.5 text-sm font-medium rounded-lg bg-brand-500 text-white hover:bg-brand-600 transition-all flex items-center gap-2 relative ${
+                    activeFiltersCount > 0 ? "ring-2 ring-brand-300" : ""
                   }`}
                 >
                   <Filter className="w-4 h-4" />
@@ -380,7 +380,7 @@ export default function FeedbackExperienceReport() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by user name, email, phone..."
-                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
               />
             </div>
 
@@ -463,7 +463,7 @@ export default function FeedbackExperienceReport() {
                           <span className="text-sm text-slate-700">{getExperienceLabel(feedback.experience)}</span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 capitalize">
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-brand-100 text-brand-700 capitalize">
                             {feedback.module || 'N/A'}
                           </span>
                         </td>
@@ -476,7 +476,7 @@ export default function FeedbackExperienceReport() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleViewDetails(feedback)}
-                              className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-brand-50 text-brand-600 transition-colors"
                               title="View Details"
                             >
                               <Eye className="w-4 h-4" />
@@ -548,7 +548,7 @@ export default function FeedbackExperienceReport() {
                   <div>
                     <label className="text-sm font-semibold text-slate-700 mb-1 block">Module</label>
                     <p className="text-sm text-slate-900 mt-1">
-                      <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-700 capitalize">
+                      <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-100 text-brand-700 capitalize">
                         {selectedFeedback.module || 'N/A'}
                       </span>
                     </p>
@@ -560,7 +560,7 @@ export default function FeedbackExperienceReport() {
           <DialogFooter className="px-6 pb-6 pt-4 border-t border-slate-200">
             <button
               onClick={() => setShowDetailsDialog(false)}
-              className="px-6 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-sm"
+              className="px-6 py-2.5 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-all shadow-sm"
             >
               Close
             </button>

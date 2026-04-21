@@ -127,7 +127,7 @@ export default function RestaurantComplaints() {
       case 'pending':
         return <Clock className="w-4 h-4 text-yellow-600" />
       case 'in_progress':
-        return <AlertCircle className="w-4 h-4 text-blue-600" />
+        return <AlertCircle className="w-4 h-4 text-brand-600" />
       case 'resolved':
         return <CheckCircle className="w-4 h-4 text-green-600" />
       case 'rejected':
@@ -142,7 +142,7 @@ export default function RestaurantComplaints() {
       case 'pending':
         return 'bg-yellow-100 text-yellow-800'
       case 'in_progress':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-brand-100 text-brand-800'
       case 'resolved':
         return 'bg-green-100 text-green-800'
       case 'rejected':
@@ -168,7 +168,7 @@ export default function RestaurantComplaints() {
               placeholder="Search by order, customer, restaurant..."
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value.replace(/\s/g, ''), page: 1 })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
             />
           </div>
           <Select value={filters.status || 'all'} onValueChange={(value) => setFilters({ ...filters, status: value, page: 1 })}>
@@ -244,9 +244,9 @@ export default function RestaurantComplaints() {
                 </div>
                 <p className="text-sm text-gray-700 mb-3">{complaint.description}</p>
                 {complaint.restaurantResponse && (
-                  <div className="bg-blue-50 rounded p-3 mb-3">
-                    <p className="text-xs font-semibold text-blue-700 mb-1">Restaurant Response:</p>
-                    <p className="text-sm text-blue-800">{complaint.restaurantResponse}</p>
+                  <div className="bg-brand-50 rounded p-3 mb-3">
+                    <p className="text-xs font-semibold text-brand-700 mb-1">Restaurant Response:</p>
+                    <p className="text-sm text-brand-800">{complaint.restaurantResponse}</p>
                   </div>
                 )}
                 {complaint.adminResponse && (
@@ -330,7 +330,7 @@ export default function RestaurantComplaints() {
           </div>
           <DialogFooter>
             <button onClick={() => setEditingComplaint(null)} className="px-4 py-2 border rounded-md">Cancel</button>
-            <button onClick={handleUpdateComplaint} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Save Changes</button>
+            <button onClick={handleUpdateComplaint} className="px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700">Save Changes</button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -117,8 +117,8 @@ export default function SupportTickets() {
               <span className="w-2 h-2 rounded-full bg-amber-500" />
               Open {stats.open}
             </span>
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 text-brand-700 border border-brand-200">
+              <span className="w-2 h-2 rounded-full bg-brand-500" />
               In progress {stats.inProgress}
             </span>
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -190,7 +190,7 @@ export default function SupportTickets() {
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <button className="px-3 py-1 rounded bg-blue-600 text-white text-sm" onClick={() => update(t._id, { adminResponse: editing[t._id] ?? t.adminResponse ?? "" })}>
+                      <button className="px-3 py-1 rounded bg-brand-600 text-white text-sm" onClick={() => update(t._id, { adminResponse: editing[t._id] ?? t.adminResponse ?? "" })}>
                         Save
                       </button>
                     </td>

@@ -275,7 +275,7 @@ export default function EmailTemplate() {
                 onClick={() => handleTemplateChange(template.id)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   activeTemplate === template.id
-                    ? "bg-blue-600 text-white"
+                    ? "bg-brand-600 text-white"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
@@ -302,7 +302,7 @@ export default function EmailTemplate() {
               type="button"
               onClick={() => setSendMailEnabled(!sendMailEnabled)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                sendMailEnabled ? "bg-blue-600" : "bg-slate-300"
+                sendMailEnabled ? "bg-brand-600" : "bg-slate-300"
               }`}
             >
               <span
@@ -370,7 +370,7 @@ export default function EmailTemplate() {
                 formData.socialMediaLinks.pinterest) && (
                 <div className="flex gap-3 mb-4">
                   {formData.socialMediaLinks.facebook && (
-                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center">
                       <Facebook className="w-4 h-4 text-white" />
                     </div>
                   )}
@@ -380,12 +380,12 @@ export default function EmailTemplate() {
                     </div>
                   )}
                   {formData.socialMediaLinks.twitter && (
-                    <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-brand-400 flex items-center justify-center">
                       <Twitter className="w-4 h-4 text-white" />
                     </div>
                   )}
                   {formData.socialMediaLinks.linkedin && (
-                    <div className="w-8 h-8 rounded-full bg-blue-700 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-brand-700 flex items-center justify-center">
                       <Linkedin className="w-4 h-4 text-white" />
                     </div>
                   )}
@@ -414,7 +414,7 @@ export default function EmailTemplate() {
                   onClick={() => setActiveLanguage(lang.id)}
                   className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
                     activeLanguage === lang.id
-                      ? "bg-blue-600 text-white"
+                      ? "bg-brand-600 text-white"
                       : "text-slate-600 hover:bg-slate-100"
                   }`}
                 >
@@ -426,7 +426,7 @@ export default function EmailTemplate() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Read Instructions Link */}
               <div className="flex items-center gap-2 mb-4">
-                <a href="#" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                <a href="#" className="text-sm text-brand-600 hover:underline flex items-center gap-1">
                   Read Instructions
                   <Info className="w-4 h-4" />
                 </a>
@@ -444,9 +444,9 @@ export default function EmailTemplate() {
                     placeholder="Choose File"
                     value={formData.icon ? "File selected" : ""}
                     readOnly
-                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
                   />
-                  <label className="px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition-colors text-sm font-medium">
+                  <label className="px-4 py-2 bg-brand-600 text-white rounded-lg cursor-pointer hover:bg-brand-700 transition-colors text-sm font-medium">
                     Browse
                     <input
                       type="file"
@@ -472,7 +472,7 @@ export default function EmailTemplate() {
                     type="text"
                     value={formData.mainTitle}
                     onChange={(e) => handleInputChange("mainTitle", e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                   />
                 </div>
               </div>
@@ -499,7 +499,7 @@ export default function EmailTemplate() {
                     value={formData.mailBody}
                     onChange={(e) => handleInputChange("mailBody", e.target.value)}
                     rows={8}
-                    className="w-full px-4 py-2 border-0 rounded-b-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                    className="w-full px-4 py-2 border-0 rounded-b-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm resize-none"
                   />
                 </div>
               </div>
@@ -520,7 +520,7 @@ export default function EmailTemplate() {
                       type="text"
                       value={formData.footerText}
                       onChange={(e) => handleInputChange("footerText", e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                     />
                   </div>
 
@@ -539,7 +539,7 @@ export default function EmailTemplate() {
                             type="checkbox"
                             checked={formData.pageLinks[item.key]}
                             onChange={(e) => handleCheckboxChange("pageLinks", item.key, e.target.checked)}
-                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                            className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500"
                           />
                           <span className="text-sm text-slate-700">{item.label}</span>
                         </label>
@@ -563,7 +563,7 @@ export default function EmailTemplate() {
                             type="checkbox"
                             checked={formData.socialMediaLinks[item.key]}
                             onChange={(e) => handleCheckboxChange("socialMediaLinks", item.key, e.target.checked)}
-                            className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                            className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500"
                           />
                           <span className="text-sm text-slate-700">{item.label}</span>
                         </label>
@@ -580,7 +580,7 @@ export default function EmailTemplate() {
                       type="text"
                       value={formData.copyrightContent}
                       onChange={(e) => handleInputChange("copyrightContent", e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                     />
                   </div>
                 </div>
@@ -598,7 +598,7 @@ export default function EmailTemplate() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
+                  className="px-6 py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium flex items-center gap-2"
                 >
                   <Save className="w-4 h-4" />
                   Save

@@ -425,7 +425,7 @@ export default function OutletInfo() {
             <button
               onClick={() => handleImageClick('profile', profileImageInputRef, "Update Profile Photo")}
               disabled={uploadingImage}
-              className="text-blue-600 text-sm font-semibold hover:text-blue-700 transition-colors text-left"
+              className="text-brand-600 text-sm font-semibold hover:text-brand-700 transition-colors text-left"
             >
               {uploadingImage && imageType === 'profile' ? 'Uploading...' : 'Edit photo'}
             </button>
@@ -458,13 +458,13 @@ export default function OutletInfo() {
         <div className="px-4 py-4"><h2 className="text-base font-bold text-gray-900 text-center">Restaurant Information</h2></div>
 
         <div className="px-4 pb-6 space-y-3">
-          <div className="bg-blue-100/50 rounded-lg p-4 border border-blue-300">
+          <div className="bg-brand-100/50 rounded-lg p-4 border border-brand-300">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-gray-500 font-normal mb-1">Restaurant's name</p>
                 <p className="text-base font-semibold text-gray-900">{loading ? "Loading..." : (restaurantName || "N/A")}</p>
               </div>
-              <button onClick={handleOpenEditDialog} className="text-blue-600 text-sm font-normal">Edit</button>
+              <button onClick={handleOpenEditDialog} className="text-brand-600 text-sm font-normal">Edit</button>
             </div>
           </div>
           {/* ... other info cards ... */}
@@ -477,7 +477,7 @@ export default function OutletInfo() {
           <div className="p-4"><Input value={editNameValue} onChange={(e) => setEditNameValue(e.target.value)} placeholder="Enter restaurant name" className="w-full" /></div>
           <DialogFooter className="p-4 bg-gray-50 flex flex-row gap-3">
             <Button variant="outline" onClick={() => setShowEditNameDialog(false)}>Cancel</Button>
-            <Button onClick={handleSaveName} disabled={!editNameValue.trim()} className="bg-blue-600 text-white">Save</Button>
+            <Button onClick={handleSaveName} disabled={!editNameValue.trim()} className="bg-brand-600 text-white">Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

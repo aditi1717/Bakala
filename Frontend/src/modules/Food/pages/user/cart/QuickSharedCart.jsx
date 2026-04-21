@@ -383,7 +383,7 @@ export default function QuickSharedCart() {
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm">
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-300">Summary</p>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-brand-300">Summary</p>
               <div className="mt-4 space-y-3 text-sm text-white/80">
                 <div className="flex justify-between">
                   <span>Subtotal</span>

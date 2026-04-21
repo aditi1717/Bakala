@@ -48,7 +48,7 @@ export default function ResendNotificationButton({ orderId, mongoId, onSuccess }
       type="button"
       onClick={handleResend}
       disabled={loading}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-100 text-brand-700 border border-brand-300 hover:bg-brand-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       title="Resend notification to delivery partners">
       {loading ? (
         <>

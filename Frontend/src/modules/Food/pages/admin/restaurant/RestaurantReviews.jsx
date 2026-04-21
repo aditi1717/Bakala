@@ -236,7 +236,7 @@ export default function RestaurantReviews() {
                       {visibleColumns.si && <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{review.sl}</td>}
                       {visibleColumns.orderId && <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-slate-700">{review.orderId}</td>}
                       {visibleColumns.restaurant && <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-emerald-600">{review.restaurant}</td>}
-                      {visibleColumns.customer && <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{review.customer}</td>}
+                      {visibleColumns.customer && <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-brand-600">{review.customer}</td>}
                       {visibleColumns.review && (
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">

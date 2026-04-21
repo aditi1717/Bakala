@@ -355,7 +355,7 @@ export default function RestaurantCommission() {
             <div className="flex items-center gap-2">
               <button 
                 onClick={handleAdd}
-                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2 transition-all shadow-md"
+                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 flex items-center gap-2 transition-all shadow-md"
               >
                 <Plus className="w-4 h-4" />
                 Add Commission
@@ -378,7 +378,7 @@ export default function RestaurantCommission() {
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -435,7 +435,7 @@ export default function RestaurantCommission() {
                         )}
                         {visibleColumns.restaurant && (
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm font-medium text-blue-600">
+                            <span className="text-sm font-medium text-brand-600">
                               {commission.restaurantName || commission.restaurant?.name || '-'}
                             </span>
                           </td>
@@ -460,8 +460,8 @@ export default function RestaurantCommission() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
                               onClick={() => handleToggleStatus(commission)}
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                                commission.status ? "bg-blue-600" : "bg-slate-300"
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${
+                                commission.status ? "bg-brand-600" : "bg-slate-300"
                               }`}
                             >
                               <span
@@ -477,7 +477,7 @@ export default function RestaurantCommission() {
                             <div className="flex items-center justify-center gap-2">
                               <button
                                 onClick={() => handleEdit(commission)}
-                                className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                                className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
                                 title="Edit"
                               >
                                 <Edit className="w-4 h-4" />
@@ -515,7 +515,7 @@ export default function RestaurantCommission() {
                 placeholder="Search restaurants..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="pl-10 pr-4 py-2 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
               />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             </div>
@@ -526,7 +526,7 @@ export default function RestaurantCommission() {
                   <button
                     key={restaurant._id}
                     onClick={() => handleSelectRestaurant(restaurant)}
-                    className="w-full p-3 text-left rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-300 transition-all"
+                    className="w-full p-3 text-left rounded-lg border border-slate-200 hover:bg-brand-50 hover:border-brand-300 transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -556,7 +556,7 @@ export default function RestaurantCommission() {
           <div className="space-y-4 px-6 py-4">
             {/* Restaurant Info */}
             {selectedRestaurant && (
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <div className="p-3 bg-brand-50 rounded-lg border border-brand-100">
                 <p className="font-semibold text-sm text-slate-900">{selectedRestaurant.name}</p>
                 <p className="text-xs text-slate-600 mt-0.5">{selectedRestaurant.restaurantId}</p>
               </div>
@@ -575,7 +575,7 @@ export default function RestaurantCommission() {
                       ...prev,
                       defaultCommission: { ...prev.defaultCommission, type: e.target.value }
                     }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                   >
                     <option value="percentage">Percentage (%)</option>
                     <option value="amount">Fixed Amount (\u20B9)</option>
@@ -590,7 +590,7 @@ export default function RestaurantCommission() {
                       ...prev,
                       defaultCommission: { ...prev.defaultCommission, value: e.target.value }
                     }))}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    className={`w-full px-3 py-2 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 ${
                       formErrors.defaultCommission ? "border-red-500" : "border-slate-300"
                     }`}
                     placeholder={formData.defaultCommission.type === "percentage" ? "e.g., 10" : "e.g., 5.00"}
@@ -610,7 +610,7 @@ export default function RestaurantCommission() {
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 resize-none"
                 rows="2"
                 placeholder="Add any notes or remarks..."
               />
@@ -626,7 +626,7 @@ export default function RestaurantCommission() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               {selectedCommission ? "Update" : "Create"}

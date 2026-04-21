@@ -172,7 +172,7 @@ export default function DeliverymanReviews() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <div className="flex items-center gap-3">
-              <Star className="w-5 h-5 text-[#2979FB]" />
+              <Star className="w-5 h-5 text-[#005128]" />
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-slate-900">Deliveryman Reviews</h1>
                 <span className="px-3 py-1 rounded-full text-sm font-semibold bg-slate-100 text-slate-700">
@@ -327,7 +327,7 @@ export default function DeliverymanReviews() {
                       )}
                       {visibleColumns.deliveryman && (
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <a href={`/admin/delivery-partners/${review.deliverymanId}`} className="text-sm font-medium text-[#2979FB] hover:text-blue-700">
+                          <a href={`/admin/delivery-partners/${review.deliverymanId}`} className="text-sm font-medium text-[#005128] hover:text-brand-700">
                             {review.deliveryman}
                           </a>
                         </td>
@@ -341,7 +341,7 @@ export default function DeliverymanReviews() {
                       )}
                       {visibleColumns.customer && (
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <a href={`/admin/users/${review.customerId}`} className="text-sm font-medium text-[#2979FB] hover:text-blue-700">
+                          <a href={`/admin/users/${review.customerId}`} className="text-sm font-medium text-[#005128] hover:text-brand-700">
                             {review.customer}
                           </a>
                         </td>
@@ -469,16 +469,16 @@ export default function DeliverymanReviews() {
 
               {/* Deliveryman & Customer */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <p className="text-xs text-[#2979FB] mb-1">Deliveryman</p>
+                <div className="bg-brand-50 rounded-lg p-4">
+                  <p className="text-xs text-[#005128] mb-1">Deliveryman</p>
                   <a 
                     href={`/admin/delivery-partners/${selectedReview.deliverymanId}`}
-                    className="text-sm font-semibold text-blue-700 hover:text-blue-800"
+                    className="text-sm font-semibold text-brand-700 hover:text-brand-800"
                   >
                     {selectedReview.deliveryman}
                   </a>
                   {selectedReview.deliverymanPhone && (
-                    <p className="text-xs text-blue-500 mt-1">{selectedReview.deliverymanPhone}</p>
+                    <p className="text-xs text-brand-500 mt-1">{selectedReview.deliverymanPhone}</p>
                   )}
                 </div>
                 <div className="bg-purple-50 rounded-lg p-4">
@@ -495,13 +495,13 @@ export default function DeliverymanReviews() {
                 </div>
               </div>
 
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-xs text-[#2979FB] mb-2 font-semibold">Rating</p>
+              <div className="bg-brand-50 rounded-lg p-4">
+                <p className="text-xs text-[#005128] mb-2 font-semibold">Rating</p>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1">
                     {renderStars(selectedReview.rating)}
                   </div>
-                  <span className="text-lg font-bold text-[#2979FB]">
+                  <span className="text-lg font-bold text-[#005128]">
                     {selectedReview.rating} / 5
                   </span>
                 </div>

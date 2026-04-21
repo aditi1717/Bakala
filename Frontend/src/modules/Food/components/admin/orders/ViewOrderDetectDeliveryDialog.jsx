@@ -2,7 +2,7 @@ import { X, Clock, CheckCircle, XCircle, User, Phone, Package, MapPin } from "lu
 
 const getStatusColor = (status) => {
   const colors = {
-    "Ordered": "bg-blue-100 text-blue-700 border-blue-200",
+    "Ordered": "bg-brand-100 text-brand-700 border-brand-200",
     "Restaurant Accepted": "bg-green-100 text-green-700 border-green-200",
     "Accepted": "bg-green-100 text-green-700 border-green-200", // Keep for backward compatibility
     "Rejected": "bg-red-100 text-red-700 border-red-200",

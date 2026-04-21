@@ -1113,12 +1113,12 @@ export default function Profile() {
                 setAppearanceOpen(false);
               }}
                 className={`w-full p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${appearance === "light"
-                  ? "border-blue-500 bg-white dark:border-blue-400 dark:bg-slate-900"
+                  ? "border-brand-500 bg-white dark:border-brand-400 dark:bg-slate-900"
                   : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600"
                 }`}>
               <div
                 className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${appearance === "light"
-                    ? "border-blue-600 bg-blue-600 dark:border-blue-500 dark:bg-blue-500"
+                    ? "border-brand-600 bg-brand-600 dark:border-brand-500 dark:bg-brand-500"
                     : "border-gray-300 dark:border-gray-600"
                   }`}>
                 {appearance === "light" && (
@@ -1141,12 +1141,12 @@ export default function Profile() {
                 setAppearanceOpen(false);
               }}
                 className={`w-full p-3 rounded-xl border-2 transition-all flex items-center gap-3 ${appearance === "dark"
-                  ? "border-blue-500 dark:border-blue-400 bg-white dark:bg-slate-900"
+                  ? "border-brand-500 dark:border-brand-400 bg-white dark:bg-slate-900"
                   : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600"
                 }`}>
               <div
                 className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${appearance === "dark"
-                    ? "border-blue-600 bg-blue-600 dark:border-blue-500 dark:bg-blue-500"
+                    ? "border-brand-600 bg-brand-600 dark:border-brand-500 dark:bg-brand-500"
                     : "border-gray-300 dark:border-gray-600"
                   }`}>
                 {appearance === "dark" && (

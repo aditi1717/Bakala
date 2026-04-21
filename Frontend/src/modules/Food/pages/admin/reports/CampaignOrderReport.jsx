@@ -102,7 +102,7 @@ export default function CampaignOrderReport() {
   const getStatusBadge = (status) => {
     const statusColors = {
       Delivered: "bg-green-100 text-green-800",
-      Pending: "bg-blue-100 text-blue-800",
+      Pending: "bg-brand-100 text-brand-800",
       Canceled: "bg-red-100 text-red-800",
       "In Progress": "bg-yellow-100 text-yellow-800",
       Failed: "bg-orange-100 text-orange-800",
@@ -132,7 +132,7 @@ export default function CampaignOrderReport() {
                 <select
                   value={filters.campaign}
                   onChange={(e) => setFilters(prev => ({ ...prev, campaign: e.target.value }))}
-                  className="w-full px-3 py-2 pr-8 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 pr-8 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="All Campaignes">All Campaignes</option>
                   <option value="Campaign 1">Campaign 1</option>
@@ -148,7 +148,7 @@ export default function CampaignOrderReport() {
                 <select
                   value={filters.restaurant}
                   onChange={(e) => setFilters(prev => ({ ...prev, restaurant: e.target.value }))}
-                  className="w-full px-3 py-2 pr-8 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 pr-8 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="All restaurants">All restaurants</option>
                   <option value="Hungry Puppets">Hungry Puppets</option>
@@ -164,7 +164,7 @@ export default function CampaignOrderReport() {
                 <select
                   value={filters.customer}
                   onChange={(e) => setFilters(prev => ({ ...prev, customer: e.target.value }))}
-                  className="w-full px-3 py-2 pr-8 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 pr-8 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="All customers">All customers</option>
                   <option value="John Doe">John Doe</option>
@@ -180,7 +180,7 @@ export default function CampaignOrderReport() {
                 <select
                   value={filters.time}
                   onChange={(e) => setFilters(prev => ({ ...prev, time: e.target.value }))}
-                  className="w-full px-3 py-2 pr-8 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 pr-8 text-xs rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="All Time">All Time</option>
                   <option value="Today">Today</option>
@@ -200,8 +200,8 @@ export default function CampaignOrderReport() {
               </button>
               <button 
                 onClick={handleFilterApply}
-                className={`px-4 py-2 text-xs font-medium rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-all flex items-center gap-2 relative ${
-                  activeFiltersCount > 0 ? "ring-2 ring-blue-300" : ""
+                className={`px-4 py-2 text-xs font-medium rounded-lg bg-brand-500 text-white hover:bg-brand-600 transition-all flex items-center gap-2 relative ${
+                  activeFiltersCount > 0 ? "ring-2 ring-brand-300" : ""
                 }`}
               >
                 <Filter className="w-3.5 h-3.5" />
@@ -232,8 +232,8 @@ export default function CampaignOrderReport() {
           {/* In progress orders */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-3 py-3">
             <div className="flex flex-col items-center text-center">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-2">
-                <RefreshCw className="w-6 h-6 text-blue-600" />
+              <div className="w-10 h-10 rounded-lg bg-brand-100 flex items-center justify-center mb-2">
+                <RefreshCw className="w-6 h-6 text-brand-600" />
               </div>
               <p className="text-lg font-bold text-slate-900 mb-0.5">{emptyCampaignOrderStats.inProgressOrders}</p>
               <p className="text-[11px] text-slate-600">In progress orders</p>
@@ -243,8 +243,8 @@ export default function CampaignOrderReport() {
           {/* On the way */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-3 py-3">
             <div className="flex flex-col items-center text-center">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-2">
-                <Truck className="w-6 h-6 text-blue-600" />
+              <div className="w-10 h-10 rounded-lg bg-brand-100 flex items-center justify-center mb-2">
+                <Truck className="w-6 h-6 text-brand-600" />
               </div>
               <p className="text-lg font-bold text-slate-900 mb-0.5">{emptyCampaignOrderStats.onTheWay}</p>
               <p className="text-[11px] text-slate-600">On the way</p>
@@ -310,7 +310,7 @@ export default function CampaignOrderReport() {
                   placeholder="Search by Order ID, Restaurant, Customer"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-3 pr-9 py-2 w-full text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="pl-3 pr-9 py-2 w-full text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                 />
                 <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               </div>
@@ -419,7 +419,7 @@ export default function CampaignOrderReport() {
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-1.5">
-                        <button className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors">
+                        <button className="p-1 text-brand-600 hover:text-brand-800 hover:bg-brand-50 rounded transition-colors">
                           <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button className="p-1 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded transition-colors">

@@ -48,7 +48,7 @@ export const ViewSupportTicketV2 = () => {
       case "open": return "text-orange-600 bg-orange-50";
       case "resolved": return "text-green-600 bg-green-50";
       case "closed": return "text-gray-600 bg-gray-50";
-      default: return "text-blue-600 bg-blue-50";
+      default: return "text-brand-600 bg-brand-50";
     }
   };
 
@@ -87,8 +87,8 @@ export const ViewSupportTicketV2 = () => {
          </div>
 
          {/* Response Section */}
-         <div className="bg-white rounded-3xl p-6 shadow-sm border border-blue-100 flex items-start gap-4">
-            <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0">
+         <div className="bg-white rounded-3xl p-6 shadow-sm border border-brand-100 flex items-start gap-4">
+            <div className="w-10 h-10 rounded-2xl bg-brand-50 flex items-center justify-center shrink-0">
                <ShieldCheck className="w-5 h-5" style={{ color: BRAND_THEME.colors.brand.primary }} />
             </div>
             <div className="space-y-2">

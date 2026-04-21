@@ -861,7 +861,7 @@ export default function HubFinance() {
                   
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-600">Commission Paid</span>
-                    <span className="text-sm font-semibold text-blue-600">
+                    <span className="text-sm font-semibold text-brand-600">
                       -₹{(() => {
                         const total = (financeData.currentCycle.orders || []).reduce((sum, order) => {
                           return sum + (order.commission || order.pricing?.restaurantCommission || 0)
@@ -871,8 +871,8 @@ export default function HubFinance() {
                     </span>
                   </div>
                   
-                  <div className="bg-blue-50 rounded-lg p-3 mt-3">
-                    <p className="text-xs text-blue-800">
+                  <div className="bg-brand-50 rounded-lg p-3 mt-3">
+                    <p className="text-xs text-brand-800">
                       💡 Platform coupons don't affect your payout. Only your coupons and offers are deducted from your earnings.
                     </p>
                   </div>
