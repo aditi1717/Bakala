@@ -26,6 +26,49 @@ const defaultFormData = {
   type: "",
   zoneId: "global",
   foodTypeScope: "Both",
+  visibilityStartHour: "",
+  visibilityStartMinute: "",
+  visibilityStartMeridiem: "AM",
+  visibilityEndHour: "",
+  visibilityEndMinute: "",
+  visibilityEndMeridiem: "AM",
+}
+
+const HOURS_12 = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+const MINUTES_60 = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"))
+
+const parse24To12 = (time24) => {
+  const value = String(time24 || "").trim()
+  const match = value.match(/^([01]\d|2[0-3]):([0-5]\d)$/)
+  if (!match) {
+    return { hour: "", minute: "", meridiem: "AM" }
+  }
+
+  const hour24 = Number(match[1])
+  const minute = match[2]
+  const meridiem = hour24 >= 12 ? "PM" : "AM"
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+  return { hour: String(hour12).padStart(2, "0"), minute, meridiem }
+}
+
+const to24From12 = (hour, minute, meridiem) => {
+  const hh = String(hour || "").trim()
+  const mm = String(minute || "").trim()
+  const ap = String(meridiem || "").trim().toUpperCase()
+
+  if (!hh && !mm) return ""
+  if (!HOURS_12.includes(hh) || !MINUTES_60.includes(mm) || !["AM", "PM"].includes(ap)) {
+    return null
+  }
+
+  let hour24 = Number(hh)
+  if (ap === "AM") {
+    if (hour24 === 12) hour24 = 0
+  } else if (hour24 !== 12) {
+    hour24 += 12
+  }
+
+  return `${String(hour24).padStart(2, "0")}:${mm}`
 }
 
 const approvalBadgeClass = (status) => {
@@ -188,6 +231,18 @@ export default function Category() {
       type: category?.type || "",
       zoneId: zoneIdValue || "global",
       foodTypeScope: category?.foodTypeScope || "Both",
+      ...(() => {
+        const start = parse24To12(category?.visibilityStartTime || "")
+        const end = parse24To12(category?.visibilityEndTime || "")
+        return {
+          visibilityStartHour: start.hour,
+          visibilityStartMinute: start.minute,
+          visibilityStartMeridiem: start.meridiem,
+          visibilityEndHour: end.hour,
+          visibilityEndMinute: end.minute,
+          visibilityEndMeridiem: end.meridiem,
+        }
+      })(),
     })
     setSelectedImageFile(null)
     setImagePreview(category?.image || null)
@@ -338,6 +393,23 @@ export default function Category() {
       setUploadingImage(true)
       let imageUrl = String(formData.image || "").trim()
 
+      const startTime24 = to24From12(
+        formData.visibilityStartHour,
+        formData.visibilityStartMinute,
+        formData.visibilityStartMeridiem,
+      )
+      const endTime24 = to24From12(
+        formData.visibilityEndHour,
+        formData.visibilityEndMinute,
+        formData.visibilityEndMeridiem,
+      )
+
+      if (startTime24 === null || endTime24 === null) {
+        toast.error("Please select a valid 12-hour time with AM/PM")
+        setUploadingImage(false)
+        return
+      }
+
       if (selectedImageFile) {
         const uploadRes = await uploadAPI.uploadMedia(selectedImageFile, { folder: "appzeto/categories" })
         const payload = uploadRes?.data?.data || uploadRes?.data
@@ -351,6 +423,8 @@ export default function Category() {
         image: imageUrl || undefined,
         zoneId: formData.zoneId || "global",
         foodTypeScope: formData.foodTypeScope,
+        visibilityStartTime: startTime24,
+        visibilityEndTime: endTime24,
       }
 
       if (editingCategory) {
@@ -668,6 +742,83 @@ export default function Category() {
                             className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-900"
                             placeholder="Examples: Starters, Desserts, Drinks"
                           />
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-slate-700">Show From (12-hour)</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              <select
+                                value={formData.visibilityStartHour}
+                                onChange={(event) => setFormData((prev) => ({ ...prev, visibilityStartHour: event.target.value }))}
+                                className="rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none focus:border-slate-900"
+                              >
+                                <option value="">HH</option>
+                                {HOURS_12.map((hour) => (
+                                  <option key={`start-hour-${hour}`} value={hour}>
+                                    {hour}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={formData.visibilityStartMinute}
+                                onChange={(event) => setFormData((prev) => ({ ...prev, visibilityStartMinute: event.target.value }))}
+                                className="rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none focus:border-slate-900"
+                              >
+                                <option value="">MM</option>
+                                {MINUTES_60.map((minute) => (
+                                  <option key={`start-minute-${minute}`} value={minute}>
+                                    {minute}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={formData.visibilityStartMeridiem}
+                                onChange={(event) => setFormData((prev) => ({ ...prev, visibilityStartMeridiem: event.target.value }))}
+                                className="rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none focus:border-slate-900"
+                              >
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="mb-2 block text-sm font-medium text-slate-700">Show Till (12-hour)</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              <select
+                                value={formData.visibilityEndHour}
+                                onChange={(event) => setFormData((prev) => ({ ...prev, visibilityEndHour: event.target.value }))}
+                                className="rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none focus:border-slate-900"
+                              >
+                                <option value="">HH</option>
+                                {HOURS_12.map((hour) => (
+                                  <option key={`end-hour-${hour}`} value={hour}>
+                                    {hour}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={formData.visibilityEndMinute}
+                                onChange={(event) => setFormData((prev) => ({ ...prev, visibilityEndMinute: event.target.value }))}
+                                className="rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none focus:border-slate-900"
+                              >
+                                <option value="">MM</option>
+                                {MINUTES_60.map((minute) => (
+                                  <option key={`end-minute-${minute}`} value={minute}>
+                                    {minute}
+                                  </option>
+                                ))}
+                              </select>
+                              <select
+                                value={formData.visibilityEndMeridiem}
+                                onChange={(event) => setFormData((prev) => ({ ...prev, visibilityEndMeridiem: event.target.value }))}
+                                className="rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none focus:border-slate-900"
+                              >
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                              </select>
+                            </div>
+                          </div>
                         </div>
 
                         <div>

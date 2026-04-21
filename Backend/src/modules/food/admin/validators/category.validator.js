@@ -28,7 +28,17 @@ const upsertSchema = z.object({
     zoneId: z.string().max(100).optional(),
     status: z.boolean().optional(),
     isActive: z.boolean().optional(),
-    sortOrder: z.coerce.number().int().optional()
+    sortOrder: z.coerce.number().int().optional(),
+    visibilityStartTime: z
+        .string()
+        .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'visibilityStartTime must be in HH:mm format')
+        .or(z.literal(''))
+        .optional(),
+    visibilityEndTime: z
+        .string()
+        .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'visibilityEndTime must be in HH:mm format')
+        .or(z.literal(''))
+        .optional()
 });
 
 const rejectSchema = z.object({

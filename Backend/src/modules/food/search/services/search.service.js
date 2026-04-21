@@ -3,6 +3,7 @@ import { FoodItem } from '../../admin/models/food.model.js';
 import { FoodCategory } from '../../admin/models/category.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import mongoose from 'mongoose';
+import { isCategoryVisibleNow } from '../../shared/categoryWorkflow.js';
 
 const zoneToPolygon = (zoneDoc) => {
     const coords = Array.isArray(zoneDoc?.coordinates) ? zoneDoc.coordinates : [];
@@ -92,6 +93,16 @@ export const searchUnified = async (query = {}, options = {}) => {
 
     // 2. Handle Category Filtering (Restaurants don't have categoryId, FoodItems do)
     if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
+        const selectedCategory = await FoodCategory.findById(categoryId)
+            .select('visibilityStartTime visibilityEndTime')
+            .lean();
+        if (!selectedCategory || !isCategoryVisibleNow(selectedCategory, { timezone: 'Asia/Kolkata' })) {
+            return {
+                success: true,
+                data: { restaurants: [], total: 0, page: parseInt(page), limit: parseInt(limit) }
+            };
+        }
+
         const catFoodItems = await FoodItem.find({ 
             categoryId: new mongoose.Types.ObjectId(categoryId),
             approvalStatus: 'approved' 
@@ -129,10 +140,38 @@ export const searchUnified = async (query = {}, options = {}) => {
         const foodFilters = { approvalStatus: 'approved' };
         if (isVeg === 'true') foodFilters.foodType = 'Veg';
         
-        const matchedFoods = await FoodItem.find({
+        const matchedFoodsRaw = await FoodItem.find({
             ...foodFilters,
             name: { $regex: regex }
         }).limit(limit * 2).lean();
+
+        const matchedFoodCategoryIds = Array.from(
+            new Set(
+                matchedFoodsRaw
+                    .map((food) => (food?.categoryId ? String(food.categoryId) : ''))
+                    .filter((value) => mongoose.Types.ObjectId.isValid(value))
+            )
+        );
+
+        const categoryVisibilityMap = new Map();
+        if (matchedFoodCategoryIds.length > 0) {
+            const categoryDocs = await FoodCategory.find({ _id: { $in: matchedFoodCategoryIds } })
+                .select('visibilityStartTime visibilityEndTime')
+                .lean();
+            categoryDocs.forEach((doc) => {
+                categoryVisibilityMap.set(
+                    String(doc._id),
+                    isCategoryVisibleNow(doc, { timezone: 'Asia/Kolkata' })
+                );
+            });
+        }
+
+        const matchedFoods = matchedFoodsRaw.filter((food) => {
+            if (!food?.categoryId) return true;
+            const key = String(food.categoryId);
+            if (!categoryVisibilityMap.has(key)) return true;
+            return categoryVisibilityMap.get(key) === true;
+        });
 
         const foodRestaurantIds = matchedFoods.map(f => f.restaurantId.toString());
         
@@ -227,6 +266,8 @@ export const getAdminCategories = async (query = {}) => {
         ];
     }
 
-    const categories = await FoodCategory.find(filter).sort({ sortOrder: 1, name: 1 }).lean();
-    return categories;
+    const categories = await FoodCategory.find(filter)
+        .sort({ sortOrder: 1, name: 1 })
+        .lean();
+    return categories.filter((category) => isCategoryVisibleNow(category, { timezone: 'Asia/Kolkata' }));
 };

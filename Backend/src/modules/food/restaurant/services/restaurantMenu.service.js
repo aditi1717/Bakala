@@ -4,6 +4,7 @@ import { FoodRestaurant } from '../models/restaurant.model.js';
 import { FoodItem } from '../../admin/models/food.model.js';
 import { FoodCategory } from '../../admin/models/category.model.js';
 import { getFoodDisplayPrice, serializeFoodVariants } from '../../admin/services/foodVariant.service.js';
+import { isCategoryVisibleNow } from '../../shared/categoryWorkflow.js';
 
 const buildMenuFromFoods = async (foods = []) => {
     const categoryIds = Array.from(
@@ -20,14 +21,22 @@ const buildMenuFromFoods = async (foods = []) => {
 
     const categoryDocs = categoryIds.length
         ? await FoodCategory.find({ _id: { $in: categoryIds } })
-            .select('name image sortOrder')
+            .select('name image sortOrder visibilityStartTime visibilityEndTime')
             .lean()
         : [];
     const categoryMap = new Map(categoryDocs.map((doc) => [String(doc._id), doc]));
+    const visibleCategoryIdSet = new Set(
+        categoryDocs
+            .filter((doc) => isCategoryVisibleNow(doc, { timezone: 'Asia/Kolkata' }))
+            .map((doc) => String(doc._id))
+    );
 
     const byCategory = new Map();
     for (const food of foods) {
         const categoryId = food?.categoryId ? String(food.categoryId) : '';
+        if (categoryId && !visibleCategoryIdSet.has(categoryId)) {
+            continue;
+        }
         const categoryDoc = categoryMap.get(categoryId) || null;
         const sectionName = (categoryDoc?.name || food?.categoryName || food?.category || 'Menu').trim() || 'Menu';
         const groupKey = categoryId || `name:${sectionName.toLowerCase()}`;

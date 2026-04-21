@@ -253,20 +253,21 @@ export const useRestaurantNotifications = () => {
           response?.data?.data?.data?.orders ||
           [];
 
-        // REST layer normalizes backend statuses so:
-        // - backend "created" -> UI "confirmed"
-        // We alert only for "confirmed/new order waiting for review".
-        const confirmed = (rows || [])
-          .filter((o) => String(o?.status || "").toLowerCase() === "confirmed")
+        // Alert only for orders waiting for restaurant review.
+        const pendingReview = (rows || [])
+          .filter((o) => {
+            const status = String(o?.status || "").toLowerCase();
+            return status === "created" || status === "confirmed";
+          })
           .sort((a, b) => {
             const at = a?.updatedAt || a?.createdAt || 0;
             const bt = b?.updatedAt || b?.createdAt || 0;
             return new Date(bt).getTime() - new Date(at).getTime();
           });
 
-        if (confirmed.length > 0) {
-          // Trigger alerts for newest confirmed orders (dedupe prevents spam).
-          confirmed.slice(0, 5).forEach((o) => handleIncomingOrderAlert(o));
+        if (pendingReview.length > 0) {
+          // Trigger alerts for newest pending-review orders (dedupe prevents spam).
+          pendingReview.slice(0, 5).forEach((o) => handleIncomingOrderAlert(o));
         }
       } catch (error) {
         // Non-blocking: keep polling.

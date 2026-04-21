@@ -1397,11 +1397,11 @@ export default function OrdersMain() {
           const targetOrders = response.data.data.orders.filter((order) => {
             if (hasOrderBeenShown(order)) return false;
 
-            const isConfirmed = order.status === "confirmed";
-            const isCreatedScheduled =
-              order.status === "created" && order.scheduledAt;
+            const statusLower = String(order.status || "").toLowerCase();
+            const isPendingReview =
+              statusLower === "created" || statusLower === "confirmed";
 
-            if (isConfirmed && !order.scheduledAt) return true; // ordinary confirmed fallback
+            if (isPendingReview && !order.scheduledAt) return true; // ordinary new-order fallback
 
             if (
               order.scheduledAt &&

@@ -32,7 +32,14 @@ const foodCategorySchema = new mongoose.Schema(
          */
         zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodZone', index: true, default: undefined },
         isActive: { type: Boolean, default: true, index: true },
-        sortOrder: { type: Number, default: 0, index: true }
+        sortOrder: { type: Number, default: 0, index: true },
+        /**
+         * Daily visibility window in local business time (HH:mm, 24h).
+         * - Empty start/end => always visible
+         * - If both set and start > end => overnight window (e.g. 22:00 to 02:00)
+         */
+        visibilityStartTime: { type: String, trim: true, default: '' },
+        visibilityEndTime: { type: String, trim: true, default: '' }
     },
     {
         collection: 'food_categories',

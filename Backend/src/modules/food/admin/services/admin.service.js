@@ -39,6 +39,7 @@ import { FoodDeliveryCashDeposit } from '../../delivery/models/foodDeliveryCashD
 import {
     backfillLegacyCategoryWorkflow,
     categoryAllowsFoodType,
+    normalizeCategoryVisibilityTime,
     normalizeCategoryFoodTypeScope,
     serializeCategoryForResponse
 } from '../../shared/categoryWorkflow.js';
@@ -2704,6 +2705,8 @@ export async function createCategory(body) {
                 : undefined,
         isActive: body.isActive !== false,
         sortOrder: Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0,
+        visibilityStartTime: normalizeCategoryVisibilityTime(body.visibilityStartTime),
+        visibilityEndTime: normalizeCategoryVisibilityTime(body.visibilityEndTime),
         // Admin-created categories are globally available immediately.
         approvalStatus: 'approved',
         isApproved: true,
@@ -2813,6 +2816,12 @@ export async function updateCategory(id, body) {
     }
     if (body.isActive !== undefined) doc.isActive = body.isActive !== false;
     if (body.sortOrder !== undefined) doc.sortOrder = Number(body.sortOrder) || 0;
+    if (body.visibilityStartTime !== undefined) {
+        doc.visibilityStartTime = normalizeCategoryVisibilityTime(body.visibilityStartTime);
+    }
+    if (body.visibilityEndTime !== undefined) {
+        doc.visibilityEndTime = normalizeCategoryVisibilityTime(body.visibilityEndTime);
+    }
     if (!doc.createdByRestaurantId && doc.restaurantId) {
         doc.createdByRestaurantId = doc.restaurantId;
     }

@@ -6,6 +6,7 @@ import { FoodRestaurant } from '../models/restaurant.model.js';
 import {
     backfillLegacyCategoryWorkflow,
     GLOBAL_CATEGORY_FILTER,
+    isCategoryVisibleNow,
     normalizeCategoryFoodTypeScope,
     serializeCategoryForResponse,
     toObjectId
@@ -113,8 +114,8 @@ export async function listRestaurantCategories(restaurantId, query = {}) {
         .limit(limit)
         .select(
             compact
-                ? 'name image type foodTypeScope approvalStatus rejectionReason zoneId restaurantId createdByRestaurantId isActive sortOrder requestedAt approvedAt rejectedAt globalizedAt'
-                : 'name image type foodTypeScope approvalStatus rejectionReason zoneId restaurantId createdByRestaurantId isActive sortOrder requestedAt approvedAt rejectedAt globalizedAt createdAt updatedAt'
+                ? 'name image type foodTypeScope approvalStatus rejectionReason zoneId restaurantId createdByRestaurantId isActive sortOrder visibilityStartTime visibilityEndTime requestedAt approvedAt rejectedAt globalizedAt'
+                : 'name image type foodTypeScope approvalStatus rejectionReason zoneId restaurantId createdByRestaurantId isActive sortOrder visibilityStartTime visibilityEndTime requestedAt approvedAt rejectedAt globalizedAt createdAt updatedAt'
         );
 
     const [list, total] = await Promise.all([
@@ -188,20 +189,17 @@ export async function listPublicCategories(query = {}) {
     }
     applyZoneVisibilityFilter(filter.$and, zoneIdRaw);
 
-    const [list, total] = await Promise.all([
-        FoodCategory.find(filter)
-            .sort({ sortOrder: 1, createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .select('name image type foodTypeScope zoneId sortOrder createdAt updatedAt')
-            .lean(),
-        FoodCategory.countDocuments(filter)
-    ]);
+    const list = await FoodCategory.find(filter)
+        .sort({ sortOrder: 1, createdAt: -1 })
+        .select('name image type foodTypeScope zoneId sortOrder visibilityStartTime visibilityEndTime createdAt updatedAt')
+        .lean();
 
     await backfillLegacyCategoryWorkflow(list);
-    const categories = list.map((category) => serializeCategoryForResponse(category));
+    const visibleList = list.filter((category) => isCategoryVisibleNow(category, { timezone: 'Asia/Kolkata' }));
+    const paged = visibleList.slice(skip, skip + limit);
+    const categories = paged.map((category) => serializeCategoryForResponse(category));
 
-    return { categories, total, page, limit };
+    return { categories, total: visibleList.length, page, limit };
 }
 
 export async function createRestaurantCategory(restaurantId, body = {}) {

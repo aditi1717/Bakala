@@ -4,6 +4,7 @@ import { FoodItem } from '../admin/models/food.model.js';
 export const CATEGORY_APPROVAL_STATUSES = ['pending', 'approved', 'rejected'];
 export const CATEGORY_FOOD_TYPE_SCOPES = ['Veg', 'Non-Veg', 'Both'];
 export const GLOBAL_CATEGORY_FILTER = [{ restaurantId: { $exists: false } }, { restaurantId: null }];
+const CATEGORY_TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export const toObjectId = (value) => new mongoose.Types.ObjectId(String(value));
 
@@ -21,6 +22,59 @@ export const normalizeFoodTypeForCategory = (value) => {
     const normalized = String(value || '').trim();
     if (normalized === 'Veg') return 'Veg';
     return 'Non-Veg';
+};
+
+const parseTimeToMinutes = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return null;
+    if (!CATEGORY_TIME_REGEX.test(text)) return null;
+    const [hours, minutes] = text.split(':').map((part) => Number(part));
+    return hours * 60 + minutes;
+};
+
+export const normalizeCategoryVisibilityTime = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    if (!CATEGORY_TIME_REGEX.test(text)) return '';
+    return text;
+};
+
+const getCurrentMinutesForTimezone = (timezone = 'Asia/Kolkata') => {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: timezone
+    });
+    const parts = formatter.formatToParts(new Date());
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value || 0);
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value || 0);
+    return hour * 60 + minute;
+};
+
+export const isCategoryVisibleNow = (category = {}, options = {}) => {
+    const start = normalizeCategoryVisibilityTime(category?.visibilityStartTime);
+    const end = normalizeCategoryVisibilityTime(category?.visibilityEndTime);
+
+    if (!start && !end) return true;
+
+    const nowMinutes = Number.isFinite(options.currentMinutes)
+        ? Number(options.currentMinutes)
+        : getCurrentMinutesForTimezone(options.timezone || 'Asia/Kolkata');
+
+    const startMinutes = parseTimeToMinutes(start);
+    const endMinutes = parseTimeToMinutes(end);
+
+    if (start && !end && startMinutes !== null) return nowMinutes >= startMinutes;
+    if (!start && end && endMinutes !== null) return nowMinutes <= endMinutes;
+    if (startMinutes === null || endMinutes === null) return true;
+
+    if (startMinutes <= endMinutes) {
+        return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+    }
+
+    // Overnight window (e.g. 22:00 -> 02:00)
+    return nowMinutes >= startMinutes || nowMinutes <= endMinutes;
 };
 
 export const categoryAllowsFoodType = (scope, foodType) => {
@@ -210,6 +264,8 @@ export const serializeCategoryForResponse = (category = {}, options = {}) => {
             : null,
         zoneId: category.zoneId || null,
         sortOrder: category.sortOrder || 0,
+        visibilityStartTime: normalizeCategoryVisibilityTime(category.visibilityStartTime),
+        visibilityEndTime: normalizeCategoryVisibilityTime(category.visibilityEndTime),
         itemCount: options.includeCounts ? Number(stats?.totalFoods || 0) : undefined,
         approvedFoodCount: options.includeCounts ? Number(stats?.approvedFoods || 0) : undefined,
         createdAt: category.createdAt,
