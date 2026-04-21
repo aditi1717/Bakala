@@ -21,6 +21,7 @@ const getStatusColor = (orderStatus) => {
     "Ready": "bg-violet-100 text-violet-700",
     "Food On The Way": "bg-yellow-100 text-yellow-700",
     "Canceled": "bg-rose-100 text-rose-700",
+    "Cancelled by Admin": "bg-rose-100 text-rose-700",
     "Cancelled by Restaurant": "bg-red-100 text-red-700",
     "Cancelled - User Unavailable": "bg-red-100 text-red-700",
     "Cancelled by User": "bg-orange-100 text-orange-700",
@@ -181,6 +182,7 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                       <span className="font-medium">
                         {order.cancelledBy === 'user' ? 'Cancelled by User - ' : 
                          order.cancelledBy === 'restaurant' ? 'Cancelled by Restaurant - ' : 
+                         order.cancelledBy === 'admin' ? 'Cancelled by Admin - ' :
                          'Cancellation '}Reason:
                       </span> {order.cancellationReason}
                     </p>
@@ -210,7 +212,6 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                       order.payment?.method === 'cash' ||
                       order.payment?.method === 'cod'
                     const orderStatusRaw = String(order.orderStatus || order.status || '').toLowerCase()
-                    const isUserUnavailable = orderStatusRaw.includes('user unavailable')
                     const normalizedPaymentStatus = String(order.paymentStatus || '').toLowerCase()
                     const isCodMarkedPaid =
                       normalizedPaymentStatus === 'paid' ||
@@ -220,9 +221,7 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                     const codDisplayStatus = order.paymentCollectionStatus
                       ? order.paymentCollectionStatus
                       : (isCodMarkedPaid || isOrderDelivered ? 'Collected' : 'Not Collected')
-                    const displayPaymentStatus = isUserUnavailable
-                      ? (order.paymentCollectionStatus || order.paymentStatus || (isCod ? 'Unpaid' : 'Paid'))
-                      : (isCod ? codDisplayStatus : order.paymentStatus)
+                    const displayPaymentStatus = isCod ? codDisplayStatus : order.paymentStatus
 
                     return (
                       <p className={`text-sm font-medium ${getPaymentStatusColor(displayPaymentStatus)}`}>
@@ -302,7 +301,12 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                         <span className="text-xs font-bold text-slate-700 bg-white px-2 py-1 rounded">
                           {item.quantity || 1}x
                         </span>
-                        <p className="text-sm font-medium text-slate-900">{item.name || "Unknown Item"}</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {item.name || "Unknown Item"}
+                          {item.variantLabel ? (
+                            <span className="text-slate-500 font-normal"> ({item.variantLabel})</span>
+                          ) : null}
+                        </p>
                         {item.isVeg !== undefined && (
                           <span className={`text-xs px-1.5 py-0.5 rounded ${item.isVeg ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             {item.isVeg ? 'Veg' : 'Non-Veg'}
@@ -371,72 +375,6 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                   </a>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* User Unavailable Proof (No-response flow) */}
-          {(order?.noResponseMeta?.isUserUnavailable || order?.noResponseMeta?.proofImageUrl) && (
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-rose-600" />
-                User Unavailable Proof
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Call Attempted</p>
-                  <p className={`text-sm font-medium ${order?.noResponseMeta?.callAttempted ? "text-emerald-600" : "text-amber-600"}`}>
-                    {order?.noResponseMeta?.callAttempted ? "Yes" : "No"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Timer Completed At</p>
-                  <p className="text-sm font-medium text-slate-900">
-                    {order?.noResponseMeta?.waitTimerCompletedAt
-                      ? new Date(order.noResponseMeta.waitTimerCompletedAt).toLocaleString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        }).toUpperCase()
-                      : "N/A"}
-                  </p>
-                </div>
-              </div>
-
-              {order?.noResponseMeta?.proofImageUrl ? (
-                <div className="space-y-3">
-                  <div className="relative w-full max-w-2xl border-2 border-rose-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                    <img
-                      src={order.noResponseMeta.proofImageUrl}
-                      alt="No-response proof"
-                      className="w-full h-auto object-contain max-h-[500px] mx-auto block"
-                      loading="lazy"
-                      onError={(e) => {
-                        e.target.style.display = "none"
-                        const errorDiv = e.target.parentElement.querySelector(".proof-error-message")
-                        if (errorDiv) errorDiv.style.display = "block"
-                      }}
-                    />
-                    <div className="proof-error-message hidden p-6 text-center text-slate-500 text-sm bg-slate-50">
-                      <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-400" />
-                      Failed to load proof image
-                    </div>
-                  </div>
-                  <a
-                    href={order.noResponseMeta.proofImageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors shadow-sm"
-                  >
-                    <Eye className="w-4 h-4" />
-                    View Full Proof
-                  </a>
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">Proof image not available</p>
-              )}
             </div>
           )}
 

@@ -103,6 +103,26 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
         )}`
       : null;
 
+  const getItemVariantLabel = (item = {}) => {
+    const addons = Array.isArray(item?.addons)
+      ? item.addons
+          .map((addon) => String(addon?.name || addon?.title || "").trim())
+          .filter(Boolean)
+      : [];
+
+    const baseVariant =
+      item?.variantName ||
+      item?.selectedVariantName ||
+      item?.variationName ||
+      item?.sizeName ||
+      item?.variant?.name ||
+      "";
+
+    const parts = [String(baseVariant || "").trim()].filter(Boolean);
+    if (addons.length) parts.push(`Add-ons: ${addons.join(", ")}`);
+    return parts.join(" | ");
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -196,32 +216,47 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
             </div>
           </div>
           
-          {/* Order Items Section - Refined for Neat & Clean Look */}
+          {/* Order Items Section - Compact table view */}
           {order.items && order.items.length > 0 && (
-            <div className="bg-gray-50/50 rounded-2xl p-4 border border-gray-100/50">
+            <div className="bg-gray-50/60 rounded-2xl p-3.5 border border-gray-100/60">
               <div 
-                className="flex items-center gap-2 mb-3 font-bold text-[10px] uppercase tracking-widest"
+                className="flex items-center gap-2 mb-2.5 font-bold text-[10px] uppercase tracking-widest"
                 style={{ color: BRAND_THEME.colors.brand.primary }}
               >
                 <ShoppingBag className="w-4 h-4" />
                 <span>Order Items ({order.items.length})</span>
               </div>
               
-              <div className="space-y-3 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
-                {order.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-center py-0.5">
-                    <div className="flex items-center gap-3">
-                      {item.isVeg !== undefined && (
-                        <div className={`w-3.5 h-3.5 border ${item.isVeg ? "border-green-600" : "border-red-600"} flex items-center justify-center p-[1px]`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${item.isVeg ? "bg-green-600" : "bg-red-600"}`} />
+              <div className="max-h-[160px] overflow-y-auto rounded-xl border border-gray-200 bg-white/80 custom-scrollbar">
+                <div className="grid grid-cols-[56px_1fr] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-100">
+                  <span>Qty</span>
+                  <span>Food</span>
+                </div>
+                {order.items.map((item, idx) => {
+                  const qty = item.quantity || item.qty || 1;
+                  const itemName = String(item.name || item.foodName || "Item").trim();
+                  const variantLabel = getItemVariantLabel(item);
+                  return (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-[56px_1fr] items-start px-3 py-2 border-b last:border-b-0 border-gray-100"
+                    >
+                      <span className="text-xs font-bold text-gray-700">{qty}x</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          {item.isVeg !== undefined && (
+                            <div className={`w-3.5 h-3.5 border ${item.isVeg ? "border-green-600" : "border-red-600"} flex items-center justify-center p-[1px] shrink-0`}>
+                              <div className={`w-1.5 h-1.5 rounded-full ${item.isVeg ? "bg-green-600" : "bg-red-600"}`} />
+                            </div>
+                          )}
+                          <p className="text-[13px] leading-4 font-semibold text-gray-900 break-words">
+                            {variantLabel ? `${itemName} (${variantLabel})` : itemName}
+                          </p>
                         </div>
-                      )}
-                      <span className="text-sm font-bold text-gray-800">
-                        {item.quantity || item.qty || 1} <span className="text-gray-400 mx-1">×</span> {item.name || item.foodName}
-                      </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -265,3 +300,4 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
     </motion.div>
   );
 };
+

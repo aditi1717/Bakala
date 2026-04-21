@@ -242,6 +242,7 @@ export const BRAND_THEME = {
           nameHover: `group-hover:text-[${COLORS.brand.primary}]`,
           closingBadge: `bg-green-50 text-[${COLORS.brand.primary}] border border-green-100 dark:bg-green-950/40 dark:text-green-200 dark:border-green-900/60`,
           metaIcon: `text-[${COLORS.brand.primary}] dark:text-green-300`,
+          featuredDishBadge: "bg-black/60 backdrop-blur-md text-white border border-white/10",
         },
         promoCards: {
           offersGradient: `linear-gradient(145deg, ${COLORS.brand.primary}, ${COLORS.brand.primaryDark})`,

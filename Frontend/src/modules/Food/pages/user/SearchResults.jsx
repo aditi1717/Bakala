@@ -1016,7 +1016,7 @@ export default function SearchResults() {
 
                         return displayText ? (
                           <div className="absolute top-3 left-3">
-                            <div className="bg-gray-800/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium">
+                            <div className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium ${BRAND_THEME.tokens.homepage.home.restaurantCard.featuredDishBadge}`}>
                               {displayText}
                             </div>
                           </div>

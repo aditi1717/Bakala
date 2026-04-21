@@ -161,24 +161,6 @@ export const adminSidebarMenu = [
   },
   {
     type: "section",
-    label: "STORE MANAGEMENT",
-    items: [
-      {
-        type: "link",
-        label: "Products",
-        path: "/admin/food/store/products",
-        icon: "Package",
-      },
-      {
-        type: "link",
-        label: "Orders",
-        path: "/admin/food/store/orders",
-        icon: "ShoppingCart",
-      },
-    ],
-  },
-  {
-    type: "section",
     label: "HELP & SUPPORT",
     items: [
       { type: "link", label: "User Feedback", path: "/admin/food/contact-messages", icon: "Mail" },

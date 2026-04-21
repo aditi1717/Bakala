@@ -4,6 +4,9 @@ const orderItemSchema = new mongoose.Schema(
     {
         itemId: { type: String, required: true, trim: true },
         name: { type: String, required: true, trim: true },
+        variantId: { type: String, default: '', trim: true },
+        variantName: { type: String, default: '', trim: true },
+        variantPrice: { type: Number, min: 0, default: 0 },
         price: { type: Number, required: true, min: 0 },
         quantity: { type: Number, required: true, min: 1 },
         isVeg: { type: Boolean, default: true },
@@ -261,7 +264,6 @@ const orderSchema = new mongoose.Schema(
                 'delivered',
                 'cancelled_by_user',
                 'cancelled_by_restaurant',
-                'cancelled_by_user_unavailable',
                 'cancelled_by_admin'
             ],
             default: 'created'

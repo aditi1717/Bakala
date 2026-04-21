@@ -551,6 +551,18 @@ export const adminAPI = {
     apiClient.delete(`/food/admin/orders/${String(orderId)}`, {
       contextModule: "admin",
     }),
+  /** Update food order status as admin (accept/reject from admin orders screen). */
+  updateOrderStatus: (orderId, body = {}) =>
+    apiClient.patch(`/food/admin/orders/${String(orderId)}/status`, body ?? {}, {
+      contextModule: "admin",
+    }),
+  acceptOrder: (orderId) =>
+    adminAPI.updateOrderStatus(orderId, { orderStatus: "preparing" }),
+  rejectOrder: (orderId, reason = "") =>
+    adminAPI.updateOrderStatus(orderId, {
+      orderStatus: "cancelled_by_admin",
+      reason: String(reason || "").trim(),
+    }),
   /** Dispatch settings – auto vs manual assign (global) */
   /** Create restaurant (admin). Single API: POST /food/admin/restaurants. Body: JSON with image URLs. */
   createRestaurant: (body) =>

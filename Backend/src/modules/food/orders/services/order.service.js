@@ -666,6 +666,11 @@ async function notifyRestaurantNewOrder(orderDoc) {
           orderMongoId: payload.orderMongoId,
         },
       );
+      io.to(rooms.admin()).emit("admin_new_order", payload);
+      io.to(rooms.admin()).emit("play_notification_sound", {
+        orderId: payload.orderId,
+        orderMongoId: payload.orderMongoId,
+      });
     }
 
     await notifyOwnersSafely(
@@ -1817,6 +1822,7 @@ export async function cancelOrder(orderId, userId, reason) {
       };
       io.to(rooms.user(userId)).emit("order_status_update", payload);
       io.to(rooms.restaurant(order.restaurantId)).emit("order_status_update", payload);
+      io.to(rooms.admin()).emit("order_status_update", payload);
     }
   } catch (err) {
     logger.warn(`cancelOrder socket emit failed: ${err?.message || err}`);
@@ -1868,6 +1874,7 @@ export async function updateOrderInstructions(orderId, userId, instructions) {
       if (order.dispatch?.deliveryPartnerId) {
         io.to(rooms.delivery(order.dispatch.deliveryPartnerId)).emit("order_status_update", payload);
       }
+      io.to(rooms.admin()).emit("order_status_update", payload);
     }
   } catch (err) {
     logger.warn(`updateOrderInstructions socket emit failed: ${err?.message || err}`);
@@ -2068,6 +2075,7 @@ export async function updateOrderStatusRestaurant(
           payload,
         );
         io.to(rooms.user(order.userId)).emit("order_status_update", payload);
+        io.to(rooms.admin()).emit("order_status_update", payload);
       }
 
     const notifyList = [
@@ -2213,6 +2221,173 @@ export async function resendDeliveryNotificationRestaurant(orderId, restaurantId
 
     await notifyAdminsOrderReadyForAssignment(order);
     return { notifiedCount: 1 };
+}
+
+export async function updateOrderStatusAdmin(
+  orderId,
+  adminId,
+  orderStatus,
+  reason = "",
+  adminScope = {},
+) {
+  const identity = buildOrderIdentityFilter(orderId);
+  if (!identity) throw new ValidationError("Order id required");
+
+  const normalizedStatus = String(orderStatus || "").trim().toLowerCase();
+  const allowedStatuses = new Set([
+    "confirmed",
+    "preparing",
+    "ready_for_pickup",
+    "picked_up",
+    "delivered",
+    "cancelled_by_admin",
+  ]);
+  if (!allowedStatuses.has(normalizedStatus)) {
+    throw new ValidationError("Invalid order status for admin update");
+  }
+
+  const order = await FoodOrder.findOne(identity);
+  if (!order) throw new NotFoundError("Order not found");
+
+  const scope = normalizeAdminScope(adminScope || {});
+  if (scope.isSubAdmin) {
+    const orderZoneId = order?.zoneId ? String(order.zoneId) : "";
+    const hasZoneAccess = scope.zoneIds.some((zid) => String(zid) === orderZoneId);
+    if (!hasZoneAccess) throw new ForbiddenError("Sub-admin can only access assigned zones");
+  }
+
+  const from = String(order.orderStatus || "").toLowerCase();
+  const terminalStatuses = new Set([
+    "delivered",
+    "cancelled_by_user",
+    "cancelled_by_restaurant",
+    "cancelled_by_admin",
+  ]);
+  if (terminalStatuses.has(from) && from !== normalizedStatus) {
+    throw new ValidationError(`Cannot update order in ${from} status`);
+  }
+  if (normalizedStatus === "confirmed" && !["created", "confirmed"].includes(from)) {
+    throw new ValidationError(`Cannot accept order from ${from} status`);
+  }
+  if (from === normalizedStatus) return order.toObject();
+
+  order.orderStatus = normalizedStatus;
+  pushStatusHistory(order, {
+    byRole: "ADMIN",
+    byId: adminId,
+    from,
+    to: normalizedStatus,
+    note: reason || "",
+  });
+  await order.save();
+
+  if (normalizedStatus === "cancelled_by_admin") {
+    try {
+      const cancelledOrder = order.toObject ? order.toObject() : order;
+      const cancelUserId = cancelledOrder.userId ? String(cancelledOrder.userId) : null;
+
+      if (cancelledOrder.appliedRestaurantOfferId) {
+        await RestaurantOffer.updateOne(
+          { _id: cancelledOrder.appliedRestaurantOfferId },
+          { $inc: { usedCount: -1 } },
+        );
+        if (cancelUserId && mongoose.Types.ObjectId.isValid(cancelUserId)) {
+          await RestaurantOfferUsage.updateOne(
+            { offerId: cancelledOrder.appliedRestaurantOfferId, userId: new mongoose.Types.ObjectId(cancelUserId) },
+            { $inc: { count: -1 } },
+          );
+        }
+      }
+
+      if (cancelledOrder.appliedCouponOfferId) {
+        await FoodOffer.updateOne(
+          { _id: cancelledOrder.appliedCouponOfferId },
+          { $inc: { usedCount: -1 } },
+        );
+        if (cancelUserId && mongoose.Types.ObjectId.isValid(cancelUserId)) {
+          await FoodOfferUsage.updateOne(
+            { offerId: cancelledOrder.appliedCouponOfferId, userId: new mongoose.Types.ObjectId(cancelUserId) },
+            { $inc: { count: -1 } },
+          );
+        }
+      }
+    } catch (offerReverseErr) {
+      logger.warn(`updateOrderStatusAdmin offer usage reversal failed: ${offerReverseErr?.message || offerReverseErr}`);
+    }
+  }
+
+  const notifyList = [
+    { ownerType: "USER", ownerId: order.userId },
+    { ownerType: "RESTAURANT", ownerId: order.restaurantId },
+  ];
+  if (order.dispatch?.deliveryPartnerId) {
+    notifyList.push({ ownerType: "DELIVERY_PARTNER", ownerId: order.dispatch.deliveryPartnerId });
+  }
+
+  const statusText = normalizedStatus.replace(/_/g, " ");
+  const title = normalizedStatus === "confirmed" ? "Order Accepted" : `Order ${order.orderId} updated`;
+  const body = normalizedStatus === "cancelled_by_admin"
+    ? `Order #${order.orderId} was cancelled by admin.${reason ? ` Reason: ${reason}` : ""}`
+    : `Order status changed to ${statusText}.`;
+
+  await notifyOwnersSafely(notifyList, {
+    title,
+    body,
+    image: "https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png",
+    data: {
+      type: "order_status_update",
+      orderId: order.orderId,
+      orderMongoId: order._id?.toString?.() || "",
+      orderStatus: normalizedStatus,
+    },
+  });
+
+  try {
+    const io = getIO();
+    if (io) {
+      const payload = {
+        orderMongoId: order._id?.toString?.(),
+        orderId: order.orderId,
+        orderStatus: normalizedStatus,
+        title,
+        message: body,
+      };
+      io.to(rooms.user(order.userId)).emit("order_status_update", payload);
+      io.to(rooms.restaurant(order.restaurantId)).emit("order_status_update", payload);
+      if (order.dispatch?.deliveryPartnerId) {
+        io.to(rooms.delivery(order.dispatch.deliveryPartnerId)).emit("order_status_update", payload);
+      }
+      io.to(rooms.admin()).emit("order_status_update", payload);
+    }
+  } catch (err) {
+    logger.warn(`updateOrderStatusAdmin socket emit failed: ${err?.message || err}`);
+  }
+
+  if (normalizedStatus === "cancelled_by_admin") {
+    try {
+      const isOnlinePaid =
+        order.payment.method === "razorpay" &&
+        (order.payment.status === "paid" || order.payment.status === "refunded");
+      await foodTransactionService.updateTransactionStatus(order._id, "cancelled_by_admin", {
+        status: isOnlinePaid ? "refunded" : "failed",
+        note: "Order cancelled by admin",
+        recordedByRole: "ADMIN",
+        recordedById: adminId,
+      });
+    } catch (err) {
+      logger.warn(`updateOrderStatusAdmin transaction sync failed: ${err?.message || err}`);
+    }
+  }
+
+  enqueueOrderEvent("admin_order_status_updated", {
+    orderMongoId: order._id?.toString?.(),
+    orderId: order.orderId,
+    adminId: adminId ? String(adminId) : "",
+    from,
+    to: normalizedStatus,
+  });
+
+  return order.toObject();
 }
 
 export async function getCurrentTripDelivery(deliveryPartnerId) {
@@ -2379,6 +2554,12 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
         orderStatus: order.orderStatus,
         dispatchStatus: order.dispatch?.status,
       });
+      io.to(rooms.admin()).emit("order_status_update", {
+        orderMongoId: order._id?.toString?.(),
+        orderId: order.orderId,
+        orderStatus: order.orderStatus,
+        dispatchStatus: order.dispatch?.status,
+      });
     }
     await notifyOwnersSafely(
       [
@@ -2444,6 +2625,12 @@ export async function rejectOrderDelivery(orderId, deliveryPartnerId, reasonType
           dispatchStatus: order.dispatch?.status,
         });
         io.to(rooms.user(order.userId)).emit("order_status_update", {
+          orderMongoId: order._id?.toString?.(),
+          orderId: order.orderId,
+          orderStatus: order.orderStatus,
+          dispatchStatus: order.dispatch?.status,
+        });
+        io.to(rooms.admin()).emit("order_status_update", {
           orderMongoId: order._id?.toString?.(),
           orderId: order.orderId,
           orderStatus: order.orderStatus,
@@ -2875,6 +3062,7 @@ function emitOrderUpdate(order, deliveryPartnerId) {
       io.to(rooms.delivery(deliveryPartnerId)).emit("order_status_update", payload);
       io.to(rooms.restaurant(order.restaurantId)).emit("order_status_update", payload);
       io.to(rooms.user(order.userId)).emit("order_status_update", payload);
+      io.to(rooms.admin()).emit("order_status_update", payload);
     }
 
     void notifyOwnersSafely(
@@ -3320,6 +3508,7 @@ export async function assignDeliveryPartnerAdmin(
   adminId,
   adminScope = {},
 ) {
+  const assignmentEligibleStatuses = new Set(["confirmed", "preparing", "ready", "ready_for_pickup"]);
   const order = await FoodOrder.findById(orderId);
   if (!order) throw new NotFoundError("Order not found");
   const scope = normalizeAdminScope(adminScope);
@@ -3328,8 +3517,8 @@ export async function assignDeliveryPartnerAdmin(
     const hasZoneAccess = scope.zoneIds.some((zid) => String(zid) === orderZoneId);
     if (!hasZoneAccess) throw new ForbiddenError("Sub-admin can only assign orders in assigned zones");
   }
-  if (order.orderStatus !== "ready_for_pickup") {
-    throw new ValidationError("Only ready orders can be assigned to a delivery partner");
+  if (!assignmentEligibleStatuses.has(String(order.orderStatus || "").toLowerCase())) {
+    throw new ValidationError("Only accepted/preparing/ready orders can be assigned to a delivery partner");
   }
   if (order.dispatch.status === "accepted")
     throw new ValidationError("Order already accepted by partner");
@@ -3366,6 +3555,7 @@ export async function assignDeliveryPartnerAdmin(
 }
 
 export async function resendAssignedDeliveryNotificationAdmin(orderId, adminId, adminScope = {}) {
+  const assignmentEligibleStatuses = new Set(["confirmed", "preparing", "ready", "ready_for_pickup"]);
   const identity = buildOrderIdentityFilter(orderId);
   if (!identity) throw new ValidationError("Order id required");
 
@@ -3378,8 +3568,8 @@ export async function resendAssignedDeliveryNotificationAdmin(orderId, adminId, 
     const hasZoneAccess = scope.zoneIds.some((zid) => String(zid) === orderZoneId);
     if (!hasZoneAccess) throw new ForbiddenError("Sub-admin can only resend notifications in assigned zones");
   }
-  if (order.orderStatus !== "ready_for_pickup") {
-    throw new ValidationError("Only ready orders can be resent to a delivery partner");
+  if (!assignmentEligibleStatuses.has(String(order.orderStatus || "").toLowerCase())) {
+    throw new ValidationError("Only accepted/preparing/ready orders can be resent to a delivery partner");
   }
   if (order.dispatch?.status !== "assigned" || !order.dispatch?.deliveryPartnerId) {
     throw new ValidationError("No assigned delivery partner found for resend");

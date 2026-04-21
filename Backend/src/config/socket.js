@@ -47,6 +47,7 @@ const roomNames = {
     restaurant: (id) => `restaurant:${String(id)}`,
     user: (id) => `user:${String(id)}`,
     delivery: (id) => `delivery:${String(id)}`,
+    admin: () => 'admin:all',
     tracking: (orderId) => `tracking:${String(orderId)}`
 };
 
@@ -147,6 +148,7 @@ export const initSocket = async (server) => {
                     room: roomNames.delivery(userId),
                 });
             }
+            if (String(role).includes('ADMIN')) socket.join(roomNames.admin());
         }
 
         // Explicit join (used by existing restaurant client hook).

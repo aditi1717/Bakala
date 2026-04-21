@@ -17,6 +17,9 @@ const getNormalizedRestaurantPath = (pathname) => {
   if (pathname.startsWith("/food/restaurant")) {
     return pathname.slice("/food/restaurant".length) || "/"
   }
+  if (pathname.startsWith("/restaurant")) {
+    return pathname.slice("/restaurant".length) || "/"
+  }
 
   return pathname || "/"
 }
@@ -29,7 +32,7 @@ const resolveRestaurantBackPath = ({ pathname, state }) => {
     normalizedPath === "/orders/all" ||
     /^\/orders\/[^/]+$/.test(normalizedPath)
   ) {
-    return explicitBackPath || "/food/restaurant/orders"
+    return explicitBackPath || "__history_back_orders__"
   }
 
   if (
@@ -127,6 +130,15 @@ export default function useRestaurantBackNavigation() {
   const location = useLocation()
 
   return useCallback(() => {
-    navigate(resolveRestaurantBackPath(location))
+    const target = resolveRestaurantBackPath(location)
+    if (target === "__history_back_orders__") {
+      if (window.history.length > 1) {
+        navigate(-1)
+      } else {
+        navigate("/food/restaurant/orders")
+      }
+      return
+    }
+    navigate(target)
   }, [location, navigate])
 }

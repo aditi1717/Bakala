@@ -355,6 +355,25 @@ export async function getOrderByIdAdminController(req, res, next) {
     }
 }
 
+export async function updateOrderStatusAdminController(req, res, next) {
+    try {
+        const adminId = req.user?.userId;
+        const orderId = req.params.orderId;
+        const dto = validateOrderStatusDto(req.body);
+        const reason = String(req.body?.reason || '').trim();
+        const order = await orderService.updateOrderStatusAdmin(
+            orderId,
+            adminId,
+            dto.orderStatus,
+            reason,
+            req.adminAuth || {}
+        );
+        return sendResponse(res, 200, 'Order status updated', { order });
+    } catch (err) {
+        next(err);
+    }
+}
+
 export async function assignDeliveryPartnerController(req, res, next) {
     try {
         const adminId = req.user?.userId;

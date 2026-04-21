@@ -40,11 +40,12 @@ const normalizeId = (value) => {
 }
 
 const getOrderStatus = (order) => String(order?.orderStatus || order?.status || "").toLowerCase()
+const isAssignmentEligibleStatus = (status) =>
+  ["confirmed", "preparing", "ready", "ready_for_pickup"].includes(String(status || "").toLowerCase())
 const isCancelledOrder = (status, cancelledAt) =>
   status === "cancelled" ||
   status === "cancelled_by_user" ||
   status === "cancelled_by_restaurant" ||
-  status === "cancelled_by_user_unavailable" ||
   status === "cancelled_by_admin" ||
   Boolean(cancelledAt)
 
@@ -101,15 +102,15 @@ const mapOrderStatus = (order) => {
 
   const partnerFallbackReason = getDeliveryPartnerFallbackReason(order)
 
-  if (status === "ready_for_pickup" && dispatch?.status === "unassigned" && partnerFallbackReason === "timed_out") {
+  if (isAssignmentEligibleStatus(status) && dispatch?.status === "unassigned" && partnerFallbackReason === "timed_out") {
     return "Delivery Request Timed Out"
   }
 
-  if (status === "ready_for_pickup" && dispatch?.status === "unassigned" && partnerFallbackReason === "passed") {
+  if (isAssignmentEligibleStatus(status) && dispatch?.status === "unassigned" && partnerFallbackReason === "passed") {
     return "Delivery Boy Passed"
   }
 
-  if (status === "ready_for_pickup" && dispatch?.status === "unassigned") {
+  if (isAssignmentEligibleStatus(status) && dispatch?.status === "unassigned") {
     return "Ready for Assignment"
   }
 
@@ -196,13 +197,13 @@ const buildStatusHistory = (order) => {
   }
 
   const fallbackReason = getDeliveryPartnerFallbackReason(order)
-  if (status === "ready_for_pickup" && String(order?.dispatch?.status || "").toLowerCase() === "unassigned" && fallbackReason === "passed") {
+  if (isAssignmentEligibleStatus(status) && String(order?.dispatch?.status || "").toLowerCase() === "unassigned" && fallbackReason === "passed") {
     history.push({
       status: "Delivery Boy Passed",
       timestamp: formatTimestamp(order.updatedAt) || "N/A"
     })
   }
-  if (status === "ready_for_pickup" && String(order?.dispatch?.status || "").toLowerCase() === "unassigned" && fallbackReason === "timed_out") {
+  if (isAssignmentEligibleStatus(status) && String(order?.dispatch?.status || "").toLowerCase() === "unassigned" && fallbackReason === "timed_out") {
     history.push({
       status: "Delivery Request Timed Out",
       timestamp: formatTimestamp(order.updatedAt) || "N/A"
@@ -342,6 +343,10 @@ const transformOrder = (order, index) => {
       normalizeId(restaurant?.zoneId) ||
       "",
     zoneName:
+      order?.zoneName ||
+      order?.zone?.name ||
+      order?.zone?.zoneName ||
+      order?.zone?.serviceLocation ||
       orderZone?.name ||
       orderZone?.zoneName ||
       orderZone?.serviceLocation ||
@@ -361,10 +366,10 @@ const transformOrder = (order, index) => {
     dispatchStatus: order?.dispatch?.status || "unassigned",
     rawOrderStatus: order?.orderStatus || order?.status || "",
     canAssign:
-      String(order?.orderStatus || "").toLowerCase() === "ready_for_pickup" &&
+      isAssignmentEligibleStatus(order?.orderStatus || order?.status) &&
       String(order?.dispatch?.status || "unassigned").toLowerCase() === "unassigned",
     canResend:
-      String(order?.orderStatus || "").toLowerCase() === "ready_for_pickup" &&
+      isAssignmentEligibleStatus(order?.orderStatus || order?.status) &&
       String(order?.dispatch?.status || "").toLowerCase() === "assigned" &&
       assignmentTimedOut &&
       Boolean(order?.dispatch?.deliveryPartnerId),
@@ -501,7 +506,6 @@ export default function OrderDetectDelivery() {
     filters,
     setFilters,
     filteredData,
-    count,
     activeFiltersCount,
     handleApplyFilters,
     handleResetFilters,
@@ -531,6 +535,29 @@ export default function OrderDetectDelivery() {
     
     return { total, ordered, restaurantAccepted, rejected, readyForAssignment, deliveryBoyAssigned, assignmentAccepted, reachedPickup, orderIdAccepted, reachedDrop, delivered }
   }, [filteredData, orders.length])
+
+  const zoneNameById = useMemo(() => {
+    const map = new Map()
+    for (const zone of zones) {
+      const zid = normalizeId(zone?._id || zone?.id)
+      if (!zid) continue
+      const label =
+        zone?.name || zone?.zoneName || zone?.serviceLocation || ""
+      if (label) map.set(zid, label)
+    }
+    return map
+  }, [zones])
+
+  const tableOrders = useMemo(() => {
+    return filteredData.map((order) => {
+      if (order?.zoneName && order.zoneName !== "N/A") return order
+      const resolvedZoneName = zoneNameById.get(normalizeId(order?.zoneId))
+      return {
+        ...order,
+        zoneName: resolvedZoneName || "N/A",
+      }
+    })
+  }, [filteredData, zoneNameById])
 
   const handleOpenAssignDialog = (order) => {
     setSelectedOrderForAssignment(order)
@@ -594,7 +621,7 @@ export default function OrderDetectDelivery() {
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       <OrdersTopbar 
         title="Order Detect Delivery" 
-        count={count} 
+        count={orders.length} 
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onFilterClick={() => setIsFilterOpen(true)}
@@ -792,7 +819,7 @@ export default function OrderDetectDelivery() {
         onAssigned={() => fetchOrders({ silent: true })}
       />
       <OrderDetectDeliveryTable 
-        orders={filteredData} 
+        orders={tableOrders} 
         visibleColumns={visibleColumns}
         onViewOrder={handleViewOrder}
         onPrintOrder={handlePrintOrder}

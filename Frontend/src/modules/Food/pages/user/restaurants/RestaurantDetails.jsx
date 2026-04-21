@@ -149,7 +149,11 @@ function RestaurantDetailsContent() {
   }, [restaurantItemOffers])
 
   const getLineItemIdForDish = (item, variant = null) =>
-    buildCartLineId(item?.id || item?._id || "", variant?.id || variant?._id || "")
+    buildCartLineId(
+      item?.id || item?._id || "",
+      variant?.id || variant?._id || "",
+      variant?.name || "",
+    )
 
   const getVariantForDish = (item, preferredVariantId = "") => {
     const variants = getFoodVariants(item)
@@ -2201,7 +2205,7 @@ function RestaurantDetailsContent() {
             onClick={() => setShowLocationSheet(true)}
           >
             <MapPin className="h-4 w-4" />
-            <span>{restaurant?.distance || "1.2 km"} � {restaurant?.location || "Location"}</span>
+            <span>{restaurant?.distance || "1.2 km"} • {restaurant?.location || "Location"}</span>
             <ChevronDown className="h-4 w-4 text-gray-500" />
           </div>
 

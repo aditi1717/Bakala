@@ -18,7 +18,7 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
-const countryCodes = [{ code: "+91", country: "IN", flag: "????" }]
+const countryCodes = [{ code: "+91", country: "IN", flag: "IN" }]
 
 export default function DeliverySignIn() {
   const companyName = useCompanyName()
@@ -111,7 +111,7 @@ export default function DeliverySignIn() {
         <div className="text-center space-y-2.5">
           <div className="mx-auto h-16 w-16 rounded-2xl flex items-center justify-center">
             {!logoUrl || showFallbackLogo ? (
-              <span className="text-white text-3xl">??</span>
+              <span className="text-white text-3xl">BK</span>
             ) : (
               <img
                 src={logoUrl}
@@ -136,7 +136,6 @@ export default function DeliverySignIn() {
           <div className="flex gap-2 items-stretch w-full">
             <div className="flex items-center px-4 h-12 border border-gray-200 bg-gray-50 text-gray-900 rounded-xl shrink-0">
               <span className="flex items-center gap-2 text-base font-medium">
-                <span role="img" aria-label="India">????</span>
                 <span>+91</span>
               </span>
             </div>
@@ -152,7 +151,7 @@ export default function DeliverySignIn() {
               style={!error ? { boxShadow: `0 0 0 2px ${BRAND_THEME.colors.brand.primary}1a`, borderColor: BRAND_THEME.colors.brand.primary } : undefined}
             />
           </div>
-          <p className="text-xs text-gray-500">We’ll send a verification code via SMS.</p>
+          <p className="text-xs text-gray-500">We'll send a verification code via SMS.</p>
           {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
 

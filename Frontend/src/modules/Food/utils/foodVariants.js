@@ -39,5 +39,17 @@ export const getFoodPriceLabel = (item = {}) => {
   return hasFoodVariants(item) ? `Starting from ₹${Math.round(price)}` : `₹${Math.round(price)}`
 }
 
-export const buildCartLineId = (itemId, variantId = "") =>
-  `${String(itemId || "")}::${String(variantId || "base")}`
+const normalizeLineKeyPart = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-_]/g, "")
+
+export const buildCartLineId = (itemId, variantId = "", variantLabel = "") => {
+  const normalizedItemId = String(itemId || "").trim()
+  const normalizedVariantId = normalizeLineKeyPart(variantId)
+  const normalizedVariantLabel = normalizeLineKeyPart(variantLabel)
+  const variantKey = normalizedVariantId || normalizedVariantLabel || "base"
+  return `${normalizedItemId}::${variantKey}`
+}

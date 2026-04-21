@@ -114,7 +114,7 @@ const normalizeCartData = (rawCart) => {
       const lineItemId =
         item.lineItemId ||
         item.cartLineId ||
-        buildCartLineId(baseItemId, variantId)
+        buildCartLineId(baseItemId, variantId, variantName)
 
       return {
         ...item,
@@ -141,14 +141,14 @@ const normalizeCartData = (rawCart) => {
     })
 }
 
-const resolveCartEntryId = (items, itemId, variantId = "") => {
+const resolveCartEntryId = (items, itemId, variantId = "", variantName = "") => {
   const normalizedItemId = String(itemId || "")
   const safeItems = Array.isArray(items) ? items : []
 
   const directMatch = safeItems.find((item) => item.id === normalizedItemId)
   if (directMatch) return directMatch.id
 
-  const preferredId = buildCartLineId(normalizedItemId, variantId)
+  const preferredId = buildCartLineId(normalizedItemId, variantId, variantName)
 
   const exactMatch = safeItems.find((item) => item.id === preferredId)
   if (exactMatch) return exactMatch.id
@@ -283,13 +283,32 @@ export function CartProvider({ children }) {
         }
       }
       
-      const existing = safePrev.find((i) => i.id === item.id)
+      const baseIncomingItemId =
+        item?.itemId ||
+        item?.productId ||
+        item?.foodId ||
+        item?.baseItemId ||
+        item?.menuItemId ||
+        item?.id ||
+        item?._id
+      const incomingVariantId =
+        item?.variantId || item?.variant?._id || item?.variant?.id || ""
+      const incomingVariantName =
+        (typeof item?.variantName === "string" && item.variantName) ||
+        (typeof item?.variant?.name === "string" ? item.variant.name : "")
+      const resolvedIncomingLineId =
+        item?.lineItemId ||
+        item?.cartLineId ||
+        buildCartLineId(baseIncomingItemId, incomingVariantId, incomingVariantName)
+
+      const existing = safePrev.find((i) => i.id === resolvedIncomingLineId)
       if (existing) {
         // Set last add event for animation when incrementing existing item
         if (sourcePosition) {
           setLastAddEvent({
             product: {
               id: item.id,
+              lineItemId: resolvedIncomingLineId,
               name: item.name,
               imageUrl: item.image || item.imageUrl,
             },
@@ -299,7 +318,7 @@ export function CartProvider({ children }) {
           setTimeout(() => setLastAddEvent(null), 1500)
         }
         return safePrev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+          i.id === resolvedIncomingLineId ? { ...i, quantity: i.quantity + 1 } : i
         )
       }
       
@@ -309,13 +328,23 @@ export function CartProvider({ children }) {
         return safePrev;
       }
       
-      const newItem = { ...item, quantity: 1 }
+      const newItem = {
+        ...item,
+        id: resolvedIncomingLineId,
+        lineItemId: resolvedIncomingLineId,
+        itemId: String(baseIncomingItemId || ""),
+        productId: String(baseIncomingItemId || ""),
+        variantId: incomingVariantId ? String(incomingVariantId) : "",
+        variantName: incomingVariantName || "",
+        quantity: 1,
+      }
       
       // Set last add event for animation if sourcePosition is provided
       if (sourcePosition) {
         setLastAddEvent({
           product: {
             id: item.id,
+            lineItemId: resolvedIncomingLineId,
             name: item.name,
             imageUrl: item.image || item.imageUrl,
           },

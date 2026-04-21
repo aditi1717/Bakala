@@ -5,9 +5,10 @@ import { useProximityCheck } from '@/modules/DeliveryV2/hooks/useProximityCheck'
 import { useOrderManager } from '@/modules/DeliveryV2/hooks/useOrderManager';
 import { useDeliveryNotifications } from '@food/hooks/useDeliveryNotifications';
 import { writeOrderTracking } from '@food/realtimeTracking';
-import { deliveryAPI, uploadAPI } from '@food/api';
+import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import { BRAND_THEME } from '@/config/brandTheme';
+import { useNavigate } from 'react-router-dom';
 
 // Components
 import LiveMap from '@/modules/DeliveryV2/components/map/LiveMap';
@@ -22,23 +23,20 @@ import PocketV2 from '@/modules/DeliveryV2/pages/PocketV2';
 import HistoryV2 from '@/modules/DeliveryV2/pages/HistoryV2';
 import ProfileV2 from '@/modules/DeliveryV2/pages/ProfileV2';
 import ExploreV2 from '@/modules/DeliveryV2/pages/ExploreV2';
-import ShopV2 from '@/modules/DeliveryV2/pages/ShopV2';
+
+// Utils
+import { getHaversineDistance, calculateETA, calculateHeading } from '@/modules/DeliveryV2/utils/geo';
+import { useCompanyName } from "@food/hooks/useCompanyName";
+import useNotificationInbox from "@food/hooks/useNotificationInbox";
 
 // Icons
 import {
   Bell, HelpCircle, AlertTriangle,
   Wallet, History, User as UserIcon, LayoutGrid,
   Plus, Minus, Navigation2, Target, Play, CheckCircle2, Clock, ChevronDown,
-  Contact, Package, Store, Phone, Camera, Image as ImageIcon, Loader2
+  Contact, Package, Phone
 } from 'lucide-react';
 
-import { getHaversineDistance, calculateETA, calculateHeading } from '@/modules/DeliveryV2/utils/geo';
-import { useCompanyName } from "@food/hooks/useCompanyName";
-import { useNavigate } from 'react-router-dom';
-import useNotificationInbox from "@food/hooks/useNotificationInbox";
-
-const USER_RESPONSE_WAIT_SECONDS = 10;
-const NO_RESPONSE_BACKEND_STATUS = 'cancelled_by_user_unavailable';
 const INCOMING_ORDER_STORAGE_KEY = 'delivery_v2_incoming_order';
 const INCOMING_ORDER_TTL_MS = 2 * 60 * 1000;
 
@@ -158,14 +156,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const [activePolyline, setActivePolyline] = useState(null);
   const [customerContact, setCustomerContact] = useState(() => ({ name: 'Customer', phone: '', dialPhone: '' }));
   const [isCustomerContactLoading, setIsCustomerContactLoading] = useState(false);
-  const [hasContactAttempted, setHasContactAttempted] = useState(false);
-  const [responseWaitEndsAt, setResponseWaitEndsAt] = useState(null);
-  const [responseWaitSecondsLeft, setResponseWaitSecondsLeft] = useState(0);
-  const [noResponseProofUrl, setNoResponseProofUrl] = useState('');
-  const [isUploadingNoResponseProof, setIsUploadingNoResponseProof] = useState(false);
-  const [isSubmittingNoResponse, setIsSubmittingNoResponse] = useState(false);
   const mapRef = useRef(null);
-  const noResponseProofInputRef = useRef(null);
   const lastContactFetchOrderIdRef = useRef(null);
 
   const isLoggingOut = useRef(false);
@@ -370,34 +361,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
   useEffect(() => {
     const orderId = String(activeOrder?.orderId || activeOrder?._id || '').trim();
-    if (!orderId || !['PICKED_UP', 'REACHED_DROP'].includes(tripStatus)) {
-      setHasContactAttempted(false);
-      setResponseWaitEndsAt(null);
-      setResponseWaitSecondsLeft(0);
-      setNoResponseProofUrl('');
-      setIsUploadingNoResponseProof(false);
-      setIsSubmittingNoResponse(false);
-    }
-  }, [activeOrder?.orderId, activeOrder?._id, tripStatus]);
-
-  useEffect(() => {
-    if (!responseWaitEndsAt) {
-      setResponseWaitSecondsLeft(0);
-      return;
-    }
-
-    const syncTime = () => {
-      const seconds = Math.max(0, Math.ceil((responseWaitEndsAt - Date.now()) / 1000));
-      setResponseWaitSecondsLeft(seconds);
-    };
-
-    syncTime();
-    const intervalId = setInterval(syncTime, 1000);
-    return () => clearInterval(intervalId);
-  }, [responseWaitEndsAt]);
-
-  useEffect(() => {
-    const orderId = String(activeOrder?.orderId || activeOrder?._id || '').trim();
     if (!orderId) {
       setCustomerContact({ name: 'Customer', phone: '', dialPhone: '' });
       setIsCustomerContactLoading(false);
@@ -458,39 +421,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       }
     : activeOrder;
 
-  const startResponseWaitTimer = useCallback(() => {
-    setHasContactAttempted(true);
-    setResponseWaitEndsAt((current) => {
-      if (current && current > Date.now()) return current;
-      return Date.now() + USER_RESPONSE_WAIT_SECONDS * 1000;
-    });
-  }, []);
-
-  const handleContactUserCall = useCallback(() => {
-    if (!customerContact.dialPhone) {
-      toast.error('Customer phone not available');
-      return;
-    }
-    startResponseWaitTimer();
-    toast.success('Call marked as connected. 10-second timer started');
-  }, [customerContact.dialPhone, startResponseWaitTimer]);
-
-  const cancelNoResponseFlow = useCallback(() => {
-    if (isSubmittingNoResponse) return;
-    setHasContactAttempted(false);
-    setResponseWaitEndsAt(null);
-    setResponseWaitSecondsLeft(0);
-    setNoResponseProofUrl('');
-    toast.success('No-response flow cancelled. Back to normal handover.');
-  }, [isSubmittingNoResponse]);
-
-  const isResponseWaitActive = !!responseWaitEndsAt && responseWaitSecondsLeft > 0;
-  const isResponseWaitCompleted = hasContactAttempted && !!responseWaitEndsAt && responseWaitSecondsLeft <= 0;
-  const isDropArrivalLockedByWait =
-    ['PICKED_UP', 'REACHED_DROP'].includes(tripStatus) && hasContactAttempted && isResponseWaitActive;
-  const isDropArrivalSlideDisabled = !isWithinRange || isDropArrivalLockedByWait;
-  const waitMinutes = String(Math.floor(responseWaitSecondsLeft / 60)).padStart(2, '0');
-  const waitSeconds = String(responseWaitSecondsLeft % 60).padStart(2, '0');
   const deliveryInstructionText = pickFirstText(
     activeOrder?.note,
     activeOrder?.customerNote,
@@ -498,92 +428,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     activeOrder?.specialInstructions,
     activeOrder?.deliveryInstructions,
   );
-
-  useEffect(() => {
-    const shouldLockScroll =
-      ['PICKED_UP', 'REACHED_DROP'].includes(tripStatus) && hasContactAttempted && isResponseWaitActive;
-    if (!shouldLockScroll) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    const previousTouchAction = document.body.style.touchAction;
-    document.body.style.overflow = 'hidden';
-    document.body.style.touchAction = 'none';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.body.style.touchAction = previousTouchAction;
-    };
-  }, [hasContactAttempted, isResponseWaitActive, tripStatus]);
-
-  const handleNoResponseProofSelect = useCallback(async (file) => {
-    if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error('Proof image must be under 8MB');
-      return;
-    }
-
-    setIsUploadingNoResponseProof(true);
-    try {
-      const response = await uploadAPI.uploadMedia(file, { folder: 'appzeto/delivery/no-response-proof' });
-      const uploadedUrl = response?.data?.data?.url || response?.data?.data?.secure_url || '';
-      if (!uploadedUrl) throw new Error('Upload failed');
-      setNoResponseProofUrl(uploadedUrl);
-      toast.success('Proof uploaded');
-    } catch (error) {
-      console.error('[DeliveryHomeV2] No-response proof upload failed:', error);
-      toast.error('Failed to upload proof');
-    } finally {
-      setIsUploadingNoResponseProof(false);
-    }
-  }, []);
-
-  const submitNoResponseCancellation = useCallback(async () => {
-    const orderId = String(activeOrder?.orderId || activeOrder?._id || '').trim();
-    if (!orderId) {
-      toast.error('Order not found');
-      return;
-    }
-    if (!isResponseWaitCompleted) {
-      toast.error('Please wait for timer completion');
-      return;
-    }
-    if (!noResponseProofUrl) {
-      toast.error('Upload proof photo first');
-      return;
-    }
-
-    setIsSubmittingNoResponse(true);
-    try {
-      const payload = {
-        orderStatus: NO_RESPONSE_BACKEND_STATUS,
-        reasonType: 'user_unavailable',
-        reason: 'User not responding at drop location',
-        noResponseProofImage: noResponseProofUrl,
-        callAttempted: hasContactAttempted,
-        waitTimerCompletedAt: new Date().toISOString(),
-      };
-
-      try {
-        await deliveryAPI.updateOrderStatus(orderId, payload);
-      } catch (primaryError) {
-        const fallbackPayload = { orderStatus: NO_RESPONSE_BACKEND_STATUS };
-        await deliveryAPI.updateOrderStatus(orderId, fallbackPayload);
-      }
-      toast.success('Order marked as user unavailable');
-      clearActiveOrder();
-      setShowVerification(false);
-    } catch (error) {
-      console.error('[DeliveryHomeV2] No-response status update failed:', error);
-      const apiMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.error?.message ||
-        error?.response?.data?.errors?.[0]?.message ||
-        error?.message;
-      toast.error(apiMessage ? `Failed to mark user unavailable: ${apiMessage}` : 'Failed to mark user unavailable');
-    } finally {
-      setIsSubmittingNoResponse(false);
-    }
-  }, [activeOrder?.orderId, activeOrder?._id, clearActiveOrder, hasContactAttempted, isResponseWaitCompleted, noResponseProofUrl]);
 
   // 1. Initial Sync (Force sync with server to avoid 'stuck' persistent state)
   useEffect(() => {
@@ -907,7 +751,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   return (
     <div className="relative h-screen w-full bg-white text-gray-900 overflow-hidden flex flex-col">
       {/* ─── 1. TOP HEADER (Neat & Clean) ─── */}
-      {currentTab !== 'history' && currentTab !== 'shop' && (
+      {currentTab !== 'history' && (
         <div className="absolute top-0 inset-x-0 bg-white/95 backdrop-blur-md z-[200] safe-top border-b border-gray-100">
           <div className="flex items-center justify-between px-4 py-2.5">
             <div className="flex items-center gap-3">
@@ -1018,7 +862,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       )}
 
       {/* ─── 2. MAIN CONTENT ─── */}
-      <div className={`flex-1 relative overflow-y-auto ${currentTab === 'feed' ? 'pt-[120px]' : (currentTab === 'history' || currentTab === 'shop') ? 'pt-0' : 'pt-[64px]'}`}>
+      <div className={`flex-1 relative overflow-y-auto ${currentTab === 'feed' ? 'pt-[120px]' : currentTab === 'history' ? 'pt-0' : 'pt-[64px]'}`}>
         {currentTab === 'feed' ? (
           <div className="absolute inset-0 top-[-120px]">
             <LiveMap
@@ -1101,8 +945,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           <PocketV2 />
         ) : currentTab === 'history' ? (
           <HistoryV2 />
-        ) : currentTab === 'shop' ? (
-          <ShopV2 />
         ) : (
           <ProfileV2 />
         )}
@@ -1188,67 +1030,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                           </div>
                         </div>
 
-                        <div className="w-full mb-4 rounded-3xl border border-brand-100 bg-brand-50/70 p-3.5">
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-600 mb-2">Contact User</p>
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-gray-900 truncate">{customerContact.name || 'Customer'}</p>
-                              <p className="text-xs font-semibold text-gray-600">
-                                {isCustomerContactLoading ? 'Fetching phone...' : (customerContact.phone || 'Phone not available')}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleContactUserCall}
-                              disabled={!customerContact.dialPhone}
-                              className={`shrink-0 inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${customerContact.dialPhone
-                                  ? 'bg-brand-600 text-white shadow-lg shadow-brand-200 active:scale-95'
-                                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                }`}
-                            >
-                              <Phone className="w-3.5 h-3.5" />
-                              {hasContactAttempted ? 'Call Attempted' : 'Contact Customer'}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="w-full mb-4 rounded-3xl border border-amber-100 bg-amber-50 p-3.5">
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700">Waiting Timer</p>
-                            <p className="text-sm font-black text-amber-800">
-                              {isResponseWaitActive ? `${waitMinutes}:${waitSeconds}` : (isResponseWaitCompleted ? 'Completed' : 'Not Started')}
-                            </p>
-                          </div>
-                          <p className="text-xs font-semibold text-amber-800/90 mt-2">
-                            {isResponseWaitCompleted
-                              ? 'Wait time complete. Next step: reach drop location to continue.'
-                              : hasContactAttempted
-                                ? 'Please wait here until countdown completes.'
-                                : 'Tap after calling the customer to start the 10-second wait timer.'}
-                          </p>
-                          {hasContactAttempted && (
-                            <button
-                              type="button"
-                              onClick={cancelNoResponseFlow}
-                              disabled={isSubmittingNoResponse}
-                              className="mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest bg-white border border-amber-200 text-amber-800 hover:bg-amber-100 disabled:opacity-60"
-                            >
-                              Cancel
-                            </button>
-                          )}
-                        </div>
-
-                        {isResponseWaitCompleted && (
-                          <div className="w-full mb-4 rounded-2xl border border-green-100 bg-green-50 p-3.5">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-700 mb-1">
-                              Next Step Unlocked
-                            </p>
-                            <p className="text-xs font-semibold text-green-800/90">
-                              Slide to confirm drop arrival. Immediately after that, you can upload proof and mark the user as not responding.
-                            </p>
-                          </div>
-                        )}
-
                         {/* Customer Instructions Panel */}
                         {deliveryInstructionText && (
                           <div className="w-full bg-orange-50 border border-orange-100 rounded-3xl p-3.5 mb-4 flex gap-3 items-start shadow-sm">
@@ -1261,15 +1042,10 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                             </div>
                           </div>
                         )}
-                        {isDropArrivalLockedByWait && (
-                          <p className="w-full mb-3 text-center text-[10px] font-black uppercase tracking-[0.14em] text-amber-700">
-                            Complete waiting timer to unlock arrival confirmation
-                          </p>
-                        )}
                         <ActionSlider
                           label="Slide to Confirm Arrival"
                           successLabel="Drop Reached"
-                          disabled={isDropArrivalSlideDisabled}
+                          disabled={!isWithinRange}
                           onConfirm={reachDrop}
                           containerStyle={{ backgroundColor: BRAND_THEME.colors.brand.primarySoft }}
                           style={{ background: BRAND_THEME.gradients.primary }}
@@ -1277,81 +1053,14 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                       </div>
                     ) : (
                       <div className="w-full bg-white rounded-[2rem] p-5 shadow-[0_-20px_60px_rgba(0,0,0,0.25)] border border-gray-100">
-                        {!hasContactAttempted ? (
-                          <button
-                            type="button"
-                            onClick={() => setShowVerification(true)}
-                            className="w-full rounded-2xl py-3.5 font-black text-[10px] tracking-[0.2em] uppercase flex items-center justify-center gap-2 transition-all bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 active:scale-95 mb-4"
-                          >
-                            <CheckCircle2 className="w-4 h-4" />
-                            Verify & Complete
-                          </button>
-                        ) : (
-                          <>
-                            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 mb-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700">Waiting Timer</p>
-                                <p className="text-sm font-black text-amber-800">
-                                  {isResponseWaitActive ? `${waitMinutes}:${waitSeconds}` : (isResponseWaitCompleted ? 'Completed' : 'Not Started')}
-                                </p>
-                              </div>
-                              <p className="text-xs font-semibold text-amber-800/90 mt-2">
-                                {isResponseWaitCompleted
-                                  ? 'Wait time complete. Upload proof and mark user not responding.'
-                                  : 'Please wait full 10 seconds before proceeding.'}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={cancelNoResponseFlow}
-                                disabled={isSubmittingNoResponse}
-                                className="mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest bg-white border border-amber-200 text-amber-800 hover:bg-amber-100 disabled:opacity-60"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-
-                            <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 mb-4">
-                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-700 mb-2">User Not Responding</p>
-                              <p className="text-xs font-semibold text-rose-800/90 mb-3">
-                                After the timer completes, upload a proof photo and mark this order as user not responding.
-                              </p>
-                              <div className="flex items-center gap-2 mb-3">
-                                <button
-                                  type="button"
-                                  onClick={() => noResponseProofInputRef.current?.click()}
-                                  disabled={isUploadingNoResponseProof}
-                                  className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest bg-white border border-rose-200 text-rose-700 hover:bg-rose-100 disabled:opacity-60"
-                                >
-                                  {isUploadingNoResponseProof ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
-                                  {isUploadingNoResponseProof ? 'Uploading...' : (noResponseProofUrl ? 'Replace Proof' : 'Upload Proof')}
-                                </button>
-                                {noResponseProofUrl && (
-                                  <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2.5 py-1 rounded-lg">Proof Added</span>
-                                )}
-                              </div>
-                              <input
-                                ref={noResponseProofInputRef}
-                                type="file"
-                                accept="image/*"
-                                capture="environment"
-                                className="hidden"
-                                onChange={(e) => handleNoResponseProofSelect(e.target.files?.[0])}
-                              />
-                              <button
-                                type="button"
-                                onClick={submitNoResponseCancellation}
-                                disabled={!isResponseWaitCompleted || !noResponseProofUrl || isSubmittingNoResponse}
-                                className={`w-full rounded-2xl py-3.5 font-black text-[10px] tracking-[0.2em] uppercase flex items-center justify-center gap-2 transition-all ${!isResponseWaitCompleted || !noResponseProofUrl || isSubmittingNoResponse
-                                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                  : 'bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-200 active:scale-95'
-                                  }`}
-                              >
-                                {isSubmittingNoResponse ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-                                {isSubmittingNoResponse ? 'Submitting...' : 'Mark User Not Responding'}
-                              </button>
-                            </div>
-                          </>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowVerification(true)}
+                          className="w-full rounded-2xl py-3.5 font-black text-[10px] tracking-[0.2em] uppercase flex items-center justify-center gap-2 transition-all bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 active:scale-95 mb-4"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          Verify & Complete
+                        </button>
 
                       </div>
                     )}
@@ -1431,9 +1140,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
         <button onClick={() => navigate('/food/delivery/history')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'history' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
           <History className="w-5 h-5" /><span className="text-[10px] font-semibold">History</span>
         </button>
-        <button onClick={() => navigate('/food/delivery/shop')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'shop' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
-          <Store className="w-5 h-5" /><span className="text-[10px] font-semibold">Shop</span>
-        </button>
+
         <button onClick={() => navigate('/food/delivery/profile')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'profile' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
           <UserIcon className="w-5 h-5" /><span className="text-[10px] font-semibold">Profile</span>
         </button>

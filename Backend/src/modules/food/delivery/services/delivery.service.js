@@ -8,7 +8,7 @@ import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
 
-const PAYABLE_DELIVERY_STATUSES = ['delivered', 'cancelled_by_user_unavailable'];
+const PAYABLE_DELIVERY_STATUSES = ['delivered'];
 
 export const registerDeliveryPartner = async (payload, files) => {
     const { 
@@ -395,8 +395,7 @@ export const getDeliveryPartnerWallet = async (deliveryPartnerId) => {
 
     const paymentTransactions = (paymentTxList || []).map((o) => {
         const deliveredAt = o?.deliveryState?.deliveredAt || o?.deliveredAt || null;
-        const isUserUnavailable = String(o?.orderStatus || '').toLowerCase() === 'cancelled_by_user_unavailable';
-        const date = deliveredAt || (isUserUnavailable ? (o?.updatedAt || o?.createdAt) : o?.createdAt) || new Date();
+        const date = deliveredAt || o?.createdAt || new Date();
         return {
             _id: o._id,
             type: 'payment',
@@ -407,10 +406,7 @@ export const getDeliveryPartnerWallet = async (deliveryPartnerId) => {
             orderId: o.orderId || String(o._id),
             paymentMethod: o?.payment?.method || '',
             metadata: { orderId: o.orderId || String(o._id) },
-            description:
-                String(o?.orderStatus || '').toLowerCase() === 'cancelled_by_user_unavailable'
-                    ? 'User unavailable compensation'
-                    : (o?.payment?.method === 'cash' ? 'COD delivery earning' : 'Online delivery earning')
+            description: o?.payment?.method === 'cash' ? 'COD delivery earning' : 'Online delivery earning'
         };
     });
 
@@ -479,16 +475,8 @@ export const getDeliveryPartnerEarnings = async (deliveryPartnerId, query = {}) 
         'dispatch.deliveryPartnerId': partnerId,
     };
     if (range) {
-        match.$or = [
-            {
-                orderStatus: 'delivered',
-                'deliveryState.deliveredAt': { $gte: range.start, $lte: range.end },
-            },
-            {
-                orderStatus: 'cancelled_by_user_unavailable',
-                updatedAt: { $gte: range.start, $lte: range.end },
-            },
-        ];
+        match.orderStatus = 'delivered';
+        match['deliveryState.deliveredAt'] = { $gte: range.start, $lte: range.end };
     } else {
         match.orderStatus = { $in: PAYABLE_DELIVERY_STATUSES };
     }
@@ -578,8 +566,7 @@ const toTripDto = (order) => {
     const createdAt = order?.createdAt || null;
     const deliveredAt = order?.deliveryState?.deliveredAt || order?.deliveredAt || order?.completedAt || null;
     const orderStatus = String(order?.orderStatus || order?.status || '').toLowerCase();
-    const isUserUnavailableCancelled = orderStatus === 'cancelled_by_user_unavailable';
-    const dateForUi = deliveredAt || (isUserUnavailableCancelled ? (order?.updatedAt || createdAt) : createdAt) || order?.updatedAt || null;
+    const dateForUi = deliveredAt || createdAt || order?.updatedAt || null;
 
     const time = dateForUi
         ? new Date(dateForUi).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
@@ -600,7 +587,7 @@ const toTripDto = (order) => {
     const pricingTotal = Number(order?.pricing?.total) || Number(order?.totalAmount) || 0;
 
     const rawEarningAmount = Number(order?.riderEarning ?? order?.deliveryEarning ?? 0) || 0;
-    const earningAmount = (isDelivered || isUserUnavailableCancelled) ? rawEarningAmount : 0;
+    const earningAmount = isDelivered ? rawEarningAmount : 0;
     const codAmount = paymentMethod === 'cash' ? Number(order?.payment?.amountDue) || 0 : 0;
     const codCollectedAmount = paymentMethod === 'cash' && order?.payment?.status === 'paid' ? codAmount : 0;
     return {
@@ -722,10 +709,7 @@ export const getDeliveryPocketDetails = async (deliveryPartnerId, query = {}) =>
         createdAt: o?.deliveryState?.deliveredAt || o?.deliveredAt || o?.createdAt,
         orderId: o.orderId || String(o._id),
         metadata: { orderId: o.orderId || String(o._id) },
-        description:
-            String(o?.orderStatus || '').toLowerCase() === 'cancelled_by_user_unavailable'
-                ? 'User unavailable compensation'
-                : (o?.restaurantId?.restaurantName ? `Order earning - ${o.restaurantId.restaurantName}` : 'Order earning')
+        description: o?.restaurantId?.restaurantName ? `Order earning - ${o.restaurantId.restaurantName}` : 'Order earning'
     }));
 
     const bonusTransactions = (bonusTxList || []).map((t) => ({

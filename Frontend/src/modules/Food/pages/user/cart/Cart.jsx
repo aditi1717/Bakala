@@ -1828,7 +1828,7 @@ export default function Cart() {
 
       // Cash flow: order placed without online payment
       if (selectedPaymentMethod === "cash") {
-        toast.success("Order placed with Cash on Delivery")
+        toast.success("Order placed with Cash on Delivery", { id: "order-placement-success" })
         setPlacedOrderId(order?._id || order?.orderId || order?.id || null)
         setShowOrderSuccess(true)
         window.dispatchEvent(new CustomEvent('order-placed', { detail: { order } }))
@@ -1846,7 +1846,7 @@ export default function Cart() {
 
       // Wallet flow: order placed with wallet payment (already processed in backend)
       if (selectedPaymentMethod === "wallet") {
-        toast.success("Order placed with Wallet payment")
+        toast.success("Order placed with Wallet payment", { id: "order-placement-success" })
         setPlacedOrderId(order?._id || order?.orderId || order?.id || null)
         setShowOrderSuccess(true)
         window.dispatchEvent(new CustomEvent('order-placed', { detail: { order } }))

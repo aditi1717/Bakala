@@ -205,11 +205,9 @@ export default function AllOrdersPage() {
     if (backendStatus === 'cancelled' || backendStatus === 'cancelled_by_user' || backendStatus === 'cancelled_by_admin') {
       status = 'CANCELLED'
       statusLabel = 'CANCELLED'
-    } else if (backendStatus === 'cancelled_by_restaurant' || backendStatus === 'cancelled_by_user_unavailable') {
+    } else if (backendStatus === 'cancelled_by_restaurant') {
       status = 'CANCELLED'
-      statusLabel = order?.noResponseMeta?.isUserUnavailable || backendStatus === 'cancelled_by_user_unavailable'
-        ? 'CANCELLED - USER UNAVAILABLE'
-        : 'CANCELLED'
+      statusLabel = 'CANCELLED'
     } else if (backendStatus === 'rejected') {
       status = 'REJECTED'
       statusLabel = 'REJECTED'
@@ -227,18 +225,43 @@ export default function AllOrdersPage() {
       statusLabel = 'OUT FOR DELIVERY'
     }
     
+    const cancelledByRaw = String(order.cancelledBy || "").toLowerCase()
+    const cancelledBy =
+      backendStatus === "cancelled_by_admin"
+        ? "admin"
+        : backendStatus === "cancelled_by_restaurant"
+          ? "restaurant"
+          : backendStatus === "cancelled_by_user"
+            ? "user"
+            : cancelledByRaw === "customer"
+              ? "user"
+              : cancelledByRaw === "admin"
+                ? "admin"
+                : cancelledByRaw === "restaurant"
+                  ? "restaurant"
+                  : "user"
+
     // Get rejection/cancellation reason
     let reason = null
     if (status === 'REJECTED' && order.rejectionReason) {
       reason = `Rejected by Restaurant: ${order.rejectionReason}`
-    } else if (status === 'CANCELLED' && order?.noResponseMeta?.isUserUnavailable) {
-      reason = 'Cancelled: user unavailable at drop location.'
     } else if (status === 'CANCELLED' && order.cancellationReason) {
-      reason = `Cancelled by ${order.cancelledBy === 'customer' ? 'customer' : 'restaurant'}: ${order.cancellationReason}`
+      const cancelledLabel =
+        cancelledBy === "admin"
+          ? "Admin"
+          : cancelledBy === "restaurant"
+            ? "Restaurant"
+            : "User"
+      reason = `Cancelled by ${cancelledLabel}: ${order.cancellationReason}`
     } else if (status === 'REJECTED') {
       reason = 'Rejected by Restaurant'
     } else if (status === 'CANCELLED') {
-      reason = 'Cancelled by customer'
+      reason =
+        cancelledBy === "admin"
+          ? "Cancelled by Admin"
+          : cancelledBy === "restaurant"
+            ? "Cancelled by Restaurant"
+            : "Cancelled by User"
     }
     
     // Determine tags based on order properties

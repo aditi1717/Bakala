@@ -768,6 +768,7 @@ export default function OrdersMain() {
   const showNewOrderPopupRef = useRef(showNewOrderPopup);
   const isMutedRef = useRef(isMuted);
   const newOrderRef = useRef(null);
+  const popupHydrationRef = useRef("");
 
   const markOrderAsShown = (orderLike) => {
     const keys = [
@@ -795,6 +796,51 @@ export default function OrdersMain() {
     return keys.some((k) => shownOrdersRef.current.has(k));
   };
 
+  const getOrderKeys = (orderLike) =>
+    [
+      orderLike?.orderMongoId,
+      orderLike?.mongoId,
+      orderLike?.orderId,
+      orderLike?._id,
+      orderLike?.id,
+    ]
+      .filter(Boolean)
+      .map((value) => String(value).trim())
+      .filter(Boolean);
+
+  const normalizePopupOrderForModal = (orderLike = {}, previous = null) => {
+    if (!orderLike || typeof orderLike !== "object") return previous || null;
+
+    const source = { ...(previous || {}), ...orderLike };
+    const sourceStatus = String(
+      source?.status || source?.orderStatus || "",
+    ).trim();
+
+    return {
+      ...source,
+      orderMongoId:
+        source?.orderMongoId || source?._id || previous?.orderMongoId || null,
+      orderId: source?.orderId || previous?.orderId || source?._id || null,
+      status: sourceStatus || previous?.status || "created",
+      orderStatus: sourceStatus || previous?.orderStatus || "created",
+      items: Array.isArray(source?.items) ? source.items : previous?.items || [],
+      pricing: source?.pricing || previous?.pricing || {},
+      paymentMethod:
+        source?.paymentMethod ||
+        source?.payment?.method ||
+        previous?.paymentMethod ||
+        null,
+      payment: source?.payment || previous?.payment || null,
+    };
+  };
+
+  const hasMatchingOrderKey = (eventKeys = [], orderLike = null) => {
+    if (!orderLike) return false;
+    const targetKeys = getOrderKeys(orderLike);
+    if (targetKeys.length === 0 || eventKeys.length === 0) return false;
+    return targetKeys.some((key) => eventKeys.includes(key));
+  };
+
   const getPopupOrderTotal = (orderLike) => {
     if (!orderLike) return 0;
 
@@ -817,8 +863,145 @@ export default function OrdersMain() {
     return Number.isFinite(itemsTotal) ? itemsTotal : 0;
   };
 
+  const formatPopupAmount = (value) => {
+    const amount = Number(value || 0);
+    return `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  };
+
+  const getPopupBillBreakdown = (orderLike) => {
+    const pricing = orderLike?.pricing || {};
+    const items = Array.isArray(orderLike?.items) ? orderLike.items : [];
+    const toFiniteOrNull = (value) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const computedItemsTotal = items.reduce((sum, item) => {
+      const quantity = Math.max(1, Number(item?.quantity || 1));
+      const unitPrice = Number(item?.price ?? item?.unitPrice ?? item?.basePrice ?? 0);
+      const lineTotal = Number(
+        item?.totalPrice ?? item?.lineTotal ?? item?.subtotal ?? unitPrice * quantity,
+      );
+      return sum + (Number.isFinite(lineTotal) ? lineTotal : 0);
+    }, 0);
+
+    const itemTotalRaw =
+      Number(pricing?.subtotal) ||
+      Number(pricing?.itemsTotal) ||
+      Number(pricing?.itemSubtotal) ||
+      Number(orderLike?.itemSubtotal) ||
+      Number(orderLike?.subtotal) ||
+      computedItemsTotal;
+    const itemTotal = Number.isFinite(itemTotalRaw) ? itemTotalRaw : 0;
+
+    const packagingFeeRaw = Number(pricing?.packagingFee ?? orderLike?.packagingFee ?? 0);
+    const packagingFee = Number.isFinite(packagingFeeRaw) ? packagingFeeRaw : 0;
+
+    const deliveryFeeRaw = Number(pricing?.deliveryFee ?? orderLike?.deliveryFee ?? 0);
+    const deliveryFee = Number.isFinite(deliveryFeeRaw) ? deliveryFeeRaw : 0;
+
+    const platformFeeRaw = Number(pricing?.platformFee ?? orderLike?.platformFee ?? 0);
+    const platformFee = Number.isFinite(platformFeeRaw) ? platformFeeRaw : 0;
+
+    const taxesRaw = Number(
+      pricing?.tax ?? pricing?.gst ?? orderLike?.tax ?? orderLike?.gst ?? 0,
+    );
+    const taxes = Number.isFinite(taxesRaw) ? taxesRaw : 0;
+
+    const discountRaw = Number(pricing?.discount ?? orderLike?.discount ?? 0);
+    const discount = Number.isFinite(discountRaw) ? discountRaw : 0;
+
+    const couponByRestaurantRaw = Number(pricing?.couponByRestaurant ?? 0);
+    const couponByRestaurant = Number.isFinite(couponByRestaurantRaw)
+      ? couponByRestaurantRaw
+      : 0;
+
+    const offerByRestaurantRaw = Number(pricing?.offerByRestaurant ?? 0);
+    const offerByRestaurant = Number.isFinite(offerByRestaurantRaw)
+      ? offerByRestaurantRaw
+      : 0;
+    const commissionRaw = Number(
+      orderLike?.commission ?? pricing?.restaurantCommission ?? 0,
+    );
+    const commission = Number.isFinite(commissionRaw) ? commissionRaw : 0;
+
+    const totalRaw =
+      Number(pricing?.total) ||
+      Number(orderLike?.payment?.amountDue) ||
+      Number(orderLike?.total) ||
+      itemTotal + packagingFee + deliveryFee + platformFee + taxes - discount;
+    const total = Number.isFinite(totalRaw) ? Math.max(0, totalRaw) : 0;
+
+    // Keep this aligned with restaurant order report/invoice logic:
+    // prefer backend payout fields; fallback to net formula used in reports.
+    // Keep this aligned with admin regular order report:
+    // restaurantEarning = subtotal + packagingFee - adminCommission - couponByRestaurant - offerByRestaurant
+    const subtotalForEarning = toFiniteOrNull(pricing?.subtotal) ?? itemTotal;
+    const directEarning =
+      toFiniteOrNull(orderLike?.restaurantEarning) ??
+      toFiniteOrNull(orderLike?.payout) ??
+      toFiniteOrNull(pricing?.restaurantEarning) ??
+      toFiniteOrNull(pricing?.payoutToRestaurant);
+    const earningRaw =
+      directEarning ??
+      (subtotalForEarning +
+        packagingFee -
+        commission -
+        couponByRestaurant -
+        offerByRestaurant);
+    const restaurantEarning = Number.isFinite(earningRaw) ? Math.max(0, earningRaw) : 0;
+
+    return {
+      itemTotal,
+      packagingFee,
+      deliveryFee,
+      platformFee,
+      taxes,
+      discount,
+      commission,
+      total,
+      restaurantEarning,
+    };
+  };
+
+  const getPopupItemVariantText = (item = {}) => {
+    const variantParts = [
+      item?.variantName,
+      item?.selectedVariant?.name,
+      item?.variant?.name,
+      typeof item?.size === "string" ? item.size : item?.size?.name,
+      item?.portion,
+    ]
+      .map((value) => (value == null ? "" : String(value).trim()))
+      .filter(Boolean);
+
+    const addons = Array.isArray(item?.addons)
+      ? item.addons
+          .map((addon) => {
+            const addonName =
+              addon?.name || addon?.title || addon?.addonName || "Add-on";
+            const addonQty = Math.max(1, Number(addon?.quantity || 1));
+            return addonQty > 1 ? `${addonName} x${addonQty}` : addonName;
+          })
+          .filter(Boolean)
+      : [];
+
+    if (addons.length > 0) {
+      variantParts.push(`Add-ons: ${addons.join(", ")}`);
+    }
+
+    return variantParts.join(" | ");
+  };
+
   // Restaurant notifications hook for real-time orders
-  const { newOrder, clearNewOrder, cancelledOrderId, clearCancelledOrderId, isConnected } = useRestaurantNotifications();
+  const {
+    newOrder,
+    clearNewOrder,
+    cancelledOrderId,
+    cancelledOrderInfo,
+    clearCancelledOrderId,
+    isConnected
+  } = useRestaurantNotifications();
 
   const rejectReasons = [
     "Restaurant is too busy",
@@ -989,7 +1172,7 @@ export default function OrdersMain() {
 
       if (!hasOrderBeenShown(newOrder)) {
         markOrderAsShown(newOrder);
-        setPopupOrder(newOrder);
+        setPopupOrder((prev) => normalizePopupOrderForModal(newOrder, prev));
         setShowNewOrderPopup(true);
         setCountdown(240); // Reset countdown to 4 minutes
         requestOrdersRefresh();
@@ -1010,15 +1193,71 @@ export default function OrdersMain() {
     newOrderRef.current = newOrder;
   }, [newOrder]);
 
+  // Hydrate popup with latest backend order details so fields stay linked
+  // with tracking/report data (items variants, payment snapshot, pricing, earnings).
+  useEffect(() => {
+    if (!showNewOrderPopup) return;
+    const orderForModal = popupOrder || newOrder;
+    if (!orderForModal) return;
+
+    const lookupIdRaw =
+      orderForModal?.orderMongoId ||
+      orderForModal?._id ||
+      orderForModal?.orderId ||
+      orderForModal?.id ||
+      "";
+    const lookupId = String(lookupIdRaw).trim();
+    if (!lookupId) return;
+
+    if (popupHydrationRef.current === lookupId) return;
+    popupHydrationRef.current = lookupId;
+
+    let active = true;
+    (async () => {
+      try {
+        const response = await restaurantAPI.getOrderById(lookupId);
+        const apiOrder =
+          response?.data?.data?.order ||
+          response?.data?.order ||
+          response?.data?.data ||
+          null;
+        if (!active || !apiOrder) return;
+
+        setPopupOrder((prev) =>
+          normalizePopupOrderForModal(apiOrder, prev || orderForModal),
+        );
+      } catch (error) {
+        debugError("Error hydrating popup order details:", error);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [showNewOrderPopup, popupOrder, newOrder]);
+
   // Real-time: close popup if the order currently shown gets cancelled by user
   useEffect(() => {
     if (!cancelledOrderId || !showNewOrderPopup) return;
 
-    const popupId = popupOrder?.orderMongoId || popupOrder?.orderId || popupOrder?._id || popupOrder?.id || "";
-    const newOrderId = newOrder?.orderMongoId || newOrder?.orderId || newOrder?._id || newOrder?.id || "";
-    const matchId = String(popupId || newOrderId).trim();
+    const eventKeys = Array.from(
+      new Set(
+        [
+          ...(Array.isArray(cancelledOrderInfo?.orderKeys)
+            ? cancelledOrderInfo.orderKeys
+            : []),
+          cancelledOrderId,
+        ]
+          .filter(Boolean)
+          .map((value) => String(value).trim())
+          .filter(Boolean),
+      ),
+    );
+    const matchesPopupOrder =
+      hasMatchingOrderKey(eventKeys, popupOrder) ||
+      hasMatchingOrderKey(eventKeys, newOrder);
 
-    if (matchId && String(cancelledOrderId).trim() === matchId) {
+    if (matchesPopupOrder) {
       // Stop audio
       if (audioRef.current) {
         audioRef.current.pause();
@@ -1029,9 +1268,53 @@ export default function OrdersMain() {
       clearNewOrder();
       clearCancelledOrderId();
       requestOrdersRefresh();
-      toast.error("Order was cancelled by the customer.");
+      const cancelledBy = String(cancelledOrderInfo?.cancelledBy || "").toLowerCase();
+      const customMessage = String(cancelledOrderInfo?.message || "").trim();
+      const messageFromPayload =
+        customMessage && /cancel/i.test(customMessage)
+          ? customMessage
+          : cancelledBy === "restaurant"
+            ? "Order was cancelled by the restaurant."
+            : cancelledBy === "admin"
+              ? "Order was cancelled by admin."
+              : "Order was cancelled by the customer.";
+      toast.error(messageFromPayload);
     }
-  }, [cancelledOrderId]);
+  }, [cancelledOrderId, cancelledOrderInfo]);
+
+  // Close open order details sheet if that order gets cancelled by user/admin.
+  useEffect(() => {
+    if (!cancelledOrderId || !isSheetOpen || !selectedOrder) return;
+
+    const eventKeys = Array.from(
+      new Set(
+        [
+          ...(Array.isArray(cancelledOrderInfo?.orderKeys)
+            ? cancelledOrderInfo.orderKeys
+            : []),
+          cancelledOrderId,
+        ]
+          .filter(Boolean)
+          .map((value) => String(value).trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (!hasMatchingOrderKey(eventKeys, selectedOrder)) return;
+
+    setIsSheetOpen(false);
+    setSelectedOrder(null);
+    setShowCancelPopup(false);
+    setOrderToCancel(null);
+    requestOrdersRefresh();
+    clearCancelledOrderId();
+  }, [
+    cancelledOrderId,
+    cancelledOrderInfo,
+    isSheetOpen,
+    selectedOrder,
+    clearCancelledOrderId,
+  ]);
 
   // Best-effort unlock for popup buzzer so it can keep playing when tab is backgrounded.
   useEffect(() => {
@@ -1167,7 +1450,9 @@ export default function OrdersMain() {
 
             debugLog("?? Found order ready for popup:", orderForPopup);
             markOrderAsShown({ orderId, _id: orderToPopup._id });
-            setPopupOrder(orderForPopup);
+            setPopupOrder((prev) =>
+              normalizePopupOrderForModal(orderForPopup, prev),
+            );
             setShowNewOrderPopup(true);
             setCountdown(240);
           }
@@ -1216,6 +1501,7 @@ export default function OrdersMain() {
 
   useEffect(() => {
     if (!showNewOrderPopup) {
+      popupHydrationRef.current = "";
       setAcceptSwipeProgress(0);
       setIsAcceptingOrder(false);
       acceptSwipeActiveRef.current = false;
@@ -1519,17 +1805,25 @@ export default function OrdersMain() {
           item?.price ?? item?.unitPrice ?? item?.itemPrice ?? item?.food?.price ?? 0,
         );
         const safePrice = Number.isFinite(unitPrice) ? unitPrice : 0;
+        const variantLabel = getPopupItemVariantText(item);
+        const itemName = item?.name || item?.food?.name || "Item";
         return {
-          name: item?.name || item?.food?.name || "Item",
+          name: variantLabel ? `${itemName} (${variantLabel})` : itemName,
           qty: safeQty,
           price: safePrice,
           total: safePrice * safeQty,
         };
       });
 
+      const bill = getPopupBillBreakdown(orderToPrint);
       const computedItemsTotal = lineItems.reduce((sum, item) => sum + item.total, 0);
       const fallbackTotal = getPopupOrderTotal(orderToPrint);
-      const grandTotal = fallbackTotal > 0 ? fallbackTotal : computedItemsTotal;
+      const grandTotal =
+        bill.total > 0
+          ? bill.total
+          : fallbackTotal > 0
+            ? fallbackTotal
+            : computedItemsTotal;
 
       const rawPaymentMethod =
         orderToPrint?.paymentMethod || orderToPrint?.payment?.method || "";
@@ -1615,6 +1909,30 @@ export default function OrdersMain() {
       doc.setDrawColor(229, 231, 235);
       doc.line(14, yPos, 196, yPos);
       yPos += 8;
+
+      const summaryRows = [
+        ["Subtotal", bill.itemTotal],
+        ...(bill.packagingFee > 0 ? [["Packaging Fee", bill.packagingFee]] : []),
+        ...(bill.deliveryFee > 0 ? [["Delivery Fee", bill.deliveryFee]] : []),
+        ...(bill.platformFee > 0 ? [["Platform Fee", bill.platformFee]] : []),
+        ...(bill.taxes > 0 ? [["Tax", bill.taxes]] : []),
+        ...(bill.discount > 0 ? [["Discount", -Math.abs(bill.discount)]] : []),
+      ];
+
+      if (summaryRows.length > 0) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        summaryRows.forEach(([label, amount]) => {
+          const amountValue = Number(amount || 0);
+          doc.text(String(label), 120, yPos);
+          doc.text(formatMoney(amountValue), 196, yPos, { align: "right" });
+          yPos += 6;
+        });
+        yPos += 2;
+        doc.setDrawColor(209, 213, 219);
+        doc.line(120, yPos, 196, yPos);
+        yPos += 7;
+      }
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
@@ -2219,29 +2537,108 @@ export default function OrdersMain() {
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
                           className="overflow-hidden">
-                          <div className="py-3 space-y-3">
-                            {(popupOrder || newOrder)?.items?.map(
-                              (item, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-start gap-3">
-                                  <div
-                                    className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${item.isVeg ? "bg-green-500" : "bg-red-500"}`}></div>
-                                  <div className="flex-1">
-                                    <div className="flex items-start justify-between">
-                                      <p className="text-sm font-medium text-gray-900">
-                                        {item.quantity} x {item.name}
-                                      </p>
-                                      <p className="text-xs text-gray-600 ml-2">
-                                        ₹{item.price * item.quantity}
-                                      </p>
-                                    </div>
-                                  </div>
+                          <div className="py-3">
+                            {(() => {
+                              const orderItems = Array.isArray(
+                                (popupOrder || newOrder)?.items,
+                              )
+                                ? (popupOrder || newOrder).items
+                                : [];
+
+                              if (orderItems.length === 0) {
+                                return (
+                                  <p className="text-sm text-gray-500">
+                                    No items
+                                  </p>
+                                );
+                              }
+
+                              return (
+                                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                  <table className="min-w-full text-xs">
+                                    <thead className="bg-gray-50 text-gray-600">
+                                      <tr>
+                                        <th className="px-2 py-2 text-left font-semibold">
+                                          Item
+                                        </th>
+                                        <th className="px-2 py-2 text-right font-semibold">
+                                          Qty
+                                        </th>
+                                        <th className="px-2 py-2 text-right font-semibold">
+                                          Rate
+                                        </th>
+                                        <th className="px-2 py-2 text-right font-semibold">
+                                          Total
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {orderItems.map((item, index) => {
+                                        const quantity = Math.max(
+                                          1,
+                                          Number(item?.quantity || 1),
+                                        );
+                                        const unitPrice = Number(
+                                          item?.price ??
+                                            item?.unitPrice ??
+                                            item?.basePrice ??
+                                            0,
+                                        );
+                                        const lineTotal = Number(
+                                          item?.totalPrice ??
+                                            item?.lineTotal ??
+                                            item?.subtotal ??
+                                            unitPrice * quantity,
+                                        );
+                                        const itemName =
+                                          item?.name || item?.title || "Item";
+                                        const itemVariant =
+                                          getPopupItemVariantText(item);
+                                        const itemDisplayName = itemVariant
+                                          ? `${itemName} (${itemVariant})`
+                                          : itemName;
+                                        const isVegItem =
+                                          item?.isVeg === true ||
+                                          String(item?.foodType || "")
+                                            .toLowerCase()
+                                            .trim() === "veg" ||
+                                          String(item?.type || "")
+                                            .toLowerCase()
+                                            .trim() === "veg";
+
+                                        return (
+                                          <tr
+                                            key={`${itemName}-${index}`}
+                                            className="border-t border-gray-100 align-top">
+                                            <td className="px-2 py-2.5 text-gray-900 font-medium">
+                                              <div className="flex items-start gap-2">
+                                                <span
+                                                  className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                                                    isVegItem
+                                                      ? "bg-green-500"
+                                                      : "bg-red-500"
+                                                  }`}
+                                                />
+                                                <span>{itemDisplayName}</span>
+                                              </div>
+                                            </td>
+                                            <td className="px-2 py-2.5 text-right text-gray-900">
+                                              {quantity}
+                                            </td>
+                                            <td className="px-2 py-2.5 text-right text-gray-900">
+                                              {formatPopupAmount(unitPrice)}
+                                            </td>
+                                            <td className="px-2 py-2.5 text-right font-semibold text-gray-900">
+                                              {formatPopupAmount(lineTotal)}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
                                 </div>
-                              ),
-                            ) || (
-                              <p className="text-sm text-gray-500">No items</p>
-                            )}
+                              );
+                            })()}
                           </div>
                         </motion.div>
                       )}
@@ -2280,46 +2677,103 @@ export default function OrdersMain() {
                     </span>
                   </div>
 
-                  {/* Total bill */}
-                  <div className="mb-4 flex items-center justify-between py-3 border-y border-gray-200">
-                    <div className="flex items-center gap-2">
-                      <svg
-                        className="w-5 h-5 text-gray-700"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
-                        />
-                      </svg>
-                      <span className="text-sm font-semibold text-gray-900">
-                        Total bill
-                      </span>
-                    </div>
-                    <span className="text-base font-bold text-gray-900">
-                      ₹{getPopupOrderTotal(popupOrder || newOrder)}
-                    </span>
-                  </div>
-
-                  {/* Payment method: treat cash/cod (any case) as COD */}
                   {(() => {
-                    const raw =
+                    const bill = getPopupBillBreakdown(popupOrder || newOrder);
+                    return (
+                      <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3">
+                        <p className="text-sm font-semibold text-gray-900">Bill summary</p>
+
+                        <div className="mt-2 space-y-1.5 text-sm">
+                          <div className="flex items-center justify-between text-gray-700">
+                            <span>Item total</span>
+                            <span>{formatPopupAmount(bill.itemTotal)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-gray-700">
+                            <span>Packaging fee</span>
+                            <span>{formatPopupAmount(bill.packagingFee)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-gray-700">
+                            <span>Delivery fee</span>
+                            <span>{formatPopupAmount(bill.deliveryFee)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-gray-700">
+                            <span>Platform fee</span>
+                            <span>{formatPopupAmount(bill.platformFee)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-gray-700">
+                            <span>Taxes & charges (GST)</span>
+                            <span>{formatPopupAmount(bill.taxes)}</span>
+                          </div>
+                          {bill.commission > 0 && (
+                            <div className="flex items-center justify-between text-orange-700">
+                              <span>Restaurant commission</span>
+                              <span>-{formatPopupAmount(bill.commission)}</span>
+                            </div>
+                          )}
+                          {bill.discount > 0 && (
+                            <div className="flex items-center justify-between text-green-700">
+                              <span>Total discount</span>
+                              <span>-{formatPopupAmount(bill.discount)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-2 border-t border-gray-200 pt-2 flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-900">Total bill</span>
+                          <span className="text-base font-bold text-gray-900">
+                            {formatPopupAmount(bill.total)}
+                          </span>
+                        </div>
+
+                        <div className="mt-2 rounded-lg border border-green-200 bg-green-50 px-2.5 py-2 flex items-center justify-between">
+                          <span className="text-sm font-semibold text-green-800">Your earning</span>
+                          <span className="text-sm font-bold text-green-800">
+                            {formatPopupAmount(bill.restaurantEarning)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Payment snapshot from backend order payload */}
+                  {(() => {
+                    const payment = (popupOrder || newOrder)?.payment || {};
+                    const rawMethod =
                       (popupOrder || newOrder)?.paymentMethod ||
-                      (popupOrder || newOrder)?.payment?.method;
-                    const m =
-                      raw != null ? String(raw).toLowerCase().trim() : "";
-                    const isCod = m === "cash" || m === "cod";
+                      payment?.method;
+                    const method = String(rawMethod || "")
+                      .toLowerCase()
+                      .trim();
+                    const methodLabelMap = {
+                      cash: "Cash on Delivery",
+                      cod: "Cash on Delivery",
+                      razorpay: "Razorpay",
+                      razorpay_qr: "Razorpay QR",
+                      wallet: "Wallet",
+                      card: "Card",
+                    };
+                    const methodLabel =
+                      methodLabelMap[method] ||
+                      (rawMethod
+                        ? String(rawMethod).replace(/_/g, " ")
+                        : "Unknown");
+
+                    const rawStatus = payment?.status;
+                    const statusLabel = rawStatus
+                      ? String(rawStatus).replace(/_/g, " ")
+                      : "";
+
+                    const isCashLike = method === "cash" || method === "cod";
+
                     return (
                       <div className="mb-4 flex items-center justify-between py-2">
                         <span className="text-sm font-medium text-gray-700">
                           Payment
                         </span>
                         <span
-                          className={`text-sm font-semibold ${isCod ? "text-amber-600" : "text-green-600"}`}>
-                          {isCod ? "Cash on Delivery" : "Online"}
+                          className={`text-sm font-semibold ${isCashLike ? "text-amber-600" : "text-green-600"}`}>
+                          {methodLabel}
+                          {statusLabel ? ` (${statusLabel})` : ""}
                         </span>
                       </div>
                     );
@@ -3574,5 +4028,6 @@ function EmptyState({ message = "Temporarily closed" }) {
     </div>
   );
 }
+
 
 

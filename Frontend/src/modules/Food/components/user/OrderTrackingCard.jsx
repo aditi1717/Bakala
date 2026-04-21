@@ -73,7 +73,6 @@ const TERMINAL_STATUSES = new Set([
   "failed",
   "cancelled_by_user",
   "cancelled_by_restaurant",
-  "cancelled_by_user_unavailable",
   "cancelled_by_admin",
 ]);
 

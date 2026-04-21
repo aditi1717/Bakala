@@ -1,6 +1,8 @@
 import { useMemo, useState, useEffect } from "react"
 import { BarChart3, ChevronDown, Settings, FileText, FileSpreadsheet, Code, Loader2 } from "lucide-react"
 import { adminAPI } from "@food/api"
+import { API_BASE_URL } from "@food/api/config"
+import io from "socket.io-client"
 import { toast } from "sonner"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@food/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@food/components/ui/dialog"
@@ -27,6 +29,7 @@ const statusMeta = {
   Pending: { label: "Pending Orders", color: "text-brand-600", bg: "bg-brand-50", icon: pendingIcon },
   Accepted: { label: "Accepted Orders", color: "text-sky-600", bg: "bg-sky-50", icon: acceptedIcon },
   Processing: { label: "Processing Orders", color: "text-indigo-600", bg: "bg-indigo-50", icon: processingIcon },
+  Ready: { label: "Ready Orders", color: "text-violet-600", bg: "bg-violet-50", icon: processingIcon },
   "Food On The Way": { label: "Food On The Way", color: "text-cyan-600", bg: "bg-cyan-50", icon: onTheWayIcon },
   Delivered: { label: "Delivered", color: "text-emerald-600", bg: "bg-emerald-50", icon: deliveredIcon },
   Canceled: { label: "Canceled", color: "text-red-600", bg: "bg-red-50", icon: canceledIcon },
@@ -35,6 +38,7 @@ const statusMeta = {
 }
 
 const PAGE_SIZE = 25
+const AUTO_REFRESH_MS = 15000
 
 export default function RegularOrderReport() {
   const [orders, setOrders] = useState([])
@@ -52,6 +56,7 @@ export default function RegularOrderReport() {
   })
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [refreshTick, setRefreshTick] = useState(0)
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
@@ -189,20 +194,37 @@ export default function RegularOrderReport() {
               "N/A"
 
             const backendStatus = String(order.orderStatus || "").toLowerCase()
+            const deliveryPhase = String(order?.deliveryState?.currentPhase || "").toLowerCase()
             let displayStatus = order.orderStatus
-            if (!backendStatus || backendStatus === "created" || backendStatus === "confirmed") {
+            if (
+              !backendStatus ||
+              backendStatus === "created" ||
+              backendStatus === "placed"
+            ) {
               displayStatus = "Pending"
-            } else if (backendStatus === "preparing" || backendStatus === "ready_for_pickup") {
+            } else if (backendStatus === "confirmed" || backendStatus === "accepted") {
+              displayStatus = "Accepted"
+            } else if (
+              backendStatus === "preparing" ||
+              backendStatus === "processed"
+            ) {
               displayStatus = "Processing"
-            } else if (backendStatus === "picked_up") {
+            } else if (
+              backendStatus === "ready" ||
+              backendStatus === "ready_for_pickup" ||
+              deliveryPhase === "ready_for_pickup" ||
+              deliveryPhase === "at_pickup"
+            ) {
+              displayStatus = "Ready"
+            } else if (
+              backendStatus === "picked_up" ||
+              backendStatus === "out_for_delivery"
+            ) {
               displayStatus = "Food On The Way"
             } else if (backendStatus === "delivered") {
               displayStatus = "Delivered"
-            } else if (backendStatus === "cancelled_by_restaurant" || backendStatus === "cancelled_by_user_unavailable") {
-              displayStatus = order?.noResponseMeta?.isUserUnavailable
-                || backendStatus === "cancelled_by_user_unavailable"
-                ? "Cancelled - User Unavailable"
-                : "Canceled"
+            } else if (backendStatus === "cancelled_by_restaurant") {
+              displayStatus = "Canceled"
             } else if (backendStatus === "cancelled_by_user" || backendStatus === "cancelled_by_admin") {
               displayStatus = "Canceled"
             }
@@ -240,7 +262,54 @@ export default function RegularOrderReport() {
     }
 
     fetchOrders()
-  }, [filters, searchQuery])
+  }, [filters, searchQuery, refreshTick])
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return
+      setRefreshTick((prev) => prev + 1)
+    }, AUTO_REFRESH_MS)
+
+    return () => clearInterval(intervalId)
+  }, [])
+
+  useEffect(() => {
+    const backendUrl = API_BASE_URL.replace(/\/api\/?$/, "")
+    if (!backendUrl || !backendUrl.startsWith("http")) return undefined
+
+    const token =
+      localStorage.getItem("admin_accessToken") ||
+      localStorage.getItem("accessToken")
+    if (!token) return undefined
+
+    const socket = io(backendUrl, {
+      path: "/socket.io/",
+      transports: ["websocket", "polling"],
+      auth: { token },
+      reconnection: true,
+    })
+
+    let lastRefreshAt = 0
+    const requestRefresh = () => {
+      const now = Date.now()
+      if (now - lastRefreshAt < 800) return
+      lastRefreshAt = now
+      setRefreshTick((prev) => prev + 1)
+    }
+
+    socket.on("connect", requestRefresh)
+    socket.on("order_status_update", requestRefresh)
+    socket.on("order_deleted", requestRefresh)
+    socket.on("admin_new_order", requestRefresh)
+
+    return () => {
+      socket.off("connect", requestRefresh)
+      socket.off("order_status_update", requestRefresh)
+      socket.off("order_deleted", requestRefresh)
+      socket.off("admin_new_order", requestRefresh)
+      socket.disconnect()
+    }
+  }, [])
 
   const filteredOrders = useMemo(() => {
     if (!searchQuery.trim()) return orders
@@ -323,6 +392,7 @@ export default function RegularOrderReport() {
           Pending: 0,
           Accepted: 0,
           Processing: 0,
+          Ready: 0,
           "Food On The Way": 0,
           Delivered: 0,
           Canceled: 0,
@@ -334,7 +404,7 @@ export default function RegularOrderReport() {
   )
 
   const formatAmount = (amount) =>
-    `₹${Number(amount || 0).toLocaleString("en-IN", {
+    `?${Number(amount || 0).toLocaleString("en-IN", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`
@@ -500,6 +570,7 @@ export default function RegularOrderReport() {
           {renderStatusRow("Scheduled")}
           {renderStatusRow("Pending")}
           {renderStatusRow("Processing")}
+          {renderStatusRow("Ready")}
           {renderStatusRow("Food On The Way")}
           {renderStatusRow("Accepted")}
           {renderStatusRow("Delivered")}
@@ -766,6 +837,8 @@ export default function RegularOrderReport() {
     </div>
   )
 }
+
+
 
 
 

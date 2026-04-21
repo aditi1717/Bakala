@@ -83,6 +83,7 @@ export const useRestaurantNotifications = () => {
   const socketRef = useRef(null);
   const [newOrder, setNewOrder] = useState(null);
   const [cancelledOrderId, setCancelledOrderId] = useState(null);
+  const [cancelledOrderInfo, setCancelledOrderInfo] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const audioRef = useRef(null);
   const activeOrderRef = useRef(null);
@@ -629,10 +630,40 @@ export const useRestaurantNotifications = () => {
       }
       const status = String(data?.orderStatus || data?.status || '').toLowerCase();
       if (status.includes('cancel')) {
-        const orderId = String(
-          data?.orderMongoId || data?.orderId || data?.order_mongo_id || data?.order_id || ''
-        ).trim();
-        if (orderId) setCancelledOrderId(orderId);
+        const orderKeys = [
+          data?.orderMongoId,
+          data?.orderId,
+          data?.order_mongo_id,
+          data?.order_id,
+          data?._id,
+          data?.id,
+        ]
+          .filter(Boolean)
+          .map((value) => String(value).trim())
+          .filter(Boolean);
+        const primaryOrderId = orderKeys[0] || '';
+        if (primaryOrderId) {
+          const cancelledByRaw = String(
+            data?.cancelledBy ||
+            data?.cancellationBy ||
+            data?.updatedByRole ||
+            data?.actor ||
+            ''
+          ).toLowerCase();
+          let cancelledBy = 'unknown';
+          if (cancelledByRaw.includes('customer') || cancelledByRaw.includes('user')) cancelledBy = 'user';
+          else if (cancelledByRaw.includes('restaurant') || cancelledByRaw.includes('seller')) cancelledBy = 'restaurant';
+          else if (cancelledByRaw.includes('admin')) cancelledBy = 'admin';
+
+          setCancelledOrderId(primaryOrderId);
+          setCancelledOrderInfo({
+            orderId: primaryOrderId,
+            orderKeys,
+            cancelledBy,
+            title: data?.title || '',
+            message: data?.message || '',
+          });
+        }
       }
     });
 
@@ -754,12 +785,16 @@ export const useRestaurantNotifications = () => {
     setNewOrder(null);
   };
 
-  const clearCancelledOrderId = () => setCancelledOrderId(null);
+  const clearCancelledOrderId = () => {
+    setCancelledOrderId(null);
+    setCancelledOrderInfo(null);
+  };
 
   return {
     newOrder,
     clearNewOrder,
     cancelledOrderId,
+    cancelledOrderInfo,
     clearCancelledOrderId,
     isConnected,
     playNotificationSound

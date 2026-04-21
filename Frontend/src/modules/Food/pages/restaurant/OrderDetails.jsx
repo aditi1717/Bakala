@@ -45,6 +45,34 @@ const firstText = (...values) => {
 const formatMoney = (value) => `₹${Number(value || 0).toFixed(2)}`
 const formatDiscount = (value) => `-₹${Math.abs(Number(value || 0)).toFixed(2)}`
 
+const getItemVariantText = (item = {}) => {
+  const variantParts = [
+    item?.variantName,
+    item?.selectedVariant?.name,
+    item?.variant?.name,
+    typeof item?.size === "string" ? item.size : item?.size?.name,
+    item?.portion,
+  ]
+    .map((value) => (value == null ? "" : String(value).trim()))
+    .filter(Boolean)
+
+  const addons = Array.isArray(item?.addons)
+    ? item.addons
+        .map((addon) => {
+          const addonName = addon?.name || addon?.title || addon?.addonName || "Add-on"
+          const addonQty = Math.max(1, Number(addon?.quantity || 1))
+          return addonQty > 1 ? `${addonName} x${addonQty}` : addonName
+        })
+        .filter(Boolean)
+    : []
+
+  if (addons.length > 0) {
+    variantParts.push(`Add-ons: ${addons.join(", ")}`)
+  }
+
+  return variantParts.join(" | ")
+}
+
 
 export default function OrderDetails() {
   const navigate = useNavigate()
@@ -73,14 +101,9 @@ export default function OrderDetails() {
         if (response.data?.success && response.data.data?.order) {
           const order = response.data.data.order
           const orderStatusRaw = String(order.status || order.orderStatus || "").toLowerCase()
-          const isNoResponseCancel =
-            (orderStatusRaw === "cancelled_by_restaurant" || orderStatusRaw === "cancelled_by_user_unavailable") &&
-            (order?.noResponseMeta?.isUserUnavailable === true || orderStatusRaw === "cancelled_by_user_unavailable")
           const isCancelledStatus =
             orderStatusRaw === "cancelled" || orderStatusRaw.startsWith("cancelled_")
-          const statusForUi = isNoResponseCancel
-            ? "CANCELLED - USER UNAVAILABLE"
-            : (isCancelledStatus ? "CANCELLED" : orderStatusRaw.toUpperCase() || "PENDING")
+          const statusForUi = isCancelledStatus ? "CANCELLED" : orderStatusRaw.toUpperCase() || "PENDING"
           const pricing = order.pricing || {}
           const computedSubtotal = Array.isArray(order.items)
             ? order.items.reduce((sum, item) => {
@@ -217,7 +240,8 @@ export default function OrderDetails() {
               name: item.name,
               quantity: item.quantity,
               price: item.price,
-              type: item.isVeg ? 'Veg' : 'Non-Veg'
+              type: item.isVeg ? 'Veg' : 'Non-Veg',
+              variantLabel: getItemVariantText(item),
             })) || [],
             billing: {
               itemSubtotal,
@@ -237,9 +261,7 @@ export default function OrderDetails() {
                 ? (order.deliveryPartnerId || order.dispatch?.deliveryPartnerId || null)
                 : null,
             dispatchStatus: order.dispatch?.status || null,
-            reason: isNoResponseCancel
-              ? 'Cancelled: user unavailable at drop location.'
-              : (order.cancellationReason || ''),
+            reason: order.cancellationReason || '',
             timeline: [
               { event: 'Order placed', timestamp: new Date(order.createdAt).toLocaleString('en-GB'), status: 'completed' },
               ...(reached.confirmed ? [{ event: 'Order confirmed', timestamp: order.tracking?.confirmed?.timestamp ? new Date(order.tracking.confirmed.timestamp).toLocaleString('en-GB') : '', status: 'completed' }] : []),
@@ -247,7 +269,7 @@ export default function OrderDetails() {
               ...(reached.ready ? [{ event: 'Ready for pickup', timestamp: order.tracking?.ready?.timestamp ? new Date(order.tracking.ready.timestamp).toLocaleString('en-GB') : '', status: 'completed' }] : []),
               ...(reached.outForDelivery ? [{ event: 'Out for delivery', timestamp: order.tracking?.outForDelivery?.timestamp ? new Date(order.tracking.outForDelivery.timestamp).toLocaleString('en-GB') : '', status: 'completed' }] : []),
               ...(reached.delivered ? [{ event: 'Delivered', timestamp: order.tracking?.delivered?.timestamp ? new Date(order.tracking.delivered.timestamp).toLocaleString('en-GB') : '', status: 'completed' }] : []),
-              ...(isCancelledStatus ? [{ event: 'Cancelled', timestamp: order.cancelledAt ? new Date(order.cancelledAt).toLocaleString('en-GB') : '', status: 'rejected', reason: isNoResponseCancel ? 'User unavailable at drop location.' : order.cancellationReason }] : [])
+              ...(isCancelledStatus ? [{ event: 'Cancelled', timestamp: order.cancelledAt ? new Date(order.cancelledAt).toLocaleString('en-GB') : '', status: 'rejected', reason: order.cancellationReason }] : [])
             ]
           }
           
@@ -420,7 +442,7 @@ export default function OrderDetails() {
     // Items Table
     const itemsTableData = orderData.items.map(item => [
       `${item.quantity}x`,
-      item.name,
+      item.variantLabel ? `${item.name} (${item.variantLabel})` : item.name,
       item.type || "-",
       formatMoney(item.price)
     ])
@@ -797,6 +819,7 @@ export default function OrderDetails() {
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-semibold text-gray-900">
                       {item.quantity} x {item.name}
+                      {item.variantLabel ? ` (${item.variantLabel})` : ""}
                     </p>
                     <p className="text-sm font-semibold text-gray-900">{formatMoney(item.price)}</p>
                   </div>

@@ -38,12 +38,41 @@ const statusConfig = {
   "offline-payments": { title: "Offline Payments", color: "slate", icon: Package },
 }
 
+const buildOrderItemVariantLabel = (item = {}) => {
+  const variantParts = [
+    item?.variantName,
+    item?.selectedVariant?.name,
+    item?.variant?.name,
+    typeof item?.size === "string" ? item.size : item?.size?.name,
+    item?.portion,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+
+  const addonParts = Array.isArray(item?.addons)
+    ? item.addons
+        .map((addon) => {
+          const addonName = addon?.name || addon?.title || addon?.addonName || ""
+          const qty = Math.max(1, Number(addon?.quantity || 1))
+          if (!addonName) return ""
+          return qty > 1 ? `${addonName} x${qty}` : addonName
+        })
+        .filter(Boolean)
+    : []
+
+  if (addonParts.length > 0) {
+    variantParts.push(`Add-ons: ${addonParts.join(", ")}`)
+  }
+
+  return variantParts.join(", ")
+}
+
 export default function OrdersPage({ statusKey = "all" }) {
   const config = statusConfig[statusKey] || statusConfig["all"]
   const [orders, setOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [processingRefund, setProcessingRefund] = useState(null)
-  const [processingActionOrderId, setProcessingActionOrderId] = useState(null)
+  const [processingAction, setProcessingAction] = useState({ orderId: null, type: null })
   const [deletingOrderId, setDeletingOrderId] = useState(null)
   const [refundModalOpen, setRefundModalOpen] = useState(false)
   const [selectedOrderForRefund, setSelectedOrderForRefund] = useState(null)
@@ -174,6 +203,21 @@ export default function OrdersPage({ statusKey = "all" }) {
     }
     alertLoopStartedAtRef.current = 0
   }, [])
+
+  const stopOrderAlertSound = useCallback(() => {
+    activeOrderAlertRef.current = null
+    stopAlertLoop()
+
+    if (notificationAudioRef.current) {
+      notificationAudioRef.current.pause()
+      notificationAudioRef.current.currentTime = 0
+    }
+
+    if (fallbackAudioRef.current) {
+      fallbackAudioRef.current.pause()
+      fallbackAudioRef.current.currentTime = 0
+    }
+  }, [stopAlertLoop])
 
   const startAlertLoop = useCallback(() => {
     stopAlertLoop()
@@ -439,38 +483,7 @@ export default function OrdersPage({ statusKey = "all" }) {
       }
 
       const backendStatus = String(order.orderStatus || "").toLowerCase()
-      const isUserUnavailableOrder =
-        backendStatus === "cancelled_by_user_unavailable" ||
-        order?.noResponseMeta?.isUserUnavailable === true
-      const noResponseDueAmount = Number(order?.noResponseMeta?.dueAmount || 0)
-      const noResponseDueStatus = String(order?.noResponseMeta?.dueStatus || "").toLowerCase()
-      const normalizedPaymentMethod = String(paymentMethod || "").toLowerCase()
-      const isCashOrder = normalizedPaymentMethod === "cash" || normalizedPaymentMethod === "cod"
       let paymentCollectionStatus = order.paymentCollectionStatus || null
-
-      // User-unavailable payment matrix:
-      // COD -> cash due / recovered due
-      // Online/Wallet -> already paid, no due
-      if (isUserUnavailableOrder) {
-        if (isCashOrder) {
-          if (noResponseDueStatus === "paid") {
-            paymentStatus = "Paid"
-            paymentCollectionStatus = noResponseDueAmount > 0
-              ? `Recovered User Due (\u20B9${noResponseDueAmount.toFixed(2)})`
-              : "Recovered User Due"
-          } else {
-            paymentStatus = "Unpaid"
-            paymentCollectionStatus = noResponseDueAmount > 0
-              ? `User Unavailable - Cash Due (\u20B9${noResponseDueAmount.toFixed(2)})`
-              : "User Unavailable - Cash Due"
-          }
-        } else {
-          if (paymentStatus !== "Refunded" && paymentStatus !== "Failed") {
-            paymentStatus = "Paid"
-          }
-          paymentCollectionStatus = "No Due - Online Paid"
-        }
-      }
 
       let displayStatus = order.orderStatus
       if (!backendStatus || backendStatus === "created" || backendStatus === "confirmed") {
@@ -483,15 +496,12 @@ export default function OrdersPage({ statusKey = "all" }) {
         displayStatus = "Food On The Way"
       } else if (backendStatus === "delivered") {
         displayStatus = "Delivered"
-      } else if (backendStatus === "cancelled_by_restaurant" || backendStatus === "cancelled_by_user_unavailable") {
-        displayStatus = order?.noResponseMeta?.isUserUnavailable
-          || backendStatus === "cancelled_by_user_unavailable"
-          ? "Cancelled - User Unavailable"
-          : "Cancelled by Restaurant"
+      } else if (backendStatus === "cancelled_by_restaurant") {
+        displayStatus = "Cancelled by Restaurant"
       } else if (backendStatus === "cancelled_by_user") {
         displayStatus = "Cancelled by User"
       } else if (backendStatus === "cancelled_by_admin") {
-        displayStatus = "Canceled"
+        displayStatus = "Cancelled by Admin"
       }
 
       const dp = order.dispatch?.deliveryPartnerId
@@ -509,6 +519,10 @@ export default function OrdersPage({ statusKey = "all" }) {
             quantity: item.quantity || 1,
             name: item.name || item.foodName || item.title || "Item",
             price: item.price || 0,
+            variantLabel: buildOrderItemVariantLabel(item),
+            addons: Array.isArray(item.addons) ? item.addons : [],
+            isVeg: item.isVeg,
+            description: item.description || "",
           }))
         : []
 
@@ -519,6 +533,16 @@ export default function OrdersPage({ statusKey = "all" }) {
         order.restaurantName ||
         order.restaurantId?.restaurantName ||
         ""
+
+      const cancelledBy =
+        order.cancelledBy ||
+        (backendStatus === "cancelled_by_user"
+          ? "user"
+          : backendStatus === "cancelled_by_restaurant"
+            ? "restaurant"
+            : backendStatus === "cancelled_by_admin"
+              ? "admin"
+              : "")
 
       return {
         ...order,
@@ -542,13 +566,12 @@ export default function OrdersPage({ statusKey = "all" }) {
         paymentStatus,
         paymentCollectionStatus,
         orderStatus: displayStatus,
+        cancelledBy,
         deliveryPartnerName,
         deliveryPartnerPhone,
         deliveryType: order.deliveryType || "Home Delivery",
         orderOtp: order.deliveryOtp,
         address: order.address || order.customerAddress || order.deliveryAddress,
-        noResponseDueAmount,
-        noResponseDueStatus,
         refundStatus: order.payment?.refund?.status || (order.payment?.status === 'refunded' ? 'processed' : null)
       }
     })
@@ -703,9 +726,10 @@ export default function OrdersPage({ statusKey = "all" }) {
     }
 
     try {
-      setProcessingActionOrderId(order.id || order.orderId)
+      setProcessingAction({ orderId: order.id || order.orderId, type: "accept" })
       const response = await adminAPI.acceptOrder(orderIdToUse)
       if (response.data?.success) {
+        stopOrderAlertSound()
         toast.success(response.data?.message || `Order ${order.orderId} accepted`)
         await fetchOrders({ silent: true, withRingCheck: false })
       } else {
@@ -715,7 +739,7 @@ export default function OrdersPage({ statusKey = "all" }) {
       debugError("Error accepting order:", error)
       toast.error(error.response?.data?.message || "Failed to accept order")
     } finally {
-      setProcessingActionOrderId(null)
+      setProcessingAction({ orderId: null, type: null })
     }
   }
 
@@ -734,9 +758,10 @@ export default function OrdersPage({ statusKey = "all" }) {
     if (reason === null) return
 
     try {
-      setProcessingActionOrderId(order.id || order.orderId)
+      setProcessingAction({ orderId: order.id || order.orderId, type: "reject" })
       const response = await adminAPI.rejectOrder(orderIdToUse, reason)
       if (response.data?.success) {
+        stopOrderAlertSound()
         toast.success(response.data?.message || `Order ${order.orderId} rejected`)
         await fetchOrders({ silent: true, withRingCheck: false })
       } else {
@@ -746,7 +771,7 @@ export default function OrdersPage({ statusKey = "all" }) {
       debugError("Error rejecting order:", error)
       toast.error(error.response?.data?.message || "Failed to reject order")
     } finally {
-      setProcessingActionOrderId(null)
+      setProcessingAction({ orderId: null, type: null })
     }
   }
 
@@ -976,7 +1001,7 @@ export default function OrdersPage({ statusKey = "all" }) {
         onDeleteOrder={statusKey === "all" ? handleDeleteOrder : undefined}
         onAcceptOrder={statusKey === "all" || statusKey === "pending" ? handleAcceptOrder : undefined}
         onRejectOrder={statusKey === "all" || statusKey === "pending" ? handleRejectOrder : undefined}
-        actionLoadingOrderId={processingActionOrderId}
+        actionLoading={processingAction}
         deletingOrderId={deletingOrderId}
       />
     </div>

@@ -344,7 +344,7 @@ export async function getRestaurants(query, adminScope = {}) {
     return { restaurants, total, page, limit };
 }
 
-const CANCELLED_ORDER_STATUSES = ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_user_unavailable', 'cancelled_by_admin'];
+const CANCELLED_ORDER_STATUSES = ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin'];
 const PENDING_ORDER_STATUSES = ['created', 'confirmed', 'preparing', 'ready_for_pickup', 'picked_up'];
 
 const getDateRangeByPeriod = (periodRaw) => {
@@ -773,14 +773,7 @@ export async function getTransactionReport(query = {}) {
         .filter((id) => mongoose.Types.ObjectId.isValid(id))
         .map((id) => new mongoose.Types.ObjectId(id));
 
-    const noResponseDebts = orderIds.length
-        ? await FoodUserDebt.find({
-            failedOrderId: { $in: orderIds },
-            reasonType: 'user_unavailable',
-        })
-            .select('failedOrderId amount status proofImageUrl metadata settledOrderId settledAt')
-            .lean()
-        : [];
+    const noResponseDebts = [];
 
     const noResponseMap = new Map(
         noResponseDebts.map((row) => [String(row?.failedOrderId), row]),
@@ -810,12 +803,7 @@ export async function getTransactionReport(query = {}) {
 
         const orderIdForMeta = order?._id ? String(order._id) : '';
         const debt = orderIdForMeta ? noResponseMap.get(orderIdForMeta) : null;
-        const backendOrderStatus = String(order?.orderStatus || '').toLowerCase();
-        const isUserUnavailableCancel =
-            (backendOrderStatus === 'cancelled_by_restaurant' || backendOrderStatus === 'cancelled_by_user_unavailable') && Boolean(debt);
-        const displayStatus = isUserUnavailableCancel
-            ? 'Cancelled - User Unavailable'
-            : (tx.status || order?.orderStatus || 'N/A');
+        const displayStatus = tx.status || order?.orderStatus || 'N/A';
 
         return {
             id: tx._id,
@@ -837,18 +825,7 @@ export async function getTransactionReport(query = {}) {
             status: tx.status,
             orderStatus: order?.orderStatus || '',
             displayStatus,
-            noResponseMeta: isUserUnavailableCancel
-                ? {
-                    isUserUnavailable: true,
-                    dueAmount: Number(debt?.amount || 0),
-                    dueStatus: debt?.status || 'pending',
-                    proofImageUrl: debt?.proofImageUrl || '',
-                    callAttempted: Boolean(debt?.metadata?.callAttempted),
-                    waitTimerCompletedAt: debt?.metadata?.waitTimerCompletedAt || null,
-                    settledOrderId: debt?.settledOrderId || null,
-                    settledAt: debt?.settledAt || null,
-                }
-                : null,
+            noResponseMeta: null,
         };
     });
 
@@ -857,10 +834,7 @@ export async function getTransactionReport(query = {}) {
         const historyKinds = Array.isArray(tx?.history)
             ? tx.history.map((h) => String(h?.kind || '').toLowerCase())
             : [];
-        return (
-            orderStatus === 'cancelled_by_user_unavailable' ||
-            historyKinds.includes('cancelled_by_delivery_no_response')
-        );
+        return historyKinds.includes('cancelled_by_delivery_no_response');
     };
 
     const isNoResponseDuePendingTx = (tx) => {
@@ -2280,7 +2254,7 @@ export async function getRestaurantAnalytics(restaurantId) {
     const currentYear = now.getFullYear();
 
     const completedOrders = orders.filter(o => o.orderStatus === 'delivered');
-    const cancelledOrders = orders.filter(o => ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_user_unavailable', 'cancelled_by_admin'].includes(o.orderStatus));
+    const cancelledOrders = orders.filter(o => ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin'].includes(o.orderStatus));
 
     // Money metrics should come from the ledger (FoodTransaction), not FoodOrder.
     const completedTx = (txRows || []).filter((tx) => {
@@ -2289,9 +2263,7 @@ export async function getRestaurantAnalytics(restaurantId) {
         const historyKinds = Array.isArray(tx?.history)
             ? tx.history.map((h) => String(h?.kind || '').toLowerCase())
             : [];
-        const isNoResponseCompensated =
-            orderStatus === 'cancelled_by_user_unavailable' ||
-            historyKinds.includes('cancelled_by_delivery_no_response');
+        const isNoResponseCompensated = historyKinds.includes('cancelled_by_delivery_no_response');
         if (orderStatus) return orderStatus === 'delivered' || isNoResponseCompensated;
         return ['captured', 'authorized', 'settled'].includes(txStatus) || isNoResponseCompensated;
     });

@@ -35,83 +35,23 @@ const isPartnerOnline = (partner) => {
   return Boolean(partner?.isOnline)
 }
 
-const normalizeLabel = (value) => String(value || "").trim().toLowerCase()
-
 const getPartnerZoneId = (partner) =>
   normalizeId(partner?.zoneId?._id) ||
   normalizeId(partner?.zoneId) ||
   normalizeId(partner?.zone?._id) ||
   normalizeId(partner?.zone)
 
-const getPartnerZoneLabel = (partner) =>
-  normalizeLabel(
-    partner?.zoneId?.name ||
-      partner?.zoneId?.zoneName ||
-      partner?.zoneId?.serviceLocation ||
-      partner?.zone?.name ||
-      partner?.zone?.zoneName ||
-      partner?.zone?.serviceLocation ||
-      partner?.zone ||
-      "",
-  )
+const getOrderRestaurantZoneId = (order) =>
+  normalizeId(order?.originalOrder?.restaurantId?.zoneId?._id) ||
+  normalizeId(order?.originalOrder?.restaurantId?.zoneId) ||
+  normalizeId(order?.restaurantZoneId)
 
-const parseCoords = (coords = []) => {
-  if (!Array.isArray(coords) || coords.length < 2) return null
-  let lat = null
-  let lng = null
-  if (coords[0] > -180 && coords[0] < 180 && coords[1] > -90 && coords[1] < 90) {
-    lng = Number(coords[0])
-    lat = Number(coords[1])
-  } else {
-    lat = Number(coords[0])
-    lng = Number(coords[1])
-  }
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
-  return { lat, lng }
-}
-
-const getZonePoint = (coord = {}) => {
-  if (Array.isArray(coord) && coord.length >= 2) return parseCoords(coord)
-  const lat = Number(coord?.latitude ?? coord?.lat)
-  const lng = Number(coord?.longitude ?? coord?.lng)
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
-  return { lat, lng }
-}
-
-const isPointInsidePolygon = (point, polygon = []) => {
-  if (!point || !Array.isArray(polygon) || polygon.length < 3) return false
-  let inside = false
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = Number(polygon[i]?.lng)
-    const yi = Number(polygon[i]?.lat)
-    const xj = Number(polygon[j]?.lng)
-    const yj = Number(polygon[j]?.lat)
-    const intersect =
-      yi > point.lat !== yj > point.lat &&
-      point.lng < ((xj - xi) * (point.lat - yi)) / ((yj - yi) || Number.EPSILON) + xi
-    if (intersect) inside = !inside
-  }
-  return inside
-}
-
-const getPartnerPoint = (partner = {}) => {
-  const availabilityCoords = partner?.availability?.currentLocation?.coordinates
-  const locationCoords = partner?.location?.coordinates
-  const currentCoords = partner?.currentLocation?.coordinates
-  return parseCoords(availabilityCoords) || parseCoords(locationCoords) || parseCoords(currentCoords) || null
-}
-
-const partnerMatchesZone = (partner, zoneId, zoneLabel) => {
-  const partnerZoneId = getPartnerZoneId(partner)
-  if (partnerZoneId && zoneId && partnerZoneId === zoneId) return true
-
-  const partnerZoneLabel = getPartnerZoneLabel(partner)
-  if (partnerZoneLabel && zoneLabel && partnerZoneLabel === zoneLabel) return true
-
-  return false
-}
+const getOrderUserZoneId = (order) =>
+  normalizeId(order?.originalOrder?.userId?.zoneId?._id) ||
+  normalizeId(order?.originalOrder?.userId?.zoneId) ||
+  normalizeId(order?.originalOrder?.deliveryAddress?.zoneId?._id) ||
+  normalizeId(order?.originalOrder?.deliveryAddress?.zoneId) ||
+  normalizeId(order?.userZoneId)
 
 export default function AssignDeliveryPartnerDialog({
   isOpen,
@@ -130,16 +70,10 @@ export default function AssignDeliveryPartnerDialog({
     normalizeId(order?.originalOrder?.zoneId) ||
     normalizeId(order?.originalOrder?.restaurantId?.zoneId?._id) ||
     normalizeId(order?.originalOrder?.restaurantId?.zoneId)
-  const orderZoneLabel = normalizeLabel(
-    order?.zoneName ||
-      order?.originalOrder?.zoneId?.name ||
-      order?.originalOrder?.zoneId?.zoneName ||
-      order?.originalOrder?.zoneId?.serviceLocation ||
-      order?.originalOrder?.restaurantId?.zoneId?.name ||
-      order?.originalOrder?.restaurantId?.zoneId?.zoneName ||
-      order?.originalOrder?.restaurantId?.zoneId?.serviceLocation ||
-      "",
-  )
+  const restaurantZoneId = getOrderRestaurantZoneId(order)
+  const userZoneId = getOrderUserZoneId(order)
+  const hasZoneMismatch = Boolean(restaurantZoneId && userZoneId && restaurantZoneId !== userZoneId)
+  const resolvedZoneId = restaurantZoneId || userZoneId || orderZoneId
 
   useEffect(() => {
     if (!isOpen) {
@@ -150,7 +84,7 @@ export default function AssignDeliveryPartnerDialog({
       return
     }
 
-    if (!orderZoneId) {
+    if (!resolvedZoneId || hasZoneMismatch) {
       setDeliveryPartners([])
       return
     }
@@ -158,51 +92,21 @@ export default function AssignDeliveryPartnerDialog({
     const loadPartners = async () => {
       try {
         setIsLoading(true)
-        const [zoneScopedResponse, allPartnersResponse, zonesResponse] = await Promise.all([
-          adminAPI.getDeliveryPartners({
-            page: 1,
-            limit: 1000,
-            zoneId: orderZoneId,
-            includeAvailability: true,
-          }),
-          adminAPI.getDeliveryPartners({
-            page: 1,
-            limit: 1000,
-            includeAvailability: true,
-          }),
-          adminAPI.getZones({ page: 1, limit: 1000, isActive: true }),
-        ])
-
-        const zoneScopedList = zoneScopedResponse?.data?.data?.deliveryPartners || []
-        const allPartners = allPartnersResponse?.data?.data?.deliveryPartners || []
-        const zones = zonesResponse?.data?.data?.zones || []
-
-        const matchedZone =
-          zones.find((zone) => normalizeId(zone?._id || zone?.id) === orderZoneId) ||
-          zones.find((zone) => normalizeLabel(zone?.name || zone?.zoneName || zone?.serviceLocation) === orderZoneLabel) ||
-          null
-
-        const zonePolygon = Array.isArray(matchedZone?.coordinates)
-          ? matchedZone.coordinates.map(getZonePoint).filter(Boolean)
-          : []
-
-        const fallbackSameZone = allPartners.filter((partner) =>
-          partnerMatchesZone(partner, orderZoneId, orderZoneLabel),
-        )
-        const fallbackInsideZone = allPartners.filter((partner) => {
-          if (zonePolygon.length < 3) return false
-          const point = getPartnerPoint(partner)
-          return isPointInsidePolygon(point, zonePolygon)
+        const response = await adminAPI.getDeliveryPartners({
+          page: 1,
+          limit: 1000,
+          zoneId: resolvedZoneId,
+          includeAvailability: true,
         })
 
-        const mergedById = new Map()
-        for (const partner of [...zoneScopedList, ...fallbackSameZone, ...fallbackInsideZone]) {
-          const id = String(partner?._id || "")
-          if (!id) continue
-          mergedById.set(id, partner)
-        }
-
-        setDeliveryPartners(Array.from(mergedById.values()))
+        const zoneScopedList = response?.data?.data?.deliveryPartners || []
+        const strictZonePartners = zoneScopedList.filter(
+          (partner) => getPartnerZoneId(partner) === resolvedZoneId,
+        )
+        const strictOnlineZonePartners = strictZonePartners.filter((partner) =>
+          isPartnerOnline(partner),
+        )
+        setDeliveryPartners(strictOnlineZonePartners)
       } catch (error) {
         toast.error(error?.response?.data?.message || "Failed to load delivery partners")
         setDeliveryPartners([])
@@ -212,7 +116,7 @@ export default function AssignDeliveryPartnerDialog({
     }
 
     loadPartners()
-  }, [isOpen, orderZoneId, orderZoneLabel])
+  }, [isOpen, resolvedZoneId, hasZoneMismatch])
 
   const handleAssign = async () => {
     if (!order?.orderMongoId || !selectedPartnerId) return
@@ -230,16 +134,7 @@ export default function AssignDeliveryPartnerDialog({
     }
   }
 
-  const sortedPartners = [...deliveryPartners].sort((a, b) => {
-    const aOnline = isPartnerOnline(a)
-    const bOnline = isPartnerOnline(b)
-    if (aOnline === bOnline) return 0
-    return aOnline ? -1 : 1
-  })
-
-  const onlineCount = sortedPartners.filter(
-    (partner) => isPartnerOnline(partner),
-  ).length
+  const sortedPartners = [...deliveryPartners]
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -254,7 +149,11 @@ export default function AssignDeliveryPartnerDialog({
         </DialogHeader>
 
         <div className="px-6 py-4">
-          {!orderZoneId ? (
+          {hasZoneMismatch ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-800">
+              Restaurant zone and user zone are different for this order. Please keep both in same zone before assigning delivery partner.
+            </div>
+          ) : !resolvedZoneId ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-800">
               This order does not have a zone assigned yet, so same-zone delivery partners cannot be listed.
             </div>
@@ -264,16 +163,12 @@ export default function AssignDeliveryPartnerDialog({
             </div>
           ) : sortedPartners.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
-              No delivery partners were found in this zone.
+              No online delivery partners were found in this zone.
             </div>
           ) : (
             <div className="space-y-3">
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                Showing <span className="font-semibold text-slate-800">{sortedPartners.length}</span> partners in this zone
-                {" | "}
-                <span className="font-semibold text-emerald-700">{onlineCount} online</span>
-                {" | "}
-                <span className="font-semibold text-slate-700">{sortedPartners.length - onlineCount} offline</span>
+                Showing <span className="font-semibold text-slate-800">{sortedPartners.length}</span> online partners in this zone
               </div>
               <div className="max-h-[380px] space-y-3 overflow-y-auto pr-1">
                 {sortedPartners.map((partner) => {
@@ -345,7 +240,7 @@ export default function AssignDeliveryPartnerDialog({
           <button
             type="button"
             onClick={handleAssign}
-            disabled={!selectedPartnerId || isAssigning || !orderZoneId}
+            disabled={!selectedPartnerId || isAssigning || !resolvedZoneId || hasZoneMismatch}
             className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isAssigning ? "Assigning..." : "Assign Partner"}

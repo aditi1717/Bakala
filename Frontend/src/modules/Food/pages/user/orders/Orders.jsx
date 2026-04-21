@@ -41,6 +41,7 @@ export default function Orders() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [expandedOrderIds, setExpandedOrderIds] = useState(() => new Set())
   const [ratingModal, setRatingModal] = useState({ open: false, order: null })
   const [activeMenuOrderId, setActiveMenuOrderId] = useState(null)
   const [showShareModal, setShowShareModal] = useState(false)
@@ -288,7 +289,6 @@ export default function Orders() {
               backendStatus === 'cancelled' ||
               backendStatus === 'cancelled_by_user' ||
               backendStatus === 'cancelled_by_restaurant' ||
-              backendStatus === 'cancelled_by_user_unavailable' ||
               backendStatus === 'cancelled_by_admin'
             const cancellationReason = order.cancellationReason || ''
             // Check cancelledBy field first, then fallback to cancellation reason pattern
@@ -488,6 +488,18 @@ export default function Orders() {
   // Three-dots menu handlers
   const toggleMenuForOrder = (orderId) => {
     setActiveMenuOrderId((current) => (current === orderId ? null : orderId))
+  }
+
+  const toggleOrderExpansion = (orderId) => {
+    setExpandedOrderIds((current) => {
+      const next = new Set(current)
+      if (next.has(orderId)) {
+        next.delete(orderId)
+      } else {
+        next.add(orderId)
+      }
+      return next
+    })
   }
 
   const openShareModal = (payload) => {
@@ -759,6 +771,7 @@ Order again from this restaurant in the ${companyName} app.`
           </div>
         ) : (
           filteredOrders.map((order) => {
+            const isExpanded = expandedOrderIds.has(order.id)
             // Check payment method - COD/wallet orders have 'pending' status which is normal
             const isCodOrWallet = order.payment?.method === 'cash' ||
               order.payment?.method === 'cod' ||
@@ -823,13 +836,23 @@ Order again from this restaurant in the ${companyName} app.`
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => toggleMenuForOrder(order.id)}
-                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <MoreVertical className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleOrderExpansion(order.id)}
+                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      aria-label={isExpanded ? "Collapse order" : "Expand order"}
+                    >
+                      <ChevronRight className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleMenuForOrder(order.id)}
+                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <MoreVertical className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Three-dots dropdown menu */}
@@ -852,6 +875,8 @@ Order again from this restaurant in the ${companyName} app.`
                   </div>
                 )}
 
+                {isExpanded && (
+                  <>
                 {/* Separator */}
                 <div className="border-t border-dashed border-gray-200 dark:border-gray-700 mx-4 my-1"></div>
 
@@ -1085,6 +1110,8 @@ Order again from this restaurant in the ${companyName} app.`
                     </button>
                   )}
                 </div>
+                  </>
+                )}
               </div>
             )
           })

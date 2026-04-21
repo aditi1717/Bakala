@@ -52,7 +52,6 @@ const DeliveryV2Router = () => {
         <Route path="/pocket" element={<ProtectedRoute><DeliveryHomeV2 tab="pocket" /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><DeliveryHomeV2 tab="history" /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><DeliveryHomeV2 tab="profile" /></ProtectedRoute>} />
-        <Route path="/shop" element={<ProtectedRoute><DeliveryHomeV2 tab="shop" /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsV2 /></ProtectedRoute>} />
         <Route path="/profile/details" element={<ProtectedRoute><ProfileDetailsV2 /></ProtectedRoute>} />
         <Route path="/profile/bank" element={<ProtectedRoute><ProfileBankV2 /></ProtectedRoute>} />

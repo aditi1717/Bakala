@@ -84,10 +84,37 @@ export const useUserNotifications = () => {
       
       const title = data.title || `Order #${data.orderId || 'Update'}`;
       const message = data.message || `Your order status is now ${String(data.orderStatus || '').replace(/_/g, ' ')}`;
+      const statusText = String(data?.orderStatus || data?.status || '').toLowerCase();
+      const isCancellationStatus = statusText.includes('cancel');
+      const incomingOrderKeys = [
+        data?.orderMongoId,
+        data?.orderId,
+        data?.order_mongo_id,
+        data?.order_id,
+      ]
+        .filter(Boolean)
+        .map((value) => String(value).trim())
+        .filter(Boolean);
+
+      // Skip duplicate cancel toast right after user cancels from OrderTracking.
+      let shouldSuppressCancelToast = false;
+      if (isCancellationStatus && typeof window !== 'undefined') {
+        const suppressMeta = window.__suppressUserCancelToast;
+        const suppressAt = Number(suppressMeta?.at || 0);
+        const suppressKeys = Array.isArray(suppressMeta?.keys)
+          ? suppressMeta.keys.map((value) => String(value).trim()).filter(Boolean)
+          : [];
+        const withinSuppressWindow = Date.now() - suppressAt < 15000;
+        const keyMatches = incomingOrderKeys.some((key) => suppressKeys.includes(key));
+        shouldSuppressCancelToast = withinSuppressWindow && keyMatches;
+        if (!withinSuppressWindow && suppressMeta) {
+          delete window.__suppressUserCancelToast;
+        }
+      }
 
       // Optional: Show toast for important updates (Cancel, Ready, etc.)
-      const isImportant = String(data.orderStatus).includes('cancel') || ['ready_for_pickup', 'ready', 'confirmed'].includes(data.orderStatus);
-      if (isImportant) {
+      const isImportant = isCancellationStatus || ['ready_for_pickup', 'ready', 'confirmed'].includes(data.orderStatus);
+      if (isImportant && !shouldSuppressCancelToast) {
         toast.message(title, {
           description: message,
           duration: 10000

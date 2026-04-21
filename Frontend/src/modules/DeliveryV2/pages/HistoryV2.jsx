@@ -175,12 +175,7 @@ export const HistoryV2 = () => {
   const metrics = useMemo(() => {
     return trips.reduce(
       (acc, trip) => {
-        const isCompensatedNoResponse =
-          trip.status === 'Cancelled' &&
-          (trip.isCompensatedCancellation === true ||
-            String(trip.rawOrderStatus || '').toLowerCase() === 'cancelled_by_user_unavailable');
-
-        if (trip.status === 'Completed' || isCompensatedNoResponse) {
+        if (trip.status === 'Completed') {
           acc.earnings += Number(trip.deliveryEarning || trip.earningAmount || trip.amount || 0);
           const isCOD = ['cash', 'cod'].includes((trip.paymentMethod || '').toLowerCase());
           if (isCOD) acc.cod += Number(trip.codCollectedAmount || 0);

@@ -50,6 +50,7 @@ const API_PERMISSION_MAP = [
     { methods: ["PATCH"], pattern: /^\/zones\/[^/]+$/, permission: ADMIN_PERMISSION_PATHS.ZONE_SETUP },
     { methods: ["DELETE"], pattern: /^\/zones\/[^/]+$/, permission: ADMIN_PERMISSION_PATHS.ZONE_SETUP },
     { methods: ["GET"], pattern: /^\/orders(\/|$)/, permission: ADMIN_PERMISSION_PATHS.ORDERS },
+    { methods: ["PATCH"], pattern: /^\/orders\/[^/]+\/status$/, permission: ADMIN_PERMISSION_PATHS.ORDERS },
     { methods: ["DELETE"], pattern: /^\/orders\/[^/]+$/, permission: ADMIN_PERMISSION_PATHS.ORDERS },
     { methods: ["GET"], pattern: /^\/categories(\/|$)/, permission: ADMIN_PERMISSION_PATHS.CATEGORIES },
     { methods: ["POST"], pattern: /^\/categories$/, permission: ADMIN_PERMISSION_PATHS.CATEGORIES },

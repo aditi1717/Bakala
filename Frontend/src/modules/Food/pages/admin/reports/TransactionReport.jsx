@@ -188,8 +188,6 @@ export default function TransactionReport() {
         'cancelled_by_admin',
         'cancelled_by_user',
         'cancelled_by_restaurant',
-        'cancelled_by_user_unavailable',
-        'cancelled - user unavailable',
       ].includes(normalized)
     ) {
       return 'bg-red-100 text-red-700'
@@ -208,15 +206,12 @@ export default function TransactionReport() {
   }
 
   const getDueAmount = (transaction) => {
-    const directDue = Number(transaction?.dueAmount || 0)
-    if (directDue > 0) return directDue
-    return Number(transaction?.noResponseMeta?.dueAmount || 0)
+    return Number(transaction?.dueAmount || 0)
   }
 
   const getDueStatus = (transaction) => {
     const status =
       transaction?.dueStatus ||
-      transaction?.noResponseMeta?.dueStatus ||
       (getDueAmount(transaction) > 0 ? "unpaid" : "n/a")
     return String(status || "n/a").toUpperCase()
   }

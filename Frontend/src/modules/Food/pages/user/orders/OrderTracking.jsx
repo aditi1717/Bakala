@@ -1,6 +1,6 @@
-import { useParams, useNavigate, useSearchParams } from "react-router-dom"
+import { useParams, useNavigate, Link } from "react-router-dom"
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { toast } from "sonner"
 import {
   ArrowLeft,
@@ -9,8 +9,6 @@ import {
   Phone,
   User,
   ChevronRight,
-  MapPin,
-  Home as HomeIcon,
   MessageSquare,
   X,
   Check,
@@ -20,7 +18,6 @@ import {
   Loader2
 } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
-import { Card, CardContent } from "@food/components/ui/card"
 import { Button } from "@food/components/ui/button"
 import {
   Dialog,
@@ -31,11 +28,8 @@ import {
 import { Textarea } from "@food/components/ui/textarea"
 import { useOrders } from "@food/context/OrdersContext"
 import { useProfile } from "@food/context/ProfileContext"
-import { useLocation as useUserLocation } from "@food/hooks/useLocation"
-import DeliveryTrackingMap from "@food/components/user/DeliveryTrackingMap"
-import { orderAPI, restaurantAPI } from "@food/api"
+import { orderAPI } from "@food/api"
 import { useCompanyName } from "@food/hooks/useCompanyName"
-import { useUserNotifications } from "@food/hooks/useUserNotifications"
 import circleIcon from "@food/assets/circleicon.png"
 import { RESTAURANT_PIN_SVG, CUSTOMER_PIN_SVG, RIDER_BIKE_SVG } from "@food/constants/mapIcons"
 import BRAND_THEME from "@/config/brandTheme"
@@ -50,139 +44,6 @@ const debugLog = (...args) => console.log('[OrderTracking]', ...args)
 const debugWarn = (...args) => console.warn('[OrderTracking]', ...args)
 const debugError = (...args) => console.error('[OrderTracking]', ...args)
 
-
-// Animated checkmark component
-const AnimatedCheckmark = ({ delay = 0 }) => (
-  <motion.svg
-    width="80"
-    height="80"
-    viewBox="0 0 80 80"
-    initial="hidden"
-    animate="visible"
-    className="mx-auto"
-  >
-    <motion.circle
-      cx="40"
-      cy="40"
-      r="36"
-      fill="none"
-      stroke="#22c55e"
-      strokeWidth="4"
-      initial={{ pathLength: 0, opacity: 0 }}
-      animate={{ pathLength: 1, opacity: 1 }}
-      transition={{ duration: 0.5, delay, ease: "easeOut" }}
-    />
-    <motion.path
-      d="M24 40 L35 51 L56 30"
-      fill="none"
-      stroke="#22c55e"
-      strokeWidth="4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      initial={{ pathLength: 0, opacity: 0 }}
-      animate={{ pathLength: 1, opacity: 1 }}
-      transition={{ duration: 0.4, delay: delay + 0.4, ease: "easeOut" }}
-    />
-  </motion.svg>
-)
-
-// Real Delivery Map Component with User Live Location
-const DeliveryMap = React.memo(({ orderId, order, isVisible, fallbackCustomerCoords = null, userLiveCoords = null, userLocationAccuracy = null, onEtaUpdate = null }) => {
-  const toPointFromGeoJSON = (coords) => {
-    if (!Array.isArray(coords) || coords.length < 2) return null;
-    const lng = Number(coords[0]);
-    const lat = Number(coords[1]);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng };
-  };
-
-  // Memoize coordinates to prevent re-calculating on every parent render
-  const restaurantCoords = useMemo(() => {
-    // Try multiple sources for restaurant coordinates
-    let coords = null;
-
-    if (order?.restaurantLocation?.coordinates &&
-      Array.isArray(order.restaurantLocation.coordinates) &&
-      order.restaurantLocation.coordinates.length >= 2) {
-      coords = order.restaurantLocation.coordinates;
-    }
-    else if (order?.restaurantId?.location?.coordinates &&
-      Array.isArray(order.restaurantId.location.coordinates) &&
-      order.restaurantId.location.coordinates.length >= 2) {
-      coords = order.restaurantId.location.coordinates;
-    }
-    else if (order?.restaurantId?.location?.latitude && order?.restaurantId?.location?.longitude) {
-      coords = [order.restaurantId.location.longitude, order.restaurantId.location.latitude];
-    }
-
-    const fromCoords = toPointFromGeoJSON(coords);
-    if (fromCoords) return fromCoords;
-
-    const fallbackLat = Number(order?.restaurantId?.location?.latitude || order?.restaurant?.location?.latitude);
-    const fallbackLng = Number(order?.restaurantId?.location?.longitude || order?.restaurant?.location?.longitude);
-    if (Number.isFinite(fallbackLat) && Number.isFinite(fallbackLng)) {
-      return { lat: fallbackLat, lng: fallbackLng };
-    }
-    return null;
-  }, [order?.restaurantId, order?.restaurantLocation, order?.restaurant]);
-
-  const customerCoords = useMemo(() => {
-    const coords = order?.address?.coordinates || order?.address?.location?.coordinates;
-    const fromCoords = toPointFromGeoJSON(coords);
-    if (fromCoords) return fromCoords;
-
-    if (
-      fallbackCustomerCoords &&
-      Number.isFinite(fallbackCustomerCoords.lat) &&
-      Number.isFinite(fallbackCustomerCoords.lng)
-    ) {
-      return fallbackCustomerCoords;
-    }
-    return null;
-  }, [order?.address, fallbackCustomerCoords]);
-
-  // Delivery boy data
-  const deliveryBoyData = useMemo(() => order?.deliveryPartner ? {
-    name: order.deliveryPartner.name || 'Delivery Partner',
-    avatar: order.deliveryPartner.avatar || null
-  } : null, [order?.deliveryPartner]);
-
-  // Firebase and backend write tracking under order.orderId (string) or mongoId; subscribe to all so we receive updates
-  const orderTrackingIdsList = useMemo(() => [
-    order?.orderId,
-    order?.mongoId,
-    order?._id,
-    orderId,
-    order?.id
-  ].filter(Boolean), [order?.orderId, order?.mongoId, order?._id, orderId, order?.id]);
-
-  if (!isVisible || !orderId || !order || !restaurantCoords || !customerCoords) {
-    return (
-      <div
-        className="relative h-[280px] md:h-[340px] bg-gradient-to-b from-gray-100 to-gray-200"
-      />
-    );
-  }
-
-  return (
-    <div
-      className="relative w-full h-[280px] md:h-[340px] overflow-hidden"
-    >
-      <DeliveryTrackingMap
-        orderId={orderId}
-        orderTrackingIds={orderTrackingIdsList}
-        restaurantCoords={restaurantCoords}
-        customerCoords={customerCoords}
-
-        userLiveCoords={userLiveCoords}
-        userLocationAccuracy={userLocationAccuracy}
-        deliveryBoyData={deliveryBoyData}
-        order={order}
-        onEtaUpdate={onEtaUpdate}
-      />
-    </div>
-  );
-});
 
 // Section item component
 const SectionItem = ({ icon: Icon, iconNode, title, subtitle, onClick, showArrow = true, rightContent }) => (
@@ -294,13 +155,41 @@ const isItemVeg = (item = {}) => {
   return false
 }
 
+const getOrderItemVariantLabel = (item = {}) => {
+  const parts = [
+    item?.variantName,
+    item?.selectedVariant?.name,
+    item?.variant?.name,
+    typeof item?.size === "string" ? item.size : item?.size?.name,
+    item?.portion,
+  ]
+    .map((value) => (value == null ? "" : String(value).trim()))
+    .filter(Boolean)
+
+  const addons = Array.isArray(item?.addons)
+    ? item.addons
+        .map((addon) => {
+          const addonName =
+            addon?.name || addon?.title || addon?.addonName || "Add-on"
+          const addonQty = Math.max(1, Number(addon?.quantity || 1))
+          return addonQty > 1 ? `${addonName} x${addonQty}` : addonName
+        })
+        .filter(Boolean)
+    : []
+
+  if (addons.length > 0) {
+    parts.push(`Add-ons: ${addons.join(", ")}`)
+  }
+
+  return parts.join(" | ")
+}
+
 const getDueAmountFromOrder = (apiOrder, previousOrder = null) => {
   const directDueCandidates = [
     apiOrder?.pricing?.previousDue,
     apiOrder?.previousDue,
     apiOrder?.dueAmount,
     apiOrder?.pricing?.dueAmount,
-    apiOrder?.noResponseMeta?.dueAmount,
   ]
 
   for (const candidate of directDueCandidates) {
@@ -374,13 +263,21 @@ const transformOrderForTracking = (apiOrder, previousOrder = null, explicitResta
     restaurantLocation: {
       coordinates: restaurantCoords
     },
-    items: apiOrder?.items?.map(item => ({
-      name: item.name,
-      variantName: item.variantName || '',
-      quantity: item.quantity,
-      price: item.price,
-      isVeg: isItemVeg(item)
-    })) || previousOrder?.items || [],
+    items:
+      apiOrder?.items?.map((item) => {
+        const quantity = Math.max(1, Number(item?.quantity || 1))
+        const unitPrice = Number(
+          item?.price ?? item?.unitPrice ?? item?.basePrice ?? 0,
+        )
+        return {
+          ...item,
+          name: item?.name || item?.title || "Item",
+          variantName: getOrderItemVariantLabel(item),
+          quantity,
+          price: unitPrice,
+          isVeg: isItemVeg(item),
+        }
+      }) || previousOrder?.items || [],
     total: apiOrder?.pricing?.total || previousOrder?.total || 0,
     // Backend canonical field is orderStatus; keep legacy `status` for UI compatibility.
     status: apiOrder?.orderStatus || apiOrder?.status || previousOrder?.status || 'pending',
@@ -521,20 +418,17 @@ export default function OrderTracking() {
   const companyName = useCompanyName()
   const navigate = useNavigate()
   const { orderId } = useParams()
-  const [searchParams] = useSearchParams()
-  const confirmed = searchParams.get("confirmed") === "true"
   const { getOrderById } = useOrders()
   const { profile, getDefaultAddress } = useProfile()
-  const { location: userLiveLocation } = useUserLocation()
-
-  const { isConnected: isSocketConnected } = useUserNotifications()
+  const [isSocketConnected, setIsSocketConnected] = useState(
+    typeof window !== "undefined" ? Boolean(window.orderSocketConnected) : false
+  )
   
   // State for order data
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const [showConfirmation, setShowConfirmation] = useState(confirmed)
   const [orderStatus, setOrderStatus] = useState('placed')
   const [estimatedTime, setEstimatedTime] = useState(29)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -547,7 +441,6 @@ export default function OrderTracking() {
   const [isUpdatingInstructions, setIsUpdatingInstructions] = useState(false)
   const [resolvedLookupId, setResolvedLookupId] = useState("")
   const [timerNow, setTimerNow] = useState(Date.now())
-  const handleEtaUpdate = useCallback((newEta) => setEstimatedTime(newEta), [])
   const lastRealtimeRefreshRef = useRef(0)
   const trackingOrderIdsRef = useRef(new Set())
   const terminalPollStopRef = useRef(false)
@@ -559,6 +452,14 @@ export default function OrderTracking() {
   // Kept separately so UI still renders even if the event arrives
   // before the order API poll populates `order` state.
   const [socketDropOtpCode, setSocketDropOtpCode] = useState(null)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined
+    const syncSocketState = () => setIsSocketConnected(Boolean(window.orderSocketConnected))
+    syncSocketState()
+    const intervalId = window.setInterval(syncSocketState, 1500)
+    return () => window.clearInterval(intervalId)
+  }, [])
 
 
   // OTP received via socket event (deliveryDropOtp)
@@ -647,8 +548,8 @@ export default function OrderTracking() {
     resolveOrderFromList: async (rawLookupId) => {
       const needle = normalizeLookupId(rawLookupId)
       if (!needle) return null
-      const maxPages = 3
-      const limit = 50
+      const maxPages = 1
+      const limit = 20
 
       for (let page = 1; page <= maxPages; page += 1) {
         const listResponse = await orderAPI.getOrders({ page, limit })
@@ -727,46 +628,6 @@ export default function OrderTracking() {
   }, [orderStatus, order])
 
   const defaultAddress = getDefaultAddress()
-  const fallbackCustomerCoords = useMemo(() => {
-    const orderCoords = order?.address?.coordinates || order?.address?.location?.coordinates
-    if (Array.isArray(orderCoords) && orderCoords.length >= 2) {
-      const lng = Number(orderCoords[0])
-      const lat = Number(orderCoords[1])
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        return { lat, lng }
-      }
-    }
-
-    const defaultCoords = defaultAddress?.location?.coordinates
-    if (Array.isArray(defaultCoords) && defaultCoords.length >= 2) {
-      const lng = Number(defaultCoords[0])
-      const lat = Number(defaultCoords[1])
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        return { lat, lng }
-      }
-    }
-
-    const liveLat = Number(userLiveLocation?.latitude)
-    const liveLng = Number(userLiveLocation?.longitude)
-    if (Number.isFinite(liveLat) && Number.isFinite(liveLng)) {
-      return { lat: liveLat, lng: liveLng }
-    }
-
-    return null
-  }, [
-    order?.address?.coordinates,
-    order?.address?.location?.coordinates,
-    defaultAddress?.location?.coordinates,
-    userLiveLocation?.latitude,
-    userLiveLocation?.longitude
-  ])
-
-  const userLiveCoords = useMemo(() => {
-    const lat = Number(userLiveLocation?.latitude)
-    const lng = Number(userLiveLocation?.longitude)
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
-    return { lat, lng }
-  }, [userLiveLocation?.latitude, userLiveLocation?.longitude])
 
   const isAdminAccepted = useMemo(() => {
     const status = order?.status
@@ -1053,14 +914,6 @@ export default function OrderTracking() {
     const ui = mapOrderToTrackingUiStatus(order)
     terminalPollStopRef.current = ui === 'delivered' || ui === 'cancelled'
   }, [order])
-
-  // Post-checkout splash only — real status comes from API / poll / socket.
-  useEffect(() => {
-    if (!confirmed) return
-    const timer1 = setTimeout(() => setShowConfirmation(false), 3000)
-    return () => clearTimeout(timer1)
-  }, [confirmed])
-
   // Countdown timer
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1106,7 +959,7 @@ export default function OrderTracking() {
       }
     };
 
-    // Listen for custom event from DeliveryTrackingMap
+    // Listen for order status updates emitted at window level
     window.addEventListener('orderStatusNotification', handleOrderStatusNotification);
 
     return () => {
@@ -1151,12 +1004,31 @@ export default function OrderTracking() {
         lookupIdsRef.current[0] || normalizeLookupId(orderId)
       const response = await orderAPI.cancelOrder(cancelLookupId, { reason: cancellationReason.trim() });
       if (response.data?.success) {
+        const cancelledOrderKeys = [
+          cancelLookupId,
+          order?._id,
+          order?.mongoId,
+          order?.orderId,
+          order?.id,
+          orderId,
+        ]
+          .filter(Boolean)
+          .map((value) => String(value).trim())
+          .filter(Boolean);
+        if (typeof window !== "undefined") {
+          window.__suppressUserCancelToast = {
+            keys: Array.from(new Set(cancelledOrderKeys)),
+            at: Date.now(),
+          };
+        }
+
         const paymentMethod = order?.payment?.method || order?.paymentMethod;
         const successMessage = response.data?.message ||
           (paymentMethod === 'cash' || paymentMethod === 'cod'
             ? 'Order cancelled successfully. No refund required as payment was not made.'
             : 'Order cancelled successfully. Refund will be processed after admin approval.');
-        toast.success(successMessage);
+        toast.dismiss("order-placement-success");
+        toast.success(successMessage, { id: "order-cancel-success" });
         setShowCancelDialog(false);
         setCancellationReason("");
         // Refresh order data
@@ -1233,48 +1105,7 @@ export default function OrderTracking() {
       const response = await fetchOrderDetailsWithFallback({ force: true })
       if (response.data?.success && response.data.data?.order) {
         const apiOrder = response.data.data.order
-
-        // Extract restaurant location coordinates with multiple fallbacks
-        let restaurantCoords = null;
-        let restaurantAddress = null;
-
-        // Priority 1: restaurantId.location.coordinates (GeoJSON format: [lng, lat])
-        if (apiOrder.restaurantId?.location?.coordinates &&
-          Array.isArray(apiOrder.restaurantId.location.coordinates) &&
-          apiOrder.restaurantId.location.coordinates.length >= 2) {
-          restaurantCoords = apiOrder.restaurantId.location.coordinates;
-        }
-        // Priority 2: restaurantId.location with latitude/longitude properties
-        else if (apiOrder.restaurantId?.location?.latitude && apiOrder.restaurantId?.location?.longitude) {
-          restaurantCoords = [apiOrder.restaurantId.location.longitude, apiOrder.restaurantId.location.latitude];
-        }
-        // Priority 3: Check nested restaurant data
-        else if (apiOrder.restaurant?.location?.coordinates) {
-          restaurantCoords = apiOrder.restaurant.location.coordinates;
-        }
-        // Priority 4: Check if restaurantId is a string ID and fetch restaurant details
-        else if (typeof apiOrder.restaurantId === 'string') {
-          debugLog('?? restaurantId is a string ID, fetching restaurant details...', apiOrder.restaurantId);
-          try {
-            const restaurantResponse = await restaurantAPI.getRestaurantById(apiOrder.restaurantId);
-            if (restaurantResponse?.data?.success && restaurantResponse.data.data?.restaurant) {
-              const restaurant = restaurantResponse.data.data.restaurant;
-              if (restaurant.location?.coordinates && Array.isArray(restaurant.location.coordinates) && restaurant.location.coordinates.length >= 2) {
-                restaurantCoords = restaurant.location.coordinates;
-                debugLog('? Fetched restaurant coordinates from API:', restaurantCoords);
-              }
-              restaurantAddress =
-                restaurant?.location?.formattedAddress ||
-                restaurant?.location?.address ||
-                restaurant?.address ||
-                null;
-            }
-          } catch (err) {
-            debugError('? Error fetching restaurant details:', err);
-          }
-        }
-
-        setOrder(transformOrderForTracking(apiOrder, order, restaurantCoords, restaurantAddress))
+        setOrder(transformOrderForTracking(apiOrder, order))
       }
     } catch (err) {
       debugError('Error refreshing order:', err)
@@ -1396,52 +1227,6 @@ export default function OrderTracking() {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-[#0a0a0a]">
-      {/* Order Confirmed Modal */}
-      <AnimatePresence>
-        {showConfirmation && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-white dark:bg-[#1a1a1a] flex flex-col items-center justify-center"
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.2, type: "spring" }}
-              className="text-center px-8"
-            >
-              <AnimatedCheckmark delay={0.3} />
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.9 }}
-                className="text-2xl font-bold text-gray-900 mt-6"
-              >
-                Order Confirmed!
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.1 }}
-                className="text-gray-600 mt-2"
-              >
-                Your order has been placed successfully
-              </motion.p>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.5 }}
-                className="mt-8"
-              >
-                <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: BRAND_THEME.tokens.orders.primaryText, borderTopColor: 'transparent' }} />
-                <p className="text-sm text-gray-500 mt-3">Loading order details...</p>
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Green Header */}
       <motion.div
         className={`${!currentStatus.color.startsWith('#') ? currentStatus.color : ''} text-white sticky top-0 z-40`}
@@ -1509,18 +1294,7 @@ export default function OrderTracking() {
       )}
       </motion.div>
 
-      {/* Map Section */}
-      {!isDeliveredOrder && orderStatus !== 'cancelled' && (
-        <DeliveryMap
-          orderId={orderId}
-          order={order}
-          isVisible={order !== null}
-          fallbackCustomerCoords={fallbackCustomerCoords}
-          userLiveCoords={userLiveCoords}
-          userLocationAccuracy={userLiveLocation?.accuracy ?? null}
-          onEtaUpdate={handleEtaUpdate}
-        />
-      )}
+      {/* Map removed from user order tracking page as requested */}
 
       {/* Scrollable Content */}
       <div className="max-w-4xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
@@ -1830,7 +1604,13 @@ export default function OrderTracking() {
                       <span className={`w-4 h-4 rounded border ${isItemVeg(item) ? "border-green-600" : "border-red-600"} flex items-center justify-center`}>
                         <span className={`w-2 h-2 rounded-full ${isItemVeg(item) ? "bg-green-600" : "bg-red-600"}`} />
                       </span>
-                      <span>{item.quantity} x {item.name}{item.variantName ? ` (${item.variantName})` : ""}</span>
+                      <span>
+                        {item.quantity} x {item.name}
+                        {(() => {
+                          const variantLabel = getOrderItemVariantLabel(item)
+                          return variantLabel ? ` (${variantLabel})` : ""
+                        })()}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1959,24 +1739,49 @@ export default function OrderTracking() {
             {/* Items Section */}
             <div>
               <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Order Items</p>
-              <div className="space-y-4">
-                {order?.items?.map((item, index) => (
-                  <div key={index} className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className={`w-5 h-5 rounded border ${isItemVeg(item) ? "border-green-600" : "border-red-600"} flex items-center justify-center mt-0.5 shrink-0`}>
-                        <div className={`w-2.5 h-2.5 rounded-full ${isItemVeg(item) ? "bg-green-600" : "bg-red-600"}`} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-900 leading-tight">{item.name}</p>
-                        {item.variantName ? (
-                          <p className="text-sm text-gray-500 mt-0.5">{item.variantName}</p>
-                        ) : null}
-                        <p className="text-sm text-gray-500 mt-0.5">Quantity: {item.quantity}</p>
-                      </div>
-                    </div>
-                    <p className="font-semibold text-gray-900">₹{((item?.price || 0) * (item?.quantity || 0)).toFixed(2)}</p>
-                  </div>
-                ))}
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold">Item</th>
+                      <th className="px-3 py-2 text-right font-semibold">Qty</th>
+                      <th className="px-3 py-2 text-right font-semibold">Rate</th>
+                      <th className="px-3 py-2 text-right font-semibold">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order?.items?.map((item, index) => {
+                      const quantity = Math.max(1, Number(item?.quantity || 1))
+                      const unitPrice = Number(
+                        item?.price ?? item?.unitPrice ?? item?.basePrice ?? 0,
+                      )
+                      const lineTotal = Number(
+                        item?.totalPrice ??
+                          item?.lineTotal ??
+                          item?.subtotal ??
+                          (unitPrice * quantity),
+                      )
+                      const variantLabel = getOrderItemVariantLabel(item)
+                      const itemLabel = `${item?.name || "Item"}${
+                        variantLabel ? ` (${variantLabel})` : ""
+                      }`
+
+                      return (
+                        <tr key={index} className="border-t border-gray-100 align-top">
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-start gap-2">
+                              <span className={`mt-1 h-2.5 w-2.5 rounded-full ${isItemVeg(item) ? "bg-green-600" : "bg-red-600"}`} />
+                              <span className="font-medium text-gray-900">{itemLabel}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-gray-700">{quantity}</td>
+                          <td className="px-3 py-2.5 text-right text-gray-700">{"\u20B9"}{unitPrice.toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold text-gray-900">{"\u20B9"}{lineTotal.toFixed(2)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -1986,50 +1791,50 @@ export default function OrderTracking() {
               
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-600">Item Total</span>
-                <span className="text-gray-900 font-medium">₹{Number(order?.subtotal || 0).toFixed(2)}</span>
+                <span className="text-gray-900 font-medium">{"\u20B9"}{Number(order?.subtotal || 0).toFixed(2)}</span>
               </div>
 
               {Number(order?.dueAmount) > 0 && (
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-gray-600">Previous Due</span>
-                  <span className="text-gray-900 font-medium">₹{Number(order.dueAmount).toFixed(2)}</span>
+                  <span className="text-gray-900 font-medium">{"\u20B9"}{Number(order.dueAmount).toFixed(2)}</span>
                 </div>
               )}
 
               {Number(order?.packagingFee) > 0 && (
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-gray-600">Packaging Charges</span>
-                  <span className="text-gray-900 font-medium">₹{Number(order.packagingFee).toFixed(2)}</span>
+                  <span className="text-gray-900 font-medium">{"\u20B9"}{Number(order.packagingFee).toFixed(2)}</span>
                 </div>
               )}
 
               {Number(order?.platformFee) > 0 && (
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-gray-600">Platform Fee</span>
-                  <span className="text-gray-900 font-medium">₹{Number(order.platformFee).toFixed(2)}</span>
+                  <span className="text-gray-900 font-medium">{"\u20B9"}{Number(order.platformFee).toFixed(2)}</span>
                 </div>
               )}
 
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-600">Delivery Fee</span>
-                <span className="text-gray-900 font-medium">₹{Number(order?.deliveryFee || 0).toFixed(2)}</span>
+                <span className="text-gray-900 font-medium">{"\u20B9"}{Number(order?.deliveryFee || 0).toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-600">Taxes & Charges (GST)</span>
-                <span className="text-gray-900 font-medium">₹{Number(order?.gst || 0).toFixed(2)}</span>
+                <span className="text-gray-900 font-medium">{"\u20B9"}{Number(order?.gst || 0).toFixed(2)}</span>
               </div>
 
               {Number(order?.discount) > 0 && (
                 <div className="flex justify-between items-center text-sm text-green-600 font-medium">
                   <span>Discount Applied</span>
-                  <span>-₹{Number(order.discount).toFixed(2)}</span>
+                  <span>-{"\u20B9"}{Number(order.discount).toFixed(2)}</span>
                 </div>
               )}
 
               <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
                 <span className="text-base font-bold text-gray-900">Total Amount</span>
-                <span className="text-lg font-bold text-gray-900">₹{Number(order?.totalAmount || 0).toFixed(2)}</span>
+                <span className="text-lg font-bold text-gray-900">{"\u20B9"}{Number(order?.totalAmount || 0).toFixed(2)}</span>
               </div>
             </div>
 
@@ -2089,3 +1894,4 @@ export default function OrderTracking() {
     </div>
   )
 }
+

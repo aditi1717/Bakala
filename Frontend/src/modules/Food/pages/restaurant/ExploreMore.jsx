@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import Lenis from "lenis"
 import {
   ArrowLeft,
@@ -339,6 +339,7 @@ function TimePickerWheel({
 
 export default function ExploreMore() {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [profileOpen, setProfileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -359,6 +360,34 @@ export default function ExploreMore() {
   const [existingSchedule, setExistingSchedule] = useState(null)
 
   const STORAGE_KEY = "restaurant_schedule_off"
+  const restaurantBasePath = pathname.startsWith("/food/restaurant")
+    ? "/food/restaurant"
+    : "/restaurant"
+  const EXPLORE_ROUTE = `${restaurantBasePath}/explore`
+
+  const toRestaurantRoute = (route) => {
+    if (typeof route !== "string" || !route.trim()) return null
+    if (restaurantBasePath === "/food/restaurant") {
+      if (route.startsWith("/food/restaurant")) return route
+      if (route === "/restaurant") return "/food/restaurant"
+      if (route.startsWith("/restaurant/")) return `/food${route}`
+      return route
+    }
+    if (route.startsWith("/food/restaurant/")) return route.replace("/food", "")
+    if (route === "/food/restaurant") return "/restaurant"
+    return route
+  }
+
+  const navigateFromExplore = (route) => {
+    const target = toRestaurantRoute(route)
+    if (!target) return
+    navigate(target, {
+      state: {
+        from: EXPLORE_ROUTE,
+        backTo: EXPLORE_ROUTE,
+      },
+    })
+  }
 
   // Restaurant data state
   const [restaurantData, setRestaurantData] = useState(null)
@@ -835,7 +864,7 @@ export default function ExploreMore() {
                   if (item.customAction === "schedule-off") {
                     handleScheduleOffClick()
                   } else if (item.route) {
-                    navigate(item.route)
+                    navigateFromExplore(item.route)
                   }
                 }}
                 className="w-full flex items-center justify-center p-6 bg-white rounded-lg shadow-md border-2 border-gray-200 hover:shadow-md transition-shadow duration-200 min-h-[110px]"
@@ -894,7 +923,7 @@ export default function ExploreMore() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1">
             <button
-              onClick={() => navigate("/food/restaurant")}
+              onClick={() => navigate(restaurantBasePath)}
               className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="Go back"
             >
@@ -911,7 +940,7 @@ export default function ExploreMore() {
               <Search className="w-5 h-5 text-gray-900" />
             </button>
             <button
-              onClick={() => navigate("/food/restaurant/onboarding?step=1")}
+              onClick={() => navigate(`${restaurantBasePath}/onboarding?step=1`)}
               className="p-2 hover:bg-gray-100 bg-gray-200 rounded-full transition-colors"
               aria-label="Profile"
             >
@@ -1149,7 +1178,7 @@ export default function ExploreMore() {
                                     if (item.id === 5) {
                                       handleScheduleOffClick()
                                     } else if (item.route) {
-                                      navigate(item.route)
+                                      navigateFromExplore(item.route)
                                     }
                                     setSearchOpen(false)
                                     setSearchQuery("")
@@ -1723,5 +1752,3 @@ export default function ExploreMore() {
     </motion.div>
   )
 }
-
-

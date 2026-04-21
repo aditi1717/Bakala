@@ -9,7 +9,7 @@ import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { createRazorpayOrder, getRazorpayKeyId, isRazorpayConfigured, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
 
-const PAYABLE_DELIVERY_STATUSES = ['delivered', 'cancelled_by_user_unavailable'];
+const PAYABLE_DELIVERY_STATUSES = ['delivered'];
 
 /**
  * Enhanced wallet fetch for delivery partners.
@@ -113,14 +113,8 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
             type: 'payment',
             amount: o.riderEarning || 0,
             status: 'Completed',
-            date:
-                String(o?.orderStatus || '').toLowerCase() === 'cancelled_by_user_unavailable'
-                    ? (o.updatedAt || o.createdAt)
-                    : o.createdAt,
-            description:
-                String(o?.orderStatus || '').toLowerCase() === 'cancelled_by_user_unavailable'
-                    ? 'User unavailable compensation'
-                    : (o.payment?.method === 'cash' ? 'COD delivery earning' : 'Online delivery earning'),
+            date: o.createdAt,
+            description: o.payment?.method === 'cash' ? 'COD delivery earning' : 'Online delivery earning',
             orderId: o.orderId
         })),
         ...(withdrawalsList || []).map(w => ({
