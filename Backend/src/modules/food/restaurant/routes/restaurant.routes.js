@@ -19,10 +19,6 @@ import {
     listRestaurantSupportTicketsController
 } from '../controllers/supportTicket.controller.js';
 import {
-    createWithdrawalRequestController,
-    listMyWithdrawalsController
-} from '../controllers/withdrawal.controller.js';
-import {
     listCategoriesController,
     createCategoryController,
     updateCategoryController,
@@ -111,8 +107,6 @@ router.patch('/availability', authMiddleware, requireRestaurant, updateRestauran
 router.get('/outlet-timings', authMiddleware, requireRestaurant, getCurrentRestaurantOutletTimingsController);
 router.put('/outlet-timings', authMiddleware, requireRestaurant, upsertCurrentRestaurantOutletTimingsController);
 router.get('/finance', authMiddleware, requireRestaurant, getRestaurantFinanceController);
-router.post('/withdraw', authMiddleware, requireRestaurant, createWithdrawalRequestController);
-router.get('/withdrawals', authMiddleware, requireRestaurant, listMyWithdrawalsController);
 router.post(
     '/profile/profile-image',
     authMiddleware,

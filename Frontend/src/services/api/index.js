@@ -301,17 +301,6 @@ export const adminAPI = {
       params,
       contextModule: "admin",
     }),
-  /** List restaurant withdrawal requests (admin). */
-  getWithdrawals: (params = {}) =>
-    apiClient.get("/food/admin/withdrawals", {
-      params,
-      contextModule: "admin",
-    }),
-  /** Update status of a withdrawal request. */
-  updateWithdrawalStatus: (id, body) =>
-    apiClient.patch(`/food/admin/withdrawals/${id}`, body, {
-      contextModule: "admin",
-    }),
   /** List delivery withdrawal requests (admin). */
   getDeliveryWithdrawals: (params = {}) =>
     apiClient.get("/food/admin/delivery/withdrawals", {
@@ -327,10 +316,6 @@ export const adminAPI = {
   getDeliveryWithdrawalRequests: (params) => adminAPI.getDeliveryWithdrawals(params),
   approveDeliveryWithdrawal: (id) => adminAPI.updateDeliveryWithdrawalStatus(id, { status: "approved" }),
   rejectDeliveryWithdrawal: (id, reason) => adminAPI.updateDeliveryWithdrawalStatus(id, { status: "rejected", rejectionReason: reason }),
-  // Aliases for RestaurantWithdraws page
-  getWithdrawalRequests: (params) => adminAPI.getWithdrawals(params),
-  approveWithdrawalRequest: (id) => adminAPI.updateWithdrawalStatus(id, { status: "approved" }),
-  rejectWithdrawalRequest: (id, reason) => adminAPI.updateWithdrawalStatus(id, { status: "rejected", rejectionReason: reason }),
   /** Delivery boy wallets (stub until backend implements - returns empty so list still loads) */
   getDeliveryBoyWallets: (params) =>
     apiClient.get("/food/admin/delivery/wallets", {
@@ -997,16 +982,6 @@ export const adminAPI = {
           },
         },
       },
-    }),
-  /** Submit a real withdrawal request to the backend. */
-  createWithdrawalRequest: (amount) =>
-    apiClient.post("/food/restaurant/withdraw", { amount: Number(amount) }, {
-      contextModule: "restaurant"
-    }),
-  /** List withdrawal history for current restaurant. */
-  getWithdrawalHistory: () =>
-    apiClient.get("/food/restaurant/withdrawals", {
-      contextModule: "restaurant"
     }),
   /** Update restaurant profile fields (name/cuisines/location/menuImages). */
   updateProfile: (body) =>

@@ -195,13 +195,6 @@ export const adminSidebarMenu = [
   },
   {
     type: "section",
-    label: "TRANSACTION MANAGEMENT",
-    items: [
-      { type: "link", label: "Restaurant Withdraws", path: "/admin/food/restaurant-withdraws", icon: "CreditCard" },
-    ],
-  },
-  {
-    type: "section",
     label: "BANNER SETTINGS",
     items: [
       { type: "link", label: "Landing Page Management", path: "/admin/food/hero-banner-management", icon: "Image" },

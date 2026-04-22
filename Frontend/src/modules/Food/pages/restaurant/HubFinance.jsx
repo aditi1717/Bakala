@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { Bell, Menu, ChevronDown, Calendar, Download, ArrowRight, FileText, Wallet, X } from "lucide-react"
+import { Bell, Menu, ChevronDown, Calendar, Download, ArrowRight, FileText } from "lucide-react"
 import BottomNavOrders from "@food/components/restaurant/BottomNavOrders"
 import { restaurantAPI } from "@food/api"
 import BRAND_THEME from "@/config/brandTheme"
@@ -18,6 +18,7 @@ export default function HubFinance() {
     return tabParam === "invoices" ? "invoices" : "payouts"
   })
   const [selectedDateRange, setSelectedDateRange] = useState("Last 30 days")
+  const [settlementStatusFilter, setSettlementStatusFilter] = useState("all")
   const [showDownloadMenu, setShowDownloadMenu] = useState(false)
   const [showDateRangePicker, setShowDateRangePicker] = useState(false)
   const downloadMenuRef = useRef(null)
@@ -28,11 +29,9 @@ export default function HubFinance() {
   const [loadingPastCycles, setLoadingPastCycles] = useState(false)
   const [restaurantData, setRestaurantData] = useState(null)
   const [loadingRestaurant, setLoadingRestaurant] = useState(true)
-  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
-  const [withdrawalAmount, setWithdrawalAmount] = useState('')
-  const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false)
-  const [withdrawalRequests, setWithdrawalRequests] = useState([])
-  const [loadingWithdrawals, setLoadingWithdrawals] = useState(false)
+  const ORDERS_PER_PAGE = 20
+  const [payoutTablePage, setPayoutTablePage] = useState(1)
+  const [invoiceTablePage, setInvoiceTablePage] = useState(1)
 
   // Fetch finance data on mount
   useEffect(() => {
@@ -58,30 +57,6 @@ export default function HubFinance() {
     fetchFinanceData()
   }, [])
 
-  useEffect(() => {
-    const fetchWithdrawals = async () => {
-      try {
-        setLoadingWithdrawals(true)
-        const response = await restaurantAPI.getWithdrawalHistory()
-        const payload = response?.data?.data
-        const list = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.withdrawals)
-            ? payload.withdrawals
-            : []
-        setWithdrawalRequests(list)
-      } catch (error) {
-        if (error?.response?.status !== 401) {
-          debugError('Error fetching withdrawal history:', error)
-        }
-        setWithdrawalRequests([])
-      } finally {
-        setLoadingWithdrawals(false)
-      }
-    }
-
-    fetchWithdrawals()
-  }, [])
 
   // Fetch restaurant data for header display
   useEffect(() => {
@@ -179,35 +154,150 @@ export default function HubFinance() {
     return { earnings, commission, gross, count: invoiceOrders.length }
   }, [invoiceOrders])
 
+  const currentCycleUnpaidSummary = useMemo(() => {
+    const orders = financeData?.currentCycle?.orders || []
+    const unpaidOrders = orders.filter((order) => !Boolean(order?.isSettled === true))
+    const unpaidAmount = unpaidOrders.reduce(
+      (sum, order) => sum + Number(order?.payout || order?.restaurantEarning || 0),
+      0
+    )
+    return { amount: unpaidAmount, count: unpaidOrders.length }
+  }, [financeData])
+
   const handleViewDetails = () => {
     navigate("/restaurant/finance-details", { state: { financeData, restaurantData } })
   }
 
-  const getWithdrawalStatusClass = (statusRaw) => {
-    const status = String(statusRaw || '').trim().toLowerCase()
-    if (status === 'approved') return 'bg-green-100 text-green-700'
-    if (status === 'rejected') return 'bg-red-100 text-red-700'
-    return 'bg-amber-100 text-amber-700'
-  }
+  const formatMoney = (amount = 0) =>
+    `₹${Number(amount || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`
 
-  const formatWithdrawalStatus = (statusRaw) => {
-    const status = String(statusRaw || '').trim().toLowerCase()
-    if (!status) return 'Pending'
-    return status.charAt(0).toUpperCase() + status.slice(1)
-  }
-
-  const formatDateTime = (dateValue) => {
-    if (!dateValue) return 'N/A'
-    const date = new Date(dateValue)
-    if (Number.isNaN(date.getTime())) return 'N/A'
-    return date.toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
+  const formatOrderDate = (value) => {
+    if (!value) return "N/A"
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return "N/A"
+    return d.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     })
+  }
+
+  const formatOrderTime = (value) => {
+    if (!value) return "N/A"
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return "N/A"
+    return d.toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+  }
+
+  const getOrderRouteId = (order = {}) => {
+    const candidate =
+      order?.orderMongoId ||
+      order?.mongoId ||
+      order?._id ||
+      order?.id ||
+      order?.orderId
+    return candidate ? String(candidate).trim() : ""
+  }
+
+  const handleOrderRowClick = (order = {}) => {
+    const routeOrderId = getOrderRouteId(order)
+    if (!routeOrderId) return
+    navigate(`/restaurant/orders/${encodeURIComponent(routeOrderId)}`)
+  }
+
+  const filterOrdersBySettlement = (orders = []) => {
+    if (!Array.isArray(orders)) return []
+    if (settlementStatusFilter === "all") return orders
+    return orders.filter((order) => {
+      const isSettled = Boolean(order?.isSettled === true)
+      return settlementStatusFilter === "paid" ? isSettled : !isSettled
+    })
+  }
+
+  const filteredPastCycleOrders = useMemo(
+    () => filterOrdersBySettlement(pastCyclesData?.orders || []),
+    [pastCyclesData, settlementStatusFilter]
+  )
+
+  const filteredCurrentCycleOrders = useMemo(
+    () => filterOrdersBySettlement(financeData?.currentCycle?.orders || []),
+    [financeData, settlementStatusFilter]
+  )
+
+  const filteredInvoiceOrders = useMemo(
+    () => filterOrdersBySettlement(invoiceOrders),
+    [invoiceOrders, settlementStatusFilter]
+  )
+
+  const isPastCyclesView = Boolean(pastCyclesData && pastCyclesData.orders)
+  const activePayoutOrders = isPastCyclesView ? filteredPastCycleOrders : filteredCurrentCycleOrders
+  const totalPayoutPages = Math.max(1, Math.ceil(activePayoutOrders.length / ORDERS_PER_PAGE))
+  const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoiceOrders.length / ORDERS_PER_PAGE))
+
+  const paginatedPayoutOrders = useMemo(() => {
+    const start = (payoutTablePage - 1) * ORDERS_PER_PAGE
+    return activePayoutOrders.slice(start, start + ORDERS_PER_PAGE)
+  }, [activePayoutOrders, payoutTablePage])
+
+  const paginatedInvoiceOrders = useMemo(() => {
+    const start = (invoiceTablePage - 1) * ORDERS_PER_PAGE
+    return filteredInvoiceOrders.slice(start, start + ORDERS_PER_PAGE)
+  }, [filteredInvoiceOrders, invoiceTablePage])
+
+  useEffect(() => {
+    setPayoutTablePage(1)
+    setInvoiceTablePage(1)
+  }, [settlementStatusFilter, selectedDateRange, activeTab])
+
+  useEffect(() => {
+    if (payoutTablePage > totalPayoutPages) {
+      setPayoutTablePage(totalPayoutPages)
+    }
+  }, [payoutTablePage, totalPayoutPages])
+
+  useEffect(() => {
+    if (invoiceTablePage > totalInvoicePages) {
+      setInvoiceTablePage(totalInvoicePages)
+    }
+  }, [invoiceTablePage, totalInvoicePages])
+
+  const renderPagination = (currentPage, totalPages, totalItems, onPageChange) => {
+    if (totalItems <= ORDERS_PER_PAGE) return null
+    const start = (currentPage - 1) * ORDERS_PER_PAGE + 1
+    const end = Math.min(currentPage * ORDERS_PER_PAGE, totalItems)
+    return (
+      <div className="px-4 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
+        <p className="text-xs text-gray-600">
+          Showing {start}-{end} of {totalItems}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1.5 text-xs font-semibold rounded-md border border-gray-200 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-gray-600">
+            Page {currentPage} / {totalPages}
+          </span>
+          <button
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1.5 text-xs font-semibold rounded-md border border-gray-200 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    )
   }
 
   // Parse date range string to extract start and end dates
@@ -733,13 +823,6 @@ export default function HubFinance() {
           <div className="flex items-center gap-1 ml-2">
             <button
               className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              onClick={() => navigate("/restaurant/withdrawal-history")}
-              title="Withdrawal History"
-            >
-              <Wallet className="w-5 h-5 text-gray-700" />
-            </button>
-            <button
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
               onClick={() => navigate("/restaurant/notifications")}
             >
               <Bell className="w-5 h-5 text-gray-700" />
@@ -795,24 +878,11 @@ export default function HubFinance() {
                 ) : (
                   <>
                     <p className="text-4xl font-bold text-gray-900 mb-2">
-                      ₹{(financeData?.currentCycle?.estimatedPayout || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatMoney(currentCycleUnpaidSummary.amount)}
                     </p>
                     <p className="text-sm text-gray-600 mb-4">
-                      {financeData?.currentCycle?.totalOrders || 0} {financeData?.currentCycle?.totalOrders === 1 ? 'order' : 'orders'}
+                      {currentCycleUnpaidSummary.count} {currentCycleUnpaidSummary.count === 1 ? 'unpaid order' : 'unpaid orders'}
                     </p>
-                    <button
-                      onClick={() => setShowWithdrawalModal(true)}
-                      disabled={!(financeData?.currentCycle?.estimatedPayout > 0)}
-                      className={`w-full py-3 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 mt-4 transition-colors ${
-                        financeData?.currentCycle?.estimatedPayout > 0
-                          ? "text-white"
-                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      }`}
-                      style={financeData?.currentCycle?.estimatedPayout > 0 ? { background: BRAND_THEME.gradients.primary } : undefined}
-                    >
-                      <Wallet className="h-5 w-5" />
-                      Withdraw
-                    </button>
                   </>
                 )}
               </div>
@@ -880,135 +950,6 @@ export default function HubFinance() {
               </div>
             )}
 
-            {/* Payout Calculation */}
-            {!loading && financeData?.currentCycle && (
-              <div>
-                <h2 className="text-base font-bold text-gray-900 mb-3">Payout calculation</h2>
-                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg p-4">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">Subtotal</span>
-                      <span className="font-medium text-gray-900">
-                        ₹{(() => {
-                          const total = (financeData.currentCycle.orders || []).reduce((sum, order) => {
-                            return sum + (order.pricing?.subtotal || order.totalAmount || 0)
-                          }, 0)
-                          return total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                        })()}
-                      </span>
-                    </div>
-                    
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">+ Packaging Fee</span>
-                      <span className="font-medium text-green-600">
-                        +₹{(() => {
-                          const total = (financeData.currentCycle.orders || []).reduce((sum, order) => {
-                            return sum + (order.pricing?.packagingFee || 0)
-                          }, 0)
-                          return total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                        })()}
-                      </span>
-                    </div>
-                    
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">- Commission</span>
-                      <span className="font-medium text-red-600">
-                        -₹{(() => {
-                          const total = (financeData.currentCycle.orders || []).reduce((sum, order) => {
-                            return sum + (order.commission || order.pricing?.restaurantCommission || 0)
-                          }, 0)
-                          return total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                        })()}
-                      </span>
-                    </div>
-                    
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">- Your Coupons</span>
-                      <span className="font-medium text-red-600">
-                        -₹{(() => {
-                          const total = (financeData.currentCycle.orders || []).reduce((sum, order) => {
-                            return sum + (order.pricing?.couponByRestaurant || 0)
-                          }, 0)
-                          return total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                        })()}
-                      </span>
-                    </div>
-                    
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">- Your Offers</span>
-                      <span className="font-medium text-red-600">
-                        -₹{(() => {
-                          const total = (financeData.currentCycle.orders || []).reduce((sum, order) => {
-                            return sum + (order.pricing?.offerByRestaurant || 0)
-                          }, 0)
-                          return total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                        })()}
-                      </span>
-                    </div>
-                    
-                    <div className="border-t-2 border-emerald-300 pt-2 mt-2 flex justify-between">
-                      <span className="font-bold text-base text-gray-900">Your Payout</span>
-                      <span className="font-bold text-base text-emerald-600">
-                        ₹{(financeData.currentCycle.estimatedPayout || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Withdrawal Requests */}
-            <div>
-              <h2 className="text-base font-bold text-gray-900 mb-3">Withdrawal requests</h2>
-              <div className="bg-white rounded-lg p-4">
-                {loadingWithdrawals ? (
-                  <div className="py-6 text-center text-sm text-gray-500">Loading withdrawal requests...</div>
-                ) : withdrawalRequests.length === 0 ? (
-                  <div className="py-6 text-center text-sm text-gray-500">No withdrawal requests found.</div>
-                ) : (
-                  <div className="space-y-3">
-                    {withdrawalRequests.slice(0, 8).map((request, index) => {
-                      const status = formatWithdrawalStatus(request?.status)
-                      return (
-                        <div
-                          key={request?._id || request?.id || index}
-                          className="border border-gray-200 rounded-lg p-3"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold text-gray-900">
-                                ₹{Number(request?.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Requested: {formatDateTime(request?.createdAt || request?.requestedAt)}
-                              </p>
-                              {request?.processedAt ? (
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  Processed: {formatDateTime(request?.processedAt)}
-                                </p>
-                              ) : null}
-                            </div>
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${getWithdrawalStatusClass(request?.status)}`}>
-                              {status}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {withdrawalRequests.length > 8 ? (
-                      <button
-                        type="button"
-                        onClick={() => navigate("/restaurant/withdrawal-history")}
-                        className="w-full text-sm font-medium text-black hover:underline pt-1"
-                      >
-                        View all requests
-                      </button>
-                    ) : null}
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Past cycles */}
             <div>
               <h2 className="text-base font-bold text-gray-900 mb-3">Past cycles</h2>
@@ -1033,7 +974,7 @@ export default function HubFinance() {
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
-                          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50"
+                          className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 z-[80]"
                         >
                           <div className="p-4">
                             <h3 className="text-sm font-semibold text-gray-900 mb-3">Select Date Range</h3>
@@ -1042,7 +983,7 @@ export default function HubFinance() {
                                 const getDateRanges = () => {
                                   const today = new Date()
                                   today.setHours(23, 59, 59, 999)
-                                  
+
                                   // Last 7 days
                                   const last7DaysStart = new Date(today)
                                   last7DaysStart.setDate(today.getDate() - 7)
@@ -1183,7 +1124,7 @@ export default function HubFinance() {
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.95, y: -10 }}
                           transition={{ duration: 0.2, ease: "easeOut" }}
-                          className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50 min-w-[180px]"
+                          className="absolute bottom-full right-0 mb-2 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-[80] min-w-[180px]"
                         >
                           <button
                             onClick={downloadPDF}
@@ -1199,6 +1140,28 @@ export default function HubFinance() {
                     </AnimatePresence>
                   </div>
                 </div>
+                <div className="flex items-center gap-2">
+                  {[
+                    { id: "all", label: "All" },
+                    { id: "paid", label: "Paid" },
+                    { id: "unpaid", label: "Unpaid" },
+                  ].map((option) => {
+                    const isActive = settlementStatusFilter === option.id
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => setSettlementStatusFilter(option.id)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+                          isActive
+                            ? "bg-gray-900 text-white border-gray-900"
+                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    )
+                  })}
+                </div>
                 {loadingPastCycles ? (
                   <div className="bg-white rounded-lg p-4">
                     <p className="text-sm text-gray-600 text-center">Loading past cycles...</p>
@@ -1207,29 +1170,67 @@ export default function HubFinance() {
                   <>
                     {/* Show past cycles orders if available */}
                     {pastCyclesData && pastCyclesData.orders && pastCyclesData.orders.length > 0 ? (
-                      <div className="bg-white rounded-lg p-4 space-y-3">
-                        {pastCyclesData.orders.map((order, index) => (
-                          <div key={order.orderId || index} className="border-b border-gray-200 pb-3 last:border-b-0 last:pb-0">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <p className="text-sm font-semibold text-gray-900 mb-1">
-                                  Order ID: {order.orderId || 'N/A'}
-                                </p>
-                                <p className="text-xs text-gray-600">
-                                  {order.foodNames || (order.items && order.items.map(item => item.name).join(', ')) || 'N/A'}
-                                </p>
-                              </div>
-                              <div className="text-right ml-4">
-                                <p className="text-sm font-bold text-gray-900">
-                                  ₹{(order.payout || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  Earning
-                                </p>
-                              </div>
-                            </div>
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[760px]">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Order ID</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Date</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Time</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wide">Your Earning</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {paginatedPayoutOrders.map((order, index) => {
+                                const payout = Number(order?.payout || order?.restaurantEarning || 0)
+                                const isSettled = Boolean(order?.isSettled === true)
+                                return (
+                                  <tr
+                                    key={order?.orderId || index}
+                                    className="hover:bg-gray-50 cursor-pointer"
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => handleOrderRowClick(order)}
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault()
+                                        handleOrderRowClick(order)
+                                      }
+                                    }}
+                                  >
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{order?.orderId || "N/A"}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-700">{formatOrderDate(order?.createdAt)}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-700">{formatOrderTime(order?.createdAt)}</td>
+                                    <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">{formatMoney(payout)}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${isSettled ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                                        {isSettled ? "Paid" : "Unpaid"}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {filteredPastCycleOrders.length === 0 && (
+                          <div className="px-4 py-5 border-t border-gray-200 bg-white text-center">
+                            <p className="text-sm text-gray-500">
+                              No {settlementStatusFilter} orders found in this selected range.
+                            </p>
                           </div>
-                        ))}
+                        )}
+                        {renderPagination(
+                          payoutTablePage,
+                          totalPayoutPages,
+                          filteredPastCycleOrders.length,
+                          setPayoutTablePage
+                        )}
+                        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                          <p className="text-xs text-gray-600">You will be paid by admin based on the selected weekly or monthly cycle. Once admin completes payment, Unpaid status will automatically change to Paid.</p>
+                        </div>
                       </div>
                     ) : (pastCyclesData && pastCyclesData.orders && pastCyclesData.orders.length === 0) ? (
                       <div className="bg-white rounded-lg p-8 text-center border border-dashed border-gray-300">
@@ -1239,29 +1240,67 @@ export default function HubFinance() {
 
                     {/* Show current cycle orders if past cycles data is not requested or not being viewed */}
                     {(!pastCyclesData || !pastCyclesData.orders) && !loadingPastCycles && financeData?.currentCycle?.orders && financeData.currentCycle.orders.length > 0 && (
-                      <div className="bg-white rounded-lg p-4 space-y-3">
-                        {financeData.currentCycle.orders.map((order, index) => (
-                          <div key={order.orderId || index} className="border-b border-gray-200 pb-3 last:border-b-0 last:pb-0">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <p className="text-sm font-semibold text-gray-900 mb-1">
-                                  Order ID: {order.orderId || 'N/A'}
-                                </p>
-                                <p className="text-xs text-gray-600">
-                                  {order.foodNames || (order.items && order.items.map(item => item.name).join(', ')) || 'N/A'}
-                                </p>
-                              </div>
-                              <div className="text-right ml-4">
-                                <p className="text-sm font-bold text-gray-900">
-                                  ₹{(order.payout || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  Earning
-                                </p>
-                              </div>
-                            </div>
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[760px]">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Order ID</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Date</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Time</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wide">Your Earning</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {paginatedPayoutOrders.map((order, index) => {
+                                const payout = Number(order?.payout || order?.restaurantEarning || 0)
+                                const isSettled = Boolean(order?.isSettled === true)
+                                return (
+                                  <tr
+                                    key={order?.orderId || index}
+                                    className="hover:bg-gray-50 cursor-pointer"
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => handleOrderRowClick(order)}
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault()
+                                        handleOrderRowClick(order)
+                                      }
+                                    }}
+                                  >
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{order?.orderId || "N/A"}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-700">{formatOrderDate(order?.createdAt)}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-700">{formatOrderTime(order?.createdAt)}</td>
+                                    <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">{formatMoney(payout)}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${isSettled ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                                        {isSettled ? "Paid" : "Unpaid"}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {filteredCurrentCycleOrders.length === 0 && (
+                          <div className="px-4 py-5 border-t border-gray-200 bg-white text-center">
+                            <p className="text-sm text-gray-500">
+                              No {settlementStatusFilter} orders found in the current cycle.
+                            </p>
                           </div>
-                        ))}
+                        )}
+                        {renderPagination(
+                          payoutTablePage,
+                          totalPayoutPages,
+                          filteredCurrentCycleOrders.length,
+                          setPayoutTablePage
+                        )}
+                        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                          <p className="text-xs text-gray-600">You will be paid by admin based on the selected weekly or monthly cycle. Once admin completes payment, Unpaid status will automatically change to Paid.</p>
+                        </div>
                       </div>
                     )}
                     
@@ -1306,13 +1345,35 @@ export default function HubFinance() {
 
             <div className="bg-white rounded-lg p-4 border border-gray-200">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Order invoice details</h3>
+              <div className="flex items-center gap-2 mb-3">
+                {[
+                  { id: "all", label: "All" },
+                  { id: "paid", label: "Paid" },
+                  { id: "unpaid", label: "Unpaid" },
+                ].map((option) => {
+                  const isActive = settlementStatusFilter === option.id
+                  return (
+                    <button
+                      key={`invoice-${option.id}`}
+                      onClick={() => setSettlementStatusFilter(option.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+                        isActive
+                          ? "bg-gray-900 text-white border-gray-900"
+                          : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                })}
+              </div>
               {loading ? (
                 <p className="text-sm text-gray-500">Loading invoice data...</p>
-              ) : invoiceOrders.length === 0 ? (
+              ) : filteredInvoiceOrders.length === 0 ? (
                 <p className="text-sm text-gray-500">No invoice data available for selected range.</p>
               ) : (
                 <div className="space-y-2">
-                  {invoiceOrders.map((order, index) => (
+                  {paginatedInvoiceOrders.map((order, index) => (
                     <div key={`${order.orderId || index}-invoice`} className="border border-gray-100 rounded-md p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -1330,6 +1391,12 @@ export default function HubFinance() {
                       </div>
                     </div>
                   ))}
+                  {renderPagination(
+                    invoiceTablePage,
+                    totalInvoicePages,
+                    filteredInvoiceOrders.length,
+                    setInvoiceTablePage
+                  )}
                 </div>
               )}
             </div>
@@ -1337,129 +1404,12 @@ export default function HubFinance() {
         )}
       </div>
 
-      {/* Withdrawal Modal */}
-      <AnimatePresence>
-        {showWithdrawalModal && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50"
-              style={{ backgroundColor: `${BRAND_THEME.colors.brand.primary}80` }}
-              onClick={() => setShowWithdrawalModal(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-900">Withdraw Amount</h2>
-                  <button
-                    onClick={() => {
-                      setShowWithdrawalModal(false)
-                      setWithdrawalAmount('')
-                    }}
-                    className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <X className="w-5 h-5 text-gray-600" />
-                  </button>
-                </div>
-                
-                <div className="mb-4">
-                  <p className="text-sm text-gray-600 mb-2">
-                    Available Balance: <span className="font-semibold text-gray-900">₹{(financeData?.currentCycle?.estimatedPayout || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </p>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Enter Amount to Withdraw
-                  </label>
-                  <input
-                    type="number"
-                    min="0.01"
-                    max={financeData?.currentCycle?.estimatedPayout || 0}
-                    step="0.01"
-                    value={withdrawalAmount}
-                    onChange={(e) => setWithdrawalAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
-                  />
-                  {withdrawalAmount && parseFloat(withdrawalAmount) > (financeData?.currentCycle?.estimatedPayout || 0) && (
-                    <p className="text-sm text-red-600 mt-1">Amount cannot exceed available balance</p>
-                  )}
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowWithdrawalModal(false)
-                      setWithdrawalAmount('')
-                    }}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const amount = parseFloat(withdrawalAmount)
-                      if (!amount || amount <= 0) {
-                        alert('Please enter a valid amount')
-                        return
-                      }
-                      if (amount > (financeData?.currentCycle?.estimatedPayout || 0)) {
-                        alert('Amount cannot exceed available balance')
-                        return
-                      }
-                      
-                      try {
-                        setSubmittingWithdrawal(true)
-                        const response = await restaurantAPI.createWithdrawalRequest(amount)
-                        if (response.data?.success) {
-                          alert('Withdrawal request submitted successfully!')
-                          setShowWithdrawalModal(false)
-                          setWithdrawalAmount('')
-                          // Refresh finance data
-                          const financeResponse = await restaurantAPI.getFinance()
-                          if (financeResponse.data?.success && financeResponse.data?.data) {
-                            setFinanceData(financeResponse.data.data)
-                          }
-                          const withdrawalResponse = await restaurantAPI.getWithdrawalHistory()
-                          const withdrawalPayload = withdrawalResponse?.data?.data
-                          const withdrawalList = Array.isArray(withdrawalPayload)
-                            ? withdrawalPayload
-                            : Array.isArray(withdrawalPayload?.withdrawals)
-                              ? withdrawalPayload.withdrawals
-                              : []
-                          setWithdrawalRequests(withdrawalList)
-                        } else {
-                          alert(response.data?.message || 'Failed to submit withdrawal request')
-                        }
-                      } catch (error) {
-                        debugError('Error submitting withdrawal request:', error)
-                        alert(error.response?.data?.message || 'Failed to submit withdrawal request. Please try again.')
-                      } finally {
-                        setSubmittingWithdrawal(false)
-                      }
-                    }}
-                    disabled={submittingWithdrawal || !withdrawalAmount || parseFloat(withdrawalAmount) <= 0 || parseFloat(withdrawalAmount) > (financeData?.currentCycle?.estimatedPayout || 0)}
-                    className="flex-1 px-4 py-3 text-white rounded-lg font-medium transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    style={!submittingWithdrawal && withdrawalAmount && parseFloat(withdrawalAmount) > 0 && parseFloat(withdrawalAmount) <= (financeData?.currentCycle?.estimatedPayout || 0) ? { background: BRAND_THEME.gradients.primary } : undefined}
-                  >
-                    {submittingWithdrawal ? 'Submitting...' : 'Submit Request'}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
       <BottomNavOrders />
     </div>
   )
 }
+
+
+
 
 

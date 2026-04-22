@@ -53,15 +53,10 @@ export default function WalletPage() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const [finRes, withRes] = await Promise.all([
-        restaurantAPI.getFinance(),
-        restaurantAPI.getWithdrawalHistory()
-      ])
+      const finRes = await restaurantAPI.getFinance()
 
       if (finRes.data?.success) setFinanceData(finRes.data.data)
-      
-      const history = withRes?.data?.data || []
-      setWithdrawals(history)
+      setWithdrawals([])
     } catch (error) {
       console.error("Error fetching wallet data:", error)
     } finally {
@@ -188,12 +183,9 @@ export default function WalletPage() {
             <Button 
               className="bg-white hover:bg-white/90 font-semibold px-4 py-2 md:px-6 md:py-3 rounded-lg"
               style={{ color: BRAND_THEME.colors.brand.primary }}
-              onClick={() => {
-                setWithdrawAmount(balances.withdrawalBalance.toString())
-                setShowWithdrawModal(true)
-              }}
+              disabled
             >
-              Withdraw
+              Disabled
             </Button>
             </motion.div>
           </div>
@@ -507,146 +499,6 @@ export default function WalletPage() {
         </motion.div>
       </div>
 
-      {/* Withdraw Request Modal */}
-      <AnimatePresence>
-        {showWithdrawModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-50 flex items-end md:items-center justify-center backdrop-blur-sm"
-            style={{ backgroundColor: `${BRAND_THEME.colors.brand.primaryDark}66` }}
-            onClick={() => setShowWithdrawModal(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 100 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-md md:max-w-lg h-[90vh] md:h-auto md:max-h-[90vh] flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Handle bar */}
-              <div className="flex justify-center pt-3 pb-2">
-                <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
-              </div>
-
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 pb-4 border-b border-gray-200">
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-                  Withdraw Request
-                </h2>
-                <button
-                  onClick={() => setShowWithdrawModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-600" />
-          </button>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto px-6 py-6">
-                <p className="text-gray-600 text-sm md:text-base mb-6">
-                  Secure and simple way to withdraw your earning
-                </p>
-
-                {/* Withdraw Amount Input */}
-                <div className="mb-6">
-                  <label className="block text-sm md:text-base font-medium text-gray-900 mb-2">
-                    Enter Withdraw Amount (?) <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    type="number"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="w-full border-gray-300"
-                    style={{
-                      borderColor: BRAND_THEME.colors.brand.primary,
-                      boxShadow: `0 0 0 1px ${BRAND_THEME.colors.brand.primary}26`,
-                    }}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                {/* Payment Method Dropdown */}
-                <div className="mb-6 relative payment-dropdown-container">
-                  <label className="block text-sm md:text-base font-medium text-gray-900 mb-2">
-                    Select Payment Method <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-          <button 
-                      type="button"
-                      onClick={() => setShowPaymentDropdown(!showPaymentDropdown)}
-                      className="w-full flex items-center justify-between px-3 py-2.5 border rounded-lg bg-white text-left focus:outline-none"
-                      style={{ borderColor: BRAND_THEME.colors.brand.primary, boxShadow: `0 0 0 1px ${BRAND_THEME.colors.brand.primary}26` }}
-          >
-                      <span className={selectedPaymentMethod ? "text-gray-900" : "text-gray-400"}>
-                        {selectedPaymentMethod || "Select payment method"}
-                      </span>
-                      <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showPaymentDropdown ? 'rotate-180' : ''}`} />
-          </button>
-                    
-                    {showPaymentDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-                      >
-                        {paymentMethods.map((method) => (
-          <button 
-                            key={method}
-                            type="button"
-                            onClick={() => {
-                              setSelectedPaymentMethod(method)
-                              setShowPaymentDropdown(false)
-                            }}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
-                          >
-                            <span className="text-gray-900 text-sm md:text-base">{method}</span>
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer Button */}
-              <div className="px-6 pb-6 pt-4 border-t border-gray-200">
-                <Button
-                  className="w-full text-white font-semibold py-3 rounded-lg text-base md:text-lg"
-                  style={{ backgroundColor: BRAND_THEME.colors.brand.primary }}
-                  disabled={!withdrawAmount || submitting}
-                  onClick={async () => {
-                    if (!withdrawAmount || submitting) return
-
-                    const amount = parseFloat(withdrawAmount)
-                    if (!Number.isFinite(amount) || amount <= 0 || amount > balances.withdrawalBalance) return
-
-                    try {
-                      setSubmitting(true)
-                      await restaurantAPI.createWithdrawalRequest(amount)
-                      await fetchData()
-                      setWithdrawAmount("")
-                      setShowPaymentDropdown(false)
-                      setShowWithdrawModal(false)
-                    } catch (error) {
-                      console.error("Error creating withdrawal request:", error)
-                    } finally {
-                      setSubmitting(false)
-                    }
-                  }}
-                >
-                  {submitting ? "Submitting..." : "Request Withdraw"}
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Balance Adjust Modal */}
       <AnimatePresence>
         {showAdjustModal && (
@@ -697,13 +549,12 @@ export default function WalletPage() {
         )}
       </AnimatePresence>
 
-      {/* Bottom Navigation Bar - Mobile Only (Hide when withdraw modal is open) */}
-      {!showWithdrawModal && (
-        <BottomNavOrders />
-      )}
+      {/* Bottom Navigation Bar - Mobile Only */}
+      <BottomNavOrders />
     </div>
   )
 }
+
 
 
 

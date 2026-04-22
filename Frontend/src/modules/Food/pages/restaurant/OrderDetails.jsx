@@ -136,6 +136,9 @@ export default function OrderDetails() {
           const discount = firstNumber(pricing.discount, order.discount) ?? 0
           const couponDiscount = firstNumber(pricing.couponDiscount, order.couponDiscount) ?? 0
           const referralDiscount = firstNumber(pricing.referralDiscount, order.referralDiscount) ?? 0
+          const couponByRestaurant = firstNumber(pricing.couponByRestaurant, order.couponByRestaurant) ?? 0
+          const offerByRestaurant = firstNumber(pricing.offerByRestaurant, order.offerByRestaurant) ?? 0
+          const commission = firstNumber(order.commission, pricing.restaurantCommission) ?? 0
 
           const total =
             firstNumber(
@@ -155,6 +158,22 @@ export default function OrderDetails() {
                 discount
             )
           const paidAmount = firstNumber(order.payment?.amountDue, order.payment?.amount, total) ?? total
+          const directRestaurantEarning = firstNumber(
+            order.restaurantEarning,
+            order.payout,
+            pricing.restaurantEarning,
+            pricing.payoutToRestaurant
+          )
+          const restaurantEarning =
+            directRestaurantEarning ??
+            Math.max(
+              0,
+              itemSubtotal +
+                packagingFee -
+                commission -
+                couponByRestaurant -
+                offerByRestaurant
+            )
 
           const addressParts = [
             order.address?.street,
@@ -252,6 +271,7 @@ export default function OrderDetails() {
               discount,
               couponDiscount,
               referralDiscount,
+              restaurantEarning,
               total,
               paidAmount,
               paymentStatus
@@ -518,6 +538,11 @@ export default function OrderDetails() {
     doc.setFontSize(11)
     doc.text("Total Bill:", leftMargin, yPosition)
     doc.text(formatMoney(orderData.billing.total), pageWidth - rightMargin, yPosition, { align: "right" })
+    yPosition += 6
+    doc.setTextColor(22, 163, 74)
+    doc.text("Your Earning:", leftMargin, yPosition)
+    doc.text(formatMoney(orderData.billing.restaurantEarning), pageWidth - rightMargin, yPosition, { align: "right" })
+    doc.setTextColor(0, 0, 0)
     yPosition += 6
     if (Number(orderData.billing.paidAmount) > 0) {
       doc.setFont("helvetica", "normal")
@@ -900,6 +925,14 @@ export default function OrderDetails() {
                 <span className="text-sm font-medium text-gray-900">{formatMoney(orderData.billing.paidAmount)}</span>
               </div>
             )}
+            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-emerald-800">Your earning</span>
+                <span className="text-sm font-bold text-emerald-800">
+                  {formatMoney(orderData.billing.restaurantEarning)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -214,8 +214,6 @@ router.get('/delivery-emergency-help', adminController.getEmergencyHelp);
 router.put('/delivery-emergency-help', adminController.createOrUpdateEmergencyHelp);
 
 // ----- Withdrawals (admin) -----
-router.get('/withdrawals', adminController.getWithdrawals);
-router.patch('/withdrawals/:id', adminController.updateWithdrawalStatus);
 router.get('/delivery/withdrawals', adminController.getDeliveryWithdrawals);
 router.patch('/delivery/withdrawals/:id', adminController.updateDeliveryWithdrawalStatus);
 router.get('/delivery/cash-limit-settlements', adminController.getCashLimitSettlements);

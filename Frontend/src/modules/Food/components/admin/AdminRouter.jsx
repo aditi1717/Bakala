@@ -86,8 +86,6 @@ const FeedbackExperienceReport = lazy(() => import("@food/pages/admin/reports/Fe
 const TaxReport = lazy(() => import("@food/pages/admin/reports/TaxReport"));
 const RestaurantVATReport = lazy(() => import("@food/pages/admin/reports/RestaurantVATReport"));
 // Transaction Management
-const RestaurantWithdraws = lazy(() => import("@food/pages/admin/transactions/RestaurantWithdraws"));
-const WithdrawMethod = lazy(() => import("@food/pages/admin/transactions/WithdrawMethod"));
 // Employee Management
 const EmployeeRole = lazy(() => import("@food/pages/admin/employees/EmployeeRole"));
 const AddEmployee = lazy(() => import("@food/pages/admin/employees/AddEmployee"));
@@ -259,9 +257,6 @@ export default function AdminRouter() {
             <Route path="customer-report/feedback-experience" element={<FeedbackExperienceReport />} />
             <Route path="tax-report" element={<TaxReport />} />
             <Route path="restaurant-vat-report" element={<RestaurantVATReport />} />
-            
-            <Route path="restaurant-withdraws" element={<RestaurantWithdraws />} />
-            <Route path="withdraw-method" element={<WithdrawMethod />} />
             
             <Route path="employee-role" element={<EmployeeRole />} />
             <Route path="employees" element={<EmployeeList />} />

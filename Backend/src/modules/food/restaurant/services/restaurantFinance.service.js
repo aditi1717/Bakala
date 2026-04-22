@@ -72,6 +72,48 @@ function buildRestaurantFinanceTransactionEligibility() {
     };
 }
 
+function mapTransactionToFinanceOrder(tx, effectiveDateOverride = null) {
+    const order = tx?.orderId || {};
+    const items = Array.isArray(order.items) ? order.items : [];
+    const foodNames = items.map((it) => it?.name).filter(Boolean).join(', ');
+    const orderTotalExclTax = Math.max(
+        0,
+        Number(order?.pricing?.total ?? 0) - Number(order?.pricing?.tax ?? 0) || 0
+    );
+    const payout = Number(tx?.amounts?.restaurantShare || 0);
+    const isSettled = Boolean(tx?.settlement?.isRestaurantSettled === true);
+
+    return {
+        orderId: order?.orderId || tx?.orderReadableId,
+        createdAt: effectiveDateOverride || tx?.createdAt,
+        items,
+        foodNames,
+        orderTotal: orderTotalExclTax,
+        totalAmount: tx?.amounts?.totalCustomerPaid || 0,
+        payout,
+        commission: tx?.amounts?.restaurantCommission || 0,
+        paymentMethod: tx?.paymentMethod || order?.payment?.method,
+        orderStatus: order?.orderStatus || order?.deliveryState?.currentPhase || order?.deliveryState?.status,
+        status: tx?.status,
+        isSettled,
+        settledAt: tx?.settlement?.restaurantSettledAt || null,
+        paidAmount: isSettled ? payout : 0,
+        unpaidAmount: isSettled ? 0 : payout,
+        pricing: {
+            subtotal: order?.pricing?.subtotal || 0,
+            packagingFee: order?.pricing?.packagingFee || 0,
+            couponByAdmin: order?.pricing?.couponByAdmin || 0,
+            couponByRestaurant: order?.pricing?.couponByRestaurant || 0,
+            offerByRestaurant: order?.pricing?.offerByRestaurant || 0,
+            tax: order?.pricing?.tax || 0,
+            deliveryFee: order?.pricing?.deliveryFee || 0,
+            platformFee: order?.pricing?.platformFee || 0,
+            total: order?.pricing?.total || 0,
+            restaurantCommission: tx?.amounts?.restaurantCommission || 0
+        }
+    };
+}
+
 export async function getRestaurantFinance(restaurantId, query = {}) {
     if (!restaurantId || !mongoose.Types.ObjectId.isValid(restaurantId)) return null;
     const rid = new mongoose.Types.ObjectId(restaurantId);
@@ -108,43 +150,13 @@ export async function getRestaurantFinance(restaurantId, query = {}) {
         .lean();
 
     const currentCycleOrders = currentTransactions.map((tx) => {
-        const order = tx.orderId || {};
-        const items = Array.isArray(order.items) ? order.items : [];
-        const foodNames = items.map((it) => it?.name).filter(Boolean).join(', ');
-        const orderTotalExclTax = Math.max(
-            0,
-            Number(order?.pricing?.total ?? 0) - Number(order?.pricing?.tax ?? 0) || 0
-        );
         const recoveredFromDue = Array.isArray(tx.history)
             ? tx.history.some((h) => String(h?.kind || '').toLowerCase() === 'recovered_user_due')
             : false;
         const effectiveDate = recoveredFromDue ? (tx.updatedAt || tx.createdAt) : tx.createdAt;
         return {
-            orderId: order?.orderId || tx.orderReadableId,
-            createdAt: effectiveDate,
-            items,
-            foodNames,
-            orderTotal: orderTotalExclTax,
-            totalAmount: tx.amounts?.totalCustomerPaid || 0,
-            payout: tx.amounts?.restaurantShare || 0,
-            commission: tx.amounts?.restaurantCommission || 0,
-            paymentMethod: tx.paymentMethod || order?.payment?.method,
-            orderStatus: order?.orderStatus || order?.deliveryState?.currentPhase || order?.deliveryState?.status,
-            status: tx.status,
-            recoveredFromDue,
-            // Add pricing breakdown for discount display
-            pricing: {
-                subtotal: order?.pricing?.subtotal || 0,
-                packagingFee: order?.pricing?.packagingFee || 0,
-                couponByAdmin: order?.pricing?.couponByAdmin || 0,
-                couponByRestaurant: order?.pricing?.couponByRestaurant || 0,
-                offerByRestaurant: order?.pricing?.offerByRestaurant || 0,
-                tax: order?.pricing?.tax || 0,
-                deliveryFee: order?.pricing?.deliveryFee || 0,
-                platformFee: order?.pricing?.platformFee || 0,
-                total: order?.pricing?.total || 0,
-                restaurantCommission: tx.amounts?.restaurantCommission || 0
-            }
+            ...mapTransactionToFinanceOrder(tx, effectiveDate),
+            recoveredFromDue
         };
     });
 
@@ -215,42 +227,7 @@ export async function getRestaurantFinance(restaurantId, query = {}) {
             .sort({ createdAt: -1 })
             .lean();
 
-        const pastCycleOrders = pastTransactions.map((tx) => {
-            const order = tx.orderId || {};
-            const items = Array.isArray(order.items) ? order.items : [];
-            const foodNames = items.map((it) => it?.name).filter(Boolean).join(', ');
-            const orderTotalExclTax = Math.max(
-                0,
-                Number(order?.pricing?.total ?? 0) - Number(order?.pricing?.tax ?? 0) || 0
-            );
-
-            return {
-                orderId: order?.orderId || tx.orderReadableId,
-                createdAt: tx.createdAt,
-                items,
-                foodNames,
-                orderTotal: orderTotalExclTax,
-                totalAmount: tx.amounts?.totalCustomerPaid || 0,
-                payout: tx.amounts?.restaurantShare || 0,
-                commission: tx.amounts?.restaurantCommission || 0,
-                paymentMethod: tx.paymentMethod || order?.payment?.method,
-                orderStatus: order?.orderStatus || order?.deliveryState?.currentPhase || order?.deliveryState?.status,
-                status: tx.status,
-                // Add pricing breakdown for discount display
-                pricing: {
-                    subtotal: order?.pricing?.subtotal || 0,
-                    packagingFee: order?.pricing?.packagingFee || 0,
-                    couponByAdmin: order?.pricing?.couponByAdmin || 0,
-                    couponByRestaurant: order?.pricing?.couponByRestaurant || 0,
-                    offerByRestaurant: order?.pricing?.offerByRestaurant || 0,
-                    tax: order?.pricing?.tax || 0,
-                    deliveryFee: order?.pricing?.deliveryFee || 0,
-                    platformFee: order?.pricing?.platformFee || 0,
-                    total: order?.pricing?.total || 0,
-                    restaurantCommission: tx.amounts?.restaurantCommission || 0
-                }
-            };
-        });
+        const pastCycleOrders = pastTransactions.map((tx) => mapTransactionToFinanceOrder(tx));
 
         pastCyclesResult = {
             orders: pastCycleOrders,
