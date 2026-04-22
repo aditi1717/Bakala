@@ -144,7 +144,9 @@ export default function RestaurantReport() {
       { key: "totalCouponByRestaurant", label: "Coupon by Restaurant" },
       { key: "totalOfferByRestaurant", label: "Offer by Restaurant" },
       { key: "totalGST", label: "GST" },
-      { key: "restaurantPayout", label: "Restaurant Payout" },
+      { key: "totalRestaurantEarning", label: "Total Restaurant Earning" },
+      { key: "paidRestaurantEarning", label: "Paid To Restaurant" },
+      { key: "unpaidRestaurantEarning", label: "Unpaid To Restaurant" },
       { key: "totalDeliveryCharge", label: "Delivery Charges" },
       { key: "totalPlatformFee", label: "Platform Fees" },
       { key: "totalOrderAmount", label: "Total Order Amount" },
@@ -380,7 +382,7 @@ export default function RestaurantReport() {
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1700px]">
+            <table className="w-full min-w-[2000px]">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
@@ -439,7 +441,19 @@ export default function RestaurantReport() {
                   </th>
                   <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                     <div className="flex items-center justify-end gap-1">
-                      <span>Restaurant Payout</span>
+                      <span>Total Restaurant Earning</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Paid</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Unpaid</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
@@ -472,7 +486,7 @@ export default function RestaurantReport() {
               <tbody className="bg-white divide-y divide-slate-100">
                 {filteredRestaurants.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="px-6 py-20 text-center">
+                    <td colSpan={16} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                         <p className="text-sm text-slate-500">No restaurants match your search</p>
@@ -528,7 +542,13 @@ export default function RestaurantReport() {
                         <span className="text-sm text-slate-700">{restaurant.totalGST}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
-                        <span className="text-sm font-bold text-emerald-600">{restaurant.restaurantPayout}</span>
+                        <span className="text-sm font-semibold text-slate-900">{restaurant.totalRestaurantEarning}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
+                        <span className="text-sm font-semibold text-emerald-600">{restaurant.paidRestaurantEarning}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
+                        <span className="text-sm font-semibold text-orange-600">{restaurant.unpaidRestaurantEarning}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
                         <span className="text-sm text-slate-700">{restaurant.totalDeliveryCharge}</span>

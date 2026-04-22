@@ -759,6 +759,25 @@ export const adminAPI = {
       params,
       contextModule: "admin",
     }),
+  getPayoutSettlementPreview: (params = {}) =>
+    apiClient.get("/food/admin/payout-settlements/preview", {
+      params,
+      contextModule: "admin",
+    }),
+  getPayoutSettlementHistory: (params = {}) =>
+    apiClient.get("/food/admin/payout-settlements/history", {
+      params,
+      contextModule: "admin",
+    }),
+  getPayoutSettlementHistoryBatchDetails: (batchId, params = {}) =>
+    apiClient.get(`/food/admin/payout-settlements/history/${String(batchId)}`, {
+      params,
+      contextModule: "admin",
+    }),
+  markAllPayoutSettlementsPaid: (body = {}) =>
+    apiClient.post("/food/admin/payout-settlements/mark-all-paid", body ?? {}, {
+      contextModule: "admin",
+    }),
 
   /** Restaurant Commission (admin) */
   getRestaurantCommissionBootstrap: () =>

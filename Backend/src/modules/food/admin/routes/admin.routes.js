@@ -219,6 +219,10 @@ router.patch('/withdrawals/:id', adminController.updateWithdrawalStatus);
 router.get('/delivery/withdrawals', adminController.getDeliveryWithdrawals);
 router.patch('/delivery/withdrawals/:id', adminController.updateDeliveryWithdrawalStatus);
 router.get('/delivery/cash-limit-settlements', adminController.getCashLimitSettlements);
+router.get('/payout-settlements/preview', adminController.getPayoutSettlementPreview);
+router.get('/payout-settlements/history', adminController.getPayoutSettlementHistory);
+router.get('/payout-settlements/history/:batchId', adminController.getPayoutSettlementHistoryBatchDetails);
+router.post('/payout-settlements/mark-all-paid', adminController.markAllPayoutSettlementsPaid);
 
 // ----- Delivery partners & general -----
 router.get('/delivery/join-requests', adminController.getDeliveryJoinRequests);

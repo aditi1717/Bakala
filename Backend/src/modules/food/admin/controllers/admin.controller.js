@@ -1522,6 +1522,63 @@ export async function getCashLimitSettlements(req, res, next) {
     }
 }
 
+export async function getPayoutSettlementPreview(req, res, next) {
+    try {
+        const beneficiaryType = String(req.query?.beneficiaryType || '').trim().toLowerCase();
+        if (beneficiaryType !== 'restaurant') {
+            return res.status(400).json({ success: false, message: 'Only restaurant beneficiaryType is supported currently' });
+        }
+        const data = await adminService.getRestaurantPayoutSettlementPreview(req.query || {}, req.adminAuth || {});
+        res.status(200).json({ success: true, message: 'Payout settlement preview fetched successfully', data });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function markAllPayoutSettlementsPaid(req, res, next) {
+    try {
+        const body = req.body || {};
+        const beneficiaryType = String(body.beneficiaryType || '').trim().toLowerCase();
+        if (beneficiaryType !== 'restaurant') {
+            return res.status(400).json({ success: false, message: 'Only restaurant beneficiaryType is supported currently' });
+        }
+        const data = await adminService.markAllRestaurantPayoutSettled(body, req.adminAuth || {});
+        res.status(200).json({ success: true, message: 'Payouts marked paid successfully', data });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getPayoutSettlementHistory(req, res, next) {
+    try {
+        const beneficiaryType = String(req.query?.beneficiaryType || '').trim().toLowerCase();
+        if (beneficiaryType !== 'restaurant') {
+            return res.status(400).json({ success: false, message: 'Only restaurant beneficiaryType is supported currently' });
+        }
+        const data = await adminService.getRestaurantPayoutSettlementHistory(req.query || {}, req.adminAuth || {});
+        res.status(200).json({ success: true, message: 'Payout settlement history fetched successfully', data });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getPayoutSettlementHistoryBatchDetails(req, res, next) {
+    try {
+        const beneficiaryType = String(req.query?.beneficiaryType || 'restaurant').trim().toLowerCase();
+        if (beneficiaryType !== 'restaurant') {
+            return res.status(400).json({ success: false, message: 'Only restaurant beneficiaryType is supported currently' });
+        }
+        const { batchId } = req.params;
+        const data = await adminService.getRestaurantPayoutSettlementHistoryBatchDetails(batchId, req.adminAuth || {});
+        if (!data) {
+            return res.status(404).json({ success: false, message: 'Settlement batch not found' });
+        }
+        res.status(200).json({ success: true, message: 'Payout settlement batch details fetched successfully', data });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function getSidebarBadges(req, res, next) {
     try {
         const counts = await adminService.getSidebarBadges();

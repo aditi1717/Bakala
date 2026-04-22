@@ -70,6 +70,9 @@ const DeliverymanBonus = lazy(() => import("@food/pages/admin/delivery-partners/
 const EarningAddon = lazy(() => import("@food/pages/admin/delivery-partners/EarningAddon"));
 const EarningAddonHistory = lazy(() => import("@food/pages/admin/delivery-partners/EarningAddonHistory"));
 const DeliveryEarnings = lazy(() => import("@food/pages/admin/delivery-partners/DeliveryEarnings"));
+const DeliveryPayoutSettlement = lazy(() => import("@food/pages/admin/payout-settlement/DeliveryPayoutSettlement"));
+const RestaurantPayoutSettlement = lazy(() => import("@food/pages/admin/payout-settlement/RestaurantPayoutSettlement"));
+const RestaurantSettlementHistory = lazy(() => import("@food/pages/admin/payout-settlement/RestaurantSettlementHistory"));
 // Disbursement Management
 // Report Management
 const TransactionReport = lazy(() => import("@food/pages/admin/reports/TransactionReport"));
@@ -239,6 +242,8 @@ export default function AdminRouter() {
             <Route path="delivery-partners/earning-addon" element={<EarningAddon />} />
             <Route path="delivery-partners/earning-addon-history" element={<EarningAddonHistory />} />
             <Route path="delivery-partners/earnings" element={<DeliveryEarnings />} />
+            <Route path="payout-settlement/delivery" element={<DeliveryPayoutSettlement />} />
+            <Route path="delivery-partners/payout-settlement" element={<DeliveryPayoutSettlement />} />
 
 
             {/* REPORTS & SETTINGS */}
@@ -249,6 +254,8 @@ export default function AdminRouter() {
             <Route path="order-report/regular" element={<RegularOrderReport />} />
             <Route path="order-report/campaign" element={<CampaignOrderReport />} />
             <Route path="restaurant-report" element={<RestaurantReport />} />
+            <Route path="restaurant-report/settlement" element={<RestaurantPayoutSettlement />} />
+            <Route path="restaurant-report/settlement-history" element={<RestaurantSettlementHistory />} />
             <Route path="customer-report/feedback-experience" element={<FeedbackExperienceReport />} />
             <Route path="tax-report" element={<TaxReport />} />
             <Route path="restaurant-vat-report" element={<RestaurantVATReport />} />

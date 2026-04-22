@@ -143,6 +143,7 @@ export const adminSidebarMenu = [
       { type: "link", label: "Delivery Boy Commission", path: "/admin/food/delivery-boy-commission", icon: "DollarSign" },
       { type: "link", label: "Delivery Emergency Help", path: "/admin/food/delivery-emergency-help", icon: "Phone" },
       { type: "link", label: "Delivery Support Tickets", path: "/admin/food/delivery-support-tickets", icon: "MessageSquare" },
+      { type: "link", label: "Payout Settlement (Delivery)", path: "/admin/food/delivery-partners/payout-settlement", icon: "Receipt" },
       {
         type: "expandable",
         label: "Deliveryman",
@@ -178,7 +179,11 @@ export const adminSidebarMenu = [
         type: "expandable",
         label: "Restaurant Report",
         icon: "FileText",
-        subItems: [{ label: "Restaurant Report", path: "/admin/food/restaurant-report" }],
+        subItems: [
+          { label: "Restaurant Report", path: "/admin/food/restaurant-report" },
+          { label: "Restaurant Settlement", path: "/admin/food/restaurant-report/settlement" },
+          { label: "Restaurant Settlement History", path: "/admin/food/restaurant-report/settlement-history" },
+        ],
       },
       {
         type: "expandable",

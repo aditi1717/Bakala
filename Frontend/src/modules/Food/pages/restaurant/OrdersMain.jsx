@@ -2704,12 +2704,6 @@ export default function OrdersMain() {
                             <span>Taxes & charges (GST)</span>
                             <span>{formatPopupAmount(bill.taxes)}</span>
                           </div>
-                          {bill.commission > 0 && (
-                            <div className="flex items-center justify-between text-orange-700">
-                              <span>Restaurant commission</span>
-                              <span>-{formatPopupAmount(bill.commission)}</span>
-                            </div>
-                          )}
                           {bill.discount > 0 && (
                             <div className="flex items-center justify-between text-green-700">
                               <span>Total discount</span>
@@ -2724,6 +2718,13 @@ export default function OrdersMain() {
                             {formatPopupAmount(bill.total)}
                           </span>
                         </div>
+
+                        {bill.commission > 0 && (
+                          <div className="mt-2 flex items-center justify-between text-sm text-orange-700">
+                            <span>Restaurant commission</span>
+                            <span className="font-semibold">-{formatPopupAmount(bill.commission)}</span>
+                          </div>
+                        )}
 
                         <div className="mt-2 rounded-lg border border-green-200 bg-green-50 px-2.5 py-2 flex items-center justify-between">
                           <span className="text-sm font-semibold text-green-800">Your earning</span>
