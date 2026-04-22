@@ -11,14 +11,16 @@ const debugError = (...args) => {}
 
 
 export default function RestaurantReport() {
+  const todayDate = new Date().toISOString().split("T")[0]
   const [searchQuery, setSearchQuery] = useState("")
   const [restaurants, setRestaurants] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
     zone: "All Zones",
     all: "All",
-    type: "All types",
     time: "All Time",
+    fromDate: "",
+    toDate: "",
   })
   const [zones, setZones] = useState([])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -43,12 +45,31 @@ export default function RestaurantReport() {
     const fetchRestaurantReport = async () => {
       try {
         setLoading(true)
+        if (filters.fromDate && filters.toDate && filters.fromDate > filters.toDate) {
+          toast.error("Start Date cannot be after End Date")
+          setRestaurants([])
+          setLoading(false)
+          return
+        }
+        if (filters.fromDate && filters.fromDate > todayDate) {
+          toast.error("Start Date cannot be in the future")
+          setRestaurants([])
+          setLoading(false)
+          return
+        }
+        if (filters.toDate && filters.toDate > todayDate) {
+          toast.error("End Date cannot be in the future")
+          setRestaurants([])
+          setLoading(false)
+          return
+        }
         
         const params = {
           zone: filters.zone !== "All Zones" ? filters.zone : undefined,
           all: filters.all !== "All" ? filters.all : undefined,
-          type: filters.type !== "All types" ? filters.type : undefined,
           time: filters.time !== "All Time" ? filters.time : undefined,
+          fromDate: filters.fromDate || undefined,
+          toDate: filters.toDate || undefined,
           search: searchQuery || undefined
         }
 
@@ -84,10 +105,28 @@ export default function RestaurantReport() {
     setFilters({
       zone: "All Zones",
       all: "All",
-      type: "All types",
       time: "All Time",
+      fromDate: "",
+      toDate: "",
     })
     setSearchQuery("")
+  }
+
+  const handleTimeFilterChange = (value) => {
+    setFilters((prev) => ({
+      ...prev,
+      time: value,
+      fromDate: "",
+      toDate: "",
+    }))
+  }
+
+  const handleDateFilterChange = (key, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value,
+      time: "All Time",
+    }))
   }
 
   const handleExport = (format) => {
@@ -100,13 +139,15 @@ export default function RestaurantReport() {
       { key: "restaurantName", label: "Restaurant Name" },
       { key: "totalFood", label: "Total Food" },
       { key: "totalOrder", label: "Total Order" },
-      { key: "totalOrderAmount", label: "Total Order Amount" },
+      { key: "totalAdminCommission", label: "Admin Commission" },
       { key: "totalCouponByAdmin", label: "Coupon by Admin" },
       { key: "totalCouponByRestaurant", label: "Coupon by Restaurant" },
       { key: "totalOfferByRestaurant", label: "Offer by Restaurant" },
-      { key: "totalAdminCommission", label: "Total Admin Commission" },
+      { key: "totalGST", label: "GST" },
       { key: "restaurantPayout", label: "Restaurant Payout" },
-      { key: "totalVATTAX", label: "Total VAT/TAX" },
+      { key: "totalDeliveryCharge", label: "Delivery Charges" },
+      { key: "totalPlatformFee", label: "Platform Fees" },
+      { key: "totalOrderAmount", label: "Total Order Amount" },
       { key: "averageRatings", label: "Average Ratings" },
     ]
     switch (format) {
@@ -121,7 +162,12 @@ export default function RestaurantReport() {
     // Filters are already applied via useMemo
   }
 
-  const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.all !== "All" ? 1 : 0) + (filters.type !== "All types" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
+  const activeFiltersCount =
+    (filters.zone !== "All Zones" ? 1 : 0) +
+    (filters.all !== "All" ? 1 : 0) +
+    (filters.time !== "All Time" ? 1 : 0) +
+    (filters.fromDate ? 1 : 0) +
+    (filters.toDate ? 1 : 0)
 
     const renderStars = (rating, reviews) => {
     if (!rating || rating === 0) {
@@ -172,7 +218,7 @@ export default function RestaurantReport() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Search Data</h3>
           <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 flex-1">
               <div className="relative">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Zone
@@ -208,27 +254,11 @@ export default function RestaurantReport() {
 
               <div className="relative">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Type
-                </label>
-                <select
-                  value={filters.type}
-                  onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-                  className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
-                >
-                  <option value="All types">All types</option>
-                  <option value="Commission">Commission</option>
-                  <option value="Subscription">Subscription</option>
-                </select>
-                <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
-              </div>
-
-              <div className="relative">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Time
                 </label>
                 <select
                   value={filters.time}
-                  onChange={(e) => setFilters(prev => ({ ...prev, time: e.target.value }))}
+                  onChange={(e) => handleTimeFilterChange(e.target.value)}
                   className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="All Time">All Time</option>
@@ -238,6 +268,32 @@ export default function RestaurantReport() {
                   <option value="This Year">This Year</option>
                 </select>
                 <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={filters.fromDate}
+                  onChange={(e) => handleDateFilterChange("fromDate", e.target.value)}
+                  max={todayDate}
+                  className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={filters.toDate}
+                  onChange={(e) => handleDateFilterChange("toDate", e.target.value)}
+                  max={todayDate}
+                  className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
               </div>
             </div>
 
@@ -324,7 +380,7 @@ export default function RestaurantReport() {
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[1700px]">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
@@ -339,62 +395,74 @@ export default function RestaurantReport() {
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
                       <span>Total Food</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
                       <span>Total Order</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
-                      <span>Total Order Amount</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
-                      <span>Coupon by Admin</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
-                      <span>Coupon by Restaurant</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
-                      <span>Offer by Restaurant</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
                       <span>Admin Commission</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Coupon by Admin</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Coupon by Restaurant</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Offer by Restaurant</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
+                      <span>GST</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
                       <span>Restaurant Payout</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
-                      <span>VAT/TAX</span>
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Delivery Charges</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Platform Fees</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Total Order Amount</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-end gap-1">
                       <span>Average Ratings</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
@@ -404,7 +472,7 @@ export default function RestaurantReport() {
               <tbody className="bg-white divide-y divide-slate-100">
                 {filteredRestaurants.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-6 py-20 text-center">
+                    <td colSpan={14} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                         <p className="text-sm text-slate-500">No restaurants match your search</p>
@@ -438,35 +506,43 @@ export default function RestaurantReport() {
                           <span className="text-sm font-medium text-slate-900">{restaurant.restaurantName}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
                         <span className="text-sm text-slate-700">{restaurant.totalFood}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
                         <span className="text-sm text-slate-700">{restaurant.totalOrder}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
+                        <span className="text-sm font-semibold text-brand-600">{restaurant.totalAdminCommission}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
+                        <span className="text-sm font-medium text-green-600">{restaurant.totalCouponByAdmin}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
+                        <span className="text-sm font-medium text-orange-600">{restaurant.totalCouponByRestaurant}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
+                        <span className="text-sm font-medium text-purple-600">{restaurant.totalOfferByRestaurant}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
+                        <span className="text-sm text-slate-700">{restaurant.totalGST}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
+                        <span className="text-sm font-bold text-emerald-600">{restaurant.restaurantPayout}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
+                        <span className="text-sm text-slate-700">{restaurant.totalDeliveryCharge}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
+                        <span className="text-sm text-slate-700">{restaurant.totalPlatformFee}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
                         <span className="text-sm font-medium text-slate-900">{restaurant.totalOrderAmount}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-green-600">{restaurant.totalCouponByAdmin}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-orange-600">{restaurant.totalCouponByRestaurant}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-purple-600">{restaurant.totalOfferByRestaurant}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-semibold text-brand-600">{restaurant.totalAdminCommission}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-bold text-emerald-600">{restaurant.restaurantPayout}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-slate-700">{restaurant.totalVATTAX}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-slate-700">{renderStars(restaurant.averageRatings, restaurant.reviews)}</span>
+                        <div className="flex justify-end">
+                          {renderStars(restaurant.averageRatings, restaurant.reviews)}
+                        </div>
                       </td>
                     </tr>
                   ))

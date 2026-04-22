@@ -3362,6 +3362,19 @@ export async function getPaymentStatus(orderId, deliveryPartnerId) {
 // ----- Admin -----
 export async function listOrdersAdmin(query, adminScope = {}) {
   const { page, limit, skip } = buildPaginationOptions(query);
+  const parseDateBoundary = (raw, endOfDay = false) => {
+    const value = String(raw || "").trim();
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+    if (isDateOnly) {
+      if (endOfDay) parsed.setHours(23, 59, 59, 999);
+      else parsed.setHours(0, 0, 0, 0);
+    }
+    return parsed;
+  };
+
   const filter = {
     $or: [
       { "payment.method": { $in: ["cash", "wallet"] } },
@@ -3445,12 +3458,12 @@ export async function listOrdersAdmin(query, adminScope = {}) {
 
   if (startDateRaw || endDateRaw) {
     const createdAt = {};
-    const start = startDateRaw ? new Date(startDateRaw) : null;
-    const end = endDateRaw ? new Date(endDateRaw) : null;
-    if (start && !Number.isNaN(start.getTime())) {
+    const start = parseDateBoundary(startDateRaw, false);
+    const end = parseDateBoundary(endDateRaw, true);
+    if (start) {
       createdAt.$gte = start;
     }
-    if (end && !Number.isNaN(end.getTime())) {
+    if (end) {
       createdAt.$lte = end;
     }
     if (Object.keys(createdAt).length > 0) {

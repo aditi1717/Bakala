@@ -42,6 +42,7 @@ const AUTO_REFRESH_MS = 15000
 const INR_SYMBOL = "\u20B9"
 
 export default function RegularOrderReport() {
+  const todayDate = new Date().toISOString().split("T")[0]
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -54,6 +55,8 @@ export default function RegularOrderReport() {
     restaurant: "All restaurants",
     customer: "All customers",
     time: "All Time",
+    fromDate: "",
+    toDate: "",
   })
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
@@ -126,16 +129,39 @@ export default function RegularOrderReport() {
       setLoading(true)
       setError(null)
       try {
+        if (filters.fromDate && filters.toDate && filters.fromDate > filters.toDate) {
+          toast.error("Start Date cannot be after End Date")
+          setOrders([])
+          setLoading(false)
+          return
+        }
+        if (filters.fromDate && filters.fromDate > todayDate) {
+          toast.error("Start Date cannot be in the future")
+          setOrders([])
+          setLoading(false)
+          return
+        }
+        if (filters.toDate && filters.toDate > todayDate) {
+          toast.error("End Date cannot be in the future")
+          setOrders([])
+          setLoading(false)
+          return
+        }
         const { fromDate, toDate } = getDateRange()
+        const hasManualDate = Boolean(filters.fromDate || filters.toDate)
         const params = {
           page: 1,
           limit: 10000, // Fetch all orders for report (can be optimized later)
           search: searchQuery || undefined,
           zone: filters.zone !== "All Zones" ? filters.zone : undefined,
-          restaurant: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
+          restaurantId: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
           customer: filters.customer !== "All customers" ? filters.customer : undefined,
-          startDate: fromDate ? fromDate.toISOString().split('T')[0] : undefined,
-          endDate: toDate ? toDate.toISOString().split('T')[0] : undefined,
+          startDate: hasManualDate
+            ? (filters.fromDate || undefined)
+            : (fromDate ? fromDate.toISOString().split('T')[0] : undefined),
+          endDate: hasManualDate
+            ? (filters.toDate || undefined)
+            : (toDate ? toDate.toISOString().split('T')[0] : undefined),
         }
 
         const response = await adminAPI.getOrders(params)
@@ -362,10 +388,18 @@ export default function RegularOrderReport() {
       restaurant: "All restaurants",
       customer: "All customers",
       time: "All Time",
+      fromDate: "",
+      toDate: "",
     })
   }
 
-  const activeFiltersCount = (filters.zone !== "All Zones" ? 1 : 0) + (filters.restaurant !== "All restaurants" ? 1 : 0) + (filters.customer !== "All customers" ? 1 : 0) + (filters.time !== "All Time" ? 1 : 0)
+  const activeFiltersCount =
+    (filters.zone !== "All Zones" ? 1 : 0) +
+    (filters.restaurant !== "All restaurants" ? 1 : 0) +
+    (filters.customer !== "All customers" ? 1 : 0) +
+    (filters.time !== "All Time" ? 1 : 0) +
+    (filters.fromDate ? 1 : 0) +
+    (filters.toDate ? 1 : 0)
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE))
 
@@ -412,6 +446,25 @@ export default function RegularOrderReport() {
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
+    setCurrentPage(1)
+  }
+
+  const handleTimeFilterChange = (value) => {
+    setFilters((prev) => ({
+      ...prev,
+      time: value,
+      fromDate: "",
+      toDate: "",
+    }))
+    setCurrentPage(1)
+  }
+
+  const handleDateFilterChange = (key, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value,
+      time: "All Time",
+    }))
     setCurrentPage(1)
   }
 
@@ -506,8 +559,8 @@ export default function RegularOrderReport() {
               >
                 <option value="All restaurants">All restaurants</option>
                 {restaurants.map((restaurant) => (
-                  <option key={restaurant._id} value={restaurant.name}>
-                    {restaurant.name}
+                  <option key={restaurant._id} value={restaurant._id}>
+                    {restaurant.restaurantName || restaurant.name}
                   </option>
                 ))}
               </select>
@@ -533,7 +586,7 @@ export default function RegularOrderReport() {
             <div className="relative flex-1 min-w-0">
               <select
                 value={filters.time}
-                onChange={(e) => handleFilterChange("time", e.target.value)}
+                onChange={(e) => handleTimeFilterChange(e.target.value)}
                 className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-xs appearance-none cursor-pointer"
               >
                 <option key="all-time" value="All Time">All Time</option>
@@ -542,6 +595,28 @@ export default function RegularOrderReport() {
                 <option key="this-month" value="This Month">This Month</option>
               </select>
               <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <input
+                type="date"
+                value={filters.fromDate}
+                onChange={(e) => handleDateFilterChange("fromDate", e.target.value)}
+                max={todayDate}
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-xs"
+                placeholder="Start Date"
+              />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <input
+                type="date"
+                value={filters.toDate}
+                onChange={(e) => handleDateFilterChange("toDate", e.target.value)}
+                max={todayDate}
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-xs"
+                placeholder="End Date"
+              />
             </div>
 
             <button 

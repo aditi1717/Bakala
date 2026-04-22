@@ -945,6 +945,15 @@ export async function getRestaurantReport(query = {}) {
     };
 
     const formatCurrency = (value) => `\u20B9${Number(value || 0).toFixed(2)}`;
+    const parseDateBoundary = (value, endOfDay = false) => {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) return null;
+        if (endOfDay) parsed.setHours(23, 59, 59, 999);
+        else parsed.setHours(0, 0, 0, 0);
+        return parsed;
+    };
 
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 1000, 1), 5000);
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
@@ -974,22 +983,6 @@ export async function getRestaurantReport(query = {}) {
                 return { restaurants: [], total: 0, page, limit };
             }
         }
-    }
-
-    const typeRaw = String(query.type || '').trim().toLowerCase();
-    if (typeRaw === 'commission') {
-        const commissionRows = await FoodRestaurantCommission.find({ status: { $ne: false } })
-            .select('restaurantId')
-            .lean();
-        const commissionRestaurantIds = commissionRows
-            .map((row) => row?.restaurantId)
-            .filter((id) => mongoose.Types.ObjectId.isValid(id))
-            .map((id) => new mongoose.Types.ObjectId(id));
-
-        if (!commissionRestaurantIds.length) {
-            return { restaurants: [], total: 0, page, limit };
-        }
-        restaurantFilter._id = { $in: commissionRestaurantIds };
     }
 
     const searchRaw = String(query.search || '').trim();
@@ -1028,7 +1021,13 @@ export async function getRestaurantReport(query = {}) {
             { "payment.status": { $in: ["paid", "authorized", "captured", "settled", "refunded"] } },
         ],
     };
-    if (orderCreatedAtFilter) {
+    const fromDate = parseDateBoundary(query.fromDate || query.startDate, false);
+    const toDate = parseDateBoundary(query.toDate || query.endDate, true);
+    if (fromDate || toDate) {
+        orderMatch.createdAt = {};
+        if (fromDate) orderMatch.createdAt.$gte = fromDate;
+        if (toDate) orderMatch.createdAt.$lte = toDate;
+    } else if (orderCreatedAtFilter) {
         orderMatch.createdAt = orderCreatedAtFilter;
     }
 
@@ -1052,20 +1051,112 @@ export async function getRestaurantReport(query = {}) {
             {
                 $group: {
                     _id: '$restaurantId',
-                    totalOrder: { $sum: 1 },
-                    totalOrderAmount: { $sum: { $ifNull: ['$pricing.total', 0] } },
-                    totalDiscountGiven: { $sum: { $ifNull: ['$pricing.discount', 0] } },
+                    totalOrder: {
+                        $sum: {
+                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, 1, 0]
+                        }
+                    },
+                    totalOrderAmount: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.total', 0] },
+                                0
+                            ]
+                        }
+                    },
+                    totalDiscountGiven: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.discount', 0] },
+                                0
+                            ]
+                        }
+                    },
                     // Discount breakdown
-                    totalCouponByAdmin: { $sum: { $ifNull: ['$pricing.couponByAdmin', 0] } },
-                    totalCouponByRestaurant: { $sum: { $ifNull: ['$pricing.couponByRestaurant', 0] } },
-                    totalOfferByRestaurant: { $sum: { $ifNull: ['$pricing.offerByRestaurant', 0] } },
+                    totalCouponByAdmin: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.couponByAdmin', 0] },
+                                0
+                            ]
+                        }
+                    },
+                    totalCouponByRestaurant: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.couponByRestaurant', 0] },
+                                0
+                            ]
+                        }
+                    },
+                    totalOfferByRestaurant: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.offerByRestaurant', 0] },
+                                0
+                            ]
+                        }
+                    },
                     // Commission and payout
-                    totalAdminCommission: { $sum: { $ifNull: ['$pricing.restaurantCommission', 0] } },
-                    totalSubtotal: { $sum: { $ifNull: ['$pricing.subtotal', 0] } },
-                    totalPackagingFee: { $sum: { $ifNull: ['$pricing.packagingFee', 0] } },
-                    totalVATTAX: { $sum: { $ifNull: ['$pricing.tax', 0] } },
-                    totalAdminCommissionFromPlatformProfit: { $sum: { $ifNull: ['$platformProfit', 0] } },
-                    totalAdminCommissionFromPlatformFee: { $sum: { $ifNull: ['$pricing.platformFee', 0] } }
+                    totalAdminCommission: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.restaurantCommission', 0] },
+                                0
+                            ]
+                        }
+                    },
+                    totalSubtotal: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.subtotal', 0] },
+                                0
+                            ]
+                        }
+                    },
+                    totalPackagingFee: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.packagingFee', 0] },
+                                0
+                            ]
+                        }
+                    },
+                    totalVATTAX: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.tax', 0] },
+                                0
+                            ]
+                        }
+                    },
+                    totalDeliveryCharge: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.deliveryFee', 0] },
+                                0
+                            ]
+                        }
+                    },
+                    totalPlatformFee: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$orderStatus', 'delivered'] },
+                                { $ifNull: ['$pricing.platformFee', 0] },
+                                0
+                            ]
+                        }
+                    }
                 }
             }
         ])
@@ -1094,11 +1185,9 @@ export async function getRestaurantReport(query = {}) {
                     totalCouponByRestaurant,
                     totalOfferByRestaurant,
                     totalVATTAX: Number(x.totalVATTAX || 0),
-                    totalAdminCommission: totalAdminCommission > 0 
-                        ? totalAdminCommission 
-                        : (Number(x.totalAdminCommissionFromPlatformProfit || 0) > 0
-                            ? Number(x.totalAdminCommissionFromPlatformProfit || 0)
-                            : Number(x.totalAdminCommissionFromPlatformFee || 0)),
+                    totalDeliveryCharge: Number(x.totalDeliveryCharge || 0),
+                    totalPlatformFee: Number(x.totalPlatformFee || 0),
+                    totalAdminCommission,
                     restaurantPayout
                 }
             ];
@@ -1115,6 +1204,8 @@ export async function getRestaurantReport(query = {}) {
             totalCouponByRestaurant: 0,
             totalOfferByRestaurant: 0,
             totalVATTAX: 0,
+            totalDeliveryCharge: 0,
+            totalPlatformFee: 0,
             totalAdminCommission: 0,
             restaurantPayout: 0
         };
@@ -1133,6 +1224,9 @@ export async function getRestaurantReport(query = {}) {
             totalOfferByRestaurant: formatCurrency(counts.totalOfferByRestaurant),
             totalAdminCommission: formatCurrency(counts.totalAdminCommission),
             restaurantPayout: formatCurrency(counts.restaurantPayout),
+            totalDeliveryCharge: formatCurrency(counts.totalDeliveryCharge),
+            totalPlatformFee: formatCurrency(counts.totalPlatformFee),
+            totalGST: formatCurrency(counts.totalVATTAX),
             totalVATTAX: formatCurrency(counts.totalVATTAX),
             averageRatings: Number(restaurant.rating || 0),
             reviews: Number(restaurant.totalRatings || 0),
