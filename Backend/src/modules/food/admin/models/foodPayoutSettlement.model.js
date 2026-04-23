@@ -24,7 +24,10 @@ const foodPayoutSettlementSchema = new mongoose.Schema(
         toAt: { type: Date, default: null, index: true },
         transactionIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FoodTransaction' }],
         ordersCount: { type: Number, default: 0, min: 0 },
+        codOrdersCount: { type: Number, default: 0, min: 0 },
         grossAmount: { type: Number, default: 0, min: 0 },
+        codAmount: { type: Number, default: 0, min: 0 },
+        codPaidAmount: { type: Number, default: 0, min: 0 },
         paidAmount: { type: Number, default: 0, min: 0 },
         adjustmentAmount: { type: Number, default: 0 },
         status: {

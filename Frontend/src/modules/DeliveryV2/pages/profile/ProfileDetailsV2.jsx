@@ -120,7 +120,7 @@ export const ProfileDetailsV2 = () => {
             navigate("/food/delivery/login", { replace: true })
           }, 2000)
         } else {
-          toast.error(error?.response?.data?.message || "Failed to load profile data")
+          toast.error("Failed to load profile data")
         }
       } finally {
         setLoading(false)
@@ -265,10 +265,10 @@ export const ProfileDetailsV2 = () => {
         toast.success("Profile photo updated")
         await refreshProfile()
       } else {
-        toast.error(response?.data?.message || "Update failed")
+        toast.error("Update failed")
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Update failed")
+      toast.error("Update failed")
     } finally {
       setIsUploadingImage(false)
       setUploadTarget(null)
@@ -306,7 +306,7 @@ export const ProfileDetailsV2 = () => {
         toast.error("Failed to remove photo")
       }
     } catch (error) {
-       toast.error(error?.response?.data?.message || "Delete failed")
+       toast.error("Delete failed")
     } finally {
       setIsDeletingImage(false)
     }
@@ -387,7 +387,7 @@ export const ProfileDetailsV2 = () => {
       setUpiQrPreview(null)
       await refreshProfile()
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Update failed")
+      toast.error("Update failed")
     } finally {
       setIsUpdatingBankDetails(false)
     }

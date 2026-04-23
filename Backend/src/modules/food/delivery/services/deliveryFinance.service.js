@@ -5,6 +5,7 @@ import { FoodDeliveryWithdrawal } from '../models/foodDeliveryWithdrawal.model.j
 import { FoodDeliveryCashDeposit } from '../models/foodDeliveryCashDeposit.model.js';
 import { FoodDeliveryPartner } from '../models/deliveryPartner.model.js';
 import { DeliveryBonusTransaction } from '../../admin/models/deliveryBonusTransaction.model.js';
+import { FoodPayoutSettlement } from '../../admin/models/foodPayoutSettlement.model.js';
 import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { createRazorpayOrder, getRazorpayKeyId, isRazorpayConfigured, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
@@ -28,7 +29,7 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
     const partner = await FoodDeliveryPartner.findById(partnerId).lean();
     if (!partner) throw new ValidationError('Delivery partner not found');
 
-    const [cashLimitSettings, earningsAgg, cashCollectedAgg, cashDepositsAgg, bonusAgg, withdrawalAgg, withdrawalsList, depositList] = await Promise.all([
+    const [cashLimitSettings, earningsAgg, cashCollectedAgg, cashDepositsAgg, bonusAgg, withdrawalAgg, payoutAgg, withdrawalsList, depositList] = await Promise.all([
         getDeliveryCashLimitSettings(),
         // 1. Total Earnings from Delivered Orders
         FoodOrder.aggregate([
@@ -72,11 +73,28 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
                 } 
             }
         ]),
-        // 6. Recent Withdrawals for History
+        // 6. Payout settlements (new "mark all paid" flow)
+        FoodPayoutSettlement.aggregate([
+            {
+                $match: {
+                    beneficiaryType: 'delivery',
+                    beneficiaryId: partnerId,
+                    status: 'paid'
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalPaid: { $sum: { $ifNull: ['$paidAmount', 0] } }
+                }
+            }
+        ]),
+        // 7. Recent Withdrawals for History
         FoodDeliveryWithdrawal.find({ deliveryPartnerId: partnerId })
             .sort({ createdAt: -1 })
             .limit(50)
             .lean(),
+        // 8. Recent COD deposits for History
         FoodDeliveryCashDeposit.find({ deliveryPartnerId: partnerId })
             .sort({ createdAt: -1 })
             .limit(50)
@@ -88,7 +106,10 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
     const totalDepositedCash = Number(cashDepositsAgg?.[0]?.depositedCash) || 0;
     const cashInHand = Math.max(0, grossCashCollected - totalDepositedCash);
     const totalBonus = Number(bonusAgg?.[0]?.total) || 0;
-    const totalWithdrawn = Number(withdrawalAgg?.[0]?.totalWithdrawn) || 0;
+    const legacyApprovedWithdrawn = Number(withdrawalAgg?.[0]?.totalWithdrawn) || 0;
+    const settlementPaid = Number(payoutAgg?.[0]?.totalPaid) || 0;
+    // Prefer new payout-settlement totals when available; fallback to legacy withdrawal totals.
+    const totalWithdrawn = settlementPaid > 0 ? settlementPaid : legacyApprovedWithdrawn;
     const pendingWithdrawals = Number(withdrawalAgg?.[0]?.pendingWithdrawals) || 0;
 
     const totalCashLimit = Number(cashLimitSettings.deliveryCashLimit) || 0;
@@ -143,6 +164,8 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
         totalBalance: totalEarned + totalBonus, // Gross lifetime earnings
         pocketBalance, // Available to withdraw
         cashInHand, // COD to be deposited/deducted
+        totalCashCollected: grossCashCollected,
+        cashSubmittedToAdmin: totalDepositedCash,
         totalWithdrawn, // Actually paid out
         pendingWithdrawals, // In process
         totalEarned,

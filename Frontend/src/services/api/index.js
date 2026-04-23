@@ -1875,6 +1875,10 @@ export const deliveryAPI = {
   })(),
   /** GET /food/delivery/current - fallback for some UI hooks */
   getCurrentDelivery: () => apiClient.get("/food/delivery/orders/current", { contextModule: "delivery" }),
+  getOrderQueue: () =>
+    apiClient.get("/food/delivery/orders/queue", {
+      contextModule: "delivery",
+    }),
   acceptOrder: (orderId, body = {}) =>
     apiClient.patch(
       `/food/delivery/orders/${String(orderId)}/accept`,

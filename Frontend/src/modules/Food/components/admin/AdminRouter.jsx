@@ -56,9 +56,6 @@ const LoyaltyPointReport = lazy(() => import("@food/pages/admin/loyalty-point/Re
 const SubscribedMailList = lazy(() => import("@food/pages/admin/SubscribedMailList"));
 // Deliveryman Management
 const DeliveryBoyCommission = lazy(() => import("@food/pages/admin/DeliveryBoyCommission"));
-const DeliveryCashLimit = lazy(() => import("@food/pages/admin/DeliveryCashLimit"));
-const CashLimitSettlement = lazy(() => import("@food/pages/admin/CashLimitSettlement"));
-const DeliveryWithdrawal = lazy(() => import("@food/pages/admin/DeliveryWithdrawal"));
 const DeliveryBoyWallet = lazy(() => import("@food/pages/admin/DeliveryBoyWallet"));
 const DeliveryEmergencyHelp = lazy(() => import("@food/pages/admin/DeliveryEmergencyHelp"));
 const DeliverySupportTickets = lazy(() => import("@food/pages/admin/DeliverySupportTickets"));
@@ -66,13 +63,11 @@ const JoinRequest = lazy(() => import("@food/pages/admin/delivery-partners/JoinR
 const AddDeliveryman = lazy(() => import("@food/pages/admin/delivery-partners/AddDeliveryman"));
 const DeliverymanList = lazy(() => import("@food/pages/admin/delivery-partners/DeliverymanList"));
 const DeliverymanReviews = lazy(() => import("@food/pages/admin/delivery-partners/DeliverymanReviews"));
-const DeliverymanBonus = lazy(() => import("@food/pages/admin/delivery-partners/DeliverymanBonus"));
-const EarningAddon = lazy(() => import("@food/pages/admin/delivery-partners/EarningAddon"));
-const EarningAddonHistory = lazy(() => import("@food/pages/admin/delivery-partners/EarningAddonHistory"));
 const DeliveryEarnings = lazy(() => import("@food/pages/admin/delivery-partners/DeliveryEarnings"));
 const DeliveryPayoutSettlement = lazy(() => import("@food/pages/admin/payout-settlement/DeliveryPayoutSettlement"));
 const RestaurantPayoutSettlement = lazy(() => import("@food/pages/admin/payout-settlement/RestaurantPayoutSettlement"));
 const RestaurantSettlementHistory = lazy(() => import("@food/pages/admin/payout-settlement/RestaurantSettlementHistory"));
+const DeliverySettlementHistory = lazy(() => import("@food/pages/admin/payout-settlement/DeliverySettlementHistory"));
 // Disbursement Management
 // Report Management
 const TransactionReport = lazy(() => import("@food/pages/admin/reports/TransactionReport"));
@@ -226,9 +221,6 @@ export default function AdminRouter() {
             <Route path="subscribed-mail-list" element={<SubscribedMailList />} />
 
             <Route path="delivery-boy-commission" element={<DeliveryBoyCommission />} />
-            <Route path="delivery-cash-limit" element={<DeliveryCashLimit />} />
-            <Route path="cash-limit-settlement" element={<CashLimitSettlement />} />
-            <Route path="delivery-withdrawal" element={<DeliveryWithdrawal />} />
             <Route path="delivery-boy-wallet" element={<DeliveryBoyWallet />} />
             <Route path="delivery-emergency-help" element={<DeliveryEmergencyHelp />} />
             <Route path="delivery-support-tickets" element={<DeliverySupportTickets />} />
@@ -236,12 +228,12 @@ export default function AdminRouter() {
             <Route path="delivery-partners/add" element={<AddDeliveryman />} />
             <Route path="delivery-partners/join-request" element={<JoinRequest />} />
             <Route path="delivery-partners/reviews" element={<DeliverymanReviews />} />
-            <Route path="delivery-partners/bonus" element={<DeliverymanBonus />} />
-            <Route path="delivery-partners/earning-addon" element={<EarningAddon />} />
-            <Route path="delivery-partners/earning-addon-history" element={<EarningAddonHistory />} />
             <Route path="delivery-partners/earnings" element={<DeliveryEarnings />} />
             <Route path="payout-settlement/delivery" element={<DeliveryPayoutSettlement />} />
             <Route path="delivery-partners/payout-settlement" element={<DeliveryPayoutSettlement />} />
+            <Route path="delivery-report" element={<DeliveryBoyWallet />} />
+            <Route path="delivery-report/settlement" element={<DeliveryPayoutSettlement />} />
+            <Route path="delivery-report/settlement-history" element={<DeliverySettlementHistory />} />
 
 
             {/* REPORTS & SETTINGS */}

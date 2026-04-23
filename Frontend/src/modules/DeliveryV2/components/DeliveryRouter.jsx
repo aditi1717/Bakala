@@ -26,7 +26,6 @@ const DeductionStatement = lazy(() => import("@food/pages/delivery/DeductionStat
 const TipsStatement = lazy(() => import("@food/pages/delivery/TipsStatement"))
 const PocketStatement = lazy(() => import("@food/pages/delivery/PocketStatement"))
 const FuelPayment = lazy(() => import("@food/pages/delivery/FuelPayment"))
-const LimitSettlement = lazy(() => import("@food/pages/delivery/LimitSettlement"))
 const OffersPage = lazy(() => import("@food/pages/delivery/OffersPage"))
 const UpdatesPage = lazy(() => import("@food/pages/delivery/UpdatesPage"))
 const SupportTickets = lazy(() => import("@food/pages/delivery/SupportTickets"))
@@ -321,16 +320,6 @@ export default function DeliveryRouter() {
             </ProtectedRoute>
           }
           path="fuel-payment"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <DeliveryLayout>
-                <LimitSettlement />
-              </DeliveryLayout>
-            </ProtectedRoute>
-          }
-          path="limit-settlement"
         />
         <Route
           element={

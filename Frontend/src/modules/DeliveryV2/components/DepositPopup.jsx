@@ -78,10 +78,10 @@ export default function DepositPopup({ onSuccess, cashInHand = 0 }) {
               window.dispatchEvent(new CustomEvent("deliveryWalletStateUpdated"))
               if (onSuccess) onSuccess()
             } else {
-              toast.error(verifyRes?.data?.message || "Verification failed")
+              toast.error("Verification failed")
             }
           } catch (err) {
-            toast.error(err?.response?.data?.message || "Verification failed. Contact support.")
+            toast.error("Verification failed. Contact support.")
           } finally {
             setProcessing(false)
           }
@@ -95,7 +95,7 @@ export default function DepositPopup({ onSuccess, cashInHand = 0 }) {
     } catch (err) {
       setLoading(false)
       setProcessing(false)
-      toast.error(err?.response?.data?.message || "Failed to create payment")
+      toast.error("Failed to create payment")
     }
   }
 
@@ -136,3 +136,4 @@ export default function DepositPopup({ onSuccess, cashInHand = 0 }) {
     </div>
   )
 }
+

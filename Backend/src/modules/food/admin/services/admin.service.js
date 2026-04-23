@@ -139,15 +139,64 @@ const startOfTodayLocal = () => {
     return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
 };
 
-const resolveAutoDateRange = async () => {
+const resolveAutoDateRange = async (beneficiaryType = 'restaurant') => {
     const now = new Date();
-    const latest = await FoodPayoutSettlement.findOne({ beneficiaryType: 'restaurant', status: 'paid' })
+    const latest = await FoodPayoutSettlement.findOne({ beneficiaryType, status: 'paid' })
         .sort({ toAt: -1, paidAt: -1, createdAt: -1 })
         .select('toAt paidAt')
         .lean();
 
     const boundary = latest?.toAt || latest?.paidAt || null;
     const start = boundary ? new Date(new Date(boundary).getTime() + 1000) : startOfTodayLocal();
+    const safeStart = start > now ? new Date(now.getTime() - 1000) : start;
+    const end = now;
+    return {
+        start: safeStart,
+        end,
+        fromRaw: toLocalYmd(safeStart),
+        toRaw: toLocalYmd(end),
+        fromTimeRaw: toLocalHm(safeStart),
+        toTimeRaw: toLocalHm(end),
+        auto: true
+    };
+};
+
+const resolveDeliveryAutoDateRange = async () => {
+    const now = new Date();
+    const latest = await FoodPayoutSettlement.findOne({ beneficiaryType: 'delivery', status: 'paid' })
+        .sort({ toAt: -1, paidAt: -1, createdAt: -1 })
+        .select('toAt paidAt')
+        .lean();
+
+    const boundary = latest?.toAt || latest?.paidAt || null;
+    const orderMatch = {
+        orderStatus: 'delivered',
+        'dispatch.deliveryPartnerId': { $exists: true, $ne: null }
+    };
+    if (boundary) {
+        orderMatch.createdAt = { $gt: new Date(new Date(boundary).getTime() + 1000) };
+    }
+
+    const earliestUnsettledOrder = await FoodOrder.findOne(orderMatch)
+        .sort({ createdAt: 1 })
+        .select('createdAt')
+        .lean();
+
+    let start = earliestUnsettledOrder?.createdAt
+        ? new Date(earliestUnsettledOrder.createdAt)
+        : (boundary ? new Date(new Date(boundary).getTime() + 1000) : null);
+
+    if (!start || Number.isNaN(start.getTime())) {
+        const firstDeliveryOrder = await FoodOrder.findOne({
+            orderStatus: 'delivered',
+            'dispatch.deliveryPartnerId': { $exists: true, $ne: null }
+        })
+            .sort({ createdAt: 1 })
+            .select('createdAt')
+            .lean();
+        start = firstDeliveryOrder?.createdAt ? new Date(firstDeliveryOrder.createdAt) : startOfTodayLocal();
+    }
+
     const safeStart = start > now ? new Date(now.getTime() - 1000) : start;
     const end = now;
     return {
@@ -4478,7 +4527,7 @@ export async function getDeliveryEarnings(query = {}) {
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
-            .select('orderId orderStatus createdAt pricing riderEarning deliveryPartnerSettlement dispatch.deliveryPartnerId restaurantId')
+            .select('orderId orderStatus createdAt pricing riderEarning deliveryPartnerSettlement dispatch.deliveryPartnerId restaurantId payment paymentMethod')
             .populate({ path: 'dispatch.deliveryPartnerId', select: 'name phone' })
             .populate({ path: 'restaurantId', select: 'restaurantName name' })
             .lean(),
@@ -4524,6 +4573,7 @@ export async function getDeliveryEarnings(query = {}) {
             deliveryPartnerName: partner?.name || 'N/A',
             deliveryPartnerPhone: partner?.phone || 'N/A',
             restaurantName: order?.restaurantId?.restaurantName || order?.restaurantId?.name || 'N/A',
+            paymentMethod: order?.payment?.method || order?.paymentMethod || '',
             amount,
             orderTotal: Number(order?.pricing?.total || 0) || 0,
             deliveryFee: Number(order?.pricing?.deliveryFee || 0) || 0,
@@ -5560,8 +5610,77 @@ export async function getDeliveryWallets(query = {}) {
     const cashLimitSettings = await FoodDeliveryCashLimit.findOne({ isActive: true }).lean();
     const globalLimit = Number(cashLimitSettings?.deliveryCashLimit || 0);
 
+    const partnerIds = partners.map((p) => p?._id).filter(Boolean);
+
+    const [cashCollectedAgg, cashDepositsAgg, payoutSettlementsAgg] = await Promise.all([
+        FoodOrder.aggregate([
+            {
+                $match: {
+                    'dispatch.deliveryPartnerId': { $in: partnerIds },
+                    orderStatus: 'delivered',
+                    'payment.method': 'cash'
+                }
+            },
+            {
+                $group: {
+                    _id: '$dispatch.deliveryPartnerId',
+                    grossCashCollected: { $sum: { $ifNull: ['$pricing.total', 0] } }
+                }
+            }
+        ]),
+        FoodDeliveryCashDeposit.aggregate([
+            {
+                $match: {
+                    deliveryPartnerId: { $in: partnerIds },
+                    status: 'Completed'
+                }
+            },
+            {
+                $group: {
+                    _id: '$deliveryPartnerId',
+                    totalSubmittedToAdmin: { $sum: { $ifNull: ['$amount', 0] } }
+                }
+            }
+        ]),
+        FoodPayoutSettlement.aggregate([
+            {
+                $match: {
+                    beneficiaryType: 'delivery',
+                    status: 'paid',
+                    beneficiaryId: { $in: partnerIds }
+                }
+            },
+            {
+                $group: {
+                    _id: '$beneficiaryId',
+                    totalPaidAmount: { $sum: { $ifNull: ['$paidAmount', 0] } }
+                }
+            }
+        ])
+    ]);
+
+    const cashCollectedMap = new Map(
+        (cashCollectedAgg || []).map((entry) => [String(entry?._id), Number(entry?.grossCashCollected || 0)])
+    );
+    const cashSubmittedMap = new Map(
+        (cashDepositsAgg || []).map((entry) => [String(entry?._id), Number(entry?.totalSubmittedToAdmin || 0)])
+    );
+    const payoutPaidMap = new Map(
+        (payoutSettlementsAgg || []).map((entry) => [String(entry?._id), Number(entry?.totalPaidAmount || 0)])
+    );
+
     const wallets = await Promise.all(partners.map(async (p) => {
         const wallet = await FoodDeliveryWallet.findOne({ deliveryPartnerId: p._id }).lean();
+        const key = String(p._id);
+
+        const grossCashCollected = Number(cashCollectedMap.get(key) || 0);
+        const totalSubmittedToAdmin = Number(cashSubmittedMap.get(key) || 0);
+        const settlementPaidAmount = Number(payoutPaidMap.get(key) || 0);
+        const derivedCashInHand = Math.max(0, grossCashCollected - totalSubmittedToAdmin);
+        const walletCashInHand = Number(wallet?.cashInHand || 0);
+        const cashInHand = derivedCashInHand > 0 ? derivedCashInHand : walletCashInHand;
+        const totalEarning = Number(wallet?.totalEarnings || 0);
+        const totalWithdrawn = settlementPaidAmount;
         
         return {
             walletId: wallet?._id,
@@ -5569,11 +5688,18 @@ export async function getDeliveryWallets(query = {}) {
             name: p.name,
             deliveryIdString: p.phone, // Placeholder or sequential ID if available
             pocketBalance: Number(wallet?.balance || 0),
-            remainingCashLimit: Math.max(0, globalLimit - Number(wallet?.cashInHand || 0)),
-            cashCollected: Number(wallet?.cashInHand || 0),
-            totalEarning: Number(wallet?.totalEarnings || 0),
+            remainingCashLimit: Math.max(0, globalLimit - cashInHand),
+            cashCollected: grossCashCollected,
+            totalCashCollected: grossCashCollected,
+            cashInHand,
+            cashSubmittedToAdmin: totalSubmittedToAdmin,
+            totalSubmittedToAdmin,
+            totalEarning,
             bonus: Number(wallet?.totalBonus || 0),
-            totalWithdrawn: Number(wallet?.totalSettled || 0)
+            totalWithdrawn,
+            paidAmount: totalWithdrawn,
+            unpaidAmount: Math.max(0, totalEarning - totalWithdrawn),
+            walletTotalSettled: Number(wallet?.totalSettled || 0)
         };
     }));
 
@@ -5685,6 +5811,49 @@ const resolveRestaurantScopeIds = async (query = {}, adminScope = {}) => {
 
     const restaurants = await FoodRestaurant.find(restaurantFilter).select('_id').lean();
     return restaurants.map((r) => r._id);
+};
+
+const normalizeDeliveryIdList = (value) => {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((id) => String(id || '').trim())
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+};
+
+const resolveDeliveryScopeIds = async (query = {}, adminScope = {}) => {
+    const requestedPartnerId = String(query.beneficiaryId || query.deliveryPartnerId || '').trim();
+    const requestedZoneId = String(query.zoneId || '').trim();
+    const scope = normalizeAdminScope(adminScope);
+
+    if (!requestedPartnerId && !requestedZoneId && !scope.isSubAdmin) {
+        return null;
+    }
+
+    const partnerFilter = { status: 'approved' };
+    if (requestedPartnerId) {
+        if (!mongoose.Types.ObjectId.isValid(requestedPartnerId)) {
+            throw new ValidationError('Invalid beneficiaryId');
+        }
+        partnerFilter._id = new mongoose.Types.ObjectId(requestedPartnerId);
+    }
+
+    if (requestedZoneId) {
+        if (!mongoose.Types.ObjectId.isValid(requestedZoneId)) {
+            throw new ValidationError('Invalid zoneId');
+        }
+        if (scope.isSubAdmin) {
+            const allowed = scope.zoneIds.some((zoneId) => String(zoneId) === requestedZoneId);
+            if (!allowed) throw new ForbiddenError('Sub-admin can only access assigned zones');
+        }
+        partnerFilter.zoneId = new mongoose.Types.ObjectId(requestedZoneId);
+    } else if (scope.isSubAdmin) {
+        if (!scope.zoneIds.length) return [];
+        partnerFilter.zoneId = { $in: scope.zoneIds };
+    }
+
+    const partners = await FoodDeliveryPartner.find(partnerFilter).select('_id').lean();
+    return partners.map((p) => p._id);
 };
 
 export async function getRestaurantPayoutSettlementPreview(query = {}, adminScope = {}) {
@@ -6250,6 +6419,741 @@ export async function markAllRestaurantPayoutSettled(payload = {}, adminScope = 
         updatedTransactions: allTransactionIds.length,
         settlementsCreated: settlementDocs.length,
         totalPaidAmount: settlementDocs.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
+        fromDate: fromRaw,
+        toDate: toRaw,
+        fromTime: fromTimeRaw,
+        toTime: toTimeRaw,
+        settledAt: end.toISOString(),
+        batchId: String(settlementBatchId),
+        recommendedNextFromAt: new Date(end.getTime() + 1000).toISOString()
+    };
+}
+
+const COD_PAYMENT_METHODS = ['cash', 'cod', 'cash_on_delivery', 'razorpay_qr'];
+
+export async function getDeliveryPayoutSettlementPreview(query = {}, adminScope = {}) {
+    const hasExplicitWindow = Boolean(
+        normalizeDateString(query.fromDate) &&
+        normalizeDateString(query.toDate)
+    );
+    const {
+        start,
+        end,
+        fromRaw,
+        toRaw,
+        fromTimeRaw,
+        toTimeRaw,
+        auto
+    } = hasExplicitWindow
+        ? normalizeDateRangeOrThrow(query.fromDate, query.toDate, query.fromTime, query.toTime)
+        : await resolveDeliveryAutoDateRange();
+    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 500);
+    const page = Math.max(parseInt(query.page, 10) || 1, 1);
+    const skip = (page - 1) * limit;
+    const search = String(query.search || '').trim().toLowerCase();
+
+    const scopedPartnerIds = await resolveDeliveryScopeIds(query, adminScope);
+    if (Array.isArray(scopedPartnerIds) && scopedPartnerIds.length === 0) {
+        return {
+            rows: [],
+            summary: {
+                totalEarning: 0,
+                totalPaid: 0,
+                totalPending: 0,
+                totalCodAmount: 0,
+                totalCodPaid: 0,
+                totalCodPending: 0,
+                rowsCount: 0
+            },
+            pagination: { total: 0, page, limit, pages: 1 },
+            window: { fromDate: fromRaw, toDate: toRaw, fromTime: fromTimeRaw, toTime: toTimeRaw, isAuto: auto }
+        };
+    }
+
+    const match = {
+        createdAt: { $gte: start, $lte: end },
+        orderStatus: 'delivered',
+        'dispatch.deliveryPartnerId': { $exists: true, $ne: null }
+    };
+    if (Array.isArray(scopedPartnerIds)) {
+        match['dispatch.deliveryPartnerId'] = { $in: scopedPartnerIds };
+    }
+
+    const rowsRaw = await FoodOrder.aggregate([
+        { $match: match },
+        {
+            $addFields: {
+                paymentMethodLower: {
+                    $toLower: {
+                        $ifNull: ['$payment.method', '$paymentMethod']
+                    }
+                }
+            }
+        },
+        {
+            $group: {
+                _id: '$dispatch.deliveryPartnerId',
+                ordersCount: { $sum: 1 },
+                totalEarning: {
+                    $sum: {
+                        $ifNull: [
+                            '$riderEarning',
+                            { $ifNull: ['$deliveryPartnerSettlement', { $ifNull: ['$pricing.deliveryFee', 0] }] }
+                        ]
+                    }
+                },
+                codOrdersCount: {
+                    $sum: {
+                        $cond: [{ $in: ['$paymentMethodLower', COD_PAYMENT_METHODS] }, 1, 0]
+                    }
+                },
+                codAmount: {
+                    $sum: {
+                        $cond: [{ $in: ['$paymentMethodLower', COD_PAYMENT_METHODS] }, { $ifNull: ['$pricing.total', 0] }, 0]
+                    }
+                }
+            }
+        },
+        {
+            $lookup: {
+                from: 'food_delivery_partners',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'partner'
+            }
+        },
+        {
+            $unwind: {
+                path: '$partner',
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                beneficiaryId: '$_id',
+                beneficiaryName: { $ifNull: ['$partner.name', 'Unknown Delivery Partner'] },
+                ordersCount: 1,
+                totalEarning: 1,
+                codOrdersCount: 1,
+                codAmount: 1
+            }
+        },
+        { $sort: { totalEarning: -1, beneficiaryName: 1 } }
+    ]);
+
+    const rowsFiltered = search
+        ? rowsRaw.filter((row) => {
+            const name = String(row.beneficiaryName || '').toLowerCase();
+            const id = String(row.beneficiaryId || '').toLowerCase();
+            return name.includes(search) || id.includes(search);
+        })
+        : rowsRaw;
+
+    const filteredIds = rowsFiltered
+        .map((row) => row?.beneficiaryId)
+        .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+        .map((id) => new mongoose.Types.ObjectId(String(id)));
+
+    const settlementMatch = {
+        beneficiaryType: 'delivery',
+        status: 'paid',
+        fromAt: { $gte: start },
+        toAt: { $lte: end }
+    };
+    if (filteredIds.length) {
+        settlementMatch.beneficiaryId = { $in: filteredIds };
+    } else {
+        settlementMatch.beneficiaryId = { $in: [] };
+    }
+
+    const [settledAgg, lastSettlements] = await Promise.all([
+        FoodPayoutSettlement.aggregate([
+            { $match: settlementMatch },
+            {
+                $group: {
+                    _id: '$beneficiaryId',
+                    alreadyPaid: { $sum: { $ifNull: ['$paidAmount', 0] } },
+                    codPaid: { $sum: { $ifNull: ['$codPaidAmount', 0] } }
+                }
+            }
+        ]),
+        FoodPayoutSettlement.aggregate([
+            {
+                $match: {
+                    beneficiaryType: 'delivery',
+                    status: 'paid',
+                    ...(filteredIds.length ? { beneficiaryId: { $in: filteredIds } } : { beneficiaryId: { $in: [] } })
+                }
+            },
+            {
+                $group: {
+                    _id: '$beneficiaryId',
+                    lastSettledAt: { $max: { $ifNull: ['$toAt', '$paidAt'] } }
+                }
+            }
+        ])
+    ]);
+
+    const settledMap = new Map(
+        settledAgg.map((item) => [
+            String(item._id),
+            {
+                alreadyPaid: Number(item.alreadyPaid || 0),
+                codPaid: Number(item.codPaid || 0)
+            }
+        ])
+    );
+    const lastSettledByPartner = new Map(
+        lastSettlements.map((item) => [String(item._id), item.lastSettledAt || null])
+    );
+
+    const rowsWithSettlement = rowsFiltered.map((row) => {
+        const id = String(row.beneficiaryId);
+        const paid = settledMap.get(id) || { alreadyPaid: 0, codPaid: 0 };
+        const totalEarning = Number(row.totalEarning || 0);
+        const codAmount = Number(row.codAmount || 0);
+        const alreadyPaid = Math.min(totalEarning, Number(paid.alreadyPaid || 0));
+        const codPaid = Math.min(codAmount, Number(paid.codPaid || 0));
+        const payableNow = Math.max(0, totalEarning - alreadyPaid);
+        const codPending = Math.max(0, codAmount - codPaid);
+        const codOrdersCount = Number(row.codOrdersCount || 0);
+        const codStatus = codOrdersCount <= 0 ? 'nil' : (codPending <= 0 ? 'paid' : (codPaid > 0 ? 'partially_paid' : 'unpaid'));
+
+        return {
+            ...row,
+            beneficiaryId: id,
+            alreadyPaid,
+            payableNow,
+            codPaid,
+            codPending,
+            codStatus,
+            status: payableNow <= 0 ? 'paid' : 'pending',
+            lastSettledToDate: lastSettledByPartner.get(id) || null
+        };
+    });
+
+    const summary = rowsWithSettlement.reduce(
+        (acc, row) => {
+            acc.totalEarning += Number(row.totalEarning || 0);
+            acc.totalPaid += Number(row.alreadyPaid || 0);
+            acc.totalPending += Number(row.payableNow || 0);
+            acc.totalCodAmount += Number(row.codAmount || 0);
+            acc.totalCodPaid += Number(row.codPaid || 0);
+            acc.totalCodPending += Number(row.codPending || 0);
+            acc.rowsCount += 1;
+            return acc;
+        },
+        {
+            totalEarning: 0,
+            totalPaid: 0,
+            totalPending: 0,
+            totalCodAmount: 0,
+            totalCodPaid: 0,
+            totalCodPending: 0,
+            rowsCount: 0
+        }
+    );
+
+    const total = rowsWithSettlement.length;
+    const rows = rowsWithSettlement.slice(skip, skip + limit);
+
+    return {
+        rows,
+        summary,
+        window: {
+            fromDate: fromRaw,
+            toDate: toRaw,
+            fromTime: fromTimeRaw,
+            toTime: toTimeRaw,
+            isAuto: auto
+        },
+        pagination: {
+            total,
+            page,
+            limit,
+            pages: Math.ceil(total / limit) || 1
+        }
+    };
+}
+
+export async function getDeliveryPayoutSettlementHistory(query = {}, adminScope = {}) {
+    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 20, 1), 100);
+    const page = Math.max(parseInt(query.page, 10) || 1, 1);
+    const skip = (page - 1) * limit;
+    const search = String(query.search || '').trim();
+
+    const scopedPartnerIds = await resolveDeliveryScopeIds(query, adminScope);
+    if (Array.isArray(scopedPartnerIds) && scopedPartnerIds.length === 0) {
+        return {
+            rows: [],
+            pagination: { total: 0, page, limit, pages: 1 }
+        };
+    }
+
+    const fromDateRaw = normalizeDateString(query.fromDate || query.startDate);
+    const toDateRaw = normalizeDateString(query.toDate || query.endDate);
+    const historyMatch = {
+        beneficiaryType: 'delivery',
+        status: 'paid'
+    };
+    if (Array.isArray(scopedPartnerIds)) {
+        historyMatch.beneficiaryId = { $in: scopedPartnerIds };
+    }
+
+    const dateRangeMatch = {};
+    if (fromDateRaw) {
+        const from = new Date(`${fromDateRaw}T00:00:00.000`);
+        if (!Number.isNaN(from.getTime())) {
+            dateRangeMatch.$gte = from;
+        }
+    }
+    if (toDateRaw) {
+        const to = new Date(`${toDateRaw}T23:59:59.999`);
+        if (!Number.isNaN(to.getTime())) {
+            dateRangeMatch.$lte = to;
+        }
+    }
+
+    const pipeline = [
+        { $match: historyMatch },
+        {
+            $addFields: {
+                effectivePaidAt: { $ifNull: ['$paidAt', '$createdAt'] },
+                effectiveFromAt: { $ifNull: ['$fromAt', '$fromDate'] },
+                effectiveToAt: { $ifNull: ['$toAt', '$toDate'] }
+            }
+        },
+        ...(Object.keys(dateRangeMatch).length ? [{ $match: { effectivePaidAt: dateRangeMatch } }] : []),
+        {
+            $lookup: {
+                from: 'food_delivery_partners',
+                localField: 'beneficiaryId',
+                foreignField: '_id',
+                as: 'partner'
+            }
+        },
+        {
+            $unwind: {
+                path: '$partner',
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $addFields: {
+                beneficiaryIdText: { $toString: '$beneficiaryId' },
+                beneficiaryName: { $ifNull: ['$partner.name', 'Unknown Delivery Partner'] }
+            }
+        },
+        ...(search
+            ? [{
+                $match: {
+                    $or: [
+                        { beneficiaryName: { $regex: search, $options: 'i' } },
+                        { beneficiaryIdText: { $regex: search, $options: 'i' } },
+                        { note: { $regex: search, $options: 'i' } },
+                        { referenceNumber: { $regex: search, $options: 'i' } }
+                    ]
+                }
+            }]
+            : []),
+        {
+            $group: {
+                _id: {
+                    batchId: '$batchId',
+                    paidAt: '$effectivePaidAt',
+                    fromAt: '$effectiveFromAt',
+                    toAt: '$effectiveToAt',
+                    paidByAdminId: '$paidByAdminId',
+                    payoutMethod: '$payoutMethod',
+                    referenceNumber: '$referenceNumber',
+                    note: '$note'
+                },
+                totalPaidAmount: { $sum: { $ifNull: ['$paidAmount', 0] } },
+                totalGrossAmount: { $sum: { $ifNull: ['$grossAmount', 0] } },
+                totalOrders: { $sum: { $ifNull: ['$ordersCount', 0] } },
+                totalCodOrders: { $sum: { $ifNull: ['$codOrdersCount', 0] } },
+                totalCodAmount: { $sum: { $ifNull: ['$codAmount', 0] } },
+                totalCodPaidAmount: { $sum: { $ifNull: ['$codPaidAmount', 0] } },
+                partnersSet: { $addToSet: '$beneficiaryIdText' },
+                settlementsCount: { $sum: 1 }
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                batchId: '$_id.batchId',
+                paidAt: '$_id.paidAt',
+                fromAt: '$_id.fromAt',
+                toAt: '$_id.toAt',
+                paidByAdminId: '$_id.paidByAdminId',
+                payoutMethod: '$_id.payoutMethod',
+                referenceNumber: '$_id.referenceNumber',
+                note: '$_id.note',
+                totalPaidAmount: 1,
+                totalGrossAmount: 1,
+                totalOrders: 1,
+                totalCodOrders: 1,
+                totalCodAmount: 1,
+                totalCodPaidAmount: 1,
+                settlementsCount: 1,
+                partnersCount: { $size: '$partnersSet' }
+            }
+        },
+        { $sort: { paidAt: -1, toAt: -1 } },
+        {
+            $facet: {
+                rows: [{ $skip: skip }, { $limit: limit }],
+                total: [{ $count: 'count' }]
+            }
+        }
+    ];
+
+    const agg = await FoodPayoutSettlement.aggregate(pipeline);
+    const rowsRaw = agg?.[0]?.rows || [];
+    const total = Number(agg?.[0]?.total?.[0]?.count || 0);
+
+    const adminIds = rowsRaw
+        .map((row) => row?.paidByAdminId)
+        .filter((id) => id && mongoose.Types.ObjectId.isValid(String(id)));
+    let adminNameMap = new Map();
+    if (adminIds.length) {
+        const admins = await FoodAdmin.find({ _id: { $in: adminIds } })
+            .select('_id name email')
+            .lean();
+        adminNameMap = new Map(
+            admins.map((admin) => [
+                String(admin._id),
+                String(admin.name || admin.email || 'Unknown Admin')
+            ])
+        );
+    }
+
+    const rows = rowsRaw.map((row) => {
+        const adminId = row?.paidByAdminId ? String(row.paidByAdminId) : '';
+        const batchId = row?.batchId ? String(row.batchId) : null;
+        return {
+            ...row,
+            batchId,
+            paidByAdminId: adminId || null,
+            paidByAdminName: adminNameMap.get(adminId) || (adminId ? 'Unknown Admin' : 'System')
+        };
+    });
+
+    return {
+        rows,
+        pagination: {
+            total,
+            page,
+            limit,
+            pages: Math.ceil(total / limit) || 1
+        }
+    };
+}
+
+export async function getDeliveryPayoutSettlementHistoryBatchDetails(batchId, adminScope = {}) {
+    const rawBatchId = String(batchId || '').trim();
+    if (!rawBatchId || !mongoose.Types.ObjectId.isValid(rawBatchId)) {
+        throw new ValidationError('Invalid settlement batch id');
+    }
+
+    const scopedPartnerIds = await resolveDeliveryScopeIds({}, adminScope);
+    const match = {
+        beneficiaryType: 'delivery',
+        status: 'paid',
+        batchId: new mongoose.Types.ObjectId(rawBatchId)
+    };
+    if (Array.isArray(scopedPartnerIds)) {
+        if (!scopedPartnerIds.length) {
+            return null;
+        }
+        match.beneficiaryId = { $in: scopedPartnerIds };
+    }
+
+    const docs = await FoodPayoutSettlement.find(match)
+        .sort({ paidAmount: -1, ordersCount: -1 })
+        .populate('beneficiaryId', 'name phone')
+        .lean();
+
+    if (!docs.length) {
+        return null;
+    }
+
+    const paidByAdminId = docs[0]?.paidByAdminId ? String(docs[0].paidByAdminId) : '';
+    let paidByAdminName = paidByAdminId ? 'Unknown Admin' : 'System';
+    if (paidByAdminId && mongoose.Types.ObjectId.isValid(paidByAdminId)) {
+        const admin = await FoodAdmin.findById(paidByAdminId).select('name email').lean();
+        if (admin) {
+            paidByAdminName = String(admin.name || admin.email || paidByAdminName);
+        }
+    }
+
+    const rows = docs.map((doc) => ({
+        settlementId: String(doc._id),
+        beneficiaryId: String(doc.beneficiaryId?._id || doc.beneficiaryId),
+        beneficiaryName: String(doc.beneficiaryId?.name || 'Unknown Delivery Partner'),
+        beneficiaryPhone: String(doc.beneficiaryId?.phone || ''),
+        ordersCount: Number(doc.ordersCount || 0),
+        codOrdersCount: Number(doc.codOrdersCount || 0),
+        grossAmount: Number(doc.grossAmount || 0),
+        codAmount: Number(doc.codAmount || 0),
+        codPaidAmount: Number(doc.codPaidAmount || 0),
+        paidAmount: Number(doc.paidAmount || 0),
+        adjustmentAmount: Number(doc.adjustmentAmount || 0),
+        note: String(doc.note || ''),
+        referenceNumber: String(doc.referenceNumber || '')
+    }));
+
+    const meta = docs[0];
+    return {
+        batchId: rawBatchId,
+        paidAt: meta?.paidAt || meta?.createdAt || null,
+        fromAt: meta?.fromAt || meta?.fromDate || null,
+        toAt: meta?.toAt || meta?.toDate || null,
+        paidByAdminId: paidByAdminId || null,
+        paidByAdminName,
+        payoutMethod: String(meta?.payoutMethod || 'manual'),
+        note: String(meta?.note || ''),
+        referenceNumber: String(meta?.referenceNumber || ''),
+        totals: {
+            partnersCount: rows.length,
+            totalOrders: rows.reduce((sum, item) => sum + Number(item.ordersCount || 0), 0),
+            totalCodOrders: rows.reduce((sum, item) => sum + Number(item.codOrdersCount || 0), 0),
+            totalGrossAmount: rows.reduce((sum, item) => sum + Number(item.grossAmount || 0), 0),
+            totalCodAmount: rows.reduce((sum, item) => sum + Number(item.codAmount || 0), 0),
+            totalCodPaidAmount: rows.reduce((sum, item) => sum + Number(item.codPaidAmount || 0), 0),
+            totalPaidAmount: rows.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0)
+        },
+        rows
+    };
+}
+
+export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}) {
+    const beneficiaryType = String(payload.beneficiaryType || 'delivery').trim().toLowerCase();
+    if (beneficiaryType !== 'delivery') {
+        throw new ValidationError('Only delivery beneficiaryType is supported in this endpoint');
+    }
+
+    const hasExplicitWindow = Boolean(
+        normalizeDateString(payload.fromDate) &&
+        normalizeDateString(payload.toDate)
+    );
+    const {
+        start,
+        end,
+        fromRaw,
+        toRaw,
+        fromTimeRaw,
+        toTimeRaw
+    } = hasExplicitWindow
+        ? normalizeDateRangeOrThrow(payload.fromDate, payload.toDate, payload.fromTime, payload.toTime)
+        : await resolveDeliveryAutoDateRange();
+    const payoutMethod = normalizePayoutMethod(payload.payoutMethod || 'manual');
+    const note = String(payload.note || '').trim();
+    const referenceNumber = String(payload.referenceNumber || '').trim();
+    const now = new Date();
+
+    const scopedPartnerIds = await resolveDeliveryScopeIds(
+        {
+            beneficiaryId: payload.beneficiaryId,
+            zoneId: payload.zoneId
+        },
+        adminScope
+    );
+    const requestedBeneficiaryIds = normalizeDeliveryIdList(payload.beneficiaryIds);
+
+    let candidatePartnerIds = null;
+    if (Array.isArray(scopedPartnerIds)) {
+        candidatePartnerIds = scopedPartnerIds;
+    }
+    if (requestedBeneficiaryIds.length) {
+        if (candidatePartnerIds) {
+            const scopedSet = new Set(candidatePartnerIds.map((id) => String(id)));
+            candidatePartnerIds = requestedBeneficiaryIds.filter((id) => scopedSet.has(String(id)));
+        } else {
+            candidatePartnerIds = requestedBeneficiaryIds;
+        }
+    }
+
+    if (Array.isArray(candidatePartnerIds) && candidatePartnerIds.length === 0) {
+        return { updatedTransactions: 0, settlementsCreated: 0, totalPaidAmount: 0, totalCodSettledAmount: 0 };
+    }
+
+    const orderMatch = {
+        createdAt: { $gte: start, $lte: end },
+        orderStatus: 'delivered',
+        'dispatch.deliveryPartnerId': { $exists: true, $ne: null }
+    };
+    if (Array.isArray(candidatePartnerIds)) {
+        orderMatch['dispatch.deliveryPartnerId'] = { $in: candidatePartnerIds };
+    }
+
+    const groupedOrders = await FoodOrder.aggregate([
+        { $match: orderMatch },
+        {
+            $addFields: {
+                paymentMethodLower: {
+                    $toLower: {
+                        $ifNull: ['$payment.method', '$paymentMethod']
+                    }
+                }
+            }
+        },
+        {
+            $group: {
+                _id: '$dispatch.deliveryPartnerId',
+                orderIds: { $addToSet: '$_id' },
+                ordersCount: { $sum: 1 },
+                totalEarning: {
+                    $sum: {
+                        $ifNull: [
+                            '$riderEarning',
+                            { $ifNull: ['$deliveryPartnerSettlement', { $ifNull: ['$pricing.deliveryFee', 0] }] }
+                        ]
+                    }
+                },
+                codOrdersCount: {
+                    $sum: {
+                        $cond: [{ $in: ['$paymentMethodLower', COD_PAYMENT_METHODS] }, 1, 0]
+                    }
+                },
+                codAmount: {
+                    $sum: {
+                        $cond: [{ $in: ['$paymentMethodLower', COD_PAYMENT_METHODS] }, { $ifNull: ['$pricing.total', 0] }, 0]
+                    }
+                }
+            }
+        }
+    ]);
+
+    if (!groupedOrders.length) {
+        return { updatedTransactions: 0, settlementsCreated: 0, totalPaidAmount: 0, totalCodSettledAmount: 0 };
+    }
+
+    const partnerIds = groupedOrders
+        .map((entry) => entry?._id)
+        .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+        .map((id) => new mongoose.Types.ObjectId(String(id)));
+
+    const alreadySettled = await FoodPayoutSettlement.aggregate([
+        {
+            $match: {
+                beneficiaryType: 'delivery',
+                status: 'paid',
+                fromAt: { $gte: start },
+                toAt: { $lte: end },
+                beneficiaryId: { $in: partnerIds }
+            }
+        },
+        {
+            $group: {
+                _id: '$beneficiaryId',
+                paidAmount: { $sum: { $ifNull: ['$paidAmount', 0] } },
+                codPaidAmount: { $sum: { $ifNull: ['$codPaidAmount', 0] } }
+            }
+        }
+    ]);
+
+    const settledMap = new Map(
+        alreadySettled.map((row) => [
+            String(row._id),
+            {
+                paidAmount: Number(row.paidAmount || 0),
+                codPaidAmount: Number(row.codPaidAmount || 0)
+            }
+        ])
+    );
+
+    const paidByAdminId = mongoose.Types.ObjectId.isValid(adminScope?.id)
+        ? new mongoose.Types.ObjectId(adminScope.id)
+        : null;
+    const settlementBatchId = new mongoose.Types.ObjectId();
+    const settlementDocs = [];
+    const depositDocs = [];
+    let updatedTransactions = 0;
+
+    for (const entry of groupedOrders) {
+        const beneficiaryId = entry?._id;
+        const key = String(beneficiaryId);
+        const settled = settledMap.get(key) || { paidAmount: 0, codPaidAmount: 0 };
+
+        const totalEarning = Number(entry.totalEarning || 0);
+        const totalCodAmount = Number(entry.codAmount || 0);
+        const payableNow = Math.max(0, totalEarning - Number(settled.paidAmount || 0));
+        const codPayableNow = Math.max(0, totalCodAmount - Number(settled.codPaidAmount || 0));
+
+        if (payableNow <= 0 && codPayableNow <= 0) {
+            continue;
+        }
+
+        updatedTransactions += Number(entry.ordersCount || 0);
+        settlementDocs.push({
+            beneficiaryType: 'delivery',
+            beneficiaryId,
+            batchId: settlementBatchId,
+            fromDate: new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0),
+            toDate: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999),
+            fromAt: start,
+            toAt: end,
+            transactionIds: (entry.orderIds || []).filter((id) => mongoose.Types.ObjectId.isValid(String(id))),
+            ordersCount: Number(entry.ordersCount || 0),
+            codOrdersCount: Number(entry.codOrdersCount || 0),
+            grossAmount: totalEarning,
+            codAmount: totalCodAmount,
+            codPaidAmount: codPayableNow,
+            paidAmount: payableNow,
+            adjustmentAmount: 0,
+            status: 'paid',
+            payoutMethod,
+            referenceNumber,
+            note,
+            paidAt: now,
+            paidByAdminId
+        });
+
+        if (codPayableNow > 0) {
+            depositDocs.push({
+                deliveryPartnerId: beneficiaryId,
+                amount: codPayableNow,
+                paymentMethod: 'cash',
+                status: 'Completed',
+                adminId: paidByAdminId || null,
+                adminNote: `COD settled via payout batch ${String(settlementBatchId)}`
+            });
+        }
+    }
+
+    if (!settlementDocs.length) {
+        return { updatedTransactions: 0, settlementsCreated: 0, totalPaidAmount: 0, totalCodSettledAmount: 0 };
+    }
+
+    await FoodPayoutSettlement.insertMany(settlementDocs);
+    if (depositDocs.length) {
+        await FoodDeliveryCashDeposit.insertMany(depositDocs);
+    }
+
+    const codByPartner = new Map();
+    for (const doc of settlementDocs) {
+        const key = String(doc.beneficiaryId);
+        codByPartner.set(key, Number(codByPartner.get(key) || 0) + Number(doc.codPaidAmount || 0));
+    }
+    if (codByPartner.size) {
+        await Promise.all(
+            Array.from(codByPartner.entries()).map(async ([partnerId, codPaidAmount]) => {
+                if (!mongoose.Types.ObjectId.isValid(partnerId) || codPaidAmount <= 0) return;
+                const wallet = await FoodDeliveryWallet.findOne({ deliveryPartnerId: new mongoose.Types.ObjectId(partnerId) });
+                if (!wallet) return;
+                wallet.cashInHand = Math.max(0, Number(wallet.cashInHand || 0) - Number(codPaidAmount || 0));
+                await wallet.save();
+            })
+        );
+    }
+
+    return {
+        updatedTransactions,
+        settlementsCreated: settlementDocs.length,
+        totalPaidAmount: settlementDocs.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
+        totalCodSettledAmount: settlementDocs.reduce((sum, item) => sum + Number(item.codPaidAmount || 0), 0),
         fromDate: fromRaw,
         toDate: toRaw,
         fromTime: fromTimeRaw,

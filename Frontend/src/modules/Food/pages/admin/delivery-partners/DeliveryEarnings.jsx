@@ -24,6 +24,20 @@ const formatDate = (dateString) => {
   })
 }
 
+const getOrderType = (earning = {}) => {
+  const methodRaw =
+    earning?.paymentMethod ||
+    earning?.orderPaymentMethod ||
+    earning?.payment?.method ||
+    earning?.order?.payment?.method ||
+    ""
+
+  const method = String(methodRaw).trim().toLowerCase()
+  if (!method) return "N/A"
+  if (["cash", "cod", "cash_on_delivery", "razorpay_qr"].includes(method)) return "COD"
+  return "Online"
+}
+
 export default function DeliveryEarnings() {
   const [searchQuery, setSearchQuery] = useState("")
   const [earnings, setEarnings] = useState([])
@@ -121,6 +135,7 @@ export default function DeliveryEarnings() {
       { key: "deliveryPartnerPhone", label: "Phone" },
       { key: "orderId", label: "Order ID" },
       { key: "restaurantName", label: "Restaurant" },
+      { key: "orderType", label: "Order Type" },
       { key: "amount", label: "Earning" },
       { key: "orderTotal", label: "Order Total" },
       { key: "deliveryFee", label: "Delivery Fee" },
@@ -134,6 +149,7 @@ export default function DeliveryEarnings() {
       deliveryPartnerPhone: earning.deliveryPartnerPhone || 'N/A',
       orderId: earning.orderId || 'N/A',
       restaurantName: earning.restaurantName || 'N/A',
+      orderType: getOrderType(earning),
       amount: formatCurrency(earning.amount),
       orderTotal: formatCurrency(earning.orderTotal),
       deliveryFee: formatCurrency(earning.deliveryFee),
@@ -351,6 +367,7 @@ export default function DeliveryEarnings() {
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Phone</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Order ID</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Restaurant</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Order Type</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Earning</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Order Total</th>
                   <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase">Status</th>
@@ -360,7 +377,7 @@ export default function DeliveryEarnings() {
               <tbody className="divide-y divide-slate-100">
                 {earnings.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center">
+                    <td colSpan={10} className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Earnings Found</p>
                         <p className="text-sm text-slate-500">No earnings match your filters</p>
@@ -384,6 +401,17 @@ export default function DeliveryEarnings() {
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-700">
                         {earning.restaurantName || 'N/A'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          getOrderType(earning) === "COD"
+                            ? "bg-amber-100 text-amber-800"
+                            : getOrderType(earning) === "Online"
+                              ? "bg-sky-100 text-sky-800"
+                              : "bg-slate-100 text-slate-700"
+                        }`}>
+                          {getOrderType(earning)}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-sm font-semibold text-green-600">
                         {formatCurrency(earning.amount)}

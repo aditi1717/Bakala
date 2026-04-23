@@ -145,7 +145,7 @@ function OrderModal({ product, onClose, onSuccess }) {
         }
       });
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Failed to initialize order');
+      toast.error('Failed to initialize order');
       setPlacing(false);
     }
   };

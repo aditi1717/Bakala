@@ -16,6 +16,7 @@ import { RestaurantOffer } from '../../restaurant/models/restaurantOffer.model.j
 import { RestaurantOfferUsage } from '../../restaurant/models/restaurantOfferUsage.model.js';
 import { FoodDeliveryCommissionRule } from '../../admin/models/deliveryCommissionRule.model.js';
 import { FoodRestaurantCommission } from '../../admin/models/restaurantCommission.model.js';
+import { FoodPayoutSettlement } from '../../admin/models/foodPayoutSettlement.model.js';
 import {
   sendNotificationToOwner,
   sendNotificationToOwners,
@@ -3491,8 +3492,45 @@ export async function listOrdersAdmin(query, adminScope = {}) {
       .lean(),
     FoodOrder.countDocuments(filter),
   ]);
+
+  // Annotate delivery payout status from paid settlement batches.
+  // Delivery report consumes orders API and expects per-order paid/unpaid state.
+  const orderIds = docs
+    .map((doc) => doc?._id)
+    .filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+  let settledOrderIdSet = new Set();
+  if (orderIds.length) {
+    const settlementDocs = await FoodPayoutSettlement.find({
+      beneficiaryType: 'delivery',
+      status: 'paid',
+      transactionIds: { $in: orderIds }
+    })
+      .select('transactionIds')
+      .lean();
+
+    settledOrderIdSet = new Set(
+      settlementDocs
+        .flatMap((doc) => (Array.isArray(doc?.transactionIds) ? doc.transactionIds : []))
+        .map((id) => String(id))
+    );
+  }
+
   const noResponseMap = await buildNoResponseMetaMap(docs.map((d) => d?._id));
-  const docsWithMeta = docs.map((doc) => withNoResponseMeta(doc, noResponseMap));
+  const docsWithMeta = docs.map((doc) => {
+    const base = withNoResponseMeta(doc, noResponseMap);
+    const isDeliveryPayoutPaid = settledOrderIdSet.has(String(doc?._id));
+    if (!isDeliveryPayoutPaid) return base;
+
+    return {
+      ...base,
+      deliveryPayoutStatus: 'paid',
+      deliverySettlementStatus: 'paid',
+      settlement: {
+        ...(base?.settlement || {}),
+        deliveryStatus: 'paid'
+      }
+    };
+  });
   const paginated = buildPaginatedResult({ docs: docsWithMeta, total, page, limit });
   return { ...paginated, orders: paginated.data };
 }

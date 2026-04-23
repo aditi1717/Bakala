@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { useProximityCheck } from '@/modules/DeliveryV2/hooks/useProximityCheck';
@@ -12,10 +12,6 @@ import { useNavigate } from 'react-router-dom';
 
 // Components
 import LiveMap from '@/modules/DeliveryV2/components/map/LiveMap';
-import { NewOrderModal } from '@/modules/DeliveryV2/components/modals/NewOrderModal';
-import { PickupActionModal } from '@/modules/DeliveryV2/components/modals/PickupActionModal';
-import { OrderSummaryModal } from '@/modules/DeliveryV2/components/modals/OrderSummaryModal';
-import ActionSlider from '@/modules/DeliveryV2/components/ui/ActionSlider';
 
 // Sub Pages
 import PocketV2 from '@/modules/DeliveryV2/pages/PocketV2';
@@ -26,100 +22,545 @@ import ExploreV2 from '@/modules/DeliveryV2/pages/ExploreV2';
 // Utils
 import { getHaversineDistance, calculateETA, calculateHeading } from '@/modules/DeliveryV2/utils/geo';
 import { useCompanyName } from "@food/hooks/useCompanyName";
-import useNotificationInbox from "@food/hooks/useNotificationInbox";
 
 // Icons
 import {
-  Bell, HelpCircle, AlertTriangle,
+  HelpCircle, AlertTriangle,
   Wallet, History, User as UserIcon, LayoutGrid,
-  Plus, Minus, Navigation2, Target, Play, Clock, ChevronDown,
-  Contact, Package, Phone
+  Plus, Minus, Navigation2, Target, Play, Clock,
+  Contact, Package
 } from 'lucide-react';
 
 const INCOMING_ORDER_STORAGE_KEY = 'delivery_v2_incoming_order';
 const INCOMING_ORDER_TTL_MS = 2 * 60 * 1000;
+const ORDER_FOCUS_STORAGE_KEY = 'delivery_v2_order_focus';
+const PASSED_ORDER_STORAGE_KEY = 'delivery_v2_last_passed_order_id';
+const ORDER_RESPONSE_TIMEOUT_MS = 30 * 1000;
 
-const pickFirstText = (...values) => {
-  for (const value of values) {
-    const text = String(value ?? '').trim();
-    if (text) return text;
+const getOrderIdentity = (orderLike) =>
+  String(
+    orderLike?.orderMongoId ||
+    orderLike?._id ||
+    orderLike?.orderId ||
+    orderLike?.id ||
+    '',
+  ).trim();
+
+const getLocFromOrderRef = (ref, keysLat, keysLng) => {
+  if (!ref) return null;
+  if (ref.location) {
+    if (Array.isArray(ref.location.coordinates) && ref.location.coordinates.length >= 2) {
+      return {
+        lat: ref.location.coordinates[1],
+        lng: ref.location.coordinates[0],
+      };
+    }
+    return {
+      lat: ref.location.latitude || ref.location.lat,
+      lng: ref.location.longitude || ref.location.lng,
+    };
   }
-  return '';
+  for (const key of keysLat) {
+    if (ref[key] != null) {
+      return {
+        lat: ref[key],
+        lng: ref[keysLng[keysLat.indexOf(key)]],
+      };
+    }
+  }
+  return null;
 };
 
-const normalizeDialPhone = (value) => {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-  const hasPlusPrefix = raw.startsWith('+');
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length < 8) return '';
-  return hasPlusPrefix ? `+${digits}` : digits;
+const hydrateDeliveryOrder = (rawOrder, fallbackOrderId) => {
+  if (!rawOrder) return null;
+
+  const restaurantLocation =
+    rawOrder?.restaurantLocation ||
+    getLocFromOrderRef(rawOrder?.restaurantId, ['latitude', 'lat'], ['longitude', 'lng']) ||
+    getLocFromOrderRef(rawOrder, ['restaurant_lat', 'restaurantLat', 'latitude'], ['restaurant_lng', 'restaurantLng', 'longitude']);
+
+  const customerLocation =
+    rawOrder?.customerLocation ||
+    getLocFromOrderRef(rawOrder?.deliveryAddress, ['latitude', 'lat'], ['longitude', 'lng']) ||
+    getLocFromOrderRef(rawOrder, ['customer_lat', 'customerLat', 'latitude'], ['customer_lng', 'customerLng', 'longitude']);
+
+  return {
+    ...rawOrder,
+    orderId: rawOrder?.orderId || fallbackOrderId || rawOrder?._id || rawOrder?.id,
+    restaurantLocation,
+    customerLocation,
+  };
 };
 
-const extractCustomerContact = (order) => {
-  const userObj = order?.user || order?.userId || order?.customer || order?.customerId || {};
-  const deliveryAddress = order?.deliveryAddress || order?.address || {};
-  const recipient = order?.recipient || order?.deliveryRecipient || {};
+const deriveTripStatusFromOrder = (orderLike) => {
+  const backendStatus = String(
+    orderLike?.deliveryStatus ||
+    orderLike?.orderState?.status ||
+    orderLike?.orderStatus ||
+    orderLike?.status ||
+    '',
+  ).toLowerCase();
+  const currentPhase = String(orderLike?.deliveryState?.currentPhase || '').toLowerCase();
 
-  const name = pickFirstText(
-    order?.recipientName,
-    recipient?.name,
-    deliveryAddress?.recipientName,
-    deliveryAddress?.receiverName,
-    deliveryAddress?.contactPersonName,
-    order?.userName,
-    order?.customerName,
-    userObj?.name,
-    deliveryAddress?.name,
-    deliveryAddress?.fullName,
-    'Customer',
-  );
-
-  const rawPhone = pickFirstText(
-    order?.recipientPhone,
-    recipient?.phone,
-    deliveryAddress?.recipientPhone,
-    deliveryAddress?.receiverPhone,
-    deliveryAddress?.contactPersonPhone,
-    order?.userPhone,
-    order?.customerPhone,
-    userObj?.phone,
-    deliveryAddress?.phone,
-    deliveryAddress?.contactNumber,
-    deliveryAddress?.mobile,
-  );
-  const dialPhone = normalizeDialPhone(rawPhone);
-  const phone = rawPhone || dialPhone;
-
-  return { name, phone, dialPhone };
+  if (['delivered', 'completed'].includes(backendStatus)) return 'COMPLETED';
+  if (currentPhase === 'at_drop' || ['reached_drop', 'delivering', 'picked_up'].includes(backendStatus)) return 'PICKED_UP';
+  if (currentPhase === 'at_pickup' || backendStatus === 'reached_pickup') return 'REACHED_PICKUP';
+  return 'PICKING_UP';
 };
 
-/** Minimal bottom-sheet popup (Restored from legacy FeedNavbar) */
-function BottomPopup({ isOpen, onClose, title, children }) {
-  if (!isOpen) return null;
+const getRestaurantTitle = (order) =>
+  order?.restaurantName ||
+  order?.restaurantId?.restaurantName ||
+  order?.restaurantId?.name ||
+  'Restaurant order';
+
+const getPaymentLabel = (order) => {
+  const method = String(order?.payment?.method || order?.paymentMethod || '').toLowerCase();
+  if (method === 'cash' || method === 'cod') return 'Cash';
+  if (method === 'wallet') return 'Wallet';
+  if (!method) return 'Online';
+  return method.charAt(0).toUpperCase() + method.slice(1);
+};
+
+const isSameCalendarDay = (leftDate, rightDate = new Date()) => {
+  const left = new Date(leftDate);
+  const right = new Date(rightDate);
+  if (Number.isNaN(left.getTime()) || Number.isNaN(right.getTime())) return false;
   return (
-    <div className="fixed inset-0 z-[600] flex items-end">
-      <div className="absolute inset-0 bg-[#005128]/30" onClick={onClose} />
-      <motion.div
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="relative w-full bg-white rounded-t-3xl shadow-2xl p-6"
-        onClick={(e) => e.stopPropagation()}
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+};
+
+const getOrderEventDate = (orderLike) =>
+  orderLike?.cancelledAt ||
+  orderLike?.deliveredAt ||
+  orderLike?.updatedAt ||
+  orderLike?.createdAt ||
+  orderLike?.date ||
+  null;
+
+const isClosedOrderLike = (orderLike) => {
+  const status = String(
+    orderLike?.status ||
+    orderLike?.orderStatus ||
+    orderLike?.deliveryStatus ||
+    '',
+  ).toLowerCase();
+  return ['delivered', 'completed', 'cancelled', 'deleted'].includes(status);
+};
+
+const normalizeQueueStatus = (orderLike) =>
+  String(orderLike?.dispatch?.status || orderLike?.queueStatus || '').toLowerCase();
+
+const getOrderProgressLabel = (orderLike) => {
+  const backendStatus = String(
+    orderLike?.deliveryStatus ||
+    orderLike?.orderState?.status ||
+    orderLike?.orderStatus ||
+    orderLike?.status ||
+    '',
+  ).toLowerCase();
+  const phase = String(orderLike?.deliveryState?.currentPhase || '').toLowerCase();
+
+  if (['delivered', 'completed'].includes(backendStatus)) return 'Delivered';
+  if (['cancelled', 'rejected'].includes(backendStatus)) return 'Cancelled';
+  if (phase === 'at_drop' || backendStatus === 'reached_drop') return 'Arrived at delivery location';
+  if (['picked_up', 'delivering'].includes(backendStatus)) return 'Picked up';
+  if (phase === 'at_pickup' || backendStatus === 'reached_pickup') return 'Arrived at pickup';
+  if (backendStatus === 'accepted') return 'Accepted';
+  if (backendStatus === 'assigned') return 'Assigned';
+  return 'Picking up';
+};
+
+const isSameQueueSnapshot = (left = [], right = []) => {
+  if (!Array.isArray(left) || !Array.isArray(right)) return false;
+  if (left.length !== right.length) return false;
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftOrder = left[index];
+    const rightOrder = right[index];
+    if (getOrderIdentity(leftOrder) !== getOrderIdentity(rightOrder)) return false;
+    if (normalizeQueueStatus(leftOrder) !== normalizeQueueStatus(rightOrder)) return false;
+  }
+  return true;
+};
+
+function OrdersTabV2({
+  activeOrder,
+  incomingOrder,
+  advancedOrders,
+  todayHistoryOrders,
+  onOpenOrderDetail,
+  onAcceptQueuedOrder,
+  onPassQueuedOrder,
+  onTimeoutQueuedOrder,
+  actionBusyOrderId,
+  actionBusyType,
+}) {
+  const currentActiveOrder = activeOrder && !isClosedOrderLike(activeOrder) && isSameCalendarDay(getOrderEventDate(activeOrder)) ? activeOrder : null;
+  const currentIncomingOrder = incomingOrder && isSameCalendarDay(getOrderEventDate(incomingOrder)) ? incomingOrder : null;
+  const currentQueuedOrders = advancedOrders.filter((order) => isSameCalendarDay(getOrderEventDate(order)));
+  const currentOrderId = getOrderIdentity(currentActiveOrder);
+  const currentIncomingOrderId = getOrderIdentity(currentIncomingOrder);
+  const dedupedQueuedOrders = currentQueuedOrders.filter((order) => {
+    const orderId = getOrderIdentity(order);
+    if (!orderId) return false;
+    if (orderId === currentOrderId) return false;
+    if (currentIncomingOrderId && orderId === currentIncomingOrderId) return false;
+    return true;
+  });
+  const incomingOrders = useMemo(() => {
+    const list = [];
+    if (currentIncomingOrder && normalizeQueueStatus(currentIncomingOrder) === 'assigned') {
+      list.push(currentIncomingOrder);
+    }
+    dedupedQueuedOrders.forEach((order) => {
+      if (normalizeQueueStatus(order) === 'assigned') list.push(order);
+    });
+    const seen = new Set();
+    return list.filter((order) => {
+      const orderId = getOrderIdentity(order);
+      if (!orderId || seen.has(orderId)) return false;
+      seen.add(orderId);
+      return true;
+    });
+  }, [currentIncomingOrder, dedupedQueuedOrders]);
+  const liveOrders = useMemo(
+    () => dedupedQueuedOrders.filter((order) => normalizeQueueStatus(order) === 'accepted'),
+    [dedupedQueuedOrders],
+  );
+  const totalVisibleOrders = (currentActiveOrder ? 1 : 0) + incomingOrders.length + liveOrders.length;
+  const todayHistoryCount = Array.isArray(todayHistoryOrders) ? todayHistoryOrders.length : 0;
+  const [ordersViewTab, setOrdersViewTab] = useState('live');
+  const [nowTick, setNowTick] = useState(Date.now());
+  const [deadlineByOrderId, setDeadlineByOrderId] = useState({});
+  const timedOutOrderIdsRef = useRef(new Set());
+
+  const actionableOrders = incomingOrders;
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const activeIds = new Set(actionableOrders.map((order) => getOrderIdentity(order)).filter(Boolean));
+    setDeadlineByOrderId((prev) => {
+      let changed = false;
+      const next = {};
+      activeIds.forEach((orderId) => {
+        if (prev[orderId]) {
+          next[orderId] = prev[orderId];
+        } else {
+          next[orderId] = Date.now() + ORDER_RESPONSE_TIMEOUT_MS;
+          changed = true;
+        }
+      });
+      if (Object.keys(prev).length !== Object.keys(next).length) {
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+    timedOutOrderIdsRef.current.forEach((orderId) => {
+      if (!activeIds.has(orderId)) timedOutOrderIdsRef.current.delete(orderId);
+    });
+  }, [actionableOrders]);
+
+  useEffect(() => {
+    actionableOrders.forEach((order) => {
+      const orderId = getOrderIdentity(order);
+      if (!orderId || timedOutOrderIdsRef.current.has(orderId)) return;
+      const deadline = deadlineByOrderId[orderId];
+      if (!deadline) return;
+      if (deadline > nowTick) return;
+      timedOutOrderIdsRef.current.add(orderId);
+      onTimeoutQueuedOrder?.(order);
+    });
+  }, [actionableOrders, deadlineByOrderId, nowTick, onTimeoutQueuedOrder]);
+
+  const getTimeLeftSeconds = useCallback((order) => {
+    const orderId = getOrderIdentity(order);
+    if (!orderId) return null;
+    const deadline = deadlineByOrderId[orderId];
+    if (!deadline) return null;
+    return Math.max(0, Math.ceil((deadline - nowTick) / 1000));
+  }, [deadlineByOrderId, nowTick]);
+
+  const Card = ({ title, subtitle, amount, badge, tone = 'slate', onClick, actionText }) => {
+    const toneClasses = {
+      emerald: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      amber: 'border-amber-100 bg-amber-50 text-amber-700',
+      slate: 'border-slate-200 bg-white text-slate-700',
+      blue: 'border-sky-100 bg-sky-50 text-sky-700',
+    };
+
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full rounded-[18px] border border-slate-200 bg-white px-3.5 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.05)] text-left active:scale-[0.99] transition-all"
       >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">{title}</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-            <AlertTriangle className="w-4 h-4" />
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="min-w-0">
+            {badge && (
+              <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${toneClasses[tone] || toneClasses.slate}`}>
+                {badge}
+              </span>
+            )}
+            <p className="mt-2 text-[15px] font-bold leading-5 text-slate-950 truncate">{title}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500 line-clamp-2">{subtitle}</p>
+          </div>
+          {amount ? <p className="text-xs font-black text-slate-950 shrink-0">{amount}</p> : null}
+        </div>
+        {actionText ? (
+          <div className="mt-3 flex justify-end">
+            <span className="inline-flex rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white">
+              {actionText}
+            </span>
+          </div>
+        ) : null}
+      </button>
+    );
+  };
+
+  const QueueRequestCard = ({ order, badge = 'Incoming', tone = 'blue', subtitle }) => {
+    const orderId = getOrderIdentity(order);
+    const isAcceptBusy = actionBusyOrderId === orderId && actionBusyType === 'accept';
+    const isPassBusy = actionBusyOrderId === orderId && actionBusyType === 'pass';
+    const isTimeoutBusy = actionBusyOrderId === orderId && actionBusyType === 'timeout';
+    const isBusy = isAcceptBusy || isPassBusy || isTimeoutBusy;
+    const timeLeftSeconds = getTimeLeftSeconds(order);
+    const showTimer = timeLeftSeconds != null && normalizeQueueStatus(order) === 'assigned';
+    const timerLabel = showTimer
+      ? `${String(Math.floor(timeLeftSeconds / 60)).padStart(2, '0')}:${String(timeLeftSeconds % 60).padStart(2, '0')}`
+      : '';
+
+    return (
+      <div className="w-full rounded-[18px] border border-slate-200 bg-white px-3.5 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="min-w-0">
+            <span
+              className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${
+                tone === 'blue'
+                  ? 'border-sky-100 bg-sky-50 text-sky-700'
+                  : 'border-amber-100 bg-amber-50 text-amber-700'
+              }`}
+            >
+              {badge}
+            </span>
+            <p className="mt-2 text-[15px] font-bold leading-5 text-slate-950 truncate">{getRestaurantTitle(order)}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500 line-clamp-2">{subtitle}</p>
+          </div>
+          <p className="text-xs font-black text-slate-950 shrink-0">
+            ₹{Number(order?.riderEarning || order?.deliveryEarning || 0).toFixed(2)}
+          </p>
+        </div>
+        {showTimer && (
+          <div className={`mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold ${timeLeftSeconds <= 10 ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+            <Clock className="mr-1 h-3.5 w-3.5" />
+            Auto pass in {timerLabel}
+          </div>
+        )}
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onAcceptQueuedOrder?.(order)}
+            disabled={isBusy}
+            className="rounded-xl bg-[#005128] px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
+          >
+            {isAcceptBusy ? 'Accepting...' : 'Accept'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onPassQueuedOrder?.(order)}
+            disabled={isBusy}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-60"
+          >
+            {isPassBusy ? 'Passing...' : 'Pass this task'}
           </button>
         </div>
-        {children}
-      </motion.div>
+
+        <button
+          type="button"
+          onClick={() => onOpenOrderDetail(order)}
+          className="mt-2 text-[11px] font-semibold text-slate-500 underline underline-offset-2"
+        >
+          Open Detail
+        </button>
+      </div>
+    );
+  };
+
+  const HistoryCard = ({ order }) => {
+    const rawStatus = String(order?.status || '').toLowerCase();
+    const statusLabel = rawStatus === 'cancelled' ? 'Cancelled' : 'Delivered';
+    const toneClass = rawStatus === 'cancelled'
+      ? 'border-amber-100 bg-amber-50 text-amber-700'
+      : 'border-emerald-100 bg-emerald-50 text-emerald-700';
+    const eventDate = getOrderEventDate(order);
+    const timeLabel = eventDate
+      ? new Date(eventDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+      : '--';
+    const amount = Number(order?.deliveryEarning || order?.earningAmount || order?.amount || 0);
+
+    return (
+      <button
+        type="button"
+        onClick={() => onOpenOrderDetail(order)}
+        className="w-full rounded-[18px] border border-slate-200 bg-white px-3.5 py-3 text-left shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition-all active:scale-[0.99]"
+      >
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="min-w-0">
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${toneClass}`}>
+              {statusLabel}
+            </span>
+            <p className="mt-2 text-[15px] font-bold leading-5 text-slate-950 truncate">{getRestaurantTitle(order)}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{statusLabel} today at {timeLabel}</p>
+          </div>
+          {amount > 0 ? <p className="text-xs font-black text-slate-950 shrink-0">₹{amount.toFixed(2)}</p> : null}
+        </div>
+      </button>
+    );
+  };
+
+  return (
+    <div className="min-h-full bg-[#f7f8fc] px-3 pb-24 pt-3">
+      <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-brand-600">Orders</p>
+          <h1 className="mt-1 text-xl leading-6 font-black text-slate-950">Manage trips</h1>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            Incoming and live requests stay here.
+          </p>
+          </div>
+        <div className="rounded-[16px] bg-slate-50 px-3 py-2 shadow-sm border border-slate-200 shrink-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Visible</p>
+          <p className="mt-1 text-lg font-black text-slate-950">{totalVisibleOrders}</p>
+        </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700 border border-sky-100">Incoming {incomingOrders.length}</span>
+          <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 border border-emerald-100">Live {(currentActiveOrder ? 1 : 0) + liveOrders.length}</span>
+          <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-700 border border-slate-200">Done Today {todayHistoryCount}</span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => setOrdersViewTab('live')}
+            className={`rounded-lg px-3 py-2 text-xs font-bold transition ${ordersViewTab === 'live' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+          >
+            Incoming / Live
+          </button>
+          <button
+            type="button"
+            onClick={() => setOrdersViewTab('history')}
+            className={`rounded-lg px-3 py-2 text-xs font-bold transition ${ordersViewTab === 'history' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+          >
+            Delivered / Cancelled
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {ordersViewTab === 'live' && (
+          <>
+            {(currentActiveOrder || liveOrders.length > 0) && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Live</p>
+                </div>
+                {currentActiveOrder && (
+                  <Card
+                    title={getRestaurantTitle(currentActiveOrder)}
+                    subtitle={`${getOrderProgressLabel(currentActiveOrder)}${currentActiveOrder?.displayOrderId ? ` - #${currentActiveOrder.displayOrderId}` : ''}`}
+                    amount={`Rs ${Number(currentActiveOrder?.riderEarning || currentActiveOrder?.deliveryEarning || 0).toFixed(2)}`}
+                    badge="Current"
+                    tone="emerald"
+                    actionText="Open Detail"
+                    onClick={() => onOpenOrderDetail(currentActiveOrder)}
+                  />
+                )}
+                {liveOrders.map((order) => (
+                  <Card
+                    key={getOrderIdentity(order)}
+                    title={getRestaurantTitle(order)}
+                    subtitle={`${getOrderProgressLabel(order)}. Open detail page to continue status updates.`}
+                    amount={`Rs ${Number(order?.riderEarning || order?.deliveryEarning || 0).toFixed(2)}`}
+                    badge="Live"
+                    tone="emerald"
+                    actionText="Open Detail"
+                    onClick={() => onOpenOrderDetail(order)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {incomingOrders.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <div className="w-2 h-2 rounded-full bg-sky-500" />
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Incoming</p>
+                </div>
+                {incomingOrders.map((order) => (
+                  <QueueRequestCard
+                    key={getOrderIdentity(order)}
+                    order={order}
+                    badge="Incoming"
+                    tone="blue"
+                    subtitle={`${getPaymentLabel(order)} payment - Accept or pass this task`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {!currentActiveOrder && incomingOrders.length === 0 && liveOrders.length === 0 && (
+              <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
+                <div className="mx-auto h-12 w-12 rounded-full bg-brand-50 flex items-center justify-center">
+                  <Package className="w-5 h-5 text-brand-600" />
+                </div>
+                <p className="mt-4 text-base font-bold text-slate-950">No current orders today</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Incoming and active orders will appear here.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+        {ordersViewTab === 'history' && (
+        <div className="pt-2 space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <div className="w-2 h-2 rounded-full bg-slate-500" />
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">Delivered / Cancelled Orders</p>
+          </div>
+          {todayHistoryCount > 0 ? (
+            todayHistoryOrders.map((order, index) => (
+              <HistoryCard
+                key={`${getOrderIdentity(order) || order?.id || order?.orderId || 'history'}-${order?.status || 'status'}-${index}`}
+                order={order}
+              />
+            ))
+          ) : (
+            <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-6 text-center shadow-sm">
+              <p className="text-sm font-bold text-slate-950">No delivered or cancelled orders today</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Sirf aaj ke delivered aur cancelled orders yahan show honge.</p>
+            </div>
+          )}
+        </div>
+        )}
+      </div>
     </div>
   );
 }
 
+/** Minimal bottom-sheet popup (Restored from legacy FeedNavbar) */
 /**
  * DeliveryHomeV2 - Premium 1:1 Match with Original App UI.
  * Featuring logical tab switching for Feed, Pocket, History, and Profile.
@@ -127,35 +568,35 @@ function BottomPopup({ isOpen, onClose, title, children }) {
 export default function DeliveryHomeV2({ tab = 'feed' }) {
   const navigate = useNavigate();
   const { isOnline, toggleOnline, activeOrder, tripStatus, setRiderLocation, setActiveOrder, updateTripStatus, clearActiveOrder } = useDeliveryStore();
-  const { isWithinRange, distanceToTarget } = useProximityCheck();
-  const { acceptOrder, rejectOrder, reachPickup, pickUpOrder, completeDelivery, resetTrip } = useOrderManager();
-  const { newOrder, clearNewOrder, orderStatusUpdate, clearOrderStatusUpdate, isConnected: isSocketConnected, emitLocation } = useDeliveryNotifications();
+  const { distanceToTarget } = useProximityCheck();
+  const { acceptOrder, rejectOrder, resetTrip } = useOrderManager();
+  const { newOrder, clearNewOrder, orderStatusUpdate, clearOrderStatusUpdate, isConnected: isSocketConnected, emitLocation, playNotificationSound } = useDeliveryNotifications();
   const companyName = useCompanyName();
-  const { unreadCount: notificationUnreadCount } = useNotificationInbox("delivery", { limit: 20 });
 
   const [incomingOrder, setIncomingOrder] = useState(null);
+  const [advancedOrders, setAdvancedOrders] = useState([]);
+  const [todayHistoryOrders, setTodayHistoryOrders] = useState([]);
+  const [focusedOrderId, setFocusedOrderId] = useState(() => {
+    try {
+      return localStorage.getItem(ORDER_FOCUS_STORAGE_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
   const [currentTab, setCurrentTab] = useState(tab);
+  const [orderActionBusy, setOrderActionBusy] = useState({ orderId: '', type: '' });
 
   // Track URL changes (Prop changes) to update sub-page content
   useEffect(() => {
     setCurrentTab(tab);
   }, [tab]);
 
-  const [showEmergencyPopup, setShowEmergencyPopup] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
-  const [emergencyNumbers, setEmergencyNumbers] = useState({
-    medicalEmergency: "",
-    accidentHelpline: "",
-    contactPolice: "",
-    insurance: "",
-  });
 
-  const [isModalMinimized, setIsModalMinimized] = useState(false);
   const [eta, setEta] = useState(null);
   const lastLocationSentAt = useRef(0);
   const lastCoordRef = useRef(null);
   const rollingSpeedRef = useRef([]);
-  const lastAutoArrivalRef = useRef({ PICKING_UP: false, PICKED_UP: false });
 
   const [zoom, setZoom] = useState(14);
   const [isSimMode, setIsSimMode] = useState(false);
@@ -163,20 +604,12 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const [simIndex, setSimIndex] = useState(0);
   const [simProgress, setSimProgress] = useState(0); // 0 to 1 between points
   const [activePolyline, setActivePolyline] = useState(null);
-  const [customerContact, setCustomerContact] = useState(() => ({ name: 'Customer', phone: '', dialPhone: '' }));
   const mapRef = useRef(null);
-  const lastContactFetchOrderIdRef = useRef(null);
+  const lastAnnouncedOrderIdRef = useRef('');
+  const lastIncomingToastOrderIdRef = useRef('');
+  const queueSyncInFlightRef = useRef(false);
 
   const isLoggingOut = useRef(false);
-  const getOrderIdentity = useCallback((orderLike) => (
-    String(
-      orderLike?.orderMongoId ||
-      orderLike?._id ||
-      orderLike?.orderId ||
-      orderLike?.id ||
-      ''
-    ).trim()
-  ), []);
 
   const persistIncomingOrder = useCallback((orderLike) => {
     const orderId = getOrderIdentity(orderLike);
@@ -194,6 +627,55 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     }
   }, [getOrderIdentity]);
 
+  const activeOrderId = getOrderIdentity(activeOrder);
+
+  const upsertAdvancedOrder = useCallback((orderLike) => {
+    const hydratedOrder = hydrateDeliveryOrder(orderLike, getOrderIdentity(orderLike));
+    const nextOrderId = getOrderIdentity(hydratedOrder);
+    if (!nextOrderId || nextOrderId === activeOrderId) return hydratedOrder;
+
+    setAdvancedOrders((prev) => {
+      const withoutCurrent = prev.filter((item) => getOrderIdentity(item) !== nextOrderId);
+      const merged = [hydratedOrder, ...withoutCurrent];
+      return merged.sort((left, right) => {
+        const leftAccepted = String(left?.dispatch?.status || left?.queueStatus || '').toLowerCase() === 'accepted';
+        const rightAccepted = String(right?.dispatch?.status || right?.queueStatus || '').toLowerCase() === 'accepted';
+        if (leftAccepted !== rightAccepted) return leftAccepted ? -1 : 1;
+        return Number(right?.updatedAt || right?.createdAt || 0) - Number(left?.updatedAt || left?.createdAt || 0);
+      });
+    });
+
+    return hydratedOrder;
+  }, [activeOrderId]);
+
+  const removeAdvancedOrder = useCallback((orderLike) => {
+    const orderId = getOrderIdentity(orderLike);
+    if (!orderId) return;
+
+    setAdvancedOrders((prev) => prev.filter((item) => getOrderIdentity(item) !== orderId));
+  }, []);
+
+  const promoteNextAcceptedOrder = useCallback((ordersOverride) => {
+    const queue = Array.isArray(ordersOverride) ? ordersOverride : advancedOrders;
+    const nextAccepted = queue.find((order) => {
+      const dispatchStatus = String(order?.dispatch?.status || order?.queueStatus || '').toLowerCase();
+      return dispatchStatus === 'accepted';
+    });
+
+    if (!nextAccepted) return false;
+
+    const hydratedNextOrder = hydrateDeliveryOrder(nextAccepted, getOrderIdentity(nextAccepted));
+    setActiveOrder(hydratedNextOrder);
+    updateTripStatus(deriveTripStatusFromOrder(hydratedNextOrder));
+    setAdvancedOrders((prev) => prev.filter((item) => getOrderIdentity(item) !== getOrderIdentity(hydratedNextOrder)));
+    toast.success('Advanced order ready', {
+      description: 'Your next queued trip is now live.',
+    });
+    return true;
+  }, [advancedOrders, setActiveOrder, updateTripStatus]);
+
+  const advancedOrderCount = advancedOrders.length;
+
   const clearPersistedIncomingOrder = useCallback(() => {
     try {
       localStorage.removeItem(INCOMING_ORDER_STORAGE_KEY);
@@ -201,6 +683,24 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       // Ignore storage errors.
     }
   }, []);
+
+  const persistFocusedOrder = useCallback((orderId) => {
+    const nextValue = String(orderId || '').trim();
+    setFocusedOrderId(nextValue);
+    try {
+      if (nextValue) localStorage.setItem(ORDER_FOCUS_STORAGE_KEY, nextValue);
+      else localStorage.removeItem(ORDER_FOCUS_STORAGE_KEY);
+    } catch {
+      // Ignore storage errors.
+    }
+  }, []);
+
+  const announceIncomingRequest = useCallback((orderLike) => {
+    const orderId = getOrderIdentity(orderLike);
+    if (!orderId || lastAnnouncedOrderIdRef.current === orderId) return;
+    lastAnnouncedOrderIdRef.current = orderId;
+    void playNotificationSound(orderLike);
+  }, [playNotificationSound]);
 
   useEffect(() => {
     try {
@@ -222,6 +722,39 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       clearPersistedIncomingOrder();
     }
   }, [activeOrder, clearPersistedIncomingOrder]);
+
+  useEffect(() => {
+    let passedOrderId = '';
+    try {
+      passedOrderId = String(sessionStorage.getItem(PASSED_ORDER_STORAGE_KEY) || '').trim();
+      if (!passedOrderId) return;
+      sessionStorage.removeItem(PASSED_ORDER_STORAGE_KEY);
+    } catch {
+      return;
+    }
+
+    removeAdvancedOrder({ orderId: passedOrderId });
+    setIncomingOrder((prev) => {
+      if (getOrderIdentity(prev) !== passedOrderId) return prev;
+      clearPersistedIncomingOrder();
+      return null;
+    });
+    if (focusedOrderId === passedOrderId) {
+      persistFocusedOrder('');
+    }
+    if (activeOrderId === passedOrderId) {
+      clearActiveOrder();
+      resetTrip();
+    }
+  }, [
+    activeOrderId,
+    clearActiveOrder,
+    clearPersistedIncomingOrder,
+    focusedOrderId,
+    persistFocusedOrder,
+    removeAdvancedOrder,
+    resetTrip,
+  ]);
 
   const handleLogout = useCallback(() => {
     if (isLoggingOut.current) return;
@@ -325,17 +858,11 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     return () => clearInterval(interval);
   }, [isSimMode, simPath, simIndex, activeOrder, emitLocation, activePolyline, eta, tripStatus]);
 
-  // Fetch Emergency numbers and Profile (Restored logic)
+  // Fetch profile data for header
   useEffect(() => {
     (async () => {
       try {
-        const [emergencyRes, profileRes] = await Promise.all([
-          deliveryAPI.getEmergencyHelp(),
-          deliveryAPI.getProfile()
-        ]);
-        if (emergencyRes?.data?.success && emergencyRes.data.data) {
-          setEmergencyNumbers(emergencyRes.data.data);
-        }
+        const profileRes = await deliveryAPI.getProfile();
         if (profileRes?.data?.success && profileRes.data.data?.profile) {
           const profile = profileRes.data.data.profile;
           setProfileImage(profile.profileImage?.url || profile.documents?.photo || null);
@@ -343,13 +870,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       } catch (err) { console.warn('Navbar Data Fetch Error:', err); }
     })();
   }, []);
-
-  const emergencyOptions = [
-    { title: "Medical Emergency", subtitle: "Call an ambulance", icon: <AlertTriangle className="text-red-600" />, phone: emergencyNumbers.medicalEmergency },
-    { title: "Accident Helpline", subtitle: "Report an accident", icon: <AlertTriangle className="text-orange-600" />, phone: emergencyNumbers.accidentHelpline },
-    { title: "Contact Police", subtitle: "Nearest police support", icon: <AlertTriangle className="text-brand-600" />, phone: emergencyNumbers.contactPolice },
-    { title: "Insurance", subtitle: "Policy & claim help", icon: <AlertTriangle className="text-green-600" />, phone: emergencyNumbers.insurance },
-  ];
 
   // Reset simulation when path, order or mode changes
   useEffect(() => {
@@ -359,70 +879,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       setSimProgress(0);
     }
   }, [simPath, tripStatus, isSimMode]);
-
-  // Auto-restore modal when status or content changes
-
-  // Auto-restore modal when status or content changes
-  useEffect(() => {
-    setIsModalMinimized(false);
-  }, [tripStatus, incomingOrder]);
-
-  useEffect(() => {
-    const orderId = String(activeOrder?.orderId || activeOrder?._id || '').trim();
-    if (!orderId) {
-      setCustomerContact({ name: 'Customer', phone: '', dialPhone: '' });
-      lastContactFetchOrderIdRef.current = null;
-      return;
-    }
-
-    const localContact = extractCustomerContact(activeOrder);
-    setCustomerContact(localContact);
-
-    const shouldFetch =
-      tripStatus === 'PICKED_UP' && !localContact.dialPhone;
-
-    if (!shouldFetch || lastContactFetchOrderIdRef.current === orderId) return;
-
-    lastContactFetchOrderIdRef.current = orderId;
-
-    let cancelled = false;
-    deliveryAPI
-      .getOrderDetails(orderId)
-      .then((response) => {
-        if (cancelled) return;
-        const remoteOrder =
-          response?.data?.data?.order ||
-          response?.data?.data?.activeOrder ||
-          response?.data?.data ||
-          null;
-
-        if (!remoteOrder) return;
-
-        const remoteContact = extractCustomerContact(remoteOrder);
-        if (remoteContact.dialPhone || remoteContact.phone) {
-          setCustomerContact((prev) => ({
-            name: remoteContact.name || prev.name || 'Customer',
-            phone: remoteContact.phone || prev.phone,
-            dialPhone: remoteContact.dialPhone || prev.dialPhone,
-          }));
-        }
-      })
-      .catch((error) => {
-        console.warn('[DeliveryHomeV2] Customer contact fetch failed:', error);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeOrder, tripStatus]);
-
-  const deliveryInstructionText = pickFirstText(
-    activeOrder?.note,
-    activeOrder?.customerNote,
-    activeOrder?.instructions,
-    activeOrder?.specialInstructions,
-    activeOrder?.deliveryInstructions,
-  );
 
   // 1. Initial Sync (Force sync with server to avoid 'stuck' persistent state)
   useEffect(() => {
@@ -434,52 +890,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
         if (serverData) {
           // Robust location mapping (Same as acceptOrder logic)
-          const getLoc = (ref, keysLat, keysLng) => {
-            if (!ref) return null;
-            if (ref.location) {
-              if (Array.isArray(ref.location.coordinates) && ref.location.coordinates.length >= 2) {
-                return {
-                  lat: ref.location.coordinates[1],
-                  lng: ref.location.coordinates[0]
-                };
-              }
-              return {
-                lat: ref.location.latitude || ref.location.lat,
-                lng: ref.location.longitude || ref.location.lng
-              };
-            }
-            for (const k of keysLat) { if (ref[k] != null) return { lat: ref[k], lng: ref[keysLng[keysLat.indexOf(k)]] }; }
-            return null;
-          };
-
-          const resLoc = getLoc(serverData.restaurantId, ['latitude', 'lat'], ['longitude', 'lng']) ||
-            getLoc(serverData, ['restaurant_lat', 'restaurantLat', 'latitude'], ['restaurant_lng', 'restaurantLng', 'longitude']);
-
-          const cusLoc = getLoc(serverData.deliveryAddress, ['latitude', 'lat'], ['longitude', 'lng']) ||
-            getLoc(serverData, ['customer_lat', 'customerLat', 'latitude'], ['customer_lng', 'customerLng', 'longitude']);
-
-          const syncedOrder = {
-            ...serverData,
-            restaurantLocation: resLoc,
-            customerLocation: cusLoc
-          };
-
+          const syncedOrder = hydrateDeliveryOrder(serverData);
           setActiveOrder(syncedOrder);
-
-          const backendStatus = serverData.deliveryStatus || serverData.orderState?.status || serverData.orderStatus || serverData.status;
-          const currentPhase = serverData.deliveryState?.currentPhase;
-
-          if (['delivered', 'completed', 'DELIVERED'].includes(backendStatus)) {
-            updateTripStatus('COMPLETED');
-          } else if (currentPhase === 'at_drop' || ['reached_drop', 'REACHED_DROP'].includes(backendStatus)) {
-            updateTripStatus('PICKED_UP');
-          } else if (['picked_up', 'PICKED_UP', 'delivering'].includes(backendStatus)) {
-            updateTripStatus('PICKED_UP');
-          } else if (currentPhase === 'at_pickup' || ['reached_pickup', 'REACHED_PICKUP'].includes(backendStatus)) {
-            updateTripStatus('REACHED_PICKUP');
-          } else if (['confirmed', 'preparing', 'ready_for_pickup'].includes(backendStatus)) {
-            updateTripStatus('PICKING_UP');
-          }
+          updateTripStatus(deriveTripStatusFromOrder(serverData));
         } else {
           clearActiveOrder();
         }
@@ -490,6 +903,36 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     };
     syncWithServer();
   }, []); // Only on mount to stabilize state
+
+  // If a specific order was opened from detail page, force map context to that order.
+  useEffect(() => {
+    const targetOrderId = String(focusedOrderId || '').trim();
+    if (!targetOrderId) return;
+
+    let cancelled = false;
+    deliveryAPI
+      .getOrderDetails(targetOrderId)
+      .then((response) => {
+        if (cancelled) return;
+        const detailedOrder =
+          response?.data?.data?.order ||
+          response?.data?.data?.activeOrder ||
+          response?.data?.data ||
+          null;
+        if (!detailedOrder) return;
+
+        const mappedOrder = hydrateDeliveryOrder(detailedOrder, targetOrderId);
+        setActiveOrder(mappedOrder);
+        updateTripStatus(deriveTripStatusFromOrder(mappedOrder));
+      })
+      .catch((error) => {
+        console.warn('[DeliveryHomeV2] Focused order map context failed:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusedOrderId, setActiveOrder, updateTripStatus]);
 
   // 1.5 Professional Unified ETA Calculation Hook
   useEffect(() => {
@@ -536,20 +979,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
         : speed || 0;
 
       // ETA update is now handled by a separate globally-synchronized effect
-
-      // Phase 11: Geo-fencing Auto-arrival (within 100m) - Disabled in DEV so UI steps can be tested manually
-      if (!isSimMode && !import.meta.env.DEV && distanceToTarget && distanceToTarget <= 100 && !lastAutoArrivalRef.current[tripStatus]) {
-        if (tripStatus === 'PICKING_UP') {
-          lastAutoArrivalRef.current[tripStatus] = true;
-          reachPickup().catch(() => { lastAutoArrivalRef.current[tripStatus] = false; });
-          // toast.success('Auto-arrived at Restaurant');
-        }
-      }
-
-      // Reset auto-arrival flag if we move away or status resets (usually handled by component mount, but for safety)
-      if (distanceToTarget > 200) {
-        lastAutoArrivalRef.current[tripStatus] = false;
-      }
 
       // Check threshold for Sync (distance-based or 7s time-based)
       const distMoved = lastCoordRef.current
@@ -628,9 +1057,36 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
   useEffect(() => {
     if (!newOrder) return;
+    const newOrderId = getOrderIdentity(newOrder);
+    const isDuplicateIncomingToast = Boolean(newOrderId) && lastIncomingToastOrderIdRef.current === newOrderId;
+
+    if (activeOrder) {
+      announceIncomingRequest(newOrder);
+      upsertAdvancedOrder({
+        ...newOrder,
+        isAdvancedOrder: true,
+        queueStatus: newOrder?.queueStatus || newOrder?.dispatch?.status || 'assigned',
+      });
+      clearNewOrder();
+      if (!isDuplicateIncomingToast) {
+        toast.success('Advanced order incoming', {
+          description: 'A back-to-back trip has been added to your queue review.',
+        });
+      }
+      if (newOrderId) lastIncomingToastOrderIdRef.current = newOrderId;
+      return;
+    }
+
+    announceIncomingRequest(newOrder);
     setIncomingOrder(newOrder);
     persistIncomingOrder(newOrder);
-  }, [newOrder, persistIncomingOrder]);
+    if (!isDuplicateIncomingToast) {
+      toast.success('New order received', {
+        description: 'Open the Orders tab to review it.',
+      });
+    }
+    if (newOrderId) lastIncomingToastOrderIdRef.current = newOrderId;
+  }, [activeOrder, announceIncomingRequest, clearNewOrder, newOrder, persistIncomingOrder, upsertAdvancedOrder]);
 
   useEffect(() => {
     if (activeOrder && incomingOrder) {
@@ -641,21 +1097,39 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
   useEffect(() => {
     if (!isOnline) return;
-    if (currentTab !== 'feed') return;
-    if (activeOrder) return;
+    // Queue API is only needed on Orders tab. Feed tab uses socket/live state.
+    if (currentTab !== 'orders') return;
 
     let cancelled = false;
 
-    const hydrateAvailableOrder = async () => {
+    const syncDeliveryFeedState = async () => {
+      if (queueSyncInFlightRef.current) return;
+      queueSyncInFlightRef.current = true;
       try {
-        const currentResponse = await deliveryAPI.getCurrentDelivery();
-        const currentPayload =
-          currentResponse?.data?.data?.activeOrder ||
-          currentResponse?.data?.data ||
-          null;
+        const queueResponse = await deliveryAPI.getOrderQueue();
+        const queuePayload = queueResponse?.data?.data || {};
+        const serverCurrentOrder = queuePayload?.currentOrder ? hydrateDeliveryOrder(queuePayload.currentOrder) : null;
+        const queuedOrders = Array.isArray(queuePayload?.queue)
+          ? queuePayload.queue
+            .map((order) => hydrateDeliveryOrder(order))
+            .filter(Boolean)
+            .filter((order) => getOrderIdentity(order) !== getOrderIdentity(serverCurrentOrder))
+          : [];
 
-        if (!cancelled && currentPayload && (currentPayload._id || currentPayload.orderId)) {
-          setActiveOrder(currentPayload);
+        if (cancelled) return;
+
+        if (serverCurrentOrder && isClosedOrderLike(serverCurrentOrder)) {
+          clearActiveOrder();
+        } else if (serverCurrentOrder && getOrderIdentity(serverCurrentOrder) !== activeOrderId) {
+          setActiveOrder(serverCurrentOrder);
+          updateTripStatus(deriveTripStatusFromOrder(serverCurrentOrder));
+        }
+
+        setAdvancedOrders((prev) => (isSameQueueSnapshot(prev, queuedOrders) ? prev : queuedOrders));
+
+        if (serverCurrentOrder) {
+          setIncomingOrder(null);
+          clearPersistedIncomingOrder();
           return;
         }
 
@@ -672,16 +1146,22 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
               ? availablePayload
               : [];
 
+        const queuedOrderIds = new Set(queuedOrders.map((order) => getOrderIdentity(order)).filter(Boolean));
         const nextIncomingOrder = availableOrders.find((order) => {
+          const orderId = getOrderIdentity(order);
           const dispatchStatus = String(order?.dispatch?.status || '').toLowerCase();
           const orderStatus = String(order?.orderStatus || order?.status || '').toLowerCase();
           return (
+            orderId &&
+            !queuedOrderIds.has(orderId) &&
+            orderId !== activeOrderId &&
             ['unassigned', 'assigned'].includes(dispatchStatus) &&
             ['confirmed', 'preparing', 'ready_for_pickup'].includes(orderStatus)
           );
         });
 
         if (!cancelled && nextIncomingOrder) {
+          const nextIncomingOrderId = getOrderIdentity(nextIncomingOrder);
           persistIncomingOrder(nextIncomingOrder);
           setIncomingOrder((prev) => {
             const prevId = prev?.orderId || prev?._id || prev?.orderMongoId;
@@ -691,37 +1171,230 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
               nextIncomingOrder?.orderMongoId;
             return prevId === nextId && prev ? prev : nextIncomingOrder;
           });
+          if (nextIncomingOrderId && nextIncomingOrderId !== getOrderIdentity(incomingOrder)) {
+            announceIncomingRequest(nextIncomingOrder);
+          }
+        } else if (!cancelled && !activeOrderId) {
+          setIncomingOrder(null);
+          clearPersistedIncomingOrder();
         }
       } catch (error) {
-        console.warn('[DeliveryHomeV2] Available order fallback sync failed:', error?.message || error);
+        console.warn('[DeliveryHomeV2] Delivery feed sync failed:', error?.message || error);
+      } finally {
+        queueSyncInFlightRef.current = false;
       }
     };
 
-    void hydrateAvailableOrder();
+    void syncDeliveryFeedState();
     const poller = window.setInterval(() => {
       if (!document.hidden) {
-        void hydrateAvailableOrder();
+        void syncDeliveryFeedState();
       }
-    }, isSocketConnected ? 12000 : 5000);
+    }, isSocketConnected ? 45000 : 20000);
 
     return () => {
       cancelled = true;
       window.clearInterval(poller);
     };
-  }, [activeOrder, currentTab, isOnline, isSocketConnected, setActiveOrder, persistIncomingOrder]);
+  }, [activeOrderId, announceIncomingRequest, clearPersistedIncomingOrder, currentTab, incomingOrder, isOnline, isSocketConnected, persistIncomingOrder, setActiveOrder, updateTripStatus]);
+
+  useEffect(() => {
+    if (currentTab !== 'orders') return;
+
+    let cancelled = false;
+
+    const fetchTodayHistoryOrders = async () => {
+      try {
+        const response = await deliveryAPI.getTripHistory({
+          period: 'daily',
+          date: new Date().toISOString().slice(0, 10),
+          limit: 200,
+        });
+        const trips = response?.data?.data?.trips || [];
+        const filtered = trips
+          .filter((trip) => {
+            const status = String(trip?.status || '').toLowerCase();
+            return ['completed', 'delivered', 'cancelled'].includes(status);
+          })
+          .filter((trip) => isSameCalendarDay(getOrderEventDate(trip)))
+          .map((trip) => ({
+            ...trip,
+            status: String(trip?.status || '').toLowerCase() === 'cancelled' ? 'cancelled' : 'delivered',
+          }))
+          .sort((left, right) => new Date(getOrderEventDate(right) || 0) - new Date(getOrderEventDate(left) || 0));
+
+        if (!cancelled) {
+          setTodayHistoryOrders(filtered);
+        }
+      } catch {
+        if (!cancelled) {
+          setTodayHistoryOrders([]);
+        }
+      }
+    };
+
+    void fetchTodayHistoryOrders();
+    const poller = window.setInterval(() => {
+      void fetchTodayHistoryOrders();
+    }, 15000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(poller);
+    };
+  }, [currentTab]);
 
   useEffect(() => {
     if (orderStatusUpdate) {
-      if (orderStatusUpdate.status === 'cancelled') {
-        toast.error('Order cancelled');
-        setIncomingOrder(null);
-        clearPersistedIncomingOrder();
-        resetTrip();
+      const eventStatus = String(orderStatusUpdate.status || '').toLowerCase();
+      const eventOrderId = getOrderIdentity(orderStatusUpdate);
+      const isActiveOrderUpdate = eventOrderId && eventOrderId === activeOrderId;
+      const isIncomingOrderUpdate = eventOrderId && eventOrderId === getOrderIdentity(incomingOrder);
+
+      if (['cancelled', 'deleted'].includes(eventStatus)) {
+        if (isIncomingOrderUpdate) {
+          persistFocusedOrder('');
+          setIncomingOrder(null);
+          clearPersistedIncomingOrder();
+        }
+
+        if (eventOrderId) {
+          removeAdvancedOrder(orderStatusUpdate);
+        }
+
+        if (isActiveOrderUpdate) {
+          toast.error('Current order cancelled');
+          if (!promoteNextAcceptedOrder()) {
+            resetTrip();
+          }
+        } else {
+          toast.error('Queued order removed');
+        }
+      }
+
+      if (['delivered', 'completed'].includes(eventStatus)) {
+        if (isIncomingOrderUpdate) {
+          persistFocusedOrder('');
+          setIncomingOrder(null);
+          clearPersistedIncomingOrder();
+        }
+
+        if (eventOrderId) {
+          removeAdvancedOrder(orderStatusUpdate);
+        }
+
+        if (isActiveOrderUpdate) {
+          if (!promoteNextAcceptedOrder()) {
+            resetTrip();
+          }
+        }
       }
       clearOrderStatusUpdate();
     }
-  }, [orderStatusUpdate, resetTrip, clearOrderStatusUpdate, clearPersistedIncomingOrder]);
+  }, [activeOrderId, clearOrderStatusUpdate, clearPersistedIncomingOrder, incomingOrder, orderStatusUpdate, persistFocusedOrder, promoteNextAcceptedOrder, removeAdvancedOrder, resetTrip]);
 
+  const handleAdvancedOrderAccept = useCallback(async (order) => {
+    const acceptedOrder = await acceptOrder(order, { keepCurrentActive: Boolean(activeOrder) });
+    const nextQueuedOrder = {
+      ...acceptedOrder,
+      queueStatus: 'accepted',
+      dispatch: {
+        ...(acceptedOrder?.dispatch || order?.dispatch || {}),
+        status: 'accepted',
+      },
+      isAdvancedOrder: true,
+    };
+    upsertAdvancedOrder(nextQueuedOrder);
+    toast.success('Added to queue', {
+      description: activeOrder ? 'Finish the current trip first, then this one becomes active.' : 'Order accepted successfully.',
+    });
+  }, [acceptOrder, activeOrder, upsertAdvancedOrder]);
+
+  const handleOrdersTabDirectAccept = useCallback(async (order) => {
+    const queuedOrderId = getOrderIdentity(order);
+    if (!queuedOrderId) return;
+
+    setOrderActionBusy({ orderId: queuedOrderId, type: 'accept' });
+    try {
+      if (activeOrder) {
+        await handleAdvancedOrderAccept(order);
+      } else {
+        const accepted = await acceptOrder(order, { keepCurrentActive: false });
+        removeAdvancedOrder(order);
+        setIncomingOrder((prev) => (getOrderIdentity(prev) === queuedOrderId ? null : prev));
+        clearPersistedIncomingOrder();
+        persistFocusedOrder(getOrderIdentity(accepted) || queuedOrderId);
+        toast.success('Order accepted');
+      }
+    } catch {
+      // Errors already surfaced by API helpers/toasts.
+    } finally {
+      setOrderActionBusy({ orderId: '', type: '' });
+    }
+  }, [
+    acceptOrder,
+    activeOrder,
+    clearPersistedIncomingOrder,
+    handleAdvancedOrderAccept,
+    persistFocusedOrder,
+    removeAdvancedOrder,
+  ]);
+
+  const handleOrdersTabDirectPass = useCallback(async (order) => {
+    const queuedOrderId = getOrderIdentity(order);
+    if (!queuedOrderId) return;
+
+    setOrderActionBusy({ orderId: queuedOrderId, type: 'pass' });
+    try {
+      await rejectOrder(order, 'passed');
+      removeAdvancedOrder(order);
+      if (getOrderIdentity(incomingOrder) === queuedOrderId) {
+        setIncomingOrder(null);
+        clearPersistedIncomingOrder();
+      }
+      if (focusedOrderId === queuedOrderId) {
+        persistFocusedOrder('');
+      }
+      toast.success('Task passed to admin');
+    } finally {
+      setOrderActionBusy({ orderId: '', type: '' });
+    }
+  }, [
+    clearPersistedIncomingOrder,
+    focusedOrderId,
+    incomingOrder,
+    persistFocusedOrder,
+    rejectOrder,
+    removeAdvancedOrder,
+  ]);
+
+  const handleOrdersTabAutoTimeout = useCallback(async (order) => {
+    const queuedOrderId = getOrderIdentity(order);
+    if (!queuedOrderId) return;
+
+    setOrderActionBusy({ orderId: queuedOrderId, type: 'timeout' });
+    try {
+      await rejectOrder(order, 'timeout');
+      removeAdvancedOrder(order);
+      if (getOrderIdentity(incomingOrder) === queuedOrderId) {
+        setIncomingOrder(null);
+        clearPersistedIncomingOrder();
+      }
+      if (focusedOrderId === queuedOrderId) {
+        persistFocusedOrder('');
+      }
+      toast.error('Request timed out. Order reassigned by admin.');
+    } finally {
+      setOrderActionBusy({ orderId: '', type: '' });
+    }
+  }, [
+    clearPersistedIncomingOrder,
+    focusedOrderId,
+    incomingOrder,
+    persistFocusedOrder,
+    rejectOrder,
+    removeAdvancedOrder,
+  ]);
 
   const handleCenterMap = () => {
     if (mapRef.current && useDeliveryStore.getState().riderLocation) {
@@ -733,11 +1406,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     }
   };
 
-  const handleMapClick = (lat, lng) => {
-    if (activeOrder || incomingOrder) {
-      setIsModalMinimized(true);
-    }
-  };
+  const handleMapClick = () => {};
 
   return (
     <div className="relative h-screen w-full bg-white text-gray-900 overflow-hidden flex flex-col">
@@ -775,12 +1444,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
             </div>
             
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowEmergencyPopup(true)} className="w-[38px] h-[38px] rounded-full bg-red-50 flex items-center justify-center text-red-500 active:bg-red-100 transition-colors border border-red-100"><AlertTriangle className="w-[18px] h-[18px]" /></button>
+              <button onClick={() => navigate('/food/delivery/help/tickets')} className="w-[38px] h-[38px] rounded-full bg-red-50 flex items-center justify-center text-red-500 active:bg-red-100 transition-colors border border-red-100"><AlertTriangle className="w-[18px] h-[18px]" /></button>
               <button onClick={() => navigate('/food/delivery/help/id-card')} className="w-[38px] h-[38px] rounded-full bg-brand-50 flex items-center justify-center text-brand-600 active:bg-brand-100 transition-colors border border-brand-100"><Contact className="w-[18px] h-[18px]" /></button>
-              <button onClick={() => navigate('/food/delivery/notifications')} className="relative w-[38px] h-[38px] rounded-full bg-brand-50 flex items-center justify-center text-brand-600 active:bg-brand-100 transition-colors border border-brand-100">
-                 <Bell className="w-[18px] h-[18px]" />
-                 {notificationUnreadCount > 0 && <span className="absolute top-1 right-1 border-2 border-white w-2 h-2 rounded-full bg-red-500" />}
-              </button>
             </div>
           </div>
 
@@ -794,7 +1459,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                 className="px-4 mt-1"
               >
                 {activeOrder ? (
-                  <div className="grid grid-cols-2 gap-3 w-full">
+                  <div className="space-y-3 w-full">
+                    <div className="grid grid-cols-2 gap-3 w-full">
                     {/* LEFT: DISTANCE (Vibrant Orange Card) */}
                     <div
                       className="rounded-lg p-2 shadow-md flex items-center justify-between"
@@ -832,20 +1498,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                         <Clock className="w-3.5 h-3.5 text-white" />
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="bg-white/5 rounded-2xl p-4 flex items-center border border-white/5 shadow-sm backdrop-blur-md">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center">
-                        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
-                      </div>
-                      <div>
-                        <h3 className="text-white font-black text-[11px] uppercase tracking-widest leading-none mb-1">{isOnline ? 'System Online' : 'System Offline'}</h3>
-                        <p className="text-gray-400 text-[10px] font-bold uppercase tracking-tight">{isOnline ? 'Waiting for order requests' : 'Go online to receive jobs'}</p>
-                      </div>
                     </div>
                   </div>
-                )}
+                ) : null}
               </motion.div>
             )}
           </AnimatePresence>
@@ -853,9 +1508,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       )}
 
       {/* ─── 2. MAIN CONTENT ─── */}
-      <div className={`flex-1 relative overflow-y-auto ${currentTab === 'feed' ? 'pt-[120px]' : currentTab === 'history' ? 'pt-0' : 'pt-[64px]'}`}>
+      <div className={`flex-1 relative overflow-y-auto ${currentTab === 'feed' ? 'pt-[76px]' : currentTab === 'history' ? 'pt-0' : 'pt-[64px]'}`}>
         {currentTab === 'feed' ? (
-          <div className="absolute inset-0 top-[-120px]">
+          <div className="absolute inset-0 top-[-76px]">
             <LiveMap
               onMapLoad={(m) => mapRef.current = m}
               onMapClick={handleMapClick}
@@ -932,6 +1587,23 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
               </button>
             </div>
           </div>
+        ) : currentTab === 'orders' ? (
+          <OrdersTabV2
+            activeOrder={activeOrder}
+            incomingOrder={incomingOrder}
+            advancedOrders={advancedOrders}
+            todayHistoryOrders={todayHistoryOrders}
+            onAcceptQueuedOrder={handleOrdersTabDirectAccept}
+            onPassQueuedOrder={handleOrdersTabDirectPass}
+            onTimeoutQueuedOrder={handleOrdersTabAutoTimeout}
+            actionBusyOrderId={orderActionBusy.orderId}
+            actionBusyType={orderActionBusy.type}
+            onOpenOrderDetail={(order) => {
+              const targetOrderId = getOrderIdentity(order);
+              if (!targetOrderId) return;
+              navigate(`/food/delivery/orders/${targetOrderId}`);
+            }}
+          />
         ) : currentTab === 'pocket' ? (
           <PocketV2 />
         ) : currentTab === 'history' ? (
@@ -940,178 +1612,21 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           <ProfileV2 />
         )}
 
-        {/* OVERLAYS (Persistent if active) */}
       </div>
 
-      {/* OVERLAYS (Persistent if active) - Outside flex container to avoid clipping and z-index issues */}
-      {(currentTab === 'feed' || activeOrder) && (
-        <AnimatePresence>
-          {!isModalMinimized && (
-            <motion.div
-              key="modal-container"
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-x-0 top-0 bottom-[92px] z-[300] pointer-events-none flex items-end"
-            >
-              <div className="w-full pointer-events-auto relative">
-                {incomingOrder && (
-                  <NewOrderModal
-                    order={incomingOrder}
-                    onAccept={async (o) => {
-                      try {
-                        await acceptOrder(o);
-                        setIncomingOrder(null);
-                        clearPersistedIncomingOrder();
-                        clearNewOrder();
-                      } catch {
-                        // Keep modal open so rider can retry before auto-timeout unassign.
-                      }
-                    }}
-                    onReject={(o, reasonType) => {
-                      const orderToReject = o || incomingOrder;
-                      if (orderToReject) {
-                        rejectOrder(orderToReject, reasonType);
-                      }
-                      setIncomingOrder(null);
-                      clearPersistedIncomingOrder();
-                      clearNewOrder();
-                    }}
-                    onMinimize={() => setIsModalMinimized(true)}
-                  />
-                )}
-                {(tripStatus === 'PICKING_UP' || tripStatus === 'REACHED_PICKUP') && (
-                  <PickupActionModal
-                    order={activeOrder}
-                    status={tripStatus}
-                    isWithinRange={isWithinRange}
-                    distanceToTarget={distanceToTarget}
-                    eta={eta}
-                    onReachedPickup={reachPickup}
-                    onPickedUp={() => pickUpOrder()}
-                    onMinimize={() => setIsModalMinimized(true)}
-                  />
-                )}
-                {tripStatus === 'PICKED_UP' && (
-                  <div className="absolute bottom-4 inset-x-0 z-[120] px-4">
-                    <div className="bg-white rounded-[2.5rem] p-6 shadow-[0_-20px_80px_rgba(0,0,0,0.4)] border border-gray-100 flex flex-col items-center">
-                      <div className="w-full flex justify-center pb-2 pt-0 -mt-2">
-                        <button onClick={() => setIsModalMinimized(true)} className="p-1 hover:bg-gray-100 active:scale-95 transition-all rounded-full flex flex-col items-center">
-                          <ChevronDown className="w-6 h-6 text-gray-400 stroke-[3]" />
-                        </button>
-                      </div>
-                      <div className="flex justify-between w-full items-center mb-4 px-1 text-left">
-                        <div className="flex items-center gap-3">
-                          <div className="w-14 h-14 rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-                            <img
-                              src={activeOrder?.user?.logo || activeOrder?.user?.profileImage || 'https://cdn-icons-png.flaticon.com/512/1275/1275302.png'}
-                              className="w-full h-full object-cover"
-                              alt="Recipient"
-                            />
-                          </div>
-                          <div>
-                            <h3 className="text-gray-950 text-lg font-bold">Contact Recipient</h3>
-                            <p className="text-[10px] font-bold uppercase tracking-widest mt-0.5 text-orange-500">
-                              Out for delivery
-                            </p>
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="w-full rounded-3xl border border-gray-100 bg-gray-50 p-3.5 mb-4">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">Recipient Details</p>
-                        <p className="text-base font-bold text-gray-900">{customerContact.name || 'Customer'}</p>
-                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{customerContact.phone || 'Phone not available'}</p>
-                        {customerContact.dialPhone && (
-                          <button
-                            type="button"
-                            onClick={() => { window.location.href = `tel:${customerContact.dialPhone}`; }}
-                            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold uppercase tracking-widest text-white hover:bg-emerald-700 transition-colors"
-                          >
-                            <Phone className="w-3.5 h-3.5" />
-                            Call
-                          </button>
-                        )}
-                      </div>
 
-                      {deliveryInstructionText && (
-                        <div className="w-full bg-orange-50 border border-orange-100 rounded-3xl p-3.5 mb-4 flex gap-3 items-start shadow-sm">
-                          <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-orange-500 shadow-sm shrink-0 border border-orange-50">
-                            <Package className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em] mb-1 opacity-80">Delivery Instruction</p>
-                            <p className="text-sm font-bold text-gray-950 leading-relaxed capitalize">"{deliveryInstructionText}"</p>
-                          </div>
-                        </div>
-                      )}
-                      <ActionSlider
-                        label="Slide to Mark Delivered"
-                        successLabel="Delivered"
-                        onConfirm={() => completeDelivery()}
-                        containerStyle={{ backgroundColor: BRAND_THEME.colors.brand.primarySoft }}
-                        style={{ background: BRAND_THEME.gradients.primary }}
-                      />
-                    </div>
-                  </div>
-                )}
-                {tripStatus === 'COMPLETED' && <OrderSummaryModal order={activeOrder} onDone={resetTrip} />}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
 
-      {/* ─── MODALS RESTORED FROM OLD UI ─── */}
-      <BottomPopup isOpen={showEmergencyPopup} title="Emergency Help" onClose={() => setShowEmergencyPopup(false)}>
-        <div className="grid gap-4 py-2">
-          {emergencyOptions.map((opt, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                const num = opt.phone?.replace(/\D/g, '');
-                if (num) window.location.href = `tel:${num}`;
-                else toast.error('Number not configured');
-              }}
-              className="flex items-center gap-5 p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 active:scale-95 transition-all text-left"
-            >
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm text-xl">{opt.icon}</div>
-              <div>
-                <h4 className="font-bold text-gray-900">{opt.title}</h4>
-                <p className="text-xs text-gray-500 font-medium">{opt.subtitle}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </BottomPopup>
 
-      {/* Floating Minimize/Restore Toggle - Above navbar */}
-      {isModalMinimized && (activeOrder || incomingOrder) && (
-        <motion.div
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="fixed bottom-[100px] inset-x-0 z-[300] px-6"
-        >
-          <button
-            onClick={() => setIsModalMinimized(false)}
-            className="w-full bg-gray-900/90 text-white rounded-2xl py-4 flex items-center justify-between px-6 shadow-2xl backdrop-blur-md border border-white/10"
-          >
-            <div className="flex flex-col items-start gap-0.5">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Order Action Pending</span>
-              <span className="text-xs font-bold uppercase tracking-wider">Tap to open delivery panel</span>
-            </div>
-            <div className="bg-orange-500 p-2 rounded-xl text-white">
-              <Plus className="w-5 h-5" />
-            </div>
-          </button>
-        </motion.div>
-      )}
+
 
       {/* ─── 3. BOTTOM NAV (Clean & Uniform) ─── */}
       <div className="bg-white border-t border-gray-100 flex justify-between items-center z-[200] safe-bottom shadow-sm">
         <button onClick={() => navigate('/food/delivery/feed')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'feed' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
           <LayoutGrid className="w-5 h-5" /><span className="text-[10px] font-semibold">Feed</span>
+        </button>
+        <button onClick={() => navigate('/food/delivery/orders')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'orders' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
+          <Package className="w-5 h-5" /><span className="text-[10px] font-semibold">Orders</span>
         </button>
         <button onClick={() => navigate('/food/delivery/pocket')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'pocket' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
           <Wallet className="w-5 h-5" /><span className="text-[10px] font-semibold">Pocket</span>
@@ -1127,5 +1642,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     </div>
   );
 }
+
+
 
 

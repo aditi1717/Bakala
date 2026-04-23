@@ -11,7 +11,46 @@ export const useOrderManager = () => {
     activeOrder, tripStatus, updateTripStatus, clearActiveOrder, setActiveOrder, riderLocation 
   } = useDeliveryStore();
 
-  const acceptOrder = async (order) => {
+  const hydrateOrderForTrip = (rawOrder, fallbackOrderId) => {
+    const getLoc = (ref, keysLat, keysLng) => {
+      if (!ref) return null;
+      if (ref.location) {
+        if (Array.isArray(ref.location.coordinates) && ref.location.coordinates.length >= 2) {
+          return {
+            lat: ref.location.coordinates[1],
+            lng: ref.location.coordinates[0]
+          };
+        }
+        return {
+          lat: ref.location.latitude || ref.location.lat,
+          lng: ref.location.longitude || ref.location.lng
+        };
+      }
+      for (const k of keysLat) {
+        if (ref[k] != null) {
+          return { lat: ref[k], lng: ref[keysLng[keysLat.indexOf(k)]] };
+        }
+      }
+      return null;
+    };
+
+    const restaurantLocation =
+      getLoc(rawOrder?.restaurantId, ['latitude', 'lat'], ['longitude', 'lng']) ||
+      getLoc(rawOrder, ['restaurant_lat', 'restaurantLat', 'latitude'], ['restaurant_lng', 'restaurantLng', 'longitude']);
+
+    const customerLocation =
+      getLoc(rawOrder?.deliveryAddress, ['latitude', 'lat'], ['longitude', 'lng']) ||
+      getLoc(rawOrder, ['customer_lat', 'customerLat', 'latitude'], ['customer_lng', 'customerLng', 'longitude']);
+
+    return {
+      ...rawOrder,
+      orderId: rawOrder?.orderId || fallbackOrderId,
+      restaurantLocation,
+      customerLocation
+    };
+  };
+
+  const acceptOrder = async (order, options = {}) => {
     const orderId = order?.orderId || order?._id || order?.id;
     if (!orderId) {
       toast.error('Invalid order data');
@@ -23,51 +62,16 @@ export const useOrderManager = () => {
       
       if (response?.data?.success) {
         const fullOrder = response.data.data?.order || order;
-        
-        // Robustly determine locations from multiple possible formats (Populated API vs Socket)
-        const getLoc = (ref, keysLat, keysLng) => {
-          if (!ref) return null;
-          // Handle nested populated objects
-          if (ref.location) {
-            // Handle GeoJSON format: location: { type: 'Point', coordinates: [lng, lat] }
-            if (Array.isArray(ref.location.coordinates) && ref.location.coordinates.length >= 2) {
-              return {
-                lat: ref.location.coordinates[1], // Latitude is second in GeoJSON [lng, lat]
-                lng: ref.location.coordinates[0]  // Longitude is first
-              };
-            }
-            // Handle standard object format: location: { latitude: 12.3, longitude: 45.6 }
-            return {
-              lat: ref.location.latitude || ref.location.lat,
-              lng: ref.location.longitude || ref.location.lng
-            };
-          }
-          // Handle flat objects or direct lat/lng keys
-          for (const k of keysLat) { if (ref[k] != null) return { lat: ref[k], lng: ref[keysLng[keysLat.indexOf(k)]] }; }
-          return null;
-        };
+        const hydratedOrder = hydrateOrderForTrip(fullOrder, orderId);
 
-        console.log('[OrderManager] Raw Full Order Data:', fullOrder);
+        if (!options.keepCurrentActive) {
+          setActiveOrder(hydratedOrder);
+          updateTripStatus('PICKING_UP');
+        }
 
-        const resLoc = getLoc(fullOrder.restaurantId, ['latitude', 'lat'], ['longitude', 'lng']) || 
-                       getLoc(fullOrder, ['restaurant_lat', 'restaurantLat', 'latitude'], ['restaurant_lng', 'restaurantLng', 'longitude']);
-                       
-        const cusLoc = getLoc(fullOrder.deliveryAddress, ['latitude', 'lat'], ['longitude', 'lng']) || 
-                       getLoc(fullOrder, ['customer_lat', 'customerLat', 'latitude'], ['customer_lng', 'customerLng', 'longitude']);
-
-        console.log('[OrderManager] Locations Mapped Result:', { resLoc, cusLoc });
-
-        setActiveOrder({
-          ...fullOrder,
-          orderId: orderId,
-          restaurantLocation: resLoc,
-          customerLocation: cusLoc
-        });
-
-        updateTripStatus('PICKING_UP');
-        // toast.success('Order Accepted! Opening Map...');
+        return hydratedOrder;
       } else {
-        toast.error(response?.data?.message || 'Order already taken or unavailable');
+        toast.error('Order is already taken or unavailable');
         throw new Error('Accept failed');
       }
     } catch (error) {
@@ -158,7 +162,7 @@ export const useOrderManager = () => {
       }
     } catch (error) {
       console.error('Completion Error:', error);
-      toast.error(error?.response?.data?.message || 'Failed to complete delivery');
+      toast.error('Failed to complete delivery');
       throw error;
     }
   };

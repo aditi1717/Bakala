@@ -1,126 +1,147 @@
-import { useMemo, useState } from "react"
-import { CalendarRange, CheckCircle2, CircleDollarSign, Receipt, Search } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { CalendarRange, CheckCircle2, CircleDollarSign, Loader2, Receipt, Search } from "lucide-react"
 import { toast } from "sonner"
-
-const todayISO = new Date().toISOString().split("T")[0]
-
-const seedRows = [
-  {
-    beneficiaryId: "DLV-1001",
-    beneficiaryName: "Rahul Verma",
-    ordersCount: 34,
-    totalEarning: 13240,
-    alreadyPaid: 8000,
-    payableNow: 5240,
-    lastSettledToDate: "2026-04-14",
-  },
-  {
-    beneficiaryId: "DLV-1002",
-    beneficiaryName: "Aman Kumar",
-    ordersCount: 29,
-    totalEarning: 9840,
-    alreadyPaid: 9840,
-    payableNow: 0,
-    lastSettledToDate: "2026-04-21",
-  },
-  {
-    beneficiaryId: "DLV-1003",
-    beneficiaryName: "Sakshi Singh",
-    ordersCount: 26,
-    totalEarning: 11190,
-    alreadyPaid: 5400,
-    payableNow: 5790,
-    lastSettledToDate: "2026-04-10",
-  },
-]
+import { adminAPI } from "@food/api"
 
 const toCurrency = (amount = 0) =>
   `Rs ${Number(amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const toDisplayDate = (value = "") => {
-  if (!value) return "—"
+  if (!value) return "-"
   const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return "—"
-  return d.toLocaleDateString("en-CA")
+  if (Number.isNaN(d.getTime())) return "-"
+  return d.toLocaleString("en-GB", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
 }
 
 export default function DeliveryPayoutSettlement() {
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
+  const [fromTime, setFromTime] = useState("00:00")
+  const [toTime, setToTime] = useState("23:59")
+  const [isAutoWindow, setIsAutoWindow] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [rows, setRows] = useState(seedRows)
-
-  const filteredRows = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    if (!query) return rows
-    return rows.filter((row) => {
-      return (
-        String(row.beneficiaryName || "").toLowerCase().includes(query) ||
-        String(row.beneficiaryId || "").toLowerCase().includes(query)
-      )
-    })
-  }, [rows, searchQuery])
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const summary = useMemo(() => {
-    return filteredRows.reduce(
+    return rows.reduce(
       (acc, row) => {
         acc.totalEarning += Number(row.totalEarning || 0)
         acc.totalPaid += Number(row.alreadyPaid || 0)
         acc.totalPending += Number(row.payableNow || 0)
+        acc.totalCodAmount += Number(row.codAmount || 0)
+        acc.totalCodPaid += Number(row.codPaid || 0)
+        acc.totalCodPending += Number(row.codPending || 0)
         return acc
       },
-      { totalEarning: 0, totalPaid: 0, totalPending: 0 },
+      { totalEarning: 0, totalPaid: 0, totalPending: 0, totalCodAmount: 0, totalCodPaid: 0, totalCodPending: 0 },
     )
-  }, [filteredRows])
+  }, [rows])
 
-  const handleValidateDateRange = () => {
-    if (fromDate && toDate && fromDate > toDate) {
-      toast.error("Start date cannot be after end date")
-      return false
+  const hasWindow = Boolean(fromDate && toDate && fromTime && toTime)
+
+  const fetchPreview = async ({ forceAutoWindow = false } = {}) => {
+    try {
+      setLoading(true)
+      const params = {
+        beneficiaryType: "delivery",
+        search: searchQuery.trim() || undefined,
+        page: 1,
+        limit: 500,
+      }
+      if (!forceAutoWindow && hasWindow) {
+        params.fromDate = fromDate
+        params.toDate = toDate
+        params.fromTime = fromTime
+        params.toTime = toTime
+      }
+
+      const response = await adminAPI.getPayoutSettlementPreview(params)
+      if (response?.data?.success) {
+        setRows(response?.data?.data?.rows || [])
+        const windowInfo = response?.data?.data?.window || {}
+        if (windowInfo.fromDate) setFromDate(windowInfo.fromDate)
+        if (windowInfo.toDate) setToDate(windowInfo.toDate)
+        if (windowInfo.fromTime) setFromTime(windowInfo.fromTime)
+        if (windowInfo.toTime) setToTime(windowInfo.toTime)
+        setIsAutoWindow(Boolean(windowInfo.isAuto))
+      } else {
+        setRows([])
+        toast.error(response?.data?.message || "Failed to fetch settlement preview")
+      }
+    } catch (error) {
+      setRows([])
+      toast.error(error?.response?.data?.message || "Failed to fetch settlement preview")
+    } finally {
+      setLoading(false)
     }
-    if (fromDate && fromDate > todayISO) {
-      toast.error("Start date cannot be in the future")
-      return false
-    }
-    if (toDate && toDate > todayISO) {
-      toast.error("End date cannot be in the future")
-      return false
-    }
-    return true
   }
 
-  const handleMarkAllPaid = () => {
-    if (!handleValidateDateRange()) return
-    if (!fromDate || !toDate) {
-      toast.error("Select both start and end date before marking paid")
+  useEffect(() => {
+    fetchPreview({ forceAutoWindow: true })
+  }, [])
+
+  useEffect(() => {
+    if (!hasWindow) return
+    const timer = setTimeout(() => {
+      fetchPreview()
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const handleMarkAllPaid = async () => {
+    if (!hasWindow) {
+      toast.error("Settlement window is not ready yet")
+      return
+    }
+    if (Number(summary.totalPending || 0) <= 0 && Number(summary.totalCodPending || 0) <= 0) {
+      toast.info("No pending earning or COD amount in current list")
       return
     }
 
-    const unpaidRows = filteredRows.filter((row) => Number(row.payableNow || 0) > 0)
-    if (unpaidRows.length === 0) {
-      toast.info("No unpaid amount in current list")
-      return
-    }
+    const beneficiaryIds = rows
+      .filter((row) => Number(row.payableNow || 0) > 0 || Number(row.codPending || 0) > 0)
+      .map((row) => row.beneficiaryId)
 
-    const totalUnpaid = unpaidRows.reduce((sum, row) => sum + Number(row.payableNow || 0), 0)
-    const confirmText = `Mark all as paid for ${unpaidRows.length} delivery partners (${toCurrency(totalUnpaid)}) for ${fromDate} to ${toDate}?`
+    const confirmText = `Mark all as paid for ${beneficiaryIds.length} delivery partners (Earning: ${toCurrency(summary.totalPending)}, COD: ${toCurrency(summary.totalCodPending)}) for ${fromDate} to ${toDate}?`
     if (!window.confirm(confirmText)) return
 
-    const unpaidIds = new Set(unpaidRows.map((row) => row.beneficiaryId))
-    setRows((prev) =>
-      prev.map((row) => {
-        if (!unpaidIds.has(row.beneficiaryId)) return row
-        const unpaid = Number(row.payableNow || 0)
-        const currentPaid = Number(row.alreadyPaid || 0)
-        return {
-          ...row,
-          alreadyPaid: currentPaid + unpaid,
-          payableNow: 0,
-          lastSettledToDate: toDate,
-        }
-      }),
-    )
-    toast.success("All visible delivery partners marked paid in frontend preview")
+    try {
+      setSaving(true)
+      const response = await adminAPI.markAllPayoutSettlementsPaid({
+        beneficiaryType: "delivery",
+        fromDate,
+        toDate,
+        fromTime,
+        toTime,
+        beneficiaryIds,
+        payoutMethod: "manual",
+        note: `Batch settlement from ${fromDate} ${fromTime} to ${toDate} ${toTime}`,
+      })
+
+      if (response?.data?.success) {
+        const settledAt = response?.data?.data?.settledAt
+        const successMsg = settledAt
+          ? `Payouts marked paid. Next cycle can start after ${toDisplayDate(settledAt)}`
+          : (response?.data?.message || "Payouts marked paid successfully")
+        toast.success(successMsg)
+        await fetchPreview({ forceAutoWindow: true })
+      } else {
+        toast.error(response?.data?.message || "Failed to mark payouts paid")
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to mark payouts paid")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -132,34 +153,26 @@ export default function DeliveryPayoutSettlement() {
               <Receipt className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Payout Settlement - Delivery</h1>
-              <p className="text-sm text-slate-600 mt-1">Date range select karke delivery partner wise pending payout settle karein.</p>
+              <h1 className="text-2xl font-bold text-slate-900">Delivery Settlement</h1>
+              <p className="text-sm text-slate-600 mt-1">Settle delivery earnings and COD cash handover partner-wise for selected window.</p>
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Settlement Filters</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Start Date</label>
-              <input
-                type="date"
-                max={todayISO}
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
-              />
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Auto Start</label>
+              <div className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-slate-50 text-sm text-slate-700">
+                {fromDate && fromTime ? `${fromDate} ${fromTime}` : "Calculating..."}
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">End Date</label>
-              <input
-                type="date"
-                max={todayISO}
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
-              />
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Auto End</label>
+              <div className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-slate-50 text-sm text-slate-700">
+                {toDate && toTime ? `${toDate} ${toTime}` : "Calculating..."}
+              </div>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-slate-700 mb-2">Search Delivery Partner</label>
@@ -175,9 +188,14 @@ export default function DeliveryPayoutSettlement() {
               </div>
             </div>
           </div>
+          <p className="mt-3 text-xs text-slate-500">
+            {isAutoWindow
+              ? "Window is auto-managed. Next cycle starts automatically after previous settlement time."
+              : "Using current locked window from preview."}
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <div className="flex items-center gap-2 text-slate-600">
               <CircleDollarSign className="w-4 h-4" />
@@ -199,15 +217,37 @@ export default function DeliveryPayoutSettlement() {
             </div>
             <p className="mt-2 text-2xl font-bold text-amber-700">{toCurrency(summary.totalPending)}</p>
           </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div className="flex items-center gap-2 text-slate-600">
+              <CircleDollarSign className="w-4 h-4" />
+              <p className="text-sm font-medium">Total COD</p>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{toCurrency(summary.totalCodAmount)}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div className="flex items-center gap-2 text-emerald-700">
+              <CheckCircle2 className="w-4 h-4" />
+              <p className="text-sm font-medium">COD Paid</p>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-emerald-700">{toCurrency(summary.totalCodPaid)}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div className="flex items-center gap-2 text-amber-700">
+              <CalendarRange className="w-4 h-4" />
+              <p className="text-sm font-medium">COD Pending</p>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-amber-700">{toCurrency(summary.totalCodPending)}</p>
+          </div>
         </div>
         <div className="flex justify-end mb-4">
           <button
             type="button"
             onClick={handleMarkAllPaid}
-            disabled={Number(summary.totalPending || 0) <= 0}
-            className="px-4 py-2.5 text-sm font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || saving || (Number(summary.totalPending || 0) <= 0 && Number(summary.totalCodPending || 0) <= 0)}
+            className="px-4 py-2.5 text-sm font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
           >
-            Mark All Paid
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Mark All Paid (Earning + COD)
           </button>
         </div>
 
@@ -221,18 +261,32 @@ export default function DeliveryPayoutSettlement() {
                   <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-700 uppercase tracking-wider">Total Earning</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-700 uppercase tracking-wider">Paid</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-700 uppercase tracking-wider">Unpaid</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-700 uppercase tracking-wider">COD Orders</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-700 uppercase tracking-wider">COD Amount</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-700 uppercase tracking-wider">COD Paid</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-700 uppercase tracking-wider">COD Pending</th>
+                  <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-700 uppercase tracking-wider">COD Status</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-700 uppercase tracking-wider">Last Settled</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredRows.length === 0 ? (
+                {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-14 text-center text-sm text-slate-500">
+                    <td colSpan={11} className="px-6 py-14 text-center text-sm text-slate-500">
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading settlement preview...
+                      </span>
+                    </td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="px-6 py-14 text-center text-sm text-slate-500">
                       No delivery partner found for current filters.
                     </td>
                   </tr>
                 ) : (
-                  filteredRows.map((row) => (
+                  rows.map((row) => (
                     <tr key={row.beneficiaryId} className="hover:bg-slate-50">
                       <td className="px-5 py-4">
                         <p className="text-sm font-semibold text-slate-900">{row.beneficiaryName}</p>
@@ -242,6 +296,19 @@ export default function DeliveryPayoutSettlement() {
                       <td className="px-5 py-4 text-sm font-semibold text-slate-900">{toCurrency(row.totalEarning)}</td>
                       <td className="px-5 py-4 text-sm font-semibold text-emerald-700">{toCurrency(row.alreadyPaid)}</td>
                       <td className="px-5 py-4 text-sm font-semibold text-amber-700">{toCurrency(row.payableNow)}</td>
+                      <td className="px-5 py-4 text-sm text-slate-700">{Number(row.codOrdersCount || 0)}</td>
+                      <td className="px-5 py-4 text-sm font-semibold text-slate-900">
+                        {Number(row.codOrdersCount || 0) > 0 ? toCurrency(row.codAmount) : "NIL"}
+                      </td>
+                      <td className="px-5 py-4 text-sm font-semibold text-emerald-700">
+                        {Number(row.codOrdersCount || 0) > 0 ? toCurrency(row.codPaid) : "NIL"}
+                      </td>
+                      <td className="px-5 py-4 text-sm font-semibold text-amber-700">
+                        {Number(row.codOrdersCount || 0) > 0 ? toCurrency(row.codPending) : "NIL"}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-slate-700 uppercase">
+                        {Number(row.codOrdersCount || 0) > 0 ? String(row.codStatus || "unpaid").replaceAll("_", " ") : "NIL"}
+                      </td>
                       <td className="px-5 py-4 text-sm text-slate-700">{toDisplayDate(row.lastSettledToDate)}</td>
                     </tr>
                   ))

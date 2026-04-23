@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react"
-import { BarChart3, ChevronDown, Info, Settings, FileText, FileSpreadsheet, Code, Loader2, Wallet } from "lucide-react"
+import { BarChart3, ChevronDown, Info, Settings, FileText, FileSpreadsheet, Code, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@food/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@food/components/ui/dialog"
 import { exportTransactionReportToCSV, exportTransactionReportToExcel, exportTransactionReportToPDF, exportTransactionReportToJSON } from "@food/components/admin/reports/reportsExportUtils"
@@ -32,7 +32,6 @@ export default function TransactionReport() {
     adminEarning: 0,
     restaurantEarning: 0,
     deliverymanEarning: 0,
-    userDueOutstanding: 0,
   })
   const [filters, setFilters] = useState({
     zone: "All Zones",
@@ -108,7 +107,6 @@ export default function TransactionReport() {
             adminEarning: 0,
             restaurantEarning: 0,
             deliverymanEarning: 0,
-            userDueOutstanding: 0,
           })
         } else {
           setTransactions([])
@@ -203,17 +201,6 @@ export default function TransactionReport() {
       transaction?.orderStatus ||
       'N/A'
     )
-  }
-
-  const getDueAmount = (transaction) => {
-    return Number(transaction?.dueAmount || 0)
-  }
-
-  const getDueStatus = (transaction) => {
-    const status =
-      transaction?.dueStatus ||
-      (getDueAmount(transaction) > 0 ? "unpaid" : "n/a")
-    return String(status || "n/a").toUpperCase()
   }
 
   if (loading) {
@@ -400,23 +387,6 @@ export default function TransactionReport() {
               </div>
             </div>
 
-            {/* User Due Outstanding */}
-            <div className="rounded-lg shadow-sm border border-slate-200 p-3" style={{ backgroundColor: '#f1f5f9' }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                    <Wallet className="w-5 h-5 text-amber-700" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-900">User Due Pending</p>
-                    <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
-                      <Info className="w-3 h-3 text-white" />
-                    </div>
-                  </div>
-                </div>
-                <p className="text-base font-bold text-amber-700">{formatCurrency(summary.userDueOutstanding || 0)}</p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -495,15 +465,13 @@ export default function TransactionReport() {
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Delivery Charge</th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Platform Fee</th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Order Amount</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Penalty / Due</th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Due Status</th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider" style={{ width: '8%' }}>Status</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-100">
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="px-6 py-20 text-center">
+                    <td colSpan={13} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                         <p className="text-sm text-slate-500">No transactions match your search</p>
@@ -557,22 +525,6 @@ export default function TransactionReport() {
                       </td>
                       <td className="px-1.5 py-1">
                         <span className="text-[10px] font-medium text-slate-900">{formatFullCurrency(transaction.orderAmount)}</span>
-                      </td>
-                      <td className="px-1.5 py-1">
-                        <span className={`text-[10px] font-semibold ${getDueAmount(transaction) > 0 ? "text-amber-700" : "text-slate-500"}`}>
-                          {formatFullCurrency(getDueAmount(transaction))}
-                        </span>
-                      </td>
-                      <td className="px-1.5 py-1">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-                          getDueStatus(transaction) === "UNPAID"
-                            ? "bg-amber-100 text-amber-700"
-                            : getDueStatus(transaction) === "PAID"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-slate-100 text-slate-600"
-                        }`}>
-                          {getDueStatus(transaction)}
-                        </span>
                       </td>
                       <td className="px-1.5 py-1">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${getStatusBadgeClasses(getDisplayStatus(transaction))}`}>

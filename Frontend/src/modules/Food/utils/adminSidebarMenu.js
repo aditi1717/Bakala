@@ -135,15 +135,10 @@ export const adminSidebarMenu = [
     label: "DELIVERYMAN MANAGEMENT",
     items: [
       { type: "link", label: "Delivery Boy Heatmap", path: "/admin/food/zone-setup/delivery-boy-view", icon: "MapPin" },
-      { type: "link", label: "Delivery Cash Limit", path: "/admin/food/delivery-cash-limit", icon: "IndianRupee" },
       { type: "link", label: "Delivery & Platform Fee", path: "/admin/food/fee-settings", icon: "DollarSign" },
-      { type: "link", label: "Cash limit settlement", path: "/admin/food/cash-limit-settlement", icon: "Receipt" },
-      { type: "link", label: "Delivery Withdrawal", path: "/admin/food/delivery-withdrawal", icon: "Wallet" },
-      { type: "link", label: "Delivery boy Wallet", path: "/admin/food/delivery-boy-wallet", icon: "PiggyBank" },
       { type: "link", label: "Delivery Boy Commission", path: "/admin/food/delivery-boy-commission", icon: "DollarSign" },
       { type: "link", label: "Delivery Emergency Help", path: "/admin/food/delivery-emergency-help", icon: "Phone" },
       { type: "link", label: "Delivery Support Tickets", path: "/admin/food/delivery-support-tickets", icon: "MessageSquare" },
-      { type: "link", label: "Payout Settlement (Delivery)", path: "/admin/food/delivery-partners/payout-settlement", icon: "Receipt" },
       {
         type: "expandable",
         label: "Deliveryman",
@@ -152,9 +147,6 @@ export const adminSidebarMenu = [
           { label: "New Join Request", path: "/admin/food/delivery-partners/join-request" },
           { label: "Deliveryman List", path: "/admin/food/delivery-partners" },
           { label: "Deliveryman Reviews", path: "/admin/food/delivery-partners/reviews" },
-          { label: "Bonus", path: "/admin/food/delivery-partners/bonus" },
-          { label: "Earning Addon", path: "/admin/food/delivery-partners/earning-addon" },
-          { label: "Earning Addon History", path: "/admin/food/delivery-partners/earning-addon-history" },
           { label: "Delivery Earning", path: "/admin/food/delivery-partners/earnings" },
         ],
       },
@@ -183,6 +175,16 @@ export const adminSidebarMenu = [
           { label: "Restaurant Report", path: "/admin/food/restaurant-report" },
           { label: "Restaurant Settlement", path: "/admin/food/restaurant-report/settlement" },
           { label: "Restaurant Settlement History", path: "/admin/food/restaurant-report/settlement-history" },
+        ],
+      },
+      {
+        type: "expandable",
+        label: "Delivery Report",
+        icon: "PiggyBank",
+        subItems: [
+          { label: "Delivery Report", path: "/admin/food/delivery-report" },
+          { label: "Delivery Settlement", path: "/admin/food/delivery-report/settlement" },
+          { label: "Delivery Settlement History", path: "/admin/food/delivery-report/settlement-history" },
         ],
       },
       {

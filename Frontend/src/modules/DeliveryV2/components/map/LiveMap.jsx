@@ -72,6 +72,20 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
     setDirections(null);
   }, [tripStatus, activeOrder?._id]);
 
+  const restaurantLocation = useMemo(() => {
+    if (!activeOrder?.restaurantLocation) return null;
+    const lat = parseFloat(activeOrder.restaurantLocation.lat || activeOrder.restaurantLocation.latitude);
+    const lng = parseFloat(activeOrder.restaurantLocation.lng || activeOrder.restaurantLocation.longitude);
+    return (Number.isFinite(lat) && Number.isFinite(lng)) ? { lat, lng } : null;
+  }, [activeOrder]);
+
+  const customerLocation = useMemo(() => {
+    if (!activeOrder?.customerLocation) return null;
+    const lat = parseFloat(activeOrder.customerLocation.lat || activeOrder.customerLocation.latitude);
+    const lng = parseFloat(activeOrder.customerLocation.lng || activeOrder.customerLocation.longitude);
+    return (Number.isFinite(lat) && Number.isFinite(lng)) ? { lat, lng } : null;
+  }, [activeOrder]);
+
   const targetLocation = useMemo(() => {
     if (!activeOrder) return null;
     let rawLoc = null;
@@ -79,6 +93,8 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
       rawLoc = activeOrder.restaurantLocation;
     } else if (tripStatus === 'PICKED_UP' || tripStatus === 'REACHED_DROP') {
       rawLoc = activeOrder.customerLocation;
+    } else {
+      rawLoc = activeOrder.customerLocation || activeOrder.restaurantLocation;
     }
     if (!rawLoc) return null;
     const lat = parseFloat(rawLoc.lat || rawLoc.latitude);
@@ -229,8 +245,12 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
           </OverlayView>
         )}
 
-        {targetLocation && (
-          <Marker position={targetLocation} icon={{ url: (tripStatus === 'PICKING_UP' || tripStatus === 'REACHED_PICKUP') ? restaurantMarkerUrl : customerMarkerUrl, scaledSize: new window.google.maps.Size(44, 44), anchor: new window.google.maps.Point(22, 22) }} />
+        {restaurantLocation && (
+          <Marker position={restaurantLocation} icon={{ url: restaurantMarkerUrl, scaledSize: new window.google.maps.Size(42, 42), anchor: new window.google.maps.Point(21, 21) }} />
+        )}
+
+        {customerLocation && (
+          <Marker position={customerLocation} icon={{ url: customerMarkerUrl, scaledSize: new window.google.maps.Size(42, 42), anchor: new window.google.maps.Point(21, 21) }} />
         )}
 
         {zones.map((zone) => (

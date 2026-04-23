@@ -14,6 +14,50 @@ const formatCurrency = (amount) => {
   return `\u20B9${numericAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+const toNumber = (...values) => {
+  for (const value of values) {
+    const numericValue = Number(value)
+    if (Number.isFinite(numericValue)) return numericValue
+  }
+  return 0
+}
+
+const normalizePhone = (value) => String(value || "").replace(/\D/g, "")
+const normalizeKey = (value) => String(value || "").trim().toLowerCase()
+
+const getTotalOrdersCount = (partner = {}, wallet = {}) => {
+  const directOrders = toNumber(
+    partner.totalOrders,
+    partner.ordersCompleted,
+    partner.completedOrders,
+    partner.totalTrips,
+    partner.totalTrip,
+    partner.tripCount,
+    partner.orderCount,
+    partner.ordersCount,
+    wallet.totalOrders,
+    wallet.ordersCount,
+    wallet.orderCount,
+  )
+  if (directOrders > 0) return directOrders
+
+  const cashOrders = toNumber(
+    wallet.totalCashOrders,
+    wallet.totalCodOrders,
+    wallet.codOrders,
+    wallet.cashOrdersCount,
+    wallet.codCount,
+  )
+  const onlineOrders = toNumber(
+    wallet.totalOnlineOrders,
+    wallet.onlineOrders,
+    wallet.onlineOrdersCount,
+    wallet.onlineCount,
+    wallet.digitalOrdersCount,
+  )
+  return cashOrders + onlineOrders
+}
+
 export default function DeliverymanList() {
   const [searchQuery, setSearchQuery] = useState("")
   const [deliverymen, setDeliverymen] = useState([])
@@ -38,9 +82,6 @@ export default function DeliverymanList() {
     contact: true,
     zone: true,
     totalOrders: true,
-    pocketBalance: true,
-    cashInHand: true,
-    remainingCashLimit: true,
     availabilityStatus: true,
     actions: true,
   })
@@ -111,15 +152,40 @@ export default function DeliverymanList() {
         const partners = partnersResponse.value.data.data.deliveryPartners || []
         const walletRows = walletRowsResult.status === "fulfilled" ? walletRowsResult.value || [] : []
 
-        const walletMap = new Map(
-          walletRows.map((wallet) => [String(wallet.deliveryId), wallet]),
-        )
+        const walletMap = new Map()
+        walletRows.forEach((wallet) => {
+          const keys = [
+            String(wallet?.deliveryId || ""),
+            String(wallet?.deliveryPartnerId || ""),
+            String(wallet?.partnerId || ""),
+            String(wallet?.walletId || ""),
+            String(wallet?.deliveryIdString || ""),
+            normalizePhone(wallet?.deliveryIdString),
+          ]
+            .filter(Boolean)
+            .map(normalizeKey)
+
+          keys.forEach((key) => {
+            walletMap.set(key, wallet)
+          })
+        })
 
         const mergedPartners = partners.map((partner) => {
-          const wallet = walletMap.get(String(partner._id))
+          const walletKeys = [
+            String(partner?._id || ""),
+            String(partner?.id || ""),
+            String(partner?.deliveryId || ""),
+            String(partner?.deliveryIdString || ""),
+            normalizePhone(partner?.phone),
+            String(partner?.name || ""),
+          ]
+            .filter(Boolean)
+            .map(normalizeKey)
+          const wallet = walletKeys.map((key) => walletMap.get(key)).find(Boolean)
           return {
             ...partner,
             walletSummary: wallet || null,
+            totalOrders: getTotalOrdersCount(partner, wallet || {}),
 pocketBalance: wallet?.pocketBalance || 0,
 cashInHand: wallet?.cashCollected || 0,
 remainingCashLimit: wallet?.remainingCashLimit || 0,
@@ -130,7 +196,89 @@ availableCashLimit: wallet?.availableCashLimit || 0,
           }
         })
 
-        setDeliverymen(mergedPartners)
+        // Fallback: derive order counts directly from orders list for accurate totals.
+        let partnersWithOrderCounts = mergedPartners
+        try {
+          const orderCountMap = new Map()
+          let nextOrdersPage = 1
+          let totalOrderPages = 1
+          let guard = 0
+
+          do {
+            const ordersRes = await adminAPI.getOrders({
+              page: nextOrdersPage,
+              limit: 100,
+            })
+
+            const orderRows =
+              ordersRes?.data?.data?.orders ??
+              ordersRes?.data?.orders ??
+              ordersRes?.data?.data?.docs ??
+              ordersRes?.data?.data?.data ??
+              ordersRes?.data?.data ??
+              []
+            const safeRows = Array.isArray(orderRows) ? orderRows : []
+
+            safeRows.forEach((order) => {
+              const dispatchPartner = order?.dispatch?.deliveryPartnerId
+              const directPartner = order?.deliveryPartnerId
+
+              const partnerId =
+                (dispatchPartner && typeof dispatchPartner === "object"
+                  ? dispatchPartner?._id || dispatchPartner?.id
+                  : dispatchPartner) ||
+                (directPartner && typeof directPartner === "object" ? directPartner?._id || directPartner?.id : directPartner)
+
+              const partnerPhone =
+                order?.deliveryPartnerPhone ||
+                (dispatchPartner && typeof dispatchPartner === "object" ? dispatchPartner?.phone : "") ||
+                (directPartner && typeof directPartner === "object" ? directPartner?.phone : "")
+
+              const partnerName =
+                order?.deliveryPartnerName ||
+                (dispatchPartner && typeof dispatchPartner === "object" ? dispatchPartner?.name : "") ||
+                (directPartner && typeof directPartner === "object" ? directPartner?.name : "")
+
+              const keys = [
+                normalizeKey(partnerId),
+                normalizeKey(order?.assignedDeliveryPartnerId),
+                normalizePhone(partnerPhone),
+                normalizeKey(partnerName),
+              ].filter(Boolean)
+
+              keys.forEach((key) => {
+                orderCountMap.set(key, toNumber(orderCountMap.get(key), 0) + 1)
+              })
+            })
+
+            totalOrderPages = Number(ordersRes?.data?.data?.meta?.totalPages || ordersRes?.data?.meta?.totalPages || 1)
+            nextOrdersPage += 1
+            guard += 1
+          } while (nextOrdersPage <= totalOrderPages && guard < 100)
+
+          if (orderCountMap.size > 0) {
+            partnersWithOrderCounts = mergedPartners.map((partner) => {
+              const keys = [
+                normalizeKey(partner?._id),
+                normalizeKey(partner?.deliveryId),
+                normalizePhone(partner?.phone),
+                normalizeKey(partner?.name),
+              ].filter(Boolean)
+
+              const mappedTotalOrders = keys.map((key) => orderCountMap.get(key)).find((count) => Number.isFinite(Number(count)))
+              if (!Number.isFinite(Number(mappedTotalOrders))) return partner
+
+              return {
+                ...partner,
+                totalOrders: toNumber(mappedTotalOrders),
+              }
+            })
+          }
+        } catch (orderCountError) {
+          debugError("Order count mapping failed:", orderCountError)
+        }
+
+        setDeliverymen(partnersWithOrderCounts)
       } else {
         setError("Failed to fetch delivery partners")
         setDeliverymen([])
@@ -237,9 +385,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
       contact: true,
       zone: true,
       totalOrders: true,
-      pocketBalance: true,
-      cashInHand: true,
-      remainingCashLimit: true,
       availabilityStatus: true,
       actions: true,
     })
@@ -251,9 +396,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
     contact: "Contact",
     zone: "Zone",
     totalOrders: "Total Orders",
-    pocketBalance: "Pocket Balance",
-    cashInHand: "Cash In Hand",
-    remainingCashLimit: "Remaining Cash Limit",
     availabilityStatus: "Availability Status",
     actions: "Actions",
   }
@@ -575,30 +717,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                         </div>
                       </th>
                     )}
-                    {visibleColumns.pocketBalance && (
-                      <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Pocket Balance</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
-                      </th>
-                    )}
-                    {visibleColumns.cashInHand && (
-                      <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Cash In Hand</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
-                      </th>
-                    )}
-                    {visibleColumns.remainingCashLimit && (
-                      <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Remaining Cash Limit</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
-                      </th>
-                    )}
                     {visibleColumns.availabilityStatus && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                         <div className="flex items-center gap-2">
@@ -681,43 +799,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                             <span className="text-sm text-slate-700">{dm.totalOrders || 0}</span>
                           </td>
                         )}
-                        {visibleColumns.pocketBalance && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {editingDeliveryId === String(dm._id) ? (
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={editValues.pocketBalance}
-                                onChange={(e) => updateWalletFieldValue("pocketBalance", e.target.value)}
-                                className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
-                              />
-                            ) : (
-                              <span className="text-sm text-slate-700">{formatCurrency(dm.pocketBalance)}</span>
-                            )}
-                          </td>
-                        )}
-                        {visibleColumns.cashInHand && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {editingDeliveryId === String(dm._id) ? (
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={editValues.cashInHand}
-                                onChange={(e) => updateWalletFieldValue("cashInHand", e.target.value)}
-                                className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
-                              />
-                            ) : (
-                              <span className="text-sm text-slate-700">{formatCurrency(dm.cashInHand)}</span>
-                            )}
-                          </td>
-                        )}
-                        {visibleColumns.remainingCashLimit && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-slate-700">{formatCurrency(dm.remainingCashLimit)}</span>
-                          </td>
-                        )}
                         {visibleColumns.availabilityStatus && (
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
@@ -730,34 +811,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                         {visibleColumns.actions && (
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <div className="flex items-center justify-center gap-2">
-                              {editingDeliveryId === String(dm._id) ? (
-                                <>
-                                  <button
-                                    onClick={() => saveWalletChanges(dm)}
-                                    disabled={savingDeliveryId === String(dm._id)}
-                                    className="p-1.5 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                                    title="Save Wallet"
-                                  >
-                                    {savingDeliveryId === String(dm._id) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                  </button>
-                                  <button
-                                    onClick={cancelEditingWallet}
-                                    disabled={savingDeliveryId === String(dm._id)}
-                                    className="p-1.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
-                                    title="Cancel"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  onClick={() => startEditingWallet(dm)}
-                                  className="p-1.5 rounded bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
-                                  title="Edit Wallet"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </button>
-                              )}
                               <button 
                                 onClick={() => handleView(dm)}
                                 className="p-1.5 rounded bg-brand-50 text-[#005128] hover:bg-brand-100 transition-colors" 
@@ -970,24 +1023,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                     <CreditCard className="w-4 h-4" /> Pocket Details
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-500 uppercase">Pocket Balance</label>
-                      <p className="text-sm font-medium text-slate-900 mt-1">
-                        {formatCurrency(viewDetails.pocketBalance || viewDetails.walletSummary?.pocketBalance)}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-500 uppercase">Cash In Hand</label>
-                      <p className="text-sm font-medium text-slate-900 mt-1">
-                        {formatCurrency(viewDetails.cashInHand || viewDetails.walletSummary?.cashCollected)}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-500 uppercase">Remaining Cash Limit</label>
-                      <p className="text-sm font-medium text-slate-900 mt-1">
-                        {formatCurrency(viewDetails.remainingCashLimit || viewDetails.walletSummary?.remainingCashLimit)}
-                      </p>
-                    </div>
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">Total Earning</label>
                       <p className="text-sm font-medium text-slate-900 mt-1">

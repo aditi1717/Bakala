@@ -1330,19 +1330,6 @@ export default function OrderTracking() {
           </motion.div>
         )}
 
-        {customerDeliveryOtp && orderStatus !== 'delivered' && orderStatus !== 'cancelled' && (
-          <motion.div
-            className="bg-brand-50 rounded-xl p-4 shadow-sm border border-brand-100"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.28 }}
-          >
-            <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">Delivery OTP</p>
-            <p className="text-2xl font-extrabold text-brand-900 mt-1 tracking-widest">{customerDeliveryOtp}</p>
-            <p className="text-xs text-brand-700 mt-1">Share this 4-digit OTP with your delivery partner at drop-off.</p>
-          </motion.div>
-        )}
-
         {/* Dynamic Status Card */}
         <motion.div
           className="bg-white rounded-xl p-4 shadow-sm"

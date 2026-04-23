@@ -12,12 +12,9 @@ const SignupStep2 = lazy(() => import("./pages/auth/SignupStep2"))
 
 // V2 Pages
 import DeliveryHomeV2 from './pages/DeliveryHomeV2';
+import OrderDetailV2 from './pages/OrderDetailV2';
 import { PayoutV2 } from './pages/pocket/PayoutV2';
 import { PocketStatementV2 } from './pages/pocket/PocketStatementV2';
-import { DeductionStatementV2 } from './pages/pocket/DeductionStatementV2';
-import { LimitSettlementV2 } from './pages/pocket/LimitSettlementV2';
-import { PocketBalanceV2 } from './pages/pocket/PocketBalanceV2';
-import { CashLimitInfoV2 } from './pages/pocket/CashLimitInfoV2';
 import { ProfileBankV2 } from './pages/profile/ProfileBankV2';
 import { ProfileDocsV2 } from './pages/profile/ProfileDocsV2';
 import { SupportTicketsV2 } from './pages/help/SupportTicketsV2';
@@ -49,6 +46,8 @@ const DeliveryV2Router = () => {
         {/* Protected Core Routes */}
         <Route path="/" element={<ProtectedRoute><DeliveryHomeV2 tab="feed" /></ProtectedRoute>} />
         <Route path="/feed" element={<ProtectedRoute><DeliveryHomeV2 tab="feed" /></ProtectedRoute>} />
+        <Route path="/orders" element={<ProtectedRoute><DeliveryHomeV2 tab="orders" /></ProtectedRoute>} />
+        <Route path="/orders/:orderId" element={<ProtectedRoute><OrderDetailV2 /></ProtectedRoute>} />
         <Route path="/pocket" element={<ProtectedRoute><DeliveryHomeV2 tab="pocket" /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><DeliveryHomeV2 tab="history" /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><DeliveryHomeV2 tab="profile" /></ProtectedRoute>} />
@@ -68,10 +67,6 @@ const DeliveryV2Router = () => {
         {/* Financial Deep-Pages */}
         <Route path="/pocket/payout" element={<ProtectedRoute><PayoutV2 /></ProtectedRoute>} />
         <Route path="/pocket/statement" element={<ProtectedRoute><PocketStatementV2 /></ProtectedRoute>} />
-        <Route path="/pocket/deductions" element={<ProtectedRoute><DeductionStatementV2 /></ProtectedRoute>} />
-        <Route path="/pocket/limit-settlement" element={<ProtectedRoute><LimitSettlementV2 /></ProtectedRoute>} />
-        <Route path="/pocket/balance" element={<ProtectedRoute><PocketBalanceV2 /></ProtectedRoute>} />
-        <Route path="/pocket/cash-limit" element={<ProtectedRoute><CashLimitInfoV2 /></ProtectedRoute>} />
         <Route path="/pocket/details" element={<ProtectedRoute><PocketDetailsV2 /></ProtectedRoute>} />
 
         {/* Fallback */}

@@ -2,8 +2,10 @@ import mongoose from 'mongoose';
 import { FoodDeliveryPartner } from '../models/deliveryPartner.model.js';
 import { DeliverySupportTicket } from '../models/supportTicket.model.js';
 import { DeliveryBonusTransaction } from '../../admin/models/deliveryBonusTransaction.model.js';
+import { FoodPayoutSettlement } from '../../admin/models/foodPayoutSettlement.model.js';
 import { FoodEarningAddon } from '../../admin/models/earningAddon.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
+import { sanitizeOrderForExternal } from '../../orders/services/order.helpers.js';
 import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
@@ -585,6 +587,9 @@ const toTripDto = (order) => {
 
     const paymentMethod = order?.payment?.method || order?.paymentMethod || '';
     const pricingTotal = Number(order?.pricing?.total) || Number(order?.totalAmount) || 0;
+    const isUserUnavailableCancelled =
+        orderStatus === 'cancelled_by_user_unavailable' ||
+        String(order?.cancelReasonType || order?.cancellationReasonType || '').toLowerCase() === 'user_unavailable';
 
     const rawEarningAmount = Number(order?.riderEarning ?? order?.deliveryEarning ?? 0) || 0;
     const earningAmount = isDelivered ? rawEarningAmount : 0;
@@ -656,11 +661,131 @@ export const getDeliveryPartnerTripHistory = async (deliveryPartnerId, query = {
         .limit(limit)
         .lean();
 
+    const deliveredOrderIds = (orders || [])
+        .filter((order) => String(order?.orderStatus || '').toLowerCase() === 'delivered')
+        .map((order) => order?._id)
+        .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+        .map((id) => new mongoose.Types.ObjectId(String(id)));
+
+    const settledOrderIdSet = new Set();
+    if (deliveredOrderIds.length) {
+        const settlementRows = await FoodPayoutSettlement.find({
+            beneficiaryType: 'delivery',
+            beneficiaryId: partnerId,
+            status: 'paid',
+            transactionIds: { $in: deliveredOrderIds }
+        })
+            .select('transactionIds')
+            .lean();
+
+        for (const row of settlementRows || []) {
+            for (const txId of row?.transactionIds || []) {
+                if (!txId) continue;
+                settledOrderIdSet.add(String(txId));
+            }
+        }
+    }
+
+    const trips = (orders || []).map((order) => {
+        const trip = toTripDto(order);
+        const isDelivered = String(order?.orderStatus || '').toLowerCase() === 'delivered';
+        const isPaid = isDelivered && settledOrderIdSet.has(String(order?._id));
+
+        return {
+            ...trip,
+            partnerPayoutStatus: isPaid ? 'paid' : 'unpaid',
+            payoutStatus: isPaid ? 'paid' : 'unpaid',
+            settlementStatus: isPaid ? 'settled' : 'pending',
+            paymentSettlementStatus: isPaid ? 'paid' : 'pending',
+            deliveryPayoutStatus: isPaid ? 'paid' : 'unpaid',
+            adminPayoutStatus: isPaid ? 'paid' : 'unpaid',
+            isPartnerPaid: isPaid,
+        };
+    });
+
     return {
         period,
         date: (date || new Date()).toISOString(),
         range: { start: start.toISOString(), end: end.toISOString() },
-        trips: (orders || []).map(toTripDto)
+        trips
+    };
+};
+
+export const getDeliveryPartnerOrderQueue = async (deliveryPartnerId) => {
+    if (!deliveryPartnerId || !mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {
+        throw new ValidationError('Delivery partner not found');
+    }
+
+    const partnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
+    const activeStatuses = [
+        'confirmed',
+        'preparing',
+        'ready_for_pickup',
+        'picked_up',
+        'reached_pickup',
+        'reached_drop'
+    ];
+
+    const docs = await FoodOrder.find({
+        'dispatch.deliveryPartnerId': partnerId,
+        orderStatus: { $in: activeStatuses },
+        'dispatch.status': { $in: ['assigned', 'accepted'] }
+    })
+        .populate({ path: 'restaurantId', select: 'restaurantName name phone location addressLine1 area city state profileImage' })
+        .populate({ path: 'userId', select: 'name phone' })
+        .sort({ 'dispatch.acceptedAt': 1, 'dispatch.assignedAt': 1, createdAt: -1 })
+        .lean();
+
+    const decorated = (docs || []).map((doc) => {
+        const sanitized = sanitizeOrderForExternal(doc);
+        const dispatchStatus = String(sanitized?.dispatch?.status || '').toLowerCase();
+        const queueStatus = dispatchStatus === 'accepted' ? 'accepted' : 'assigned';
+        const phase = String(sanitized?.deliveryState?.currentPhase || '').toLowerCase();
+
+        let queuePriority = 3;
+        if (queueStatus === 'accepted') queuePriority = 2;
+        if (queueStatus === 'accepted' && ['at_drop', 'picked_up', 'delivered', 'completed'].includes(phase)) {
+            queuePriority = 1;
+        }
+
+        return {
+            ...sanitized,
+            queueStatus,
+            queuePriority,
+            isAdvancedOrder: true
+        };
+    });
+
+    decorated.sort((a, b) => {
+        const priorityDiff = Number(a?.queuePriority || 99) - Number(b?.queuePriority || 99);
+        if (priorityDiff !== 0) return priorityDiff;
+
+        const acceptedAtA = a?.dispatch?.acceptedAt ? new Date(a.dispatch.acceptedAt).getTime() : 0;
+        const acceptedAtB = b?.dispatch?.acceptedAt ? new Date(b.dispatch.acceptedAt).getTime() : 0;
+        if (acceptedAtA !== acceptedAtB) return acceptedAtA - acceptedAtB;
+
+        const assignedAtA = a?.dispatch?.assignedAt ? new Date(a.dispatch.assignedAt).getTime() : 0;
+        const assignedAtB = b?.dispatch?.assignedAt ? new Date(b.dispatch.assignedAt).getTime() : 0;
+        return assignedAtA - assignedAtB;
+    });
+
+    const acceptedOrders = decorated.filter((item) => item.queueStatus === 'accepted');
+    const assignedOrders = decorated.filter((item) => item.queueStatus === 'assigned');
+    const currentOrder = acceptedOrders[0] || null;
+    const queue = currentOrder
+        ? decorated.filter((item) => String(item?._id || item?.orderId) !== String(currentOrder?._id || currentOrder?.orderId))
+        : decorated;
+
+    return {
+        currentOrder,
+        acceptedOrders,
+        assignedOrders,
+        queue,
+        summary: {
+            total: decorated.length,
+            accepted: acceptedOrders.length,
+            assigned: assignedOrders.length
+        }
     };
 };
 
