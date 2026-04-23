@@ -36,6 +36,8 @@ const INCOMING_ORDER_TTL_MS = 2 * 60 * 1000;
 const ORDER_FOCUS_STORAGE_KEY = 'delivery_v2_order_focus';
 const PASSED_ORDER_STORAGE_KEY = 'delivery_v2_last_passed_order_id';
 const ORDER_RESPONSE_TIMEOUT_MS = 30 * 1000;
+const ORDER_SYNC_POLL_CONNECTED_MS = 12000;
+const ORDER_SYNC_POLL_DISCONNECTED_MS = 8000;
 
 const getOrderIdentity = (orderLike) =>
   String(
@@ -1185,16 +1187,25 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       }
     };
 
+    const triggerSyncNow = () => {
+      if (document.hidden) return;
+      void syncDeliveryFeedState();
+    };
+
     void syncDeliveryFeedState();
+    window.addEventListener('focus', triggerSyncNow);
+    document.addEventListener('visibilitychange', triggerSyncNow);
     const poller = window.setInterval(() => {
       if (!document.hidden) {
         void syncDeliveryFeedState();
       }
-    }, isSocketConnected ? 45000 : 20000);
+    }, isSocketConnected ? ORDER_SYNC_POLL_CONNECTED_MS : ORDER_SYNC_POLL_DISCONNECTED_MS);
 
     return () => {
       cancelled = true;
       window.clearInterval(poller);
+      window.removeEventListener('focus', triggerSyncNow);
+      document.removeEventListener('visibilitychange', triggerSyncNow);
     };
   }, [activeOrderId, announceIncomingRequest, clearPersistedIncomingOrder, currentTab, incomingOrder, isOnline, isSocketConnected, persistIncomingOrder, setActiveOrder, updateTripStatus]);
 

@@ -2,12 +2,29 @@ import { useState, useMemo, useEffect } from "react"
 import { Search, Download, ChevronDown, Filter, Briefcase, RefreshCw, Settings, ArrowUpDown, FileText, FileSpreadsheet, Code, Loader2, Star } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@food/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@food/components/ui/dialog"
-import { exportReportsToCSV, exportReportsToExcel, exportReportsToPDF, exportReportsToJSON } from "@food/components/admin/reports/reportsExportUtils"
+import { exportReportsToCSV, exportReportsToPDF, exportReportsToJSON } from "@food/components/admin/reports/reportsExportUtils"
 import { adminAPI } from "@food/api"
 import { toast } from "sonner"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
+
+const toAmountNumber = (value) => {
+  if (value == null) return 0
+  const direct = Number(value)
+  if (Number.isFinite(direct)) return direct
+  const cleaned = String(value).replace(/[^0-9.-]/g, "")
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const htmlEscape = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 
 
 export default function RestaurantReport() {
@@ -152,9 +169,149 @@ export default function RestaurantReport() {
       { key: "totalOrderAmount", label: "Total Order Amount" },
       { key: "averageRatings", label: "Average Ratings" },
     ]
+    if (format === "excel") {
+      const metrics = filteredRestaurants.reduce(
+        (acc, item) => {
+          acc.totalFood += toAmountNumber(item.totalFood)
+          acc.totalOrder += toAmountNumber(item.totalOrder)
+          acc.totalAdminCommission += toAmountNumber(item.totalAdminCommission)
+          acc.totalCouponByAdmin += toAmountNumber(item.totalCouponByAdmin)
+          acc.totalCouponByRestaurant += toAmountNumber(item.totalCouponByRestaurant)
+          acc.totalOfferByRestaurant += toAmountNumber(item.totalOfferByRestaurant)
+          acc.totalGST += toAmountNumber(item.totalGST)
+          acc.totalRestaurantEarning += toAmountNumber(item.totalRestaurantEarning)
+          acc.paidRestaurantEarning += toAmountNumber(item.paidRestaurantEarning)
+          acc.unpaidRestaurantEarning += toAmountNumber(item.unpaidRestaurantEarning)
+          acc.totalDeliveryCharge += toAmountNumber(item.totalDeliveryCharge)
+          acc.totalPlatformFee += toAmountNumber(item.totalPlatformFee)
+          acc.totalOrderAmount += toAmountNumber(item.totalOrderAmount)
+          if (toAmountNumber(item.averageRatings) > 0) {
+            acc.ratingsTotal += toAmountNumber(item.averageRatings)
+            acc.ratingsCount += 1
+          }
+          return acc
+        },
+        {
+          totalFood: 0,
+          totalOrder: 0,
+          totalAdminCommission: 0,
+          totalCouponByAdmin: 0,
+          totalCouponByRestaurant: 0,
+          totalOfferByRestaurant: 0,
+          totalGST: 0,
+          totalRestaurantEarning: 0,
+          paidRestaurantEarning: 0,
+          unpaidRestaurantEarning: 0,
+          totalDeliveryCharge: 0,
+          totalPlatformFee: 0,
+          totalOrderAmount: 0,
+          ratingsTotal: 0,
+          ratingsCount: 0,
+        },
+      )
+
+      const bodyRowsHtml = filteredRestaurants
+        .map(
+          (item, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${htmlEscape(item.restaurantName || "-")}</td>
+            <td class="num">${htmlEscape(item.totalFood ?? 0)}</td>
+            <td class="num">${htmlEscape(item.totalOrder ?? 0)}</td>
+            <td class="num">${htmlEscape(item.totalAdminCommission ?? 0)}</td>
+            <td class="num">${htmlEscape(item.totalCouponByAdmin ?? 0)}</td>
+            <td class="num">${htmlEscape(item.totalCouponByRestaurant ?? 0)}</td>
+            <td class="num">${htmlEscape(item.totalOfferByRestaurant ?? 0)}</td>
+            <td class="num">${htmlEscape(item.totalGST ?? 0)}</td>
+            <td class="num">${htmlEscape(item.totalRestaurantEarning ?? 0)}</td>
+            <td class="num">${htmlEscape(item.paidRestaurantEarning ?? 0)}</td>
+            <td class="num">${htmlEscape(item.unpaidRestaurantEarning ?? 0)}</td>
+            <td class="num">${htmlEscape(item.totalDeliveryCharge ?? 0)}</td>
+            <td class="num">${htmlEscape(item.totalPlatformFee ?? 0)}</td>
+            <td class="num">${htmlEscape(item.totalOrderAmount ?? 0)}</td>
+            <td class="num">${htmlEscape(item.averageRatings ?? 0)}</td>
+          </tr>`,
+        )
+        .join("")
+
+      const avgRating = metrics.ratingsCount > 0 ? metrics.ratingsTotal / metrics.ratingsCount : 0
+
+      const xlsHtml = `
+        <html>
+          <head>
+            <meta charset="UTF-8" />
+            <style>
+              table { border-collapse: collapse; width: 100%; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
+              th, td { border: 1px solid #d1d5db; padding: 8px; }
+              th { background: #f3f4f6; font-weight: 700; text-align: left; }
+              td.num { text-align: right; }
+              tr.total-row td { background: #dbeafe; color: #1e3a8a; font-weight: 700; }
+            </style>
+          </head>
+          <body>
+            <table>
+              <thead>
+                <tr>
+                  <th>SL</th>
+                  <th>Restaurant Name</th>
+                  <th>Total Food</th>
+                  <th>Total Order</th>
+                  <th>Admin Commission</th>
+                  <th>Coupon by Admin</th>
+                  <th>Coupon by Restaurant</th>
+                  <th>Offer by Restaurant</th>
+                  <th>GST</th>
+                  <th>Total Restaurant Earning</th>
+                  <th>Paid To Restaurant</th>
+                  <th>Unpaid To Restaurant</th>
+                  <th>Delivery Charges</th>
+                  <th>Platform Fees</th>
+                  <th>Total Order Amount</th>
+                  <th>Average Ratings</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${bodyRowsHtml}
+                <tr class="total-row">
+                  <td>TOTAL</td>
+                  <td>${htmlEscape(`${filteredRestaurants.length} restaurants`)}</td>
+                  <td class="num">${htmlEscape(metrics.totalFood.toFixed(0))}</td>
+                  <td class="num">${htmlEscape(metrics.totalOrder.toFixed(0))}</td>
+                  <td class="num">${htmlEscape(metrics.totalAdminCommission.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(metrics.totalCouponByAdmin.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(metrics.totalCouponByRestaurant.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(metrics.totalOfferByRestaurant.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(metrics.totalGST.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(metrics.totalRestaurantEarning.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(metrics.paidRestaurantEarning.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(metrics.unpaidRestaurantEarning.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(metrics.totalDeliveryCharge.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(metrics.totalPlatformFee.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(metrics.totalOrderAmount.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(avgRating.toFixed(2))}</td>
+                </tr>
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `
+
+      const blob = new Blob([xlsHtml], { type: "application/vnd.ms-excel;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      const stamp = new Date().toISOString().slice(0, 10)
+      link.href = url
+      link.download = `restaurant-report-${stamp}.xls`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      toast.success("Excel downloaded")
+      return
+    }
+
     switch (format) {
       case "csv": exportReportsToCSV(filteredRestaurants, headers, "restaurant_report"); break
-      case "excel": exportReportsToExcel(filteredRestaurants, headers, "restaurant_report"); break
       case "pdf": exportReportsToPDF(filteredRestaurants, headers, "restaurant_report", "Restaurant Report"); break
       case "json": exportReportsToJSON(filteredRestaurants, "restaurant_report"); break
     }

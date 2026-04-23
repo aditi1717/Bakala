@@ -174,6 +174,14 @@ export default function HubFinance() {
       maximumFractionDigits: 2,
     })}`
 
+  const htmlEscape = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+
   const formatOrderDate = (value) => {
     if (!value) return "N/A"
     const d = new Date(value)
@@ -772,6 +780,118 @@ export default function HubFinance() {
     }
   }
 
+  const downloadExcelReport = () => {
+    try {
+      setShowDownloadMenu(false)
+      const reportData = getReportData()
+      const orders = Array.isArray(reportData?.allOrders) ? reportData.allOrders : []
+
+      if (!orders.length) {
+        alert("No orders available to export.")
+        return
+      }
+
+      const totals = orders.reduce(
+        (acc, order) => {
+          acc.orderAmount += Number(order?.totalAmount || order?.orderTotal || order?.amount || 0)
+          acc.earning += Number(order?.payout || order?.restaurantEarning || 0)
+          return acc
+        },
+        { orderAmount: 0, earning: 0 },
+      )
+
+      const bodyRowsHtml = orders
+        .map((order) => {
+          const orderDate = order?.createdAt
+            ? formatOrderDate(order.createdAt)
+            : (order?.deliveredAt ? formatOrderDate(order.deliveredAt) : "N/A")
+          const orderTime = order?.createdAt
+            ? formatOrderTime(order.createdAt)
+            : (order?.deliveredAt ? formatOrderTime(order.deliveredAt) : "N/A")
+          const orderAmount = Number(order?.totalAmount || order?.orderTotal || order?.amount || 0)
+          const earning = Number(order?.payout || order?.restaurantEarning || 0)
+          const isSettled = Boolean(order?.isSettled === true)
+
+          return `
+            <tr>
+              <td>${htmlEscape(order?.cycle || "N/A")}</td>
+              <td>${htmlEscape(order?.orderId || "N/A")}</td>
+              <td>${htmlEscape(orderDate)}</td>
+              <td>${htmlEscape(orderTime)}</td>
+              <td class="num">${htmlEscape(orderAmount.toFixed(2))}</td>
+              <td class="num">${htmlEscape(earning.toFixed(2))}</td>
+              <td>${isSettled ? "Paid" : "Unpaid"}</td>
+            </tr>
+          `
+        })
+        .join("")
+
+      const xlsHtml = `
+        <html>
+          <head>
+            <meta charset="UTF-8" />
+            <style>
+              table { border-collapse: collapse; width: 100%; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
+              th, td { border: 1px solid #d1d5db; padding: 8px; }
+              th { background: #f3f4f6; font-weight: 700; text-align: left; }
+              td.num { text-align: right; }
+              tr.total-row td { background: #fef3c7; font-weight: 700; color: #111827; }
+              .meta { margin-bottom: 10px; font-family: Calibri, Arial, sans-serif; }
+              .meta p { margin: 0 0 4px 0; font-size: 12px; }
+            </style>
+          </head>
+          <body>
+            <div class="meta">
+              <p><strong>Restaurant:</strong> ${htmlEscape(reportData?.restaurantName || "Restaurant")}</p>
+              <p><strong>ID:</strong> ${htmlEscape(reportData?.restaurantId || "N/A")}</p>
+              <p><strong>Date Range:</strong> ${htmlEscape(reportData?.dateRange || "N/A")}</p>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Cycle</th>
+                  <th>Order ID</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Order Amount</th>
+                  <th>Your Earning</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${bodyRowsHtml}
+                <tr class="total-row">
+                  <td>TOTAL</td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td class="num">${htmlEscape(totals.orderAmount.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.earning.toFixed(2))}</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `
+
+      const blob = new Blob([xlsHtml], { type: "application/vnd.ms-excel;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      const fileDate = new Date().toISOString().split("T")[0]
+      link.href = url
+      link.download = `finance-report-${fileDate}.xls`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      debugError("? Error downloading Excel:", error)
+      alert(`Failed to download Excel: ${error.message}`)
+      setShowDownloadMenu(false)
+    }
+  }
+
   // Close download menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1126,6 +1246,15 @@ export default function HubFinance() {
                           transition={{ duration: 0.2, ease: "easeOut" }}
                           className="absolute bottom-full right-0 mb-2 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-[80] min-w-[180px]"
                         >
+                          <button
+                            onClick={downloadExcelReport}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="w-6 h-6 rounded-md bg-emerald-50 flex items-center justify-center">
+                              <FileText className="w-4 h-4 text-emerald-600" />
+                            </div>
+                            <span>Download Excel</span>
+                          </button>
                           <button
                             onClick={downloadPDF}
                             className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"

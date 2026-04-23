@@ -121,7 +121,13 @@ const getCodStatusBadgeClasses = (status) => {
 
 const pad = (n) => String(n).padStart(2, '0');
 const toInputDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const csvEscape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+const htmlEscape = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 const toStartOfDay = (dateString) => {
   const d = new Date(dateString);
@@ -270,16 +276,6 @@ export const PocketDetailsV2 = () => {
       return;
     }
 
-    const headers = [
-      'Order ID',
-      'Restaurant',
-      'Delivered At',
-      'Payment',
-      'Order Amount',
-      'Earning',
-      'Admin Paid',
-      'COD To Admin',
-    ];
     const body = filteredRows.map((row) => [
       row.id,
       row.restaurant,
@@ -299,12 +295,83 @@ export const PocketDetailsV2 = () => {
       row.codToAdminStatus,
     ]);
 
-    const csv = [headers, ...body].map((line) => line.map(csvEscape).join(',')).join('\n');
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const totals = filteredRows.reduce(
+      (acc, row) => {
+        acc.orderAmount += Number(row.orderAmount || 0);
+        acc.earning += Number(row.earning || 0);
+        return acc;
+      },
+      { orderAmount: 0, earning: 0 },
+    );
+
+    const bodyRowsHtml = body
+      .map((line) => `
+        <tr>
+          <td>${htmlEscape(line[0])}</td>
+          <td>${htmlEscape(line[1])}</td>
+          <td>${htmlEscape(line[2])}</td>
+          <td>${htmlEscape(line[3])}</td>
+          <td class="num">${htmlEscape(line[4])}</td>
+          <td class="num">${htmlEscape(line[5])}</td>
+          <td>${htmlEscape(line[6])}</td>
+          <td>${htmlEscape(line[7])}</td>
+        </tr>
+      `)
+      .join('');
+
+    const totalRowHtml = `
+      <tr class="total-row">
+        <td>TOTAL</td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td class="num">${htmlEscape(totals.orderAmount.toFixed(2))}</td>
+        <td class="num">${htmlEscape(totals.earning.toFixed(2))}</td>
+        <td></td>
+        <td></td>
+      </tr>
+    `;
+
+    const xlsHtml = `
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            table { border-collapse: collapse; width: 100%; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; }
+            th { background: #f3f4f6; font-weight: 700; text-align: left; }
+            td.num { text-align: right; }
+            tr.total-row td { background: #fef3c7; font-weight: 700; color: #111827; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Restaurant</th>
+                <th>Delivered At</th>
+                <th>Payment</th>
+                <th>Order Amount</th>
+                <th>Earning</th>
+                <th>Admin Paid</th>
+                <th>COD To Admin</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyRowsHtml}
+              ${totalRowHtml}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([xlsHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `delivered-payout-${toInputDate(new Date())}.csv`;
+    link.download = `delivered-payout-${toInputDate(new Date())}.xls`;
     document.body.appendChild(link);
     link.click();
     link.remove();

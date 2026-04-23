@@ -45,15 +45,27 @@ const formatTripTime = (trip) => {
 };
 
 const isCashLike = (trip) => ['cash', 'cod'].includes(String(trip?.paymentMethod || '').toLowerCase());
-const csvEscape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+const htmlEscape = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 export const HistoryV2 = () => {
   const goBack = useDeliveryBackNavigation();
   const navigate = useNavigate();
 
   const today = new Date();
+  const todayDateStr = toDateStr(today);
 
-  const [singleDate, setSingleDate] = useState(toDateStr(today));
+  const [dateFilterMode, setDateFilterMode] = useState('one_day');
+  const [singleDate, setSingleDate] = useState(todayDateStr);
+  const [selectedWeekDate, setSelectedWeekDate] = useState(todayDateStr);
+  const [selectedMonth, setSelectedMonth] = useState(`${today.getFullYear()}-${pad(today.getMonth() + 1)}`);
+  const [rangeStart, setRangeStart] = useState(toDateStr(new Date(today.getFullYear(), today.getMonth(), 1)));
+  const [rangeEnd, setRangeEnd] = useState(todayDateStr);
   const [selectedTripType, setSelectedTripType] = useState('ALL TRIPS');
 
   const [allTrips, setAllTrips] = useState([]);
@@ -65,13 +77,18 @@ export const HistoryV2 = () => {
     const fetchTrips = async () => {
       setLoading(true);
       try {
-        // Use month bucket + status-wise fetch so delivered trips appear by deliveredAt date
-        // (matches Pocket details behavior better than ALL_TRIPS daily fetch by createdAt).
-        const responses = await Promise.allSettled([
-          deliveryAPI.getTripHistory({ status: 'Completed', period: 'monthly', date: singleDate, limit: 1000 }),
-          deliveryAPI.getTripHistory({ status: 'Cancelled', period: 'monthly', date: singleDate, limit: 1000 }),
-          deliveryAPI.getTripHistory({ status: 'Pending', period: 'monthly', date: singleDate, limit: 1000 }),
-        ]);
+        // Load last 12 months so One Day / Weekly / Monthly / Date Wise / All filters work from one dataset.
+        const monthAnchors = Array.from({ length: 12 }, (_, index) => {
+          const d = new Date(today.getFullYear(), today.getMonth() - index, 15);
+          return toDateStr(d);
+        });
+        const statuses = ['Completed', 'Cancelled', 'Pending'];
+
+        const requests = monthAnchors.flatMap((date) =>
+          statuses.map((status) => deliveryAPI.getTripHistory({ status, period: 'monthly', date, limit: 1000 })),
+        );
+
+        const responses = await Promise.allSettled(requests);
 
         const merged = [];
         for (const result of responses) {
@@ -96,7 +113,7 @@ export const HistoryV2 = () => {
     };
 
     fetchTrips();
-  }, [singleDate]);
+  }, []);
 
   const filteredTrips = useMemo(() => {
     const startOfDay = (dateStr) => {
@@ -111,9 +128,6 @@ export const HistoryV2 = () => {
       return d;
     };
 
-    const singleStart = startOfDay(singleDate);
-    const singleEnd = endOfDay(singleDate);
-
     return allTrips
       .filter((trip) => {
         const tripDate = getTripDate(trip);
@@ -126,14 +140,47 @@ export const HistoryV2 = () => {
           if (selectedTripType === 'Pending' && ['completed', 'delivered', 'cancelled', 'rejected'].includes(normalized)) return false;
         }
 
-        return tripDate >= singleStart && tripDate <= singleEnd;
+        if (dateFilterMode === 'all') return true;
+
+        if (dateFilterMode === 'one_day') {
+          const singleStart = startOfDay(singleDate);
+          const singleEnd = endOfDay(singleDate);
+          return tripDate >= singleStart && tripDate <= singleEnd;
+        }
+
+        if (dateFilterMode === 'weekly') {
+          const anchor = startOfDay(selectedWeekDate);
+          const weekStart = new Date(anchor);
+          weekStart.setDate(anchor.getDate() - anchor.getDay());
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          weekEnd.setHours(23, 59, 59, 999);
+          return tripDate >= weekStart && tripDate <= weekEnd;
+        }
+
+        if (dateFilterMode === 'monthly') {
+          const [yearRaw, monthRaw] = String(selectedMonth || '').split('-');
+          const year = Number(yearRaw);
+          const monthIndex = Number(monthRaw) - 1;
+          if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || monthIndex < 0 || monthIndex > 11) return false;
+          return tripDate.getFullYear() === year && tripDate.getMonth() === monthIndex;
+        }
+
+        if (dateFilterMode === 'date_wise') {
+          if (!rangeStart || !rangeEnd || rangeStart > rangeEnd) return false;
+          const rangeStartDate = startOfDay(rangeStart);
+          const rangeEndDate = endOfDay(rangeEnd);
+          return tripDate >= rangeStartDate && tripDate <= rangeEndDate;
+        }
+
+        return false;
       })
       .sort((a, b) => {
         const left = getTripDate(a)?.getTime() || 0;
         const right = getTripDate(b)?.getTime() || 0;
         return right - left;
       });
-  }, [allTrips, singleDate, selectedTripType]);
+  }, [allTrips, dateFilterMode, singleDate, selectedWeekDate, selectedMonth, rangeStart, rangeEnd, selectedTripType]);
 
   const metrics = useMemo(() => {
     return filteredTrips.reduce(
@@ -170,16 +217,6 @@ export const HistoryV2 = () => {
       return;
     }
 
-    const headers = [
-      'Order ID',
-      'Date Time',
-      'Restaurant',
-      'Status',
-      'Payment',
-      'COD',
-      'Earning',
-    ];
-
     const rows = filteredTrips.map((trip) => {
       const id = getTripIdentity(trip);
       const status = getStatusStyle(trip?.status).label;
@@ -197,16 +234,72 @@ export const HistoryV2 = () => {
       ];
     });
 
-    const csv = [headers, ...rows]
-      .map((row) => row.map(csvEscape).join(','))
-      .join('\n');
+    const bodyRowsHtml = rows
+      .map((row) => `
+        <tr>
+          <td>${htmlEscape(row[0])}</td>
+          <td>${htmlEscape(row[1])}</td>
+          <td>${htmlEscape(row[2])}</td>
+          <td>${htmlEscape(row[3])}</td>
+          <td>${htmlEscape(row[4])}</td>
+          <td class="num">${htmlEscape(row[5])}</td>
+          <td class="num">${htmlEscape(row[6])}</td>
+        </tr>
+      `)
+      .join('');
 
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const totalRowHtml = `
+      <tr class="total-row">
+        <td>TOTAL</td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td class="num">${htmlEscape(metrics.cod.toFixed(2))}</td>
+        <td class="num">${htmlEscape(metrics.earnings.toFixed(2))}</td>
+      </tr>
+    `;
+
+    const xlsHtml = `
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            table { border-collapse: collapse; width: 100%; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; }
+            th { background: #f3f4f6; font-weight: 700; text-align: left; }
+            td.num { text-align: right; }
+            tr.total-row td { background: #fef3c7; font-weight: 700; color: #111827; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Date Time</th>
+                <th>Restaurant</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th>COD</th>
+                <th>Earning</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyRowsHtml}
+              ${totalRowHtml}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([xlsHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     const stamp = toDateStr(new Date());
     link.href = url;
-    link.download = `delivery-history-${stamp}.csv`;
+    link.download = `delivery-history-${stamp}.xls`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -241,15 +334,94 @@ export const HistoryV2 = () => {
 
       <div className="bg-white border-b border-gray-100 px-4 py-3 space-y-3 sticky top-[66px] z-[90]">
         <div>
-          <label className="text-[11px] font-semibold text-gray-600">One Day</label>
-          <input
-            type="date"
-            value={singleDate}
-            max={toDateStr(new Date())}
-            onChange={(e) => setSingleDate(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-800"
-          />
+          <label className="text-[11px] font-semibold text-gray-600">Date Filter</label>
+          <div className="mt-1 flex items-center gap-2 overflow-x-auto pb-1">
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'one_day', label: 'One Day' },
+              { key: 'weekly', label: 'Weekly' },
+              { key: 'monthly', label: 'Monthly' },
+              { key: 'date_wise', label: 'Date Wise' },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setDateFilterMode(opt.key)}
+                className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition ${
+                  dateFilterMode === opt.key
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {dateFilterMode === 'one_day' && (
+          <div>
+            <label className="text-[11px] font-semibold text-gray-600">Select Date</label>
+            <input
+              type="date"
+              value={singleDate}
+              max={todayDateStr}
+              onChange={(e) => setSingleDate(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-800"
+            />
+          </div>
+        )}
+
+        {dateFilterMode === 'weekly' && (
+          <div>
+            <label className="text-[11px] font-semibold text-gray-600">Select Week (Pick Any Day)</label>
+            <input
+              type="date"
+              value={selectedWeekDate}
+              max={todayDateStr}
+              onChange={(e) => setSelectedWeekDate(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-800"
+            />
+          </div>
+        )}
+
+        {dateFilterMode === 'monthly' && (
+          <div>
+            <label className="text-[11px] font-semibold text-gray-600">Select Month</label>
+            <input
+              type="month"
+              value={selectedMonth}
+              max={`${today.getFullYear()}-${pad(today.getMonth() + 1)}`}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-800"
+            />
+          </div>
+        )}
+
+        {dateFilterMode === 'date_wise' && (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[11px] font-semibold text-gray-600">Start Date</label>
+              <input
+                type="date"
+                value={rangeStart}
+                max={todayDateStr}
+                onChange={(e) => setRangeStart(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-800"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-600">End Date</label>
+              <input
+                type="date"
+                value={rangeEnd}
+                max={todayDateStr}
+                onChange={(e) => setRangeEnd(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-800"
+              />
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="text-[11px] font-semibold text-gray-600">Trip Status</label>

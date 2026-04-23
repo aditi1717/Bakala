@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from "react"
-import { Search, PiggyBank, Loader2, Package, RefreshCw, HandCoins } from "lucide-react"
+import { Search, PiggyBank, Loader2, Package, RefreshCw, HandCoins, Download } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { toast } from "sonner"
 import BRAND_THEME from "@/config/brandTheme"
@@ -23,6 +23,13 @@ const toNumber = (...values) => {
 
 const normalizePhone = (value) => String(value || "").replace(/\D/g, "")
 const normalizeKey = (value) => String(value || "").trim().toLowerCase()
+const htmlEscape = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 
 const normalizeWalletRow = (row = {}) => {
   const totalEarning = toNumber(row.totalEarning, row.totalEarned, row.totalEarnings, row.earning)
@@ -618,6 +625,119 @@ export default function DeliveryBoyWallet() {
   const isQuickTimeActive = filters.time !== "All Time"
   const isDateRangeActive = Boolean(filters.fromDate || filters.toDate)
 
+  const handleDownloadExcel = () => {
+    if (!wallets.length) {
+      toast.error("No rows to export")
+      return
+    }
+
+    const totals = wallets.reduce(
+      (acc, wallet) => {
+        acc.totalCashOrders += toNumber(wallet.totalCashOrders)
+        acc.totalOnlineOrders += toNumber(wallet.totalOnlineOrders)
+        acc.totalCash += getTotalCashAmount(wallet)
+        acc.cashInHand += toNumber(wallet.cashInHand)
+        acc.takenByAdmin += toNumber(wallet.cashSubmittedToAdmin)
+        acc.totalEarning += toNumber(wallet.totalEarning)
+        acc.paid += getPaidAmount(wallet)
+        acc.unpaid += getUnpaidAmount(wallet)
+        return acc
+      },
+      {
+        totalCashOrders: 0,
+        totalOnlineOrders: 0,
+        totalCash: 0,
+        cashInHand: 0,
+        takenByAdmin: 0,
+        totalEarning: 0,
+        paid: 0,
+        unpaid: 0,
+      },
+    )
+
+    const bodyRowsHtml = wallets
+      .map(
+        (wallet, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${htmlEscape(wallet.name || "-")}</td>
+            <td>${htmlEscape(wallet.deliveryIdString || "-")}</td>
+            <td class="num">${htmlEscape(toNumber(wallet.totalCashOrders).toFixed(0))}</td>
+            <td class="num">${htmlEscape(toNumber(wallet.totalOnlineOrders).toFixed(0))}</td>
+            <td class="num">${htmlEscape(getTotalCashAmount(wallet).toFixed(2))}</td>
+            <td class="num">${htmlEscape(toNumber(wallet.cashInHand).toFixed(2))}</td>
+            <td class="num">${htmlEscape(toNumber(wallet.cashSubmittedToAdmin).toFixed(2))}</td>
+            <td class="num">${htmlEscape(toNumber(wallet.totalEarning).toFixed(2))}</td>
+            <td class="num">${htmlEscape(getPaidAmount(wallet).toFixed(2))}</td>
+            <td class="num">${htmlEscape(getUnpaidAmount(wallet).toFixed(2))}</td>
+          </tr>
+        `,
+      )
+      .join("")
+
+    const xlsHtml = `
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            table { border-collapse: collapse; width: 100%; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; }
+            th { background: #f3f4f6; font-weight: 700; text-align: left; }
+            td.num { text-align: right; }
+            tr.total-row td { background: #dbeafe; color: #1e3a8a; font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>ID</th>
+                <th>Total COD orders</th>
+                <th>Total online orders</th>
+                <th>Total cash</th>
+                <th>Cash in hand</th>
+                <th>Taken by admin</th>
+                <th>Total earning</th>
+                <th>Paid</th>
+                <th>Unpaid</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyRowsHtml}
+              <tr class="total-row">
+                <td>TOTAL</td>
+                <td>${htmlEscape(`${wallets.length} rows`)}</td>
+                <td></td>
+                <td class="num">${htmlEscape(totals.totalCashOrders.toFixed(0))}</td>
+                <td class="num">${htmlEscape(totals.totalOnlineOrders.toFixed(0))}</td>
+                <td class="num">${htmlEscape(totals.totalCash.toFixed(2))}</td>
+                <td class="num">${htmlEscape(totals.cashInHand.toFixed(2))}</td>
+                <td class="num">${htmlEscape(totals.takenByAdmin.toFixed(2))}</td>
+                <td class="num">${htmlEscape(totals.totalEarning.toFixed(2))}</td>
+                <td class="num">${htmlEscape(totals.paid.toFixed(2))}</td>
+                <td class="num">${htmlEscape(totals.unpaid.toFixed(2))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    const blob = new Blob([xlsHtml], { type: "application/vnd.ms-excel;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    const stamp = new Date().toISOString().slice(0, 10)
+    link.href = url
+    link.download = `delivery-report-${stamp}.xls`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    toast.success("Excel downloaded")
+  }
+
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
@@ -688,15 +808,25 @@ export default function DeliveryBoyWallet() {
                 {total}
               </span>
             </div>
-            <div className="relative flex-1 sm:flex-initial min-w-[200px] max-w-xs">
-              <input
-                type="text"
-                placeholder="Search by name, ID, phone"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
-              />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadExcel}
+                className="px-4 py-2.5 text-sm font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors inline-flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download Excel
+              </button>
+              <div className="relative flex-1 sm:flex-initial min-w-[200px] max-w-xs">
+                <input
+                  type="text"
+                  placeholder="Search by name, ID, phone"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2.5 w-full text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
+                />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              </div>
             </div>
             </div>
           </div>

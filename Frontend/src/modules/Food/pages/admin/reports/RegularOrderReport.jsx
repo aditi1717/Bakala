@@ -6,7 +6,7 @@ import io from "socket.io-client"
 import { toast } from "sonner"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@food/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@food/components/ui/dialog"
-import { exportReportsToCSV, exportReportsToExcel, exportReportsToPDF, exportReportsToJSON } from "@food/components/admin/reports/reportsExportUtils"
+import { exportReportsToCSV, exportReportsToPDF, exportReportsToJSON } from "@food/components/admin/reports/reportsExportUtils"
 import searchIcon from "@food/assets/Dashboard-icons/image8.png"
 import exportIcon from "@food/assets/Dashboard-icons/image9.png"
 import scheduledIcon from "@food/assets/Dashboard-icons/image24.png"
@@ -40,6 +40,21 @@ const statusMeta = {
 const PAGE_SIZE = 25
 const AUTO_REFRESH_MS = 15000
 const INR_SYMBOL = "\u20B9"
+const toAmountNumber = (value) => {
+  if (value == null) return 0
+  const direct = Number(value)
+  if (Number.isFinite(direct)) return direct
+  const cleaned = String(value).replace(/[^0-9.-]/g, "")
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+const htmlEscape = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 
 export default function RegularOrderReport() {
   const todayDate = new Date().toISOString().split("T")[0]
@@ -370,9 +385,134 @@ export default function RegularOrderReport() {
       { key: "totalAmount", label: "Order Amount" },
       { key: "orderStatus", label: "Status" },
     ]
+    if (format === "excel") {
+      const totals = filteredOrders.reduce(
+        (acc, order) => {
+          acc.totalItemAmount += toAmountNumber(order.totalItemAmount)
+          acc.couponByAdmin += toAmountNumber(order.couponByAdmin)
+          acc.couponByRestaurant += toAmountNumber(order.couponByRestaurant)
+          acc.offerByRestaurant += toAmountNumber(order.offerByRestaurant)
+          acc.restaurantEarning += toAmountNumber(order.restaurantEarning)
+          acc.adminCommission += toAmountNumber(order.adminCommission)
+          acc.deliveryBoyEarning += toAmountNumber(order.deliveryBoyEarning)
+          acc.vatTax += toAmountNumber(order.vatTax)
+          acc.deliveryCharge += toAmountNumber(order.deliveryCharge)
+          acc.platformFee += toAmountNumber(order.platformFee)
+          acc.totalAmount += toAmountNumber(order.totalAmount)
+          return acc
+        },
+        {
+          totalItemAmount: 0,
+          couponByAdmin: 0,
+          couponByRestaurant: 0,
+          offerByRestaurant: 0,
+          restaurantEarning: 0,
+          adminCommission: 0,
+          deliveryBoyEarning: 0,
+          vatTax: 0,
+          deliveryCharge: 0,
+          platformFee: 0,
+          totalAmount: 0,
+        },
+      )
+
+      const bodyRowsHtml = filteredOrders
+        .map(
+          (order) => `
+            <tr>
+              <td>${htmlEscape(order.orderId || "-")}</td>
+              <td>${htmlEscape(order.restaurant || "-")}</td>
+              <td>${htmlEscape(order.customerName || "-")}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.totalItemAmount).toFixed(2))}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.couponByAdmin).toFixed(2))}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.couponByRestaurant).toFixed(2))}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.offerByRestaurant).toFixed(2))}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.restaurantEarning).toFixed(2))}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.adminCommission).toFixed(2))}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.deliveryBoyEarning).toFixed(2))}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.vatTax).toFixed(2))}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.deliveryCharge).toFixed(2))}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.platformFee).toFixed(2))}</td>
+              <td class="num">${htmlEscape(toAmountNumber(order.totalAmount).toFixed(2))}</td>
+              <td>${htmlEscape(order.orderStatus || "-")}</td>
+            </tr>
+          `,
+        )
+        .join("")
+
+      const xlsHtml = `
+        <html>
+          <head>
+            <meta charset="UTF-8" />
+            <style>
+              table { border-collapse: collapse; width: 100%; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
+              th, td { border: 1px solid #d1d5db; padding: 8px; }
+              th { background: #f3f4f6; font-weight: 700; text-align: left; }
+              td.num { text-align: right; }
+              tr.total-row td { background: #dbeafe; color: #1e3a8a; font-weight: 700; }
+            </style>
+          </head>
+          <body>
+            <table>
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Restaurant</th>
+                  <th>Customer Name</th>
+                  <th>Total Item Amount</th>
+                  <th>Coupon by Admin</th>
+                  <th>Coupon by Restaurant</th>
+                  <th>Offer by Restaurant</th>
+                  <th>Restaurant Earning</th>
+                  <th>Admin Commission</th>
+                  <th>Delivery Boy Earning</th>
+                  <th>VAT/Tax</th>
+                  <th>Delivery Charge</th>
+                  <th>Platform Fee</th>
+                  <th>Order Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${bodyRowsHtml}
+                <tr class="total-row">
+                  <td>TOTAL</td>
+                  <td>${htmlEscape(`${filteredOrders.length} orders`)}</td>
+                  <td></td>
+                  <td class="num">${htmlEscape(totals.totalItemAmount.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.couponByAdmin.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.couponByRestaurant.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.offerByRestaurant.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.restaurantEarning.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.adminCommission.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.deliveryBoyEarning.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.vatTax.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.deliveryCharge.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.platformFee.toFixed(2))}</td>
+                  <td class="num">${htmlEscape(totals.totalAmount.toFixed(2))}</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `
+
+      const blob = new Blob([xlsHtml], { type: "application/vnd.ms-excel;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `regular-order-report-${new Date().toISOString().slice(0, 10)}.xls`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      toast.success("Excel downloaded")
+      return
+    }
+
     switch (format) {
       case "csv": exportReportsToCSV(filteredOrders, headers, "regular_order_report"); break
-      case "excel": exportReportsToExcel(filteredOrders, headers, "regular_order_report"); break
       case "pdf": exportReportsToPDF(filteredOrders, headers, "regular_order_report", "Regular Order Report"); break
       case "json": exportReportsToJSON(filteredOrders, "regular_order_report"); break
     }

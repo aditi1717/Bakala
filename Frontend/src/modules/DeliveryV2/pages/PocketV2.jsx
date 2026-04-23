@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  IndianRupee,
   ChevronRight,
   ShieldCheck,
   Loader2,
@@ -83,16 +82,6 @@ export const PocketV2 = () => {
     fetchData();
   }, []);
 
-  const getCurrentWeekRange = () => {
-    const now = new Date();
-    const start = new Date(now);
-    start.setDate(now.getDate() - now.getDay());
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    const formatDate = (d) => `${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })}`;
-    return `${formatDate(start)} - ${formatDate(end)}`;
-  };
-
   const InfoCard = ({ label, value, className = '' }) => (
     <div className={`rounded-xl border border-gray-200 bg-white p-4 ${className}`}>
       <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</p>
@@ -134,23 +123,6 @@ export const PocketV2 = () => {
       )}
 
       <div className="p-4 space-y-4">
-        <div
-          onClick={() => navigate('/food/delivery/earnings')}
-          className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center justify-between cursor-pointer active:bg-gray-50 transition-colors"
-        >
-          <div>
-            <p className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-0.5">
-              This Week - {getCurrentWeekRange()}
-            </p>
-            <h2 className="text-2xl font-bold text-gray-900 leading-none">
-              Rs {walletState.weeklyEarnings.toFixed(0)}
-            </h2>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0 border border-green-100">
-            <IndianRupee className="w-5 h-5 text-green-600" />
-          </div>
-        </div>
-
         <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
           <p className="text-[11px] font-bold uppercase tracking-wide text-blue-700 mb-2">Delivery Earnings Settlement</p>
           <div className="grid grid-cols-2 gap-3">

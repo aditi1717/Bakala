@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { CalendarRange, CheckCircle2, CircleDollarSign, Loader2, Receipt, Search } from "lucide-react"
+import { CalendarRange, CheckCircle2, CircleDollarSign, Download, Loader2, Receipt, Search } from "lucide-react"
 import { toast } from "sonner"
 import { adminAPI } from "@food/api"
 
@@ -19,6 +19,14 @@ const toDisplayDate = (value = "") => {
     hour12: false,
   })
 }
+
+const htmlEscape = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 
 export default function DeliveryPayoutSettlement() {
   const [fromDate, setFromDate] = useState("")
@@ -144,6 +152,100 @@ export default function DeliveryPayoutSettlement() {
     }
   }
 
+  const handleDownloadExcel = () => {
+    if (!rows.length) {
+      toast.error("No rows to export")
+      return
+    }
+
+    const totalOrders = rows.reduce((sum, row) => sum + Number(row.ordersCount || 0), 0)
+    const totalCodOrders = rows.reduce((sum, row) => sum + Number(row.codOrdersCount || 0), 0)
+
+    const bodyRowsHtml = rows
+      .map(
+        (row) => `
+          <tr>
+            <td>${htmlEscape(row.beneficiaryName || "-")}</td>
+            <td>${htmlEscape(row.beneficiaryId || "-")}</td>
+            <td class="num">${htmlEscape(Number(row.ordersCount || 0).toFixed(0))}</td>
+            <td class="num">${htmlEscape(Number(row.totalEarning || 0).toFixed(2))}</td>
+            <td class="num">${htmlEscape(Number(row.alreadyPaid || 0).toFixed(2))}</td>
+            <td class="num">${htmlEscape(Number(row.payableNow || 0).toFixed(2))}</td>
+            <td class="num">${htmlEscape(Number(row.codOrdersCount || 0).toFixed(0))}</td>
+            <td class="num">${htmlEscape(Number(row.codAmount || 0).toFixed(2))}</td>
+            <td class="num">${htmlEscape(Number(row.codPaid || 0).toFixed(2))}</td>
+            <td class="num">${htmlEscape(Number(row.codPending || 0).toFixed(2))}</td>
+            <td>${htmlEscape(Number(row.codOrdersCount || 0) > 0 ? String(row.codStatus || "unpaid").replaceAll("_", " ") : "NIL")}</td>
+            <td>${htmlEscape(toDisplayDate(row.lastSettledToDate))}</td>
+          </tr>
+        `,
+      )
+      .join("")
+
+    const xlsHtml = `
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            table { border-collapse: collapse; width: 100%; font-family: Calibri, Arial, sans-serif; font-size: 12px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; }
+            th { background: #f3f4f6; font-weight: 700; text-align: left; }
+            td.num { text-align: right; }
+            tr.total-row td { background: #dbeafe; color: #1e3a8a; font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <thead>
+              <tr>
+                <th>Delivery Partner</th>
+                <th>Partner ID</th>
+                <th>Orders</th>
+                <th>Total Earning</th>
+                <th>Paid</th>
+                <th>Unpaid</th>
+                <th>COD Orders</th>
+                <th>COD Amount</th>
+                <th>COD Paid</th>
+                <th>COD Pending</th>
+                <th>COD Status</th>
+                <th>Last Settled</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyRowsHtml}
+              <tr class="total-row">
+                <td>TOTAL</td>
+                <td>${htmlEscape(`${rows.length} partners`)}</td>
+                <td class="num">${htmlEscape(totalOrders.toFixed(0))}</td>
+                <td class="num">${htmlEscape(Number(summary.totalEarning || 0).toFixed(2))}</td>
+                <td class="num">${htmlEscape(Number(summary.totalPaid || 0).toFixed(2))}</td>
+                <td class="num">${htmlEscape(Number(summary.totalPending || 0).toFixed(2))}</td>
+                <td class="num">${htmlEscape(totalCodOrders.toFixed(0))}</td>
+                <td class="num">${htmlEscape(Number(summary.totalCodAmount || 0).toFixed(2))}</td>
+                <td class="num">${htmlEscape(Number(summary.totalCodPaid || 0).toFixed(2))}</td>
+                <td class="num">${htmlEscape(Number(summary.totalCodPending || 0).toFixed(2))}</td>
+                <td></td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    const blob = new Blob([xlsHtml], { type: "application/vnd.ms-excel;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `delivery-settlement-${new Date().toISOString().slice(0, 10)}.xls`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    toast.success("Excel downloaded")
+  }
+
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
@@ -239,7 +341,16 @@ export default function DeliveryPayoutSettlement() {
             <p className="mt-2 text-2xl font-bold text-amber-700">{toCurrency(summary.totalCodPending)}</p>
           </div>
         </div>
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-end gap-2 mb-4">
+          <button
+            type="button"
+            onClick={handleDownloadExcel}
+            disabled={loading || rows.length === 0}
+            className="px-4 py-2.5 text-sm font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Download Excel
+          </button>
           <button
             type="button"
             onClick={handleMarkAllPaid}
