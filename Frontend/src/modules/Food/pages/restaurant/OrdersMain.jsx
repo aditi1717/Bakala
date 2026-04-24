@@ -42,7 +42,7 @@ const filterTabs = [
   { id: "all", label: "All" },
   { id: "preparing", label: "Preparing" },
   { id: "ready", label: "Ready" },
-  { id: "out-for-delivery", label: "Out for delivery" },
+  { id: "out-for-delivery", label: "Picked Up" },
   { id: "scheduled", label: "Scheduled" },
   { id: "completed", label: "Completed" },
   { id: "cancelled", label: "Cancelled" },
@@ -53,7 +53,9 @@ const allOrdersStatusPriority = {
   confirmed: 1,
   preparing: 2,
   ready: 3,
+  picked_up: 4,
   out_for_delivery: 4,
+  reached_drop: 5,
   scheduled: 5,
   // delivered, completed, cancelled — no fixed priority, sorted by date only
 };
@@ -97,6 +99,22 @@ const formatOrderDateTime = (dateInput) => {
 const getDispatchPartnerId = (orderLike) =>
   orderLike?.deliveryPartnerId || orderLike?.dispatch?.deliveryPartnerId || null;
 
+const getDispatchPartnerName = (orderLike) => {
+  const candidates = [
+    orderLike?.deliveryPartnerName,
+    orderLike?.dispatch?.deliveryPartnerName,
+    orderLike?.dispatch?.deliveryPartner?.name,
+    orderLike?.dispatch?.deliveryPartnerId?.name,
+    orderLike?.deliveryPartner?.name,
+    orderLike?.deliveryPartnerId?.name,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+};
+
 const transformOrderForList = (order) => ({
   orderId: order.orderId || order._id,
   mongoId: order._id,
@@ -109,10 +127,12 @@ const transformOrderForList = (order) => ({
   itemsSummary:
     order.items?.map((item) => `${item.quantity}x ${item.name}`).join(", ") ||
     "No items",
+  items: Array.isArray(order.items) ? order.items : [],
   photoUrl: order.items?.[0]?.image || null,
   photoAlt: order.items?.[0]?.name || "Order",
   paymentMethod: order.paymentMethod || order.payment?.method || null,
   deliveryPartnerId: getDispatchPartnerId(order),
+  deliveryPartnerName: getDispatchPartnerName(order),
   dispatchStatus: order.dispatch?.status || null,
   deliveryState: order.deliveryState || null,
   preparingTimestamp: order.tracking?.preparing?.timestamp
@@ -156,6 +176,7 @@ function CompletedOrders({ onSelectOrder, refreshToken = 0 }) {
               order.items
                 ?.map((item) => `${item.quantity}x ${item.name}`)
                 .join(", ") || "No items",
+            items: Array.isArray(order.items) ? order.items : [],
             photoUrl: order.items?.[0]?.image || null,
             photoAlt: order.items?.[0]?.name || "Order",
             amount: order.pricing?.total || order.total || 0,
@@ -245,12 +266,14 @@ function CompletedOrders({ onSelectOrder, refreshToken = 0 }) {
                   onClick={() =>
                     onSelectOrder?.({
                       orderId: order.orderId,
+                      mongoId: order.mongoId,
                       status: "Delivered",
                       customerName: order.customerName,
                       type: order.type,
                       tableOrToken: order.tableOrToken,
                       timePlaced: deliveredDate,
                       itemsSummary: order.itemsSummary,
+                      items: order.items,
                       paymentMethod: order.paymentMethod,
                     })
                   }
@@ -362,6 +385,7 @@ function CancelledOrders({ onSelectOrder, refreshToken = 0 }) {
               order.items
                 ?.map((item) => `${item.quantity}x ${item.name}`)
                 .join(", ") || "No items",
+            items: Array.isArray(order.items) ? order.items : [],
             photoUrl: order.items?.[0]?.image || null,
             photoAlt: order.items?.[0]?.name || "Order",
             amount: order.pricing?.total || order.total || 0,
@@ -458,12 +482,14 @@ function CancelledOrders({ onSelectOrder, refreshToken = 0 }) {
                   onClick={() =>
                     onSelectOrder?.({
                       orderId: order.orderId,
+                      mongoId: order.mongoId,
                       status: "Cancelled",
                       customerName: order.customerName,
                       type: order.type,
                       tableOrToken: order.tableOrToken,
                       timePlaced: cancelledDate,
                       itemsSummary: order.itemsSummary,
+                      items: order.items,
                       paymentMethod: order.paymentMethod,
                     })
                   }
@@ -618,7 +644,7 @@ function AllOrders({ onSelectOrder, onCancel, refreshToken = 0 }) {
       if (intervalId) clearInterval(intervalId);
       if (countdownIntervalId) clearInterval(countdownIntervalId);
     };
-  }, []);
+  }, [refreshToken]);
 
   const handleMarkReady = async ({ orderId, mongoId }) => {
     const orderKey = mongoId || orderId;
@@ -769,6 +795,7 @@ export default function OrdersMain() {
   const isMutedRef = useRef(isMuted);
   const newOrderRef = useRef(null);
   const popupHydrationRef = useRef("");
+  const selectedOrderHydrationRef = useRef("");
 
   const markOrderAsShown = (orderLike) => {
     const keys = [
@@ -831,6 +858,45 @@ export default function OrdersMain() {
         previous?.paymentMethod ||
         null,
       payment: source?.payment || previous?.payment || null,
+    };
+  };
+
+  const normalizeSelectedOrderForSheet = (orderLike = {}, previous = null) => {
+    if (!orderLike || typeof orderLike !== "object") return previous || null;
+
+    const source = { ...(previous || {}), ...orderLike };
+    const sourceStatusRaw = String(source?.status || "").trim();
+    const formattedStatus = sourceStatusRaw
+      ? sourceStatusRaw
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase())
+      : String(previous?.status || "Pending");
+
+    return {
+      ...source,
+      orderId:
+        source?.orderId || source?.id || source?._id || previous?.orderId || "",
+      mongoId: source?.mongoId || source?._id || previous?.mongoId || null,
+      status: formattedStatus,
+      items: Array.isArray(source?.items) ? source.items : previous?.items || [],
+      itemsSummary:
+        source?.itemsSummary ||
+        previous?.itemsSummary ||
+        (Array.isArray(source?.items)
+          ? source.items
+              .map((item) => `${item?.quantity || 1}x ${item?.name || "Item"}`)
+              .join(", ")
+          : "No items"),
+      paymentMethod:
+        source?.paymentMethod ||
+        source?.payment?.method ||
+        previous?.paymentMethod ||
+        null,
+      deliveryPartnerName:
+        source?.deliveryPartnerName ||
+        previous?.deliveryPartnerName ||
+        getDispatchPartnerName(source) ||
+        "",
     };
   };
 
@@ -1315,6 +1381,68 @@ export default function OrdersMain() {
     selectedOrder,
     clearCancelledOrderId,
   ]);
+
+  // Hydrate selected order with latest backend payload when details sheet opens.
+  useEffect(() => {
+    if (!isSheetOpen || !selectedOrder) return;
+
+    const lookupIdRaw =
+      selectedOrder?.mongoId ||
+      selectedOrder?.orderMongoId ||
+      selectedOrder?.orderId ||
+      selectedOrder?.id ||
+      "";
+    const lookupId = String(lookupIdRaw).trim();
+    if (!lookupId) return;
+
+    if (selectedOrderHydrationRef.current === lookupId) return;
+    selectedOrderHydrationRef.current = lookupId;
+
+    let active = true;
+
+    (async () => {
+      try {
+        const response = await restaurantAPI.getOrderById(lookupId);
+        const apiOrder =
+          response?.data?.data?.order ||
+          response?.data?.order ||
+          response?.data?.data ||
+          null;
+        if (!active || !apiOrder) return;
+
+        setSelectedOrder((prev) =>
+          normalizeSelectedOrderForSheet(
+            {
+              ...apiOrder,
+              orderId: prev?.orderId || apiOrder?.orderId || apiOrder?._id,
+              mongoId: prev?.mongoId || apiOrder?._id || null,
+              customerName:
+                prev?.customerName ||
+                apiOrder?.userId?.name ||
+                apiOrder?.user?.name ||
+                apiOrder?.customerName ||
+                apiOrder?.userId?.phone ||
+                "Guest",
+              type:
+                prev?.type ||
+                (apiOrder?.deliveryFleet === "standard"
+                  ? "Home Delivery"
+                  : "Express Delivery"),
+              tableOrToken: prev?.tableOrToken || null,
+              timePlaced: prev?.timePlaced || formatOrderDateTime(apiOrder?.createdAt),
+            },
+            prev,
+          ),
+        );
+      } catch (error) {
+        debugError("Error hydrating selected order details:", error);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [isSheetOpen, selectedOrder]);
 
   // Best-effort unlock for popup buzzer so it can keep playing when tab is backgrounded.
   useEffect(() => {
@@ -2082,7 +2210,8 @@ export default function OrdersMain() {
   }, [activeFilter]);
 
   const handleSelectOrder = (order) => {
-    setSelectedOrder(order);
+    selectedOrderHydrationRef.current = "";
+    setSelectedOrder(normalizeSelectedOrderForSheet(order));
     setIsSheetOpen(true);
   };
 
@@ -3091,7 +3220,11 @@ export default function OrdersMain() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setIsSheetOpen(false)}>
+            onClick={() => {
+              setIsSheetOpen(false);
+              setSelectedOrder(null);
+              selectedOrderHydrationRef.current = "";
+            }}>
             <motion.div
               className="w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto bg-white rounded-t-3xl p-4 pb-[calc(1.25rem+env(safe-area-inset-bottom)+6rem)] shadow-lg"
               initial={{ y: 80 }}
@@ -3118,6 +3251,14 @@ export default function OrdersMain() {
                       ? ` • ${selectedOrder.tableOrToken}`
                       : ""}
                   </p>
+                  {selectedOrder.deliveryPartnerName ? (
+                    <p className="text-[11px] text-gray-600 mt-1">
+                      Delivery Partner:{" "}
+                      <span className="font-semibold text-gray-800">
+                        {selectedOrder.deliveryPartnerName}
+                      </span>
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span
@@ -3145,9 +3286,74 @@ export default function OrdersMain() {
 
               <div className="mb-3">
                 <p className="text-xs font-medium text-gray-700 mb-1">Items</p>
-                <p className="text-xs text-gray-600">
-                  {selectedOrder.itemsSummary}
-                </p>
+                {Array.isArray(selectedOrder.items) &&
+                selectedOrder.items.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 text-gray-600">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-medium">Item</th>
+                          <th className="px-2 py-2 text-center font-medium">Qty</th>
+                          <th className="px-2 py-2 text-right font-medium">Rate</th>
+                          <th className="px-2 py-2 text-right font-medium">Price</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedOrder.items.map((item, index) => {
+                          const quantity = Math.max(1, Number(item?.quantity || 1));
+                          const variantName =
+                            item?.variantName ||
+                            item?.selectedVariant?.name ||
+                            item?.variant?.name ||
+                            item?.size ||
+                            "-";
+                          const unitPrice = Number(
+                            item?.price ??
+                              item?.unitPrice ??
+                              item?.basePrice ??
+                              item?.selectedVariant?.price ??
+                              0,
+                          );
+                          const lineTotalRaw = Number(
+                            item?.totalPrice ??
+                              item?.lineTotal ??
+                              item?.subtotal ??
+                              unitPrice * quantity,
+                          );
+                          const lineTotal = Number.isFinite(lineTotalRaw)
+                            ? lineTotalRaw
+                            : 0;
+                          const itemName = item?.name || "Item";
+                          const itemDisplayName =
+                            variantName && variantName !== "-"
+                              ? `${itemName} (${variantName})`
+                              : itemName;
+
+                          return (
+                            <tr key={`${item?.id || item?.name || "item"}-${index}`} className="border-t border-gray-100">
+                              <td className="px-2 py-2 text-gray-800">
+                                {itemDisplayName}
+                              </td>
+                              <td className="px-2 py-2 text-center text-gray-700">
+                                {quantity}
+                              </td>
+                              <td className="px-2 py-2 text-right text-gray-700">
+                                Rs {unitPrice.toFixed(2)}
+                              </td>
+                              <td className="px-2 py-2 text-right text-gray-800">
+                                Rs {lineTotal.toFixed(2)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-600">
+                    {selectedOrder.itemsSummary}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-gray-500 mb-4">
@@ -3180,7 +3386,11 @@ export default function OrdersMain() {
               <button
                 className="w-full text-white py-2.5 rounded-xl text-sm font-medium"
                 style={{ background: BRAND_THEME.gradients.primary }}
-                onClick={() => setIsSheetOpen(false)}>
+                onClick={() => {
+                  setIsSheetOpen(false);
+                  setSelectedOrder(null);
+                  selectedOrderHydrationRef.current = "";
+                }}>
                 Close
               </button>
             </motion.div>
@@ -3206,10 +3416,12 @@ function OrderCard({
   timePlaced,
   eta,
   itemsSummary,
+  items,
   paymentMethod,
   photoUrl,
   photoAlt,
   deliveryPartnerId,
+  deliveryPartnerName,
   dispatchStatus,
   deliveryState,
   onSelect,
@@ -3240,9 +3452,22 @@ function OrderCard({
     hasDeliveryProgressAfterAccept;
   const isReady = normalizedStatus === "ready";
   const isPreparing = normalizedStatus === "preparing";
-  const statusLabel = String(status || "")
+  let statusLabel = String(status || "")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+  if (
+    normalizedStatus === "out_for_delivery" ||
+    normalizedStatus === "picked_up" ||
+    normalizedStatus === "en_route_to_delivery"
+  ) {
+    statusLabel = "Picked Up";
+  } else if (
+    normalizedStatus === "reached_drop" ||
+    normalizedStatus === "at_drop" ||
+    normalizedStatus === "at_delivery"
+  ) {
+    statusLabel = "Picked Up";
+  }
 
   return (
     <div className="w-full bg-white rounded-2xl p-4 mb-3 border border-gray-200 hover:border-gray-400 transition-colors relative">
@@ -3263,6 +3488,7 @@ function OrderCard({
         onClick={() =>
           onSelect?.({
             orderId,
+            mongoId,
             status,
             customerName,
             type,
@@ -3270,7 +3496,9 @@ function OrderCard({
             timePlaced,
             eta,
             itemsSummary,
+            items,
             paymentMethod,
+            deliveryPartnerName,
           })
         }
         className="w-full text-left flex gap-3 items-stretch cursor-pointer">
@@ -3434,9 +3662,11 @@ function PreparingOrders({
                 order.items
                   ?.map((item) => `${item.quantity}x ${item.name}`)
                   .join(", ") || "No items",
+              items: Array.isArray(order.items) ? order.items : [],
               photoUrl: order.items?.[0]?.image || null,
               photoAlt: order.items?.[0]?.name || "Order",
               deliveryPartnerId: getDispatchPartnerId(order),
+              deliveryPartnerName: getDispatchPartnerName(order),
               dispatchStatus: order.dispatch?.status || null,
               deliveryState: order.deliveryState || null,
               paymentMethod:
@@ -3682,10 +3912,12 @@ function PreparingOrders({
                 timePlaced={order.timePlaced}
                 eta={etaDisplay}
                 itemsSummary={order.itemsSummary}
+                items={order.items}
                 photoUrl={order.photoUrl}
                 photoAlt={order.photoAlt}
                 paymentMethod={order.paymentMethod}
                 deliveryPartnerId={order.deliveryPartnerId}
+                deliveryPartnerName={order.deliveryPartnerName}
                 dispatchStatus={order.dispatchStatus}
                 deliveryState={order.deliveryState}
                 onSelect={onSelectOrder}
@@ -3740,10 +3972,12 @@ function ReadyOrders({ onSelectOrder, refreshToken = 0 }) {
               order.items
                 ?.map((item) => `${item.quantity}x ${item.name}`)
                 .join(", ") || "No items",
+            items: Array.isArray(order.items) ? order.items : [],
             photoUrl: order.items?.[0]?.image || null,
             photoAlt: order.items?.[0]?.name || "Order",
             paymentMethod: order.paymentMethod || order.payment?.method || null,
             deliveryPartnerId: getDispatchPartnerId(order),
+            deliveryPartnerName: getDispatchPartnerName(order),
             dispatchStatus: order.dispatch?.status || null,
             deliveryState: order.deliveryState || null,
           }));
@@ -3819,7 +4053,7 @@ function ReadyOrders({ onSelectOrder, refreshToken = 0 }) {
   );
 }
 
-// Out for Delivery Orders List
+// Delivery Progress Orders List
 const OutForDeliveryOrders = ({ onSelectOrder, refreshToken = 0 }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -3829,21 +4063,26 @@ const OutForDeliveryOrders = ({ onSelectOrder, refreshToken = 0 }) => {
 
     const fetchOrders = async () => {
       try {
-        // Fetch all orders and filter for 'out_for_delivery' status on frontend
+        // Fetch all orders and filter for active delivery progress statuses on frontend
         const response = await restaurantAPI.getOrders();
 
         if (!isMounted) return;
 
         if (response.data?.success && response.data.data?.orders) {
-          // Filter orders with 'out_for_delivery' status
+          // Filter orders that are in picked-up delivery stage equivalents
           const outForDeliveryOrders = response.data.data.orders.filter(
-            (order) => order.status === "out_for_delivery",
+            (order) =>
+              order.status === "out_for_delivery" ||
+              order.status === "picked_up" ||
+              order.status === "reached_drop" ||
+              order.status === "at_drop" ||
+              order.status === "at_delivery",
           );
 
           const transformedOrders = outForDeliveryOrders.map((order) => ({
             orderId: order.orderId || order._id,
             mongoId: order._id,
-            status: order.status || "out_for_delivery",
+            status: order.status || "picked_up",
             customerName: order.userId?.name || order.user?.name || order.customerName || order.userId?.phone || 'Guest',
             type:
               order.deliveryFleet === "standard"
@@ -3856,10 +4095,12 @@ const OutForDeliveryOrders = ({ onSelectOrder, refreshToken = 0 }) => {
               order.items
                 ?.map((item) => `${item.quantity}x ${item.name}`)
                 .join(", ") || "No items",
+            items: Array.isArray(order.items) ? order.items : [],
             photoUrl: order.items?.[0]?.image || null,
             photoAlt: order.items?.[0]?.name || "Order",
             paymentMethod: order.paymentMethod || order.payment?.method || null,
             deliveryPartnerId: getDispatchPartnerId(order),
+            deliveryPartnerName: getDispatchPartnerName(order),
             dispatchStatus: order.dispatch?.status || null,
             deliveryState: order.deliveryState || null,
           }));
@@ -3900,9 +4141,7 @@ const OutForDeliveryOrders = ({ onSelectOrder, refreshToken = 0 }) => {
     return (
       <div className="pt-4 pb-6">
         <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-base font-semibold text-black">
-            Out for delivery
-          </h2>
+          <h2 className="text-base font-semibold text-black">Delivery progress</h2>
           <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
         </div>
         <div className="text-center py-8 text-gray-500 text-sm">Loading...</div>
@@ -3913,12 +4152,12 @@ const OutForDeliveryOrders = ({ onSelectOrder, refreshToken = 0 }) => {
   return (
     <div className="pt-4 pb-6">
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-base font-semibold text-black">Out for delivery</h2>
+        <h2 className="text-base font-semibold text-black">Delivery progress</h2>
         <span className="text-xs text-gray-500">{orders.length} active</span>
       </div>
       {orders.length === 0 ? (
         <div className="text-center py-8 text-gray-500 text-sm">
-          No orders out for delivery
+          No delivery progress orders
         </div>
       ) : (
         <div>

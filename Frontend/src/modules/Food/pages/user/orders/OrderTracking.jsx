@@ -401,6 +401,20 @@ function mapOrderToTrackingUiStatus(orderLike) {
   return mapBackendOrderStatusToUi(statusRaw)
 }
 
+function getUserFacingOrderStatusLabel(rawStatus) {
+  const s = String(rawStatus || "").toLowerCase()
+  if (s === "picked_up" || s === "out_for_delivery" || s === "en_route_to_delivery") return "Picked Up"
+  if (s === "reached_drop" || s === "at_drop" || s === "at_delivery") return "Picked Up"
+  if (s === "delivered" || s === "completed") return "Delivered"
+  if (s === "ready_for_pickup" || s === "ready") return "Ready"
+  if (s === "preparing") return "Preparing"
+  if (s === "confirmed" || s === "accepted") return "Accepted"
+  if (s.includes("cancelled") || s === "cancelled") return "Cancelled"
+  return String(rawStatus || "Pending")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 /** Prefer live delivery phase when present (socket / polling include deliveryState). */
 function isFoodOrderCancelledStatus(statusRaw) {
   const s = String(statusRaw || "").toLowerCase()
@@ -448,11 +462,6 @@ export default function OrderTracking() {
   const isInitialPollRequestedRef = useRef(null)
   const lastPollExecutionRef = useRef(0) // New: Hard throttle for extreme cases
 
-  // Delivery handover OTP received via socket event.
-  // Kept separately so UI still renders even if the event arrives
-  // before the order API poll populates `order` state.
-  const [socketDropOtpCode, setSocketDropOtpCode] = useState(null)
-
   useEffect(() => {
     if (typeof window === "undefined") return undefined
     const syncSocketState = () => setIsSocketConnected(Boolean(window.orderSocketConnected))
@@ -461,60 +470,6 @@ export default function OrderTracking() {
     return () => window.clearInterval(intervalId)
   }, [])
 
-
-  // OTP received via socket event (deliveryDropOtp)
-  useEffect(() => {
-    const handleDeliveryDropOtp = (event) => {
-      const detail = event?.detail || {}
-      const otp = detail?.otp != null ? String(detail.otp) : null
-      const evtOrderId = detail?.orderId != null ? String(detail.orderId) : null
-      const evtOrderMongoId =
-        detail?.orderMongoId != null ? String(detail.orderMongoId) : null
-
-      if (!otp) return
-
-      // If the order is already loaded, match by either orderId or mongoId.
-      // Otherwise, match against the current URL param.
-      const currentIds = [String(orderId)]
-      if (order?.orderId) currentIds.push(String(order.orderId))
-      if (order?.mongoId) currentIds.push(String(order.mongoId))
-      if (order?._id) currentIds.push(String(order._id))
-
-      const matches =
-        (evtOrderId && currentIds.includes(evtOrderId)) ||
-        (evtOrderMongoId && currentIds.includes(evtOrderMongoId))
-
-      if (!matches) return
-
-      // Always store so UI can render even if `order` hasn't loaded yet.
-      setSocketDropOtpCode(otp)
-
-      setOrder((prev) => {
-        if (!prev) return prev
-        const prevDV = prev.deliveryVerification || {}
-        const prevDropOtp = prevDV.dropOtp || {}
-        
-        // Only update if code actually changed to avoid render loops
-        if (prevDropOtp.code === otp) return prev;
-        
-        return {
-          ...prev,
-          deliveryVerification: {
-            ...prevDV,
-            dropOtp: {
-              ...prevDropOtp,
-              required: true,
-              verified: false,
-              code: otp
-            }
-          }
-        }
-      })
-    }
-
-    window.addEventListener('deliveryDropOtp', handleDeliveryDropOtp)
-    return () => window.removeEventListener('deliveryDropOtp', handleDeliveryDropOtp)
-  }, [orderId, order])
 
   // --------------------------------------------------------------------------
   // DATA FETCHING & POLLING STABILITY (FIXED FOR HAMMERING)
@@ -602,30 +557,6 @@ export default function OrderTracking() {
     }
     navigate("/food/orders")
   }, [navigate])
-
-  // Clear OTP when order is finalized.
-  useEffect(() => {
-    if (!order) return
-    const status = mapOrderToTrackingUiStatus(order)
-    if (status === 'delivered' || status === 'cancelled') {
-      setSocketDropOtpCode(null)
-
-
-      setOrder((prev) => {
-        if (!prev?.deliveryVerification?.dropOtp?.code) return prev
-        return {
-          ...prev,
-          deliveryVerification: {
-            ...(prev.deliveryVerification || {}),
-            dropOtp: {
-              ...(prev.deliveryVerification?.dropOtp || {}),
-              code: null
-            }
-          }
-        }
-      })
-    }
-  }, [orderStatus, order])
 
   const defaultAddress = getDefaultAddress()
 
@@ -784,12 +715,6 @@ export default function OrderTracking() {
       window.location.assign(`tel:${cleanPhone}`);
     }
   };
-
-  const customerDeliveryOtp = useMemo(() => {
-    const codeFromOrder = order?.deliveryVerification?.dropOtp?.code
-    const code = codeFromOrder ?? socketDropOtpCode
-    return code ? String(code) : null
-  }, [order?.deliveryVerification?.dropOtp?.code, socketDropOtpCode])
 
   useEffect(() => {
     if (!isEditWindowOpen) return
@@ -1189,14 +1114,14 @@ export default function OrderTracking() {
       iconType: 'rider'
     },
     on_way: {
-      title: "Out for delivery",
-      subtitle: typeof estimatedTime === 'number' ? `Arriving in ${estimatedTime} mins` : "Rider is out for delivery",
+      title: "Picked Up",
+      subtitle: typeof estimatedTime === 'number' ? `Arriving in ${estimatedTime} mins` : "Rider picked your order and is on the way",
       color: BRAND_THEME.colors.brand.primary,
       iconType: 'rider'
     },
     at_drop: {
-      title: "Arrived at location",
-      subtitle: "Please come to the door",
+      title: "Picked Up",
+      subtitle: typeof estimatedTime === 'number' ? `Arriving in ${estimatedTime} mins` : "Rider picked your order and is on the way",
       color: BRAND_THEME.colors.brand.primary,
       iconType: 'rider'
     },
@@ -1704,7 +1629,7 @@ export default function OrderTracking() {
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wider">Status</p>
                   <span className="text-sm font-bold text-green-600 uppercase">
-                    {order?.status?.replace('_', ' ')}
+                    {getUserFacingOrderStatusLabel(order?.orderStatus || order?.status)}
                   </span>
                 </div>
               </div>

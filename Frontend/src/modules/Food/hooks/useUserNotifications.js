@@ -137,30 +137,8 @@ export const useUserNotifications = () => {
       });
       window.dispatchEvent(event);
     });
-
-    /** Customer receives handover OTP when partner confirms "reached drop" (never shown to partner). */
-    socketRef.current.on('delivery_drop_otp', (payload) => {
-      debugLog('🔐 Delivery handover OTP:', payload?.orderId);
-      const otp = payload?.otp != null ? String(payload.otp) : '';
-      const orderId = payload?.orderId != null ? String(payload.orderId) : '';
-      const message = payload?.message != null ? String(payload.message) : '';
-      window.dispatchEvent(
-        new CustomEvent('deliveryDropOtp', {
-          detail: {
-            orderMongoId: payload?.orderMongoId,
-            orderId,
-            otp,
-            message
-          }
-        })
-      );
-      const title = orderId ? `Order ${orderId}` : 'Delivery OTP';
-      const parts = [message, otp ? `OTP: ${otp}` : ''].filter(Boolean);
-      toast.message(title, {
-        description: parts.join(' — ') || 'Handover OTP from your delivery partner.',
-        duration: 90_000
-      });
-    });
+    // Intentionally ignore delivery_drop_otp for user app:
+    // customer OTP should not be shown as toast or notification.
 
     socketRef.current.on('admin_notification', (payload) => {
       toast.message(payload?.title || 'Notification', {
@@ -194,3 +172,4 @@ export const useUserNotifications = () => {
 
   return { isConnected };
 };
+

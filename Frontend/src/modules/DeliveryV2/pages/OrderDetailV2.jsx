@@ -11,6 +11,7 @@ import {
   Store,
   User,
 } from 'lucide-react';
+import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
 
 const INCOMING_ORDER_STORAGE_KEY = 'delivery_v2_incoming_order';
 const ORDER_FOCUS_STORAGE_KEY = 'delivery_v2_order_focus';
@@ -208,6 +209,34 @@ const toFiniteNumber = (value) => {
 };
 
 const formatMoney = (value) => `Rs ${Number(value || 0).toFixed(2)}`;
+
+const getPaymentMethodMeta = (orderLike) => {
+  const method = String(orderLike?.payment?.method || orderLike?.paymentMethod || '').toLowerCase();
+  if (method === 'cash' || method === 'cod') {
+    return { label: 'Cash on Delivery', tone: 'amber' };
+  }
+  if (method === 'wallet') {
+    return { label: 'Wallet', tone: 'emerald' };
+  }
+  if (!method) {
+    return { label: 'Online', tone: 'blue' };
+  }
+  return { label: 'Online', tone: 'blue' };
+};
+
+const getPaymentStatusMeta = (orderLike) => {
+  const status = String(orderLike?.payment?.status || '').toLowerCase();
+  if (!status) return { label: 'Status Pending', tone: 'slate' };
+  if (['paid', 'authorized', 'captured', 'settled'].includes(status)) {
+    return { label: 'Paid', tone: 'emerald' };
+  }
+  if (status === 'failed') return { label: 'Payment Failed', tone: 'rose' };
+  if (status === 'refunded') return { label: 'Refunded', tone: 'blue' };
+  if (status === 'cod_pending' || status === 'created' || status === 'pending_qr') {
+    return { label: 'Payment Pending', tone: 'amber' };
+  }
+  return { label: status.replace(/_/g, ' '), tone: 'slate' };
+};
 
 const getPickupContactMeta = (order) => {
   const restaurantObj = order?.restaurantId || {};
@@ -425,6 +454,8 @@ const OrderDetailV2 = () => {
   }, [order]);
 
   const customerMeta = useMemo(() => getCustomerMeta(order), [order]);
+  const paymentMethodMeta = useMemo(() => getPaymentMethodMeta(order), [order]);
+  const paymentStatusMeta = useMemo(() => getPaymentStatusMeta(order), [order]);
   const restaurantLocation = order?.restaurantLocation;
   const customerLocation = order?.customerLocation;
   const restaurantAddress = pickFirstText(
@@ -497,6 +528,21 @@ const OrderDetailV2 = () => {
     }
   }, [fetchOrderDetails, order]);
 
+  const dispatchStatus = getDispatchStatus(order);
+  const rawStatus = String(order?.status || order?.orderStatus || '').toLowerCase();
+  const phase = String(order?.deliveryState?.currentPhase || '').toLowerCase();
+  const isClosedOrder = ['cancelled', 'delivered', 'completed'].includes(rawStatus);
+  const hasReachedPickup =
+    phase === 'at_pickup' ||
+    ['reached_pickup', 'picked_up', 'delivering', 'reached_drop', 'delivered', 'completed'].includes(rawStatus);
+  const hasPickedOrder =
+    ['picked_up', 'delivering', 'reached_drop', 'delivered', 'completed'].includes(rawStatus) ||
+    phase === 'at_drop';
+  const hasReachedDrop =
+    rawStatus === 'reached_drop' ||
+    phase === 'at_drop' ||
+    ['delivered', 'completed'].includes(rawStatus);
+
   const handleAccept = useCallback(() => runAction(
     'accept',
     async () => {
@@ -541,17 +587,11 @@ const OrderDetailV2 = () => {
     );
   }, [clearActiveOrder, navigate, order, orderId, runAction]);
 
-  const handleArrivePickup = useCallback(() => runAction(
-    'pickup-arrival',
-    async () => {
-      await deliveryAPI.confirmReachedPickup(orderId);
-    },
-    'Pickup arrival updated',
-  ), [orderId, runAction]);
-
   const handlePicked = useCallback(() => runAction(
     'picked',
     async () => {
+      // Keep backend transition valid: rider must reach pickup before marking picked.
+      await deliveryAPI.confirmReachedPickup(orderId);
       await deliveryAPI.confirmOrderId(
         orderId,
         order?.displayOrderId || orderId,
@@ -579,60 +619,45 @@ const OrderDetailV2 = () => {
     'Order delivered',
   ), [clearActiveOrder, orderId, runAction]);
 
-  const dispatchStatus = getDispatchStatus(order);
-  const rawStatus = String(order?.status || order?.orderStatus || '').toLowerCase();
-  const phase = String(order?.deliveryState?.currentPhase || '').toLowerCase();
-  const isClosedOrder = ['cancelled', 'delivered', 'completed'].includes(rawStatus);
-  const hasReachedPickup =
-    phase === 'at_pickup' ||
-    ['reached_pickup', 'picked_up', 'delivering', 'reached_drop', 'delivered', 'completed'].includes(rawStatus);
-  const hasPickedOrder =
-    ['picked_up', 'delivering', 'reached_drop', 'delivered', 'completed'].includes(rawStatus) ||
-    phase === 'at_drop';
-  const hasReachedDrop =
-    rawStatus === 'reached_drop' ||
-    phase === 'at_drop' ||
-    ['delivered', 'completed'].includes(rawStatus);
+  const handleReachedAndDelivered = useCallback(() => runAction(
+    'reached-and-delivered',
+    async () => {
+      if (!hasReachedDrop) {
+        await deliveryAPI.confirmReachedDrop(orderId);
+      }
+      await deliveryAPI.completeDelivery(orderId, { rating: 5 });
+      clearActiveOrder();
+    },
+    'Reached location and delivered',
+  ), [clearActiveOrder, hasReachedDrop, orderId, runAction]);
   const isPassedTaskFlow = dispatchStatus === 'unassigned' && !isClosedOrder;
 
   const canAccept = order && dispatchStatus === 'assigned' && !isClosedOrder;
-  const canArrivePickup = order && dispatchStatus === 'accepted' && !hasReachedPickup && !isClosedOrder;
-  const canPicked = order && dispatchStatus === 'accepted' && hasReachedPickup && !hasPickedOrder && !isClosedOrder;
-  const canArriveDrop = order && dispatchStatus === 'accepted' && hasPickedOrder && !hasReachedDrop && !isClosedOrder;
-  const canDelivered = order && dispatchStatus === 'accepted' && hasReachedDrop && !isClosedOrder;
   const isAcceptedFlow = dispatchStatus === 'accepted' && !isClosedOrder;
 
-  const statusFlowSteps = [
-    { key: 'accepted', label: 'Accepted' },
-    { key: 'pickup-arrival', label: 'Arrived at Pickup' },
-    { key: 'picked', label: 'Picked Order' },
-    { key: 'drop-arrival', label: 'Reached Customer' },
-    { key: 'delivered', label: 'Complete Delivery' },
-  ];
-
-  const currentStatusStepIndex = (() => {
-    if (isClosedOrder) return statusFlowSteps.length - 1;
-    if (dispatchStatus !== 'accepted') return -1;
-    if (!hasReachedPickup) return 0;
-    if (!hasPickedOrder) return 1;
-    if (!hasReachedDrop) return 2;
-    return 3;
-  })();
-
-  const handleStatusDropdownChange = useCallback((event) => {
-    const selectedKey = String(event?.target?.value || '').trim();
-    if (!selectedKey) return;
-    if (selectedKey === 'pickup-arrival') {
-      handleArrivePickup();
-    } else if (selectedKey === 'picked') {
-      handlePicked();
-    } else if (selectedKey === 'drop-arrival') {
-      handleArriveDrop();
-    } else if (selectedKey === 'delivered') {
-      handleDelivered();
+  const sliderStepConfig = useMemo(() => {
+    if (!isAcceptedFlow || isPassedTaskFlow) return null;
+    if (!hasPickedOrder) {
+      return {
+        key: 'picked',
+        label: 'Slide to mark Picked Up',
+        successLabel: 'Picked Up Done',
+        run: handlePicked,
+      };
     }
-    event.target.value = '';
-  }, [handleArriveDrop, handleArrivePickup, handleDelivered, handlePicked]);
+    return {
+      key: 'reached-and-delivered',
+      label: 'Slide to mark Reached Location & Delivered',
+      successLabel: 'Reached & Delivered',
+      run: handleReachedAndDelivered,
+    };
+  }, [
+    handleReachedAndDelivered,
+    handlePicked,
+    hasPickedOrder,
+    isAcceptedFlow,
+    isPassedTaskFlow,
+  ]);
 
   if (loading) {
     return (
@@ -692,8 +717,12 @@ const OrderDetailV2 = () => {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h1 className="truncate text-base font-semibold text-slate-900">{getRestaurantTitle(order)}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <StatusPill tone={paymentMethodMeta.tone}>{paymentMethodMeta.label}</StatusPill>
+                <StatusPill tone={paymentStatusMeta.tone}>{paymentStatusMeta.label}</StatusPill>
+              </div>
               <p className="mt-1 text-xs text-slate-500">
-                {getPaymentLabel(order)} | {getOrderEventDate(order) ? new Date(getOrderEventDate(order)).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '--'}
+                {getOrderEventDate(order) ? new Date(getOrderEventDate(order)).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '--'}
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 Order ID: {order?.displayOrderId ? `#${order.displayOrderId}` : String(orderId || '--')}
@@ -705,15 +734,15 @@ const OrderDetailV2 = () => {
           <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
             <div className="rounded-xl bg-slate-50 p-2.5">
               <p className="text-slate-500">Earning</p>
-              <p className="mt-0.5 font-semibold text-slate-900">{formatMoney(order?.riderEarning || order?.deliveryEarning || 0)}</p>
+              <p className="mt-0.5 text-base font-extrabold text-slate-900">{formatMoney(order?.riderEarning || order?.deliveryEarning || 0)}</p>
             </div>
             <div className="rounded-xl bg-slate-50 p-2.5">
               <p className="text-slate-500">Items</p>
-              <p className="mt-0.5 font-semibold text-slate-900">{orderItems.length || Number(order?.itemCount || 0)}</p>
+              <p className="mt-0.5 text-base font-extrabold text-slate-900">{orderItems.length || Number(order?.itemCount || 0)}</p>
             </div>
             <div className="rounded-xl bg-slate-50 p-2.5">
               <p className="text-slate-500">Total</p>
-              <p className="mt-0.5 font-semibold text-slate-900">{formatMoney(grandTotal)}</p>
+              <p className="mt-0.5 text-base font-extrabold text-slate-900">{formatMoney(grandTotal)}</p>
             </div>
           </div>
         </section>
@@ -739,25 +768,19 @@ const OrderDetailV2 = () => {
 
           {isAcceptedFlow && !isPassedTaskFlow && (
             <div className="rounded-2xl border border-slate-200 bg-white p-3">
-              <select
-                defaultValue=""
-                onChange={handleStatusDropdownChange}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 outline-none focus:border-[#005128]"
-              >
-                <option value="" disabled>
-                  Select next status
-                </option>
-                {statusFlowSteps.map((step, index) => {
-                  const isPreviousOrCurrent = index <= currentStatusStepIndex;
-                  const isFutureBeyondNext = index > currentStatusStepIndex + 1;
-                  const shouldDisable = step.key === 'accepted' || isPreviousOrCurrent || isFutureBeyondNext;
-                  return (
-                    <option key={step.key} value={step.key} disabled={shouldDisable}>
-                      {step.label}
-                    </option>
-                  );
-                })}
-              </select>
+              <ActionSlider
+                key={sliderStepConfig?.key || 'status-slider'}
+                label={busyAction ? 'Updating...' : sliderStepConfig?.label || 'Slide to update'}
+                successLabel={sliderStepConfig?.successLabel || 'Done'}
+                disabled={!sliderStepConfig || Boolean(busyAction)}
+                onConfirm={async () => {
+                  if (!sliderStepConfig?.run) return;
+                  await sliderStepConfig.run();
+                }}
+                color="bg-[#005128]"
+                containerStyle={{ backgroundColor: '#E8F3EE' }}
+                style={{ background: 'linear-gradient(135deg, #005128 0%, #0A7A45 100%)' }}
+              />
             </div>
           )}
           {isPassedTaskFlow && (
@@ -819,27 +842,34 @@ const OrderDetailV2 = () => {
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
               <h3 className="text-sm font-semibold text-slate-900">Order Details</h3>
               {orderItems.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {orderItems.map((item, index) => {
-                    const itemName = pickFirstText(item?.name, item?.foodName, item?.title, `Item ${index + 1}`);
-                    const qty = getItemQuantity(item);
-                    const variantLabel = getItemVariantLabel(item);
-                    const unitPrice = getItemUnitPrice(item);
-                    const lineTotal = getItemLineTotal(item);
+                <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="w-20 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Qty</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Item</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {orderItems.map((item, index) => {
+                        const itemName = pickFirstText(item?.name, item?.foodName, item?.title, `Item ${index + 1}`);
+                        const qty = getItemQuantity(item);
+                        const variantLabel = getItemVariantLabel(item);
 
-                    return (
-                      <div key={`${itemName}-${index}`} className="rounded-xl bg-slate-50 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="break-words text-sm font-medium text-slate-900">{itemName}</p>
-                            {variantLabel && <p className="mt-0.5 break-words text-xs text-slate-500">{variantLabel}</p>}
-                          </div>
-                          <p className="text-sm font-medium text-slate-900">{formatMoney(lineTotal)}</p>
-                        </div>
-                        <p className="mt-1 text-xs text-slate-500">Qty {qty} x {formatMoney(unitPrice)}</p>
-                      </div>
-                    );
-                  })}
+                        return (
+                          <tr key={`${itemName}-${index}`} className="align-top">
+                            <td className="px-3 py-2.5 font-semibold text-slate-800">{qty}</td>
+                            <td className="px-3 py-2.5">
+                              <p className="break-words font-medium text-slate-900">
+                                {itemName}
+                                {variantLabel ? <span className="text-slate-600"> ({variantLabel})</span> : null}
+                              </p>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               ) : (
                 <p className="mt-2 text-sm text-slate-500">Item details not available.</p>

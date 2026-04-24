@@ -45,7 +45,16 @@ const ICON_MAP = {
 export default function Notifications() {
   const [notificationsList, setNotificationsList] = useState(() => {
     const saved = localStorage.getItem('food_user_notifications')
-    return saved ? JSON.parse(saved) : DEFAULT_NOTIFICATIONS
+    const parsed = saved ? JSON.parse(saved) : DEFAULT_NOTIFICATIONS
+    return (Array.isArray(parsed) ? parsed : DEFAULT_NOTIFICATIONS).filter((item) => {
+      const title = String(item?.title || "").toLowerCase()
+      const message = String(item?.message || "").toLowerCase()
+      const isOtpNotification =
+        title.includes("otp") ||
+        message.includes("otp for order") ||
+        message.includes("share this otp")
+      return !isOtpNotification
+    })
   })
   const {
     items: broadcastNotifications,
@@ -82,28 +91,10 @@ export default function Notifications() {
       setNotificationsList(prev => [newNotification, ...prev])
     }
 
-    const handleDeliveryOtp = (event) => {
-      const { orderId, otp, message } = event.detail
-      const newNotification = {
-        id: `otp-${Date.now()}`,
-        type: "alert",
-        title: "Delivery OTP Received",
-        message: message || `Your OTP for order #${orderId} is ${otp}`,
-        time: "Just now",
-        timestamp: Date.now(),
-        read: false,
-        icon: "AlertCircle",
-        iconColor: "text-orange-600"
-      }
-      setNotificationsList(prev => [newNotification, ...prev])
-    }
-
     window.addEventListener('orderStatusNotification', handleOrderUpdate)
-    window.addEventListener('deliveryDropOtp', handleDeliveryOtp)
 
     return () => {
       window.removeEventListener('orderStatusNotification', handleOrderUpdate)
-      window.removeEventListener('deliveryDropOtp', handleDeliveryOtp)
     }
   }, [])
   

@@ -80,7 +80,7 @@ const filterOptions = {
   "Order status": [
     { id: "preparing", label: "Preparing", key: "orderStatus" },
     { id: "ready", label: "Ready", key: "orderStatus" },
-    { id: "out-for-delivery", label: "Out for delivery", key: "orderStatus" },
+    { id: "out-for-delivery", label: "Picked Up", key: "orderStatus" },
     { id: "delivered", label: "Delivered", key: "orderStatus" },
     { id: "rejected", label: "Rejected", key: "orderStatus" },
     { id: "cancelled", label: "Cancelled", key: "orderStatus" }
@@ -221,8 +221,11 @@ export default function AllOrdersPage() {
       status = 'READY'
       statusLabel = 'READY'
     } else if (backendStatus === 'out_for_delivery' || backendStatus === 'out for delivery' || backendStatus === 'picked_up') {
-      status = 'OUT FOR DELIVERY'
-      statusLabel = 'OUT FOR DELIVERY'
+      status = 'PICKED UP'
+      statusLabel = 'PICKED UP'
+    } else if (backendStatus === 'reached_drop' || backendStatus === 'at_drop' || backendStatus === 'at_delivery') {
+      status = 'PICKED UP'
+      statusLabel = 'PICKED UP'
     }
     
     const cancelledByRaw = String(order.cancelledBy || "").toLowerCase()
@@ -478,6 +481,7 @@ export default function AllOrdersPage() {
       case "READY":
         return "bg-brand-600 text-white"
       case "OUT FOR DELIVERY":
+      case "PICKED UP":
         return "bg-purple-600 text-white"
       default:
         return "bg-gray-600 text-white"
@@ -501,7 +505,7 @@ export default function AllOrdersPage() {
       const statusMap = {
         'preparing': 'PREPARING',
         'ready': 'READY',
-        'out-for-delivery': 'OUT FOR DELIVERY',
+        'out-for-delivery': 'PICKED UP',
         'delivered': 'DELIVERED',
         'rejected': 'REJECTED',
         'cancelled': 'CANCELLED'

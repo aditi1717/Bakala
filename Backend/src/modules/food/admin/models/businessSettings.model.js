@@ -19,6 +19,23 @@ const businessSettingsSchema = new mongoose.Schema(
         favicon: {
             url: { type: String, default: '' },
             publicId: { type: String, default: '' }
+        },
+        maintenanceModes: {
+            userApp: {
+                enabled: { type: Boolean, default: false },
+                heading: { type: String, default: 'Store is Closed' },
+                paragraph: { type: String, default: 'Currently undergoing maintenance.' }
+            },
+            deliveryApp: {
+                enabled: { type: Boolean, default: false },
+                heading: { type: String, default: 'Delivery is Temporarily Closed' },
+                paragraph: { type: String, default: 'Please check again shortly.' }
+            },
+            restaurantApp: {
+                enabled: { type: Boolean, default: false },
+                heading: { type: String, default: 'Restaurant Panel is Temporarily Closed' },
+                paragraph: { type: String, default: 'Maintenance is in progress. Please come back soon.' }
+            }
         }
     },
     { timestamps: true }

@@ -189,7 +189,6 @@ export default function DeliveryBoyWallet() {
         const data = res.data.data
         const walletRows = (data?.wallets || data?.rows || data?.deliveryPartners || []).map(normalizeWalletRow)
         let partnerMap = new Map()
-        let settlementMap = new Map()
 
         try {
           const partnersRes = await adminAPI.getDeliveryPartners({
@@ -227,41 +226,6 @@ export default function DeliveryBoyWallet() {
           }
         } catch (partnerError) {
           debugWarn("Delivery partners merge failed:", partnerError)
-        }
-
-        try {
-          const settlementsRes = await adminAPI.getCashLimitSettlements({
-            page: 1,
-            limit: 1000,
-            search: searchValue.trim() || undefined,
-          })
-          if (settlementsRes?.data?.success) {
-            const txRows = settlementsRes?.data?.data?.transactions || []
-            settlementMap = new Map()
-
-            txRows.forEach((tx) => {
-              const amount = toNumber(tx?.amount)
-              if (amount <= 0) return
-              const status = String(tx?.status || "").trim().toLowerCase()
-              const isSuccessful = !status || ["completed", "success", "paid", "settled"].includes(status)
-              if (!isSuccessful) return
-
-              const keys = [
-                String(tx?.deliveryId || ""),
-                String(tx?.deliveryIdString || ""),
-                normalizePhone(tx?.deliveryIdString),
-                String(tx?.deliveryName || "").trim().toLowerCase(),
-              ]
-                .filter(Boolean)
-                .map((key) => String(key).trim().toLowerCase())
-
-              keys.forEach((key) => {
-                settlementMap.set(key, toNumber(settlementMap.get(key), 0) + amount)
-              })
-            })
-          }
-        } catch (settlementError) {
-          debugWarn("Cash settlements merge failed:", settlementError)
         }
 
         let nextRows = walletRows
@@ -362,30 +326,6 @@ export default function DeliveryBoyWallet() {
               ...row,
               name: row.name === "â€”" ? partnerMatch.name : row.name,
               cashInHand,
-            }
-          })
-        }
-
-        if (settlementMap.size > 0) {
-          nextRows = nextRows.map((row) => {
-            const keyCandidates = [
-              String(row.deliveryId || ""),
-              String(row.deliveryPartnerId || ""),
-              String(row.deliveryIdString || ""),
-              normalizePhone(row.deliveryIdString),
-              normalizePhone(row.phone),
-              String(row.name || "").trim().toLowerCase(),
-            ]
-              .filter(Boolean)
-              .map((key) => String(key).trim().toLowerCase())
-
-            const submitted = keyCandidates
-              .map((key) => settlementMap.get(key))
-              .find((value) => Number.isFinite(Number(value)))
-
-            return {
-              ...row,
-              cashSubmittedToAdmin: toNumber(row.cashSubmittedToAdmin, submitted, 0),
             }
           })
         }
@@ -506,10 +446,7 @@ export default function DeliveryBoyWallet() {
     try {
       setSummary((prev) => ({ ...prev, loading: true }))
 
-      const [walletsRes, settlementsRes] = await Promise.all([
-        adminAPI.getDeliveryWallets({ page: 1, limit: 1000 }),
-        adminAPI.getCashLimitSettlements({ page: 1, limit: 1000 }),
-      ])
+      const walletsRes = await adminAPI.getDeliveryWallets({ page: 1, limit: 1000 })
 
       const walletRows = (walletsRes?.data?.data?.wallets || []).map(normalizeWalletRow)
       const totalCashInHand = walletRows.reduce((sum, row) => sum + toNumber(row.cashInHand), 0)
@@ -517,13 +454,10 @@ export default function DeliveryBoyWallet() {
       const totalPaid = walletRows.reduce((sum, row) => sum + getPaidAmount(row), 0)
       const totalUnpaid = walletRows.reduce((sum, row) => sum + getUnpaidAmount(row), 0)
 
-      const settlementRows = settlementsRes?.data?.data?.transactions || []
-      const totalSubmittedToAdmin = settlementRows.reduce((sum, tx) => {
-        const normalizedStatus = String(tx?.status || "").trim().toLowerCase()
-        const isSuccessful = !normalizedStatus || ["completed", "success", "paid", "settled"].includes(normalizedStatus)
-        if (!isSuccessful) return sum
-        return sum + toNumber(tx?.amount)
-      }, 0)
+      const totalSubmittedToAdmin = walletRows.reduce(
+        (sum, row) => sum + toNumber(row.cashSubmittedToAdmin, row.totalSubmittedToAdmin),
+        0,
+      )
       const totalCollectedByDeliveryBoys = totalCashInHand + totalSubmittedToAdmin
 
       let totalCodOrders = 0

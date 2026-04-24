@@ -4,6 +4,7 @@ import ProtectedRoute from "@food/components/ProtectedRoute"
 import AuthRedirect from "@food/components/AuthRedirect"
 import Loader from "@food/components/Loader"
 import PushSoundEnableButton from "@food/components/PushSoundEnableButton"
+import AppMaintenanceOverlay from "@food/components/common/AppMaintenanceOverlay"
 import { registerWebPushForCurrentModule } from "@food/utils/firebaseMessaging"
 import { isModuleAuthenticated } from "@food/utils/auth"
 import { useRestaurantNotifications } from "@food/hooks/useRestaurantNotifications"
@@ -81,6 +82,7 @@ export default function App() {
       <ScrollToTop />
       <RestaurantGlobalNotificationListener />
       <PushSoundEnableButton />
+      <AppMaintenanceOverlay />
       <Suspense fallback={<Loader />}>
         <Routes>
           {/* Restaurant Module */}

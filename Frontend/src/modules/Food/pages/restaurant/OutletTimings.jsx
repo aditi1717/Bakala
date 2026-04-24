@@ -1,180 +1,249 @@
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { motion, AnimatePresence } from "framer-motion"
-import Lenis from "lenis"
-import { ArrowLeft, ChevronUp, ChevronDown, Clock, Edit2 } from "lucide-react"
-import { Switch } from "@food/components/ui/switch"
+import { ArrowLeft, Clock, Loader2, Plus, Trash2 } from "lucide-react"
 import { MobileTimePicker } from "@mui/x-date-pickers/MobileTimePicker"
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider"
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns"
+import { Switch } from "@food/components/ui/switch"
 import { useCompanyName } from "@food/hooks/useCompanyName"
 import { restaurantAPI } from "@food/api"
-const debugLog = (...args) => {}
-const debugWarn = (...args) => {}
-const debugError = (...args) => {}
 
-// Helper function to convert "HH:mm" string to Date object
-const stringToTime = (timeString) => {
-  if (!timeString || !timeString.includes(":")) {
-    return new Date(2000, 0, 1, 9, 0) // Default to 9:00 AM
+const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+const MAX_SLOTS = 5
+
+const toTimeValue = (timeString, fallbackHour = 9, fallbackMinute = 0) => {
+  if (!timeString || !String(timeString).includes(":")) {
+    return new Date(2000, 0, 1, fallbackHour, fallbackMinute)
   }
-  const [hours, minutes] = timeString.split(":").map(Number)
-  // Ensure valid hours (0-23) and minutes (0-59)
-  const validHours = Math.max(0, Math.min(23, hours || 9))
-  const validMinutes = Math.max(0, Math.min(59, minutes || 0))
-  return new Date(2000, 0, 1, validHours, validMinutes)
+  const [hours, minutes] = String(timeString).split(":").map(Number)
+  const h = Math.max(0, Math.min(23, Number.isFinite(hours) ? hours : fallbackHour))
+  const m = Math.max(0, Math.min(59, Number.isFinite(minutes) ? minutes : fallbackMinute))
+  return new Date(2000, 0, 1, h, m)
 }
 
-// Helper function to convert Date object to "HH:mm" string
-const timeToString = (date) => {
-  if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
-    return "09:00"
-  }
-  const hours = date.getHours().toString().padStart(2, "0")
-  const minutes = date.getMinutes().toString().padStart(2, "0")
+const fromTimeValue = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "09:00"
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
   return `${hours}:${minutes}`
 }
 
-// Format time from 24-hour to 12-hour format for display
-const formatTime12Hour = (time24) => {
-  if (!time24) return "09:00 AM"
-  const [hours, minutes] = time24.split(":").map(Number)
-  const period = hours >= 12 ? 'PM' : 'AM'
+const format12Hour = (time24) => {
+  if (!time24 || !String(time24).includes(":")) return ""
+  const [hoursRaw, minutesRaw] = String(time24).split(":").map(Number)
+  const hours = Number.isFinite(hoursRaw) ? hoursRaw : 0
+  const minutes = Number.isFinite(minutesRaw) ? minutesRaw : 0
+  const period = hours >= 12 ? "PM" : "AM"
   const hours12 = hours % 12 || 12
-  const minutesStr = minutes.toString().padStart(2, '0')
-  return `${hours12}:${minutesStr} ${period}`
+  return `${hours12}:${String(minutes).padStart(2, "0")} ${period}`
 }
 
-const getDefaultDays = () => ({
-  Monday: { isOpen: true, openingTime: "09:00", closingTime: "22:00" },
-  Tuesday: { isOpen: true, openingTime: "09:00", closingTime: "22:00" },
-  Wednesday: { isOpen: true, openingTime: "09:00", closingTime: "22:00" },
-  Thursday: { isOpen: true, openingTime: "09:00", closingTime: "22:00" },
-  Friday: { isOpen: true, openingTime: "09:00", closingTime: "22:00" },
-  Saturday: { isOpen: true, openingTime: "09:00", closingTime: "22:00" },
-  Sunday: { isOpen: true, openingTime: "09:00", closingTime: "22:00" },
+const timeToMinutes = (value) => {
+  if (!value || !String(value).includes(":")) return null
+  const [hoursRaw, minutesRaw] = String(value).split(":").map(Number)
+  if (!Number.isFinite(hoursRaw) || !Number.isFinite(minutesRaw)) return null
+  if (hoursRaw < 0 || hoursRaw > 23 || minutesRaw < 0 || minutesRaw > 59) return null
+  return (hoursRaw * 60) + minutesRaw
+}
+
+const getDefaultSchedule = () => ({
+  isOpen: true,
+  slots: [{ id: `slot-${Date.now()}`, openingTime: "09:00", closingTime: "22:00" }],
 })
+
+const normalizeSlotsFromDay = (dayData) => {
+  const rawSlots = Array.isArray(dayData?.slots) ? dayData.slots : []
+  const slotsFromArray = rawSlots
+    .map((slot, index) => {
+      const openingTime = String(slot?.openingTime || "").trim()
+      const closingTime = String(slot?.closingTime || "").trim()
+      if (!openingTime || !closingTime) return null
+      return {
+        id: `slot-${Date.now()}-${index}`,
+        openingTime,
+        closingTime,
+      }
+    })
+    .filter(Boolean)
+
+  if (slotsFromArray.length > 0) return slotsFromArray
+
+  const openingTime = String(dayData?.openingTime || "").trim()
+  const closingTime = String(dayData?.closingTime || "").trim()
+  if (!openingTime || !closingTime) return getDefaultSchedule().slots
+
+  return [{ id: `slot-${Date.now()}`, openingTime, closingTime }]
+}
+
+const normalizeScheduleFromApi = (outletTimings) => {
+  if (!outletTimings || typeof outletTimings !== "object") return getDefaultSchedule()
+  const firstAvailableDay = DAY_NAMES.find((day) => outletTimings?.[day]) || "Monday"
+  const dayData = outletTimings[firstAvailableDay] || {}
+
+  return {
+    isOpen: dayData.isOpen !== false,
+    slots: normalizeSlotsFromDay(dayData),
+  }
+}
+
+const validateSlots = (slots = []) => {
+  if (!Array.isArray(slots) || slots.length === 0) return "At least one time slot is required."
+
+  const normalized = slots.map((slot) => {
+    const openingMinutes = timeToMinutes(slot?.openingTime)
+    const closingMinutes = timeToMinutes(slot?.closingTime)
+    return {
+      openingMinutes,
+      closingMinutes,
+    }
+  })
+
+  const hasInvalid = normalized.some((slot) => slot.openingMinutes === null || slot.closingMinutes === null)
+  if (hasInvalid) return "Please select valid opening and closing times."
+
+  const hasReverse = normalized.some((slot) => slot.closingMinutes <= slot.openingMinutes)
+  if (hasReverse) return "Each slot's closing time must be greater than opening time."
+
+  const sorted = [...normalized].sort((a, b) => a.openingMinutes - b.openingMinutes)
+  for (let i = 1; i < sorted.length; i += 1) {
+    if (sorted[i].openingMinutes < sorted[i - 1].closingMinutes) {
+      return "Time slots cannot overlap."
+    }
+  }
+
+  return ""
+}
+
+const buildPayloadForAllDays = (schedule) => {
+  const isOpen = schedule?.isOpen !== false
+  const slots = isOpen
+    ? (schedule?.slots || []).map((slot) => ({
+      openingTime: slot.openingTime,
+      closingTime: slot.closingTime,
+    }))
+    : []
+
+  const openingTime = isOpen ? (slots[0]?.openingTime || "09:00") : ""
+  const closingTime = isOpen ? (slots[0]?.closingTime || "22:00") : ""
+
+  return DAY_NAMES.reduce((acc, day) => {
+    acc[day] = { isOpen, openingTime, closingTime, slots }
+    return acc
+  }, {})
+}
 
 export default function OutletTimings() {
   const companyName = useCompanyName()
   const navigate = useNavigate()
-  const [expandedDay, setExpandedDay] = useState("Monday")
-  const isInternalUpdate = useRef(false)
-  const [days, setDays] = useState(getDefaultDays)
-  const [loading, setLoading] = useState(true)
   const saveTimerRef = useRef(null)
+  const [loading, setLoading] = useState(true)
+  const [savingState, setSavingState] = useState("idle")
+  const [schedule, setSchedule] = useState(getDefaultSchedule)
+  const [validationError, setValidationError] = useState("")
 
-  // Load from backend on mount.
   useEffect(() => {
-    let mounted = true
+    let active = true
     ;(async () => {
       try {
         setLoading(true)
         const res = await restaurantAPI.getOutletTimings()
         const outletTimings = res?.data?.data?.outletTimings || res?.data?.outletTimings
-        if (mounted && outletTimings && typeof outletTimings === "object") {
-          setDays({ ...getDefaultDays(), ...outletTimings })
-        }
-      } catch (error) {
-        debugError("Error loading outlet timings from backend:", error)
+        if (!active) return
+        setSchedule(normalizeScheduleFromApi(outletTimings))
+      } catch (_) {
+        if (!active) return
+        setSchedule(getDefaultSchedule())
       } finally {
-        if (mounted) setLoading(false)
+        if (active) setLoading(false)
       }
     })()
+
     return () => {
-      mounted = false
+      active = false
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
   }, [])
 
-  // Save to backend whenever days change (debounced).
   useEffect(() => {
     if (loading) return
+    if (!schedule.isOpen) {
+      setValidationError("")
+      return
+    }
+    setValidationError(validateSlots(schedule.slots))
+  }, [schedule, loading])
+
+  useEffect(() => {
+    if (loading) return
+    if (validationError) return
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+
     saveTimerRef.current = setTimeout(async () => {
       try {
-        await restaurantAPI.saveOutletTimings(days)
+        setSavingState("saving")
+        const outletTimings = buildPayloadForAllDays(schedule)
+        await restaurantAPI.saveOutletTimings(outletTimings)
+        setSavingState("saved")
         window.dispatchEvent(new Event("outletTimingsUpdated"))
-      } catch (error) {
-        debugError("Error saving outlet timings to backend:", error)
+      } catch (_) {
+        setSavingState("error")
       }
     }, 500)
+
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
-  }, [days, loading])
+  }, [schedule, validationError, loading])
 
-  // Lenis smooth scrolling
-  useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: true,
-    })
+  const statusLabel = useMemo(() => {
+    if (savingState === "saving") return "Saving..."
+    if (savingState === "saved") return "Saved"
+    if (savingState === "error") return "Save failed"
+    return ""
+  }, [savingState])
 
-    function raf(time) {
-      lenis.raf(time)
-      requestAnimationFrame(raf)
-    }
-
-    requestAnimationFrame(raf)
-
-    return () => {
-      lenis.destroy()
-    }
-  }, [])
-
-  const toggleDay = (day) => {
-    setExpandedDay(expandedDay === day ? null : day)
-  }
-
-  const toggleDayOpen = (day) => {
-    isInternalUpdate.current = true
-    setDays(prev => {
-      const newOpen = !prev[day].isOpen
-      return {
-        ...prev,
-        [day]: {
-          ...prev[day],
-          isOpen: newOpen,
-          openingTime: newOpen ? (prev[day].openingTime || "09:00") : "",
-          closingTime: newOpen ? (prev[day].closingTime || "22:00") : ""
-        }
-      }
-    })
-  }
-
-  const handleTimeChange = (day, timeType, newTime) => {
-    if (!newTime) {
-      debugWarn('?? No time value received in handleTimeChange')
-      return
-    }
-    
-    isInternalUpdate.current = true
-    const timeString = timeToString(newTime)
-    
-    // Validate time string format
-    if (!timeString || !timeString.includes(":")) {
-      debugWarn('?? Invalid time string generated:', timeString)
-      return
-    }
-    
-    debugLog(`?? Time changed for ${day} - ${timeType}: ${timeString}`)
-    
-    setDays(prev => ({
+  const handleSlotTimeChange = (slotId, field, dateValue) => {
+    const nextTime = fromTimeValue(dateValue)
+    setSavingState("idle")
+    setSchedule((prev) => ({
       ...prev,
-      [day]: {
-        ...prev[day],
-        [timeType]: timeString
-      }
+      slots: prev.slots.map((slot) => (
+        slot.id === slotId
+          ? { ...slot, [field]: nextTime }
+          : slot
+      )),
     }))
   }
 
-  const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+  const handleAddSlot = () => {
+    if (schedule.slots.length >= MAX_SLOTS) return
+    setSavingState("idle")
+    setSchedule((prev) => ({
+      ...prev,
+      slots: [
+        ...prev.slots,
+        {
+          id: `slot-${Date.now()}-${Math.random()}`,
+          openingTime: "09:00",
+          closingTime: "22:00",
+        },
+      ],
+    }))
+  }
+
+  const handleDeleteSlot = (slotId) => {
+    if (schedule.slots.length <= 1) return
+    setSavingState("idle")
+    setSchedule((prev) => ({
+      ...prev,
+      slots: prev.slots.filter((slot) => slot.id !== slotId),
+    }))
+  }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-sm text-gray-600">Loading outlet timings...</div>
+        <Loader2 className="h-7 w-7 animate-spin text-brand-600" />
       </div>
     )
   }
@@ -182,7 +251,6 @@ export default function OutletTimings() {
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <div className="min-h-screen bg-white overflow-x-hidden">
-        {/* Header */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50">
           <div className="flex items-center gap-3">
             <button
@@ -192,201 +260,133 @@ export default function OutletTimings() {
             >
               <ArrowLeft className="w-6 h-6 text-gray-900" />
             </button>
-            <h1 className="text-lg font-bold text-gray-900">Outlet timings</h1>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg font-bold text-gray-900">Outlet timings</h1>
+              <p className="text-xs text-gray-500">One schedule applied to all 7 days</p>
+            </div>
+            {statusLabel ? (
+              <p className={`text-xs font-medium ${savingState === "error" ? "text-red-600" : "text-emerald-600"}`}>
+                {statusLabel}
+              </p>
+            ) : null}
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="px-4 py-6">
-          {/* Appzeto delivery Section Header */}
-          <div className="mb-6">
-            <div className="text-center mb-2">
-              <h2 className="text-base font-semibold text-brand-600">{companyName} delivery</h2>
+        <div className="px-4 py-5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold text-brand-700">{companyName} delivery timings</h2>
+              <p className="text-xs text-slate-600 mt-1">
+                Same timing Monday to Sunday. Add multiple slots if you close in between.
+              </p>
             </div>
-            <div className="h-0.5 bg-brand-600"></div>
-          </div>
 
-          {/* Day-wise Accordion */}
-          <div className="space-y-2">
-            {dayNames.map((day, index) => {
-              const dayData = days[day] || { isOpen: true, openingTime: "09:00", closingTime: "22:00" }
-              const isExpanded = expandedDay === day
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Outlet status</p>
+                <p className="text-xs text-slate-500">{schedule.isOpen ? "Open for all days" : "Closed for all days"}</p>
+              </div>
+              <Switch
+                checked={schedule.isOpen}
+                onCheckedChange={(checked) => {
+                  setSavingState("idle")
+                  setSchedule((prev) => ({ ...prev, isOpen: Boolean(checked) }))
+                }}
+                className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
+              />
+            </div>
 
-              return (
-                <motion.div
-                  key={day}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.03 }}
-                  className="bg-white border border-gray-200 rounded-sm overflow-hidden"
-                >
-                  {/* Day Header */}
-                  <div
-                    className={`w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-color transition-all ${isExpanded ? "bg-gray-100" : ""}`}
-                  >
-                    <button
-                      onClick={() => toggleDay(day)}
-                      className="flex items-center gap-3 flex-1 text-left"
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="w-5 h-5 text-gray-700" />
-                      ) : (
-                        <ChevronDown className="w-5 h-5 text-gray-700" />
-                      )}
-                      <span className="text-base font-medium text-gray-900">{day}</span>
-                    </button>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-700">{dayData.isOpen ? "Open" : "Close"}</span>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <Switch
-                          checked={dayData.isOpen}
-                          onCheckedChange={() => toggleDayOpen(day)}
-                          className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300"
+            {schedule.isOpen ? (
+              <div className="mt-4 space-y-3">
+                {schedule.slots.map((slot, index) => (
+                  <div key={slot.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold text-slate-900">Slot {index + 1}</p>
+                      {schedule.slots.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSlot(slot.id)}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100"
+                          aria-label="Delete slot"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            Opening
+                          </span>
+                        </label>
+                        <MobileTimePicker
+                          value={toTimeValue(slot.openingTime)}
+                          onChange={(value) => value && handleSlotTimeChange(slot.id, "openingTime", value)}
+                          format="hh:mm a"
+                          slotProps={{
+                            textField: {
+                              size: "small",
+                              fullWidth: true,
+                            },
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            Closing
+                          </span>
+                        </label>
+                        <MobileTimePicker
+                          value={toTimeValue(slot.closingTime, 22, 0)}
+                          onChange={(value) => value && handleSlotTimeChange(slot.id, "closingTime", value)}
+                          format="hh:mm a"
+                          slotProps={{
+                            textField: {
+                              size: "small",
+                              fullWidth: true,
+                            },
+                          }}
                         />
                       </div>
                     </div>
+
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      {format12Hour(slot.openingTime)} - {format12Hour(slot.closingTime)}
+                    </p>
                   </div>
+                ))}
 
-                  {/* Expanded Content */}
-                  <AnimatePresence>
-                    {isExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="p-4 space-y-4 border-t border-gray-100">
-                          {dayData.isOpen ? (
-                            <>
-                              {/* Opening Time */}
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                  <Clock className="w-4 h-4" />
-                                  Opening time
-                                </label>
-                                <div className="border border-gray-200 rounded-md px-3 py-2 bg-gray-50/60">
-                                  <MobileTimePicker
-                                    value={stringToTime(dayData.openingTime)}
-                                    onChange={(newValue) => {
-                                      debugLog('?? Opening time picker onChange:', newValue)
-                                      if (newValue) {
-                                        handleTimeChange(day, "openingTime", newValue)
-                                      }
-                                    }}
-                                    onAccept={(newValue) => {
-                                      debugLog('? Opening time picker onAccept:', newValue)
-                                      if (newValue) {
-                                        handleTimeChange(day, "openingTime", newValue)
-                                      }
-                                    }}
-                                    slotProps={{
-                                      textField: {
-                                        variant: "outlined",
-                                        size: "small",
-                                        placeholder: "Select opening time",
-                                        sx: {
-                                          "& .MuiOutlinedInput-root": {
-                                            height: "36px",
-                                            fontSize: "12px",
-                                            backgroundColor: "white",
-                                            "& fieldset": {
-                                              borderColor: "#e5e7eb",
-                                            },
-                                            "&:hover fieldset": {
-                                              borderColor: "#d1d5db",
-                                            },
-                                            "&.Mui-focused fieldset": {
-                                              borderColor: "#000",
-                                            },
-                                          },
-                                          "& .MuiInputBase-input": {
-                                            padding: "8px 12px",
-                                            fontSize: "12px",
-                                          },
-                                        },
-                                      },
-                                    }}
-                                    format="hh:mm a"
-                                  />
-                                </div>
-                                <p className="text-xs text-gray-500">
-                                  Current: {formatTime12Hour(dayData.openingTime)}
-                                </p>
-                              </div>
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={handleAddSlot}
+                    disabled={schedule.slots.length >= MAX_SLOTS}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Slot
+                  </button>
+                  <p className="text-[11px] text-slate-500">{schedule.slots.length}/{MAX_SLOTS} slots</p>
+                </div>
 
-                              {/* Closing Time */}
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                  <Clock className="w-4 h-4" />
-                                  Closing time
-                                </label>
-                                <div className="border border-gray-200 rounded-md px-3 py-2 bg-gray-50/60">
-                                  <MobileTimePicker
-                                    value={stringToTime(dayData.closingTime)}
-                                    onChange={(newValue) => {
-                                      debugLog('?? Closing time picker onChange:', newValue)
-                                      if (newValue) {
-                                        handleTimeChange(day, "closingTime", newValue)
-                                      }
-                                    }}
-                                    onAccept={(newValue) => {
-                                      debugLog('? Closing time picker onAccept:', newValue)
-                                      if (newValue) {
-                                        handleTimeChange(day, "closingTime", newValue)
-                                      }
-                                    }}
-                                    slotProps={{
-                                      textField: {
-                                        variant: "outlined",
-                                        size: "small",
-                                        placeholder: "Select closing time",
-                                        sx: {
-                                          "& .MuiOutlinedInput-root": {
-                                            height: "36px",
-                                            fontSize: "12px",
-                                            backgroundColor: "white",
-                                            "& fieldset": {
-                                              borderColor: "#e5e7eb",
-                                            },
-                                            "&:hover fieldset": {
-                                              borderColor: "#d1d5db",
-                                            },
-                                            "&.Mui-focused fieldset": {
-                                              borderColor: "#000",
-                                            },
-                                          },
-                                          "& .MuiInputBase-input": {
-                                            padding: "8px 12px",
-                                            fontSize: "12px",
-                                          },
-                                        },
-                                      },
-                                    }}
-                                    format="hh:mm a"
-                                  />
-                                </div>
-                                <p className="text-xs text-gray-500">
-                                  Current: {formatTime12Hour(dayData.closingTime)}
-                                </p>
-                              </div>
-                            </>
-                          ) : (
-                            <p className="text-sm text-gray-500 pl-6">This day is closed</p>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              )
-            })}
+                {validationError ? (
+                  <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{validationError}</p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                Outlet closed for all days. Turn ON to set timings.
+              </p>
+            )}
           </div>
         </div>
       </div>
     </LocalizationProvider>
   )
 }
-
-

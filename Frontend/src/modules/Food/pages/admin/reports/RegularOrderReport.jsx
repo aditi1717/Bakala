@@ -38,7 +38,7 @@ const statusMeta = {
 }
 
 const PAGE_SIZE = 25
-const AUTO_REFRESH_MS = 15000
+const AUTO_REFRESH_MS = 5000
 const INR_SYMBOL = "\u20B9"
 const toAmountNumber = (value) => {
   if (value == null) return 0
@@ -55,6 +55,47 @@ const htmlEscape = (value) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;")
+
+const mapOrderStatusForReport = (backendStatusRaw, deliveryPhaseRaw = "") => {
+  const backendStatus = String(backendStatusRaw || "").toLowerCase()
+  const deliveryPhase = String(deliveryPhaseRaw || "").toLowerCase()
+
+  if (!backendStatus || backendStatus === "created" || backendStatus === "placed") return "Pending"
+  if (backendStatus === "confirmed" || backendStatus === "accepted") return "Accepted"
+  if (backendStatus === "preparing" || backendStatus === "processed") return "Processing"
+  if (
+    backendStatus === "ready" ||
+    backendStatus === "ready_for_pickup" ||
+    deliveryPhase === "ready_for_pickup" ||
+    deliveryPhase === "at_pickup"
+  ) {
+    return "Ready"
+  }
+  if (
+    backendStatus === "picked_up" ||
+    backendStatus === "out_for_delivery" ||
+    backendStatus === "reached_drop" ||
+    backendStatus === "at_drop" ||
+    backendStatus === "at_delivery"
+  ) {
+    return "Food On The Way"
+  }
+  if (backendStatus === "delivered" || backendStatus === "completed") return "Delivered"
+  if (
+    backendStatus === "cancelled_by_restaurant" ||
+    backendStatus === "cancelled_by_user" ||
+    backendStatus === "cancelled_by_admin" ||
+    backendStatus === "cancelled"
+  ) {
+    return "Canceled"
+  }
+
+  // Keep previous fallback behavior for unknown statuses.
+  return String(backendStatusRaw || "")
+}
+
+const toIdCandidates = (...values) =>
+  [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))]
 
 export default function RegularOrderReport() {
   const todayDate = new Date().toISOString().split("T")[0]
@@ -235,43 +276,13 @@ export default function RegularOrderReport() {
               order.customerName ||
               "N/A"
 
-            const backendStatus = String(order.orderStatus || "").toLowerCase()
-            const deliveryPhase = String(order?.deliveryState?.currentPhase || "").toLowerCase()
-            let displayStatus = order.orderStatus
-            if (
-              !backendStatus ||
-              backendStatus === "created" ||
-              backendStatus === "placed"
-            ) {
-              displayStatus = "Pending"
-            } else if (backendStatus === "confirmed" || backendStatus === "accepted") {
-              displayStatus = "Accepted"
-            } else if (
-              backendStatus === "preparing" ||
-              backendStatus === "processed"
-            ) {
-              displayStatus = "Processing"
-            } else if (
-              backendStatus === "ready" ||
-              backendStatus === "ready_for_pickup" ||
-              deliveryPhase === "ready_for_pickup" ||
-              deliveryPhase === "at_pickup"
-            ) {
-              displayStatus = "Ready"
-            } else if (
-              backendStatus === "picked_up" ||
-              backendStatus === "out_for_delivery"
-            ) {
-              displayStatus = "Food On The Way"
-            } else if (backendStatus === "delivered") {
-              displayStatus = "Delivered"
-            } else if (backendStatus === "cancelled_by_restaurant") {
-              displayStatus = "Canceled"
-            } else if (backendStatus === "cancelled_by_user" || backendStatus === "cancelled_by_admin") {
-              displayStatus = "Canceled"
-            }
+            const displayStatus = mapOrderStatusForReport(
+              order.orderStatus || order.status,
+              order?.deliveryState?.currentPhase,
+            )
 
             return {
+              mongoId: order._id || order.id || "",
               orderId: order.orderId,
               restaurant: restaurantName,
               customerName,
@@ -316,7 +327,10 @@ export default function RegularOrderReport() {
   }, [])
 
   useEffect(() => {
-    const backendUrl = API_BASE_URL.replace(/\/api\/?$/, "")
+    const backendUrl = String(API_BASE_URL || "")
+      .replace(/\/api\/v1\/?$/i, "")
+      .replace(/\/api\/?$/i, "")
+      .replace(/\/$/, "")
     if (!backendUrl || !backendUrl.startsWith("http")) return undefined
 
     const token =
@@ -339,14 +353,57 @@ export default function RegularOrderReport() {
       setRefreshTick((prev) => prev + 1)
     }
 
+    const applyLiveStatusUpdate = (payload = {}) => {
+      const targetOrderIds = toIdCandidates(
+        payload.orderId,
+        payload.displayOrderId,
+        payload.orderMongoId,
+        payload.mongoId,
+        payload._id,
+        payload.id,
+      )
+      const nextStatus = mapOrderStatusForReport(
+        payload.orderStatus ||
+          payload.status ||
+          payload.newStatus ||
+          payload.currentStatus ||
+          payload.updatedStatus,
+        payload?.deliveryState?.currentPhase || payload.currentPhase || payload.phase,
+      )
+
+      if (targetOrderIds.length === 0 || !nextStatus) {
+        requestRefresh()
+        return
+      }
+
+      setOrders((prev) =>
+        prev.map((order) => {
+          const orderIds = toIdCandidates(order.orderId, order.mongoId, order.id, order._id)
+          const isSameOrder = orderIds.some((id) => targetOrderIds.includes(id))
+          if (!isSameOrder) return order
+          if (order.orderStatus === nextStatus) return order
+          return { ...order, orderStatus: nextStatus }
+        }),
+      )
+
+      // Keep server as source of truth for totals/pagination consistency.
+      requestRefresh()
+    }
+
     socket.on("connect", requestRefresh)
-    socket.on("order_status_update", requestRefresh)
+    socket.on("reconnect", requestRefresh)
+    socket.on("order_status_update", applyLiveStatusUpdate)
+    socket.on("admin_order_status_updated", applyLiveStatusUpdate)
+    socket.on("order_updated", applyLiveStatusUpdate)
     socket.on("order_deleted", requestRefresh)
     socket.on("admin_new_order", requestRefresh)
 
     return () => {
       socket.off("connect", requestRefresh)
-      socket.off("order_status_update", requestRefresh)
+      socket.off("reconnect", requestRefresh)
+      socket.off("order_status_update", applyLiveStatusUpdate)
+      socket.off("admin_order_status_updated", applyLiveStatusUpdate)
+      socket.off("order_updated", applyLiveStatusUpdate)
       socket.off("order_deleted", requestRefresh)
       socket.off("admin_new_order", requestRefresh)
       socket.disconnect()

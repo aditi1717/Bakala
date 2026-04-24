@@ -8,6 +8,7 @@ import { validateDeliveryCommissionRuleDto, validateOptionalStatusDto, validateR
 import { validateFeeSettingsUpsertDto } from '../validators/feeSettings.validator.js';
 import { validateDeliveryEmergencyHelpUpsertDto } from '../validators/deliveryEmergencyHelp.validator.js';
 import { validateReferralSettingsUpsertDto } from '../validators/referralSettings.validator.js';
+import { getOutletTimingsForRestaurant, upsertOutletTimingsForRestaurant } from '../../restaurant/services/outletTimings.service.js';
 
 // ----- Customers / Users -----
 export async function getCustomers(req, res, next) {
@@ -232,6 +233,40 @@ export async function getRestaurantById(req, res, next) {
             success: true,
             message: 'Restaurant fetched successfully',
             data: restaurant
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function getRestaurantOutletTimings(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: 'Invalid restaurant id' });
+        }
+        const data = await getOutletTimingsForRestaurant(id);
+        return res.status(200).json({
+            success: true,
+            message: 'Outlet timings fetched successfully',
+            data
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function updateRestaurantOutletTimings(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: 'Invalid restaurant id' });
+        }
+        const data = await upsertOutletTimingsForRestaurant(id, req.body?.outletTimings);
+        return res.status(200).json({
+            success: true,
+            message: 'Outlet timings updated successfully',
+            data
         });
     } catch (error) {
         next(error);

@@ -7,6 +7,23 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
+const DEFAULT_MAINTENANCE_MODES = {
+  userApp: {
+    enabled: false,
+    heading: "Store is Closed",
+    paragraph: "Currently undergoing maintenance.",
+  },
+  deliveryApp: {
+    enabled: false,
+    heading: "Delivery is Temporarily Closed",
+    paragraph: "Please check again shortly.",
+  },
+  restaurantApp: {
+    enabled: false,
+    heading: "Restaurant Panel is Temporarily Closed",
+    paragraph: "Maintenance is in progress. Please come back soon.",
+  },
+};
 
 export default function BusinessSetup() {
   const [loading, setLoading] = useState(true);
@@ -27,6 +44,7 @@ export default function BusinessSetup() {
     state: "",
     pincode: "",
     region: "",
+    maintenanceModes: DEFAULT_MAINTENANCE_MODES,
   });
 
   // Fetch business settings on mount
@@ -50,6 +68,23 @@ export default function BusinessSetup() {
           state: settings.state || "",
           pincode: settings.pincode || "",
           region: settings.region || "India",
+          maintenanceModes: {
+            userApp: {
+              enabled: Boolean(settings?.maintenanceModes?.userApp?.enabled),
+              heading: settings?.maintenanceModes?.userApp?.heading || DEFAULT_MAINTENANCE_MODES.userApp.heading,
+              paragraph: settings?.maintenanceModes?.userApp?.paragraph || DEFAULT_MAINTENANCE_MODES.userApp.paragraph,
+            },
+            deliveryApp: {
+              enabled: Boolean(settings?.maintenanceModes?.deliveryApp?.enabled),
+              heading: settings?.maintenanceModes?.deliveryApp?.heading || DEFAULT_MAINTENANCE_MODES.deliveryApp.heading,
+              paragraph: settings?.maintenanceModes?.deliveryApp?.paragraph || DEFAULT_MAINTENANCE_MODES.deliveryApp.paragraph,
+            },
+            restaurantApp: {
+              enabled: Boolean(settings?.maintenanceModes?.restaurantApp?.enabled),
+              heading: settings?.maintenanceModes?.restaurantApp?.heading || DEFAULT_MAINTENANCE_MODES.restaurantApp.heading,
+              paragraph: settings?.maintenanceModes?.restaurantApp?.paragraph || DEFAULT_MAINTENANCE_MODES.restaurantApp.paragraph,
+            },
+          },
         });
 
         // Set logo and favicon previews if they exist
@@ -72,6 +107,19 @@ export default function BusinessSetup() {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
+    }));
+  };
+
+  const handleMaintenanceModeChange = (targetApp, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      maintenanceModes: {
+        ...(prev.maintenanceModes || DEFAULT_MAINTENANCE_MODES),
+        [targetApp]: {
+          ...((prev.maintenanceModes || DEFAULT_MAINTENANCE_MODES)[targetApp] || {}),
+          [field]: value,
+        },
+      },
     }));
   };
 
@@ -112,6 +160,20 @@ export default function BusinessSetup() {
         return;
       }
 
+      const maintenanceEntries = Object.entries(formData.maintenanceModes || {});
+      for (const [, config] of maintenanceEntries) {
+        const heading = String(config?.heading || "").trim();
+        const paragraph = String(config?.paragraph || "").trim();
+        if (config?.enabled && !heading) {
+          toast.error("Maintenance heading is required when mode is ON");
+          return;
+        }
+        if (config?.enabled && !paragraph) {
+          toast.error("Maintenance paragraph is required when mode is ON");
+          return;
+        }
+      }
+
       setSaving(true);
 
       // Prepare form data
@@ -124,6 +186,23 @@ export default function BusinessSetup() {
         state: formData.state.trim(),
         pincode: formData.pincode.trim(),
         region: formData.region,
+        maintenanceModes: {
+          userApp: {
+            enabled: Boolean(formData?.maintenanceModes?.userApp?.enabled),
+            heading: String(formData?.maintenanceModes?.userApp?.heading || "").trim(),
+            paragraph: String(formData?.maintenanceModes?.userApp?.paragraph || "").trim(),
+          },
+          deliveryApp: {
+            enabled: Boolean(formData?.maintenanceModes?.deliveryApp?.enabled),
+            heading: String(formData?.maintenanceModes?.deliveryApp?.heading || "").trim(),
+            paragraph: String(formData?.maintenanceModes?.deliveryApp?.paragraph || "").trim(),
+          },
+          restaurantApp: {
+            enabled: Boolean(formData?.maintenanceModes?.restaurantApp?.enabled),
+            heading: String(formData?.maintenanceModes?.restaurantApp?.heading || "").trim(),
+            paragraph: String(formData?.maintenanceModes?.restaurantApp?.paragraph || "").trim(),
+          },
+        },
       };
 
       // Prepare files
@@ -476,6 +555,56 @@ export default function BusinessSetup() {
                 </div>
               </div>
             </div>
+
+            <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h4 className="text-sm font-semibold text-slate-900 mb-1">Maintenance Mode (App-wise)</h4>
+              <p className="text-xs text-slate-600 mb-4">
+                Turn ON any app mode to show a full-page blur and top banner in that app only.
+              </p>
+
+              <div className="space-y-4">
+                {[
+                  { key: "userApp", label: "User App" },
+                  { key: "deliveryApp", label: "Delivery App" },
+                  { key: "restaurantApp", label: "Restaurant App" },
+                ].map((item) => (
+                  <div key={item.key} className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <p className="text-xs font-semibold text-slate-800">{item.label}</p>
+                      <ToggleSwitch
+                        enabled={Boolean(formData?.maintenanceModes?.[item.key]?.enabled)}
+                        onChange={(next) => handleMaintenanceModeChange(item.key, "enabled", next)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Heading</label>
+                        <input
+                          type="text"
+                          maxLength={120}
+                          value={formData?.maintenanceModes?.[item.key]?.heading || ""}
+                          onChange={(e) => handleMaintenanceModeChange(item.key, "heading", e.target.value)}
+                          placeholder="Store is Closed"
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Paragraph</label>
+                        <input
+                          type="text"
+                          maxLength={280}
+                          value={formData?.maintenanceModes?.[item.key]?.paragraph || ""}
+                          onChange={(e) => handleMaintenanceModeChange(item.key, "paragraph", e.target.value)}
+                          placeholder="Currently undergoing maintenance."
+                          className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Save Button Section */}
@@ -517,13 +646,11 @@ export default function BusinessSetup() {
   );
 }
 
-function ToggleSwitch({ initial = false }) {
-  const [enabled, setEnabled] = useState(initial);
-
+function ToggleSwitch({ enabled = false, onChange = () => {} }) {
   return (
     <button
       type="button"
-      onClick={() => setEnabled((prev) => !prev)}
+      onClick={() => onChange(!enabled)}
       className={`inline-flex items-center w-10 h-5 rounded-full border transition-all ${enabled ? "bg-brand-600 border-brand-600 justify-end" : "bg-slate-200 border-slate-300 justify-start"
         }`}
     >

@@ -37,12 +37,11 @@ export const PocketBalanceV2 = () => {
         const totalWithdrawn = toNumber(wallet.totalWithdrawn, wallet.paidAmount);
         const grossBalance = toNumber(wallet.totalBalance, totalEarned + totalBonus);
 
-        const totalCashCollected = toNumber(wallet.totalCashCollected);
         const cashInHand = toNumber(wallet.cashInHand);
         const cashSubmittedToAdmin = toNumber(
           wallet.cashSubmittedToAdmin,
           wallet.totalSubmittedToAdmin,
-          totalCashCollected > 0 ? Math.max(0, totalCashCollected - cashInHand) : 0,
+          0,
         );
 
         setSummary({

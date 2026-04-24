@@ -7,7 +7,7 @@ import SettingsDialog from "@food/components/admin/orders/SettingsDialog"
 import { useOrdersManagement } from "@food/components/admin/orders/useOrdersManagement"
 
 const foodOnTheWayOrders = emptyOrders.filter(
-  (order) => order.orderStatus === "Food On The Way"
+  (order) => order.orderStatus === "Food On The Way" || order.orderStatus === "Picked Up"
 )
 
 export default function FoodOnTheWayOrders() {
@@ -35,12 +35,12 @@ export default function FoodOnTheWayOrders() {
     handlePrintOrder,
     toggleColumn,
     resetColumns,
-  } = useOrdersManagement(foodOnTheWayOrders, "food-on-the-way", "Food On The Way Orders")
+  } = useOrdersManagement(foodOnTheWayOrders, "food-on-the-way", "Picked Up Orders")
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen w-full max-w-full overflow-x-hidden">
       <OrdersTopbar 
-        title="Food On The Way Orders" 
+        title="Picked Up Orders" 
         count={count} 
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}

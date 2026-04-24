@@ -68,6 +68,30 @@ const getTodayTiming = (restaurant, dayName) => {
   return null
 }
 
+const extractDaySlots = (timing) => {
+  const rawSlots = Array.isArray(timing?.slots) ? timing.slots : []
+  const normalizedFromSlots = rawSlots
+    .map((slot) => ({
+      openingTime: slot?.openingTime || null,
+      closingTime: slot?.closingTime || null,
+      openingMinutes: parseTimeToMinutes(slot?.openingTime),
+      closingMinutes: parseTimeToMinutes(slot?.closingTime),
+    }))
+    .filter((slot) => slot.openingMinutes !== null && slot.closingMinutes !== null)
+
+  if (normalizedFromSlots.length > 0) {
+    return normalizedFromSlots
+  }
+
+  const openingTime = timing?.openingTime || null
+  const closingTime = timing?.closingTime || null
+  const openingMinutes = parseTimeToMinutes(openingTime)
+  const closingMinutes = parseTimeToMinutes(closingTime)
+  if (openingMinutes === null || closingMinutes === null) return []
+
+  return [{ openingTime, closingTime, openingMinutes, closingMinutes }]
+}
+
 const isWithinTimeWindow = (nowMinutes, openingMinutes, closingMinutes) => {
   if (openingMinutes === null || closingMinutes === null) return true
   if (openingMinutes === closingMinutes) return true
@@ -92,6 +116,15 @@ const getMinutesUntilClosing = (nowMinutes, openingMinutes, closingMinutes) => {
   }
 
   return (24 * 60 - nowMinutes) + closingMinutes
+}
+
+const getActiveSlot = (nowMinutes, slots = []) => {
+  for (const slot of slots) {
+    if (isWithinTimeWindow(nowMinutes, slot.openingMinutes, slot.closingMinutes)) {
+      return slot
+    }
+  }
+  return null
 }
 
 const formatTimeLabel = (timeValue) => {
@@ -202,19 +235,30 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
     restaurant?.closingTime ||
     null
 
-  const openingMinutes = parseTimeToMinutes(openingTime)
-  const closingMinutes = parseTimeToMinutes(closingTime)
+  const derivedSlots = extractDaySlots(todayTiming)
+  const hasDaySlots = derivedSlots.length > 0
+  const fallbackOpeningMinutes = parseTimeToMinutes(openingTime)
+  const fallbackClosingMinutes = parseTimeToMinutes(closingTime)
+  const slots = hasDaySlots
+    ? derivedSlots
+    : (
+      fallbackOpeningMinutes !== null && fallbackClosingMinutes !== null
+        ? [{
+          openingTime,
+          closingTime,
+          openingMinutes: fallbackOpeningMinutes,
+          closingMinutes: fallbackClosingMinutes,
+        }]
+        : []
+    )
   const nowMinutes = now.getHours() * 60 + now.getMinutes()
-  const hasExplicitWindow = Boolean(openingTime || closingTime)
+  const hasExplicitWindow = slots.length > 0 || Boolean(openingTime || closingTime)
   // If a restaurant provides only one side of the window, treat timings as not enforced
   // (prevents accidental "offline" due to partial data).
-  const isWithinTimings = hasExplicitWindow
-    ? (openingMinutes !== null && closingMinutes !== null
-      ? isWithinTimeWindow(nowMinutes, openingMinutes, closingMinutes)
-      : true)
-    : true
-  const minutesUntilClose = isWithinTimings
-    ? getMinutesUntilClosing(nowMinutes, openingMinutes, closingMinutes)
+  const activeSlot = getActiveSlot(nowMinutes, slots)
+  const isWithinTimings = hasExplicitWindow ? (slots.length > 0 ? Boolean(activeSlot) : true) : true
+  const minutesUntilClose = (isWithinTimings && activeSlot)
+    ? getMinutesUntilClosing(nowMinutes, activeSlot.openingMinutes, activeSlot.closingMinutes)
     : null
 
   return {
@@ -222,11 +266,11 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
     isActive,
     isAcceptingOrders,
     isWithinTimings,
-    openingTime,
-    closingTime,
+    openingTime: activeSlot?.openingTime || openingTime,
+    closingTime: activeSlot?.closingTime || closingTime,
     minutesUntilClose,
     closingCountdownLabel: isWithinTimings
-      ? formatClosingCountdown(minutesUntilClose, closingTime)
+      ? formatClosingCountdown(minutesUntilClose, activeSlot?.closingTime || closingTime)
       : null,
     reason: isWithinTimings
       ? (isAcceptingOrders ? "open" : "open-by-timings")

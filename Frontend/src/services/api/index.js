@@ -434,6 +434,17 @@ export const adminAPI = {
   /** Get single restaurant by id (full details for View Details modal). */
   getRestaurantById: (id) =>
     apiClient.get(`/food/admin/restaurants/${id}`, { contextModule: "admin" }),
+  /** Get/set restaurant outlet timings (admin) - linked with restaurant app outlet timings. */
+  getRestaurantOutletTimings: (id) =>
+    apiClient.get(`/food/admin/restaurants/${String(id)}/outlet-timings`, {
+      contextModule: "admin",
+    }),
+  saveRestaurantOutletTimings: (id, outletTimings) =>
+    apiClient.put(
+      `/food/admin/restaurants/${String(id)}/outlet-timings`,
+      { outletTimings: outletTimings || {} },
+      { contextModule: "admin" },
+    ),
   /** Get restaurant analytics for POS. */
   getRestaurantAnalytics: (id) =>
     apiClient.get(`/food/admin/restaurants/${id}/analytics`, {

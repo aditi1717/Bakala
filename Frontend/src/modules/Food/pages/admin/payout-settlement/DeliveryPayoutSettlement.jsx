@@ -130,6 +130,7 @@ export default function DeliveryPayoutSettlement() {
         toDate,
         fromTime,
         toTime,
+        settleCodToAdmin: true,
         beneficiaryIds,
         payoutMethod: "manual",
         note: `Batch settlement from ${fromDate} ${fromTime} to ${toDate} ${toTime}`,

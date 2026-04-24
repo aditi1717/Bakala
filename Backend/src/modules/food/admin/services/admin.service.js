@@ -169,32 +169,52 @@ const resolveDeliveryAutoDateRange = async () => {
         .lean();
 
     const boundary = latest?.toAt || latest?.paidAt || null;
-    const orderMatch = {
+    const boundaryPlusOneSecond = boundary ? new Date(new Date(boundary).getTime() + 1000) : null;
+    const deliveryOrderBaseMatch = {
         orderStatus: 'delivered',
         'dispatch.deliveryPartnerId': { $exists: true, $ne: null }
     };
-    if (boundary) {
-        orderMatch.createdAt = { $gt: new Date(new Date(boundary).getTime() + 1000) };
-    }
 
-    const earliestUnsettledOrder = await FoodOrder.findOne(orderMatch)
-        .sort({ createdAt: 1 })
-        .select('createdAt')
-        .lean();
+    const earliestUnsettledOrder = await FoodOrder.aggregate([
+        { $match: deliveryOrderBaseMatch },
+        {
+            $addFields: {
+                effectiveDeliveredAt: {
+                    $ifNull: [
+                        '$deliveryState.deliveredAt',
+                        { $ifNull: ['$deliveredAt', { $ifNull: ['$completedAt', { $ifNull: ['$updatedAt', '$createdAt'] }] }] }
+                    ]
+                }
+            }
+        },
+        ...(boundaryPlusOneSecond ? [{ $match: { effectiveDeliveredAt: { $gt: boundaryPlusOneSecond } } }] : []),
+        { $sort: { effectiveDeliveredAt: 1 } },
+        { $limit: 1 },
+        { $project: { effectiveDeliveredAt: 1 } }
+    ]);
 
-    let start = earliestUnsettledOrder?.createdAt
-        ? new Date(earliestUnsettledOrder.createdAt)
+    let start = earliestUnsettledOrder?.[0]?.effectiveDeliveredAt
+        ? new Date(earliestUnsettledOrder[0].effectiveDeliveredAt)
         : (boundary ? new Date(new Date(boundary).getTime() + 1000) : null);
 
     if (!start || Number.isNaN(start.getTime())) {
-        const firstDeliveryOrder = await FoodOrder.findOne({
-            orderStatus: 'delivered',
-            'dispatch.deliveryPartnerId': { $exists: true, $ne: null }
-        })
-            .sort({ createdAt: 1 })
-            .select('createdAt')
-            .lean();
-        start = firstDeliveryOrder?.createdAt ? new Date(firstDeliveryOrder.createdAt) : startOfTodayLocal();
+        const firstDeliveryOrder = await FoodOrder.aggregate([
+            { $match: deliveryOrderBaseMatch },
+            {
+                $addFields: {
+                    effectiveDeliveredAt: {
+                        $ifNull: [
+                            '$deliveryState.deliveredAt',
+                            { $ifNull: ['$deliveredAt', { $ifNull: ['$completedAt', { $ifNull: ['$updatedAt', '$createdAt'] }] }] }
+                        ]
+                    }
+                }
+            },
+            { $sort: { effectiveDeliveredAt: 1 } },
+            { $limit: 1 },
+            { $project: { effectiveDeliveredAt: 1 } }
+        ]);
+        start = firstDeliveryOrder?.[0]?.effectiveDeliveredAt ? new Date(firstDeliveryOrder[0].effectiveDeliveredAt) : startOfTodayLocal();
     }
 
     const safeStart = start > now ? new Date(now.getTime() - 1000) : start;
@@ -5609,6 +5629,8 @@ export async function getDeliveryWallets(query = {}) {
 
     const cashLimitSettings = await FoodDeliveryCashLimit.findOne({ isActive: true }).lean();
     const globalLimit = Number(cashLimitSettings?.deliveryCashLimit || 0);
+    const COD_CASH_METHODS = ['cash', 'cod', 'cash_on_delivery'];
+    const AUTO_COD_SETTLEMENT_NOTE_REGEX = /^COD settled via payout batch/i;
 
     const partnerIds = partners.map((p) => p?._id).filter(Boolean);
 
@@ -5618,7 +5640,7 @@ export async function getDeliveryWallets(query = {}) {
                 $match: {
                     'dispatch.deliveryPartnerId': { $in: partnerIds },
                     orderStatus: 'delivered',
-                    'payment.method': 'cash'
+                    'payment.method': { $in: COD_CASH_METHODS }
                 }
             },
             {
@@ -5632,7 +5654,12 @@ export async function getDeliveryWallets(query = {}) {
             {
                 $match: {
                     deliveryPartnerId: { $in: partnerIds },
-                    status: 'Completed'
+                    status: 'Completed',
+                    $or: [
+                        { adminNote: { $exists: false } },
+                        { adminNote: null },
+                        { adminNote: { $not: AUTO_COD_SETTLEMENT_NOTE_REGEX } }
+                    ]
                 }
             },
             {
@@ -5674,11 +5701,10 @@ export async function getDeliveryWallets(query = {}) {
         const key = String(p._id);
 
         const grossCashCollected = Number(cashCollectedMap.get(key) || 0);
-        const totalSubmittedToAdmin = Number(cashSubmittedMap.get(key) || 0);
+        const rawSubmittedToAdmin = Number(cashSubmittedMap.get(key) || 0);
+        const totalSubmittedToAdmin = Math.max(0, Math.min(rawSubmittedToAdmin, grossCashCollected));
         const settlementPaidAmount = Number(payoutPaidMap.get(key) || 0);
-        const derivedCashInHand = Math.max(0, grossCashCollected - totalSubmittedToAdmin);
-        const walletCashInHand = Number(wallet?.cashInHand || 0);
-        const cashInHand = derivedCashInHand > 0 ? derivedCashInHand : walletCashInHand;
+        const cashInHand = Math.max(0, grossCashCollected - totalSubmittedToAdmin);
         const totalEarning = Number(wallet?.totalEarnings || 0);
         const totalWithdrawn = settlementPaidAmount;
         
@@ -5722,7 +5748,14 @@ export async function getCashLimitSettlements(query = {}) {
     const page = parseInt(query.page, 10) || 1;
     const skip = (page - 1) * limit;
 
-    const filter = {};
+    const AUTO_COD_SETTLEMENT_NOTE_REGEX = /^COD settled via payout batch/i;
+    const filter = {
+        $or: [
+            { adminNote: { $exists: false } },
+            { adminNote: null },
+            { adminNote: { $not: AUTO_COD_SETTLEMENT_NOTE_REGEX } }
+        ]
+    };
     if (query.search) {
         // Search by razorpay ID or find partner IDs to search by partner
         if (query.search.startsWith('pay_')) {
@@ -6430,6 +6463,12 @@ export async function markAllRestaurantPayoutSettled(payload = {}, adminScope = 
 }
 
 const COD_PAYMENT_METHODS = ['cash', 'cod', 'cash_on_delivery', 'razorpay_qr'];
+const DELIVERY_EFFECTIVE_DELIVERED_AT_EXPR = {
+    $ifNull: [
+        '$deliveryState.deliveredAt',
+        { $ifNull: ['$deliveredAt', { $ifNull: ['$completedAt', { $ifNull: ['$updatedAt', '$createdAt'] }] }] }
+    ]
+};
 
 export async function getDeliveryPayoutSettlementPreview(query = {}, adminScope = {}) {
     const hasExplicitWindow = Boolean(
@@ -6471,7 +6510,7 @@ export async function getDeliveryPayoutSettlementPreview(query = {}, adminScope 
     }
 
     const match = {
-        createdAt: { $gte: start, $lte: end },
+        effectiveDeliveredAt: { $gte: start, $lte: end },
         orderStatus: 'delivered',
         'dispatch.deliveryPartnerId': { $exists: true, $ne: null }
     };
@@ -6480,9 +6519,9 @@ export async function getDeliveryPayoutSettlementPreview(query = {}, adminScope 
     }
 
     const rowsRaw = await FoodOrder.aggregate([
-        { $match: match },
         {
             $addFields: {
+                effectiveDeliveredAt: DELIVERY_EFFECTIVE_DELIVERED_AT_EXPR,
                 paymentMethodLower: {
                     $toLower: {
                         $ifNull: ['$payment.method', '$paymentMethod']
@@ -6490,6 +6529,7 @@ export async function getDeliveryPayoutSettlementPreview(query = {}, adminScope 
                 }
             }
         },
+        { $match: match },
         {
             $group: {
                 _id: '$dispatch.deliveryPartnerId',
@@ -6949,6 +6989,7 @@ export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}
         ? normalizeDateRangeOrThrow(payload.fromDate, payload.toDate, payload.fromTime, payload.toTime)
         : await resolveDeliveryAutoDateRange();
     const payoutMethod = normalizePayoutMethod(payload.payoutMethod || 'manual');
+    const settleCodToAdmin = payload?.settleCodToAdmin === true;
     const note = String(payload.note || '').trim();
     const referenceNumber = String(payload.referenceNumber || '').trim();
     const now = new Date();
@@ -6980,7 +7021,7 @@ export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}
     }
 
     const orderMatch = {
-        createdAt: { $gte: start, $lte: end },
+        effectiveDeliveredAt: { $gte: start, $lte: end },
         orderStatus: 'delivered',
         'dispatch.deliveryPartnerId': { $exists: true, $ne: null }
     };
@@ -6989,9 +7030,9 @@ export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}
     }
 
     const groupedOrders = await FoodOrder.aggregate([
-        { $match: orderMatch },
         {
             $addFields: {
+                effectiveDeliveredAt: DELIVERY_EFFECTIVE_DELIVERED_AT_EXPR,
                 paymentMethodLower: {
                     $toLower: {
                         $ifNull: ['$payment.method', '$paymentMethod']
@@ -6999,6 +7040,7 @@ export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}
                 }
             }
         },
+        { $match: orderMatch },
         {
             $group: {
                 _id: '$dispatch.deliveryPartnerId',
@@ -7081,8 +7123,9 @@ export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}
         const totalCodAmount = Number(entry.codAmount || 0);
         const payableNow = Math.max(0, totalEarning - Number(settled.paidAmount || 0));
         const codPayableNow = Math.max(0, totalCodAmount - Number(settled.codPaidAmount || 0));
+        const codSettledNow = settleCodToAdmin ? codPayableNow : 0;
 
-        if (payableNow <= 0 && codPayableNow <= 0) {
+        if (payableNow <= 0 && codSettledNow <= 0) {
             continue;
         }
 
@@ -7100,7 +7143,7 @@ export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}
             codOrdersCount: Number(entry.codOrdersCount || 0),
             grossAmount: totalEarning,
             codAmount: totalCodAmount,
-            codPaidAmount: codPayableNow,
+            codPaidAmount: codSettledNow,
             paidAmount: payableNow,
             adjustmentAmount: 0,
             status: 'paid',
@@ -7111,14 +7154,14 @@ export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}
             paidByAdminId
         });
 
-        if (codPayableNow > 0) {
+        if (codSettledNow > 0) {
             depositDocs.push({
                 deliveryPartnerId: beneficiaryId,
-                amount: codPayableNow,
+                amount: codSettledNow,
                 paymentMethod: 'cash',
                 status: 'Completed',
                 adminId: paidByAdminId || null,
-                adminNote: `COD settled via payout batch ${String(settlementBatchId)}`
+                adminNote: `COD handover settled via payout batch ${String(settlementBatchId)}`
             });
         }
     }

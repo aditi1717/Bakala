@@ -11,6 +11,8 @@ import { ValidationError } from '../../../../core/auth/errors.js';
 import { createRazorpayOrder, getRazorpayKeyId, isRazorpayConfigured, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
 
 const PAYABLE_DELIVERY_STATUSES = ['delivered'];
+const COD_CASH_METHODS = ['cash', 'cod', 'cash_on_delivery'];
+const AUTO_COD_SETTLEMENT_NOTE_REGEX = /^COD settled via payout batch/i;
 
 /**
  * Enhanced wallet fetch for delivery partners.
@@ -42,7 +44,7 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
                 $match: { 
                     'dispatch.deliveryPartnerId': partnerId, 
                     orderStatus: 'delivered', 
-                    'payment.method': 'cash'
+                    'payment.method': { $in: COD_CASH_METHODS }
                 } 
             },
             { $group: { _id: null, cashCollected: { $sum: { $ifNull: ['$pricing.total', 0] } } } }
@@ -52,7 +54,12 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
             {
                 $match: {
                     deliveryPartnerId: partnerId,
-                    status: 'Completed'
+                    status: 'Completed',
+                    $or: [
+                        { adminNote: { $exists: false } },
+                        { adminNote: null },
+                        { adminNote: { $not: AUTO_COD_SETTLEMENT_NOTE_REGEX } }
+                    ]
                 }
             },
             { $group: { _id: null, depositedCash: { $sum: { $ifNull: ['$amount', 0] } } } }
@@ -96,6 +103,11 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
             .lean(),
         // 8. Recent COD deposits for History
         FoodDeliveryCashDeposit.find({ deliveryPartnerId: partnerId })
+            .or([
+                { adminNote: { $exists: false } },
+                { adminNote: null },
+                { adminNote: { $not: AUTO_COD_SETTLEMENT_NOTE_REGEX } }
+            ])
             .sort({ createdAt: -1 })
             .limit(50)
             .lean()
@@ -103,7 +115,8 @@ export const getDeliveryPartnerWalletEnhanced = async (deliveryPartnerId) => {
 
     const totalEarned = Number(earningsAgg?.[0]?.totalEarned) || 0;
     const grossCashCollected = Number(cashCollectedAgg?.[0]?.cashCollected) || 0;
-    const totalDepositedCash = Number(cashDepositsAgg?.[0]?.depositedCash) || 0;
+    const rawDepositedCash = Number(cashDepositsAgg?.[0]?.depositedCash) || 0;
+    const totalDepositedCash = Math.max(0, Math.min(rawDepositedCash, grossCashCollected));
     const cashInHand = Math.max(0, grossCashCollected - totalDepositedCash);
     const totalBonus = Number(bonusAgg?.[0]?.total) || 0;
     const legacyApprovedWithdrawn = Number(withdrawalAgg?.[0]?.totalWithdrawn) || 0;

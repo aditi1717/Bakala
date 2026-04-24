@@ -9,6 +9,53 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
+const getOrderIdentityKey = (order = {}) => {
+  const candidate = order?.orderId || order?._id || order?.id || order?.orderMongoId || order?.mongoId
+  return candidate ? String(candidate).trim() : ""
+}
+
+const getOrderSortTimestamp = (order = {}) => {
+  const candidate =
+    order?.settledAt ||
+    order?.updatedAt ||
+    order?.createdAt ||
+    order?.deliveredAt ||
+    order?.timestamp
+  const time = candidate ? new Date(candidate).getTime() : 0
+  return Number.isFinite(time) ? time : 0
+}
+
+const dedupeOrdersByIdentity = (orders = []) => {
+  const keyed = new Map()
+  const passthrough = []
+
+  for (const order of Array.isArray(orders) ? orders : []) {
+    const key = getOrderIdentityKey(order)
+    if (!key) {
+      passthrough.push(order)
+      continue
+    }
+
+    const existing = keyed.get(key)
+    if (!existing) {
+      keyed.set(key, order)
+      continue
+    }
+
+    const existingTs = getOrderSortTimestamp(existing)
+    const nextTs = getOrderSortTimestamp(order)
+    const existingSettled = Boolean(existing?.isSettled === true)
+    const nextSettled = Boolean(order?.isSettled === true)
+
+    // Prefer latest entry; if timestamps match, prefer settled snapshot.
+    if (nextTs > existingTs || (nextTs === existingTs && nextSettled && !existingSettled)) {
+      keyed.set(key, order)
+    }
+  }
+
+  return [...keyed.values(), ...passthrough]
+}
+
 
 export default function HubFinance() {
   const navigate = useNavigate()
@@ -154,15 +201,32 @@ export default function HubFinance() {
     return { earnings, commission, gross, count: invoiceOrders.length }
   }, [invoiceOrders])
 
-  const currentCycleUnpaidSummary = useMemo(() => {
-    const orders = financeData?.currentCycle?.orders || []
+  const dedupedCurrentCycleOrders = useMemo(
+    () => dedupeOrdersByIdentity(financeData?.currentCycle?.orders || []),
+    [financeData],
+  )
+
+  const dedupedPastCycleOrders = useMemo(
+    () => dedupeOrdersByIdentity(pastCyclesData?.orders || []),
+    [pastCyclesData],
+  )
+
+  const isPastCyclesView = Boolean(pastCyclesData && pastCyclesData.orders)
+
+  const payoutSourceOrders = useMemo(
+    () => (isPastCyclesView ? dedupedPastCycleOrders : dedupedCurrentCycleOrders),
+    [isPastCyclesView, dedupedPastCycleOrders, dedupedCurrentCycleOrders],
+  )
+
+  const payoutUnpaidSummary = useMemo(() => {
+    const orders = payoutSourceOrders
     const unpaidOrders = orders.filter((order) => !Boolean(order?.isSettled === true))
     const unpaidAmount = unpaidOrders.reduce(
       (sum, order) => sum + Number(order?.payout || order?.restaurantEarning || 0),
       0
     )
     return { amount: unpaidAmount, count: unpaidOrders.length }
-  }, [financeData])
+  }, [payoutSourceOrders])
 
   const handleViewDetails = () => {
     navigate("/restaurant/finance-details", { state: { financeData, restaurantData } })
@@ -230,13 +294,13 @@ export default function HubFinance() {
   }
 
   const filteredPastCycleOrders = useMemo(
-    () => filterOrdersBySettlement(pastCyclesData?.orders || []),
-    [pastCyclesData, settlementStatusFilter]
+    () => filterOrdersBySettlement(dedupedPastCycleOrders),
+    [dedupedPastCycleOrders, settlementStatusFilter]
   )
 
   const filteredCurrentCycleOrders = useMemo(
-    () => filterOrdersBySettlement(financeData?.currentCycle?.orders || []),
-    [financeData, settlementStatusFilter]
+    () => filterOrdersBySettlement(dedupedCurrentCycleOrders),
+    [dedupedCurrentCycleOrders, settlementStatusFilter]
   )
 
   const filteredInvoiceOrders = useMemo(
@@ -244,7 +308,6 @@ export default function HubFinance() {
     [invoiceOrders, settlementStatusFilter]
   )
 
-  const isPastCyclesView = Boolean(pastCyclesData && pastCyclesData.orders)
   const activePayoutOrders = isPastCyclesView ? filteredPastCycleOrders : filteredCurrentCycleOrders
   const totalPayoutPages = Math.max(1, Math.ceil(activePayoutOrders.length / ORDERS_PER_PAGE))
   const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoiceOrders.length / ORDERS_PER_PAGE))
@@ -989,19 +1052,21 @@ export default function HubFinance() {
       <div className="flex-1 overflow-y-auto px-4 pt-6 pb-28">
         {activeTab === "payouts" && (
           <div className="space-y-6">
-            {/* Current cycle */}
+            {/* Payout summary */}
             <div>
-              <h2 className="text-base font-bold text-gray-900 mb-3">Current cycle</h2>
+              <h2 className="text-base font-bold text-gray-900 mb-3">
+                {isPastCyclesView ? "Selected range" : "Current cycle"}
+              </h2>
               <div className="bg-white rounded-lg p-4">
                 {loading ? (
                   <div className="py-8 text-center text-gray-500">Loading...</div>
                 ) : (
                   <>
                     <p className="text-4xl font-bold text-gray-900 mb-2">
-                      {formatMoney(currentCycleUnpaidSummary.amount)}
+                      {formatMoney(payoutUnpaidSummary.amount)}
                     </p>
                     <p className="text-sm text-gray-600 mb-4">
-                      {currentCycleUnpaidSummary.count} {currentCycleUnpaidSummary.count === 1 ? 'unpaid order' : 'unpaid orders'}
+                      {payoutUnpaidSummary.count} {payoutUnpaidSummary.count === 1 ? 'unpaid order' : 'unpaid orders'}
                     </p>
                   </>
                 )}
@@ -1009,7 +1074,7 @@ export default function HubFinance() {
             </div>
 
             {/* Discount Breakdown */}
-            {!loading && financeData?.currentCycle && (
+            {!loading && (
               <div>
                 <h2 className="text-base font-bold text-gray-900 mb-3">Discount breakdown</h2>
                 <div className="bg-white rounded-lg p-4 space-y-3">
@@ -1017,7 +1082,7 @@ export default function HubFinance() {
                     <span className="text-sm text-gray-600">Platform Coupons</span>
                     <span className="text-sm font-semibold text-green-600">
                       ₹{(() => {
-                        const total = (financeData.currentCycle.orders || []).reduce((sum, order) => {
+                        const total = (payoutSourceOrders || []).reduce((sum, order) => {
                           return sum + (order.pricing?.couponByAdmin || 0)
                         }, 0)
                         return total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -1029,7 +1094,7 @@ export default function HubFinance() {
                     <span className="text-sm text-gray-600">Your Coupons</span>
                     <span className="text-sm font-semibold text-orange-600">
                       -₹{(() => {
-                        const total = (financeData.currentCycle.orders || []).reduce((sum, order) => {
+                        const total = (payoutSourceOrders || []).reduce((sum, order) => {
                           return sum + (order.pricing?.couponByRestaurant || 0)
                         }, 0)
                         return total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -1041,7 +1106,7 @@ export default function HubFinance() {
                     <span className="text-sm text-gray-600">Your Offers</span>
                     <span className="text-sm font-semibold text-purple-600">
                       -₹{(() => {
-                        const total = (financeData.currentCycle.orders || []).reduce((sum, order) => {
+                        const total = (payoutSourceOrders || []).reduce((sum, order) => {
                           return sum + (order.pricing?.offerByRestaurant || 0)
                         }, 0)
                         return total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -1053,7 +1118,7 @@ export default function HubFinance() {
                     <span className="text-sm text-gray-600">Commission Paid</span>
                     <span className="text-sm font-semibold text-brand-600">
                       -₹{(() => {
-                        const total = (financeData.currentCycle.orders || []).reduce((sum, order) => {
+                        const total = (payoutSourceOrders || []).reduce((sum, order) => {
                           return sum + (order.commission || order.pricing?.restaurantCommission || 0)
                         }, 0)
                         return total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

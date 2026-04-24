@@ -1700,6 +1700,21 @@ function RestaurantDetailsContent() {
     setShowItemDetail(true)
   }
 
+  // For variant-based dishes, never add directly from list card.
+  // Open the detail sheet first so user can choose variant explicitly.
+  const handleCardQuantityUpdate = (item, newQuantity, event = null) => {
+    const currentQuantity = getDishQuantity(item)
+    const isIncrement = Number(newQuantity) > Number(currentQuantity)
+
+    if (hasFoodVariants(item) && isIncrement) {
+      setSelectedItem(item)
+      setShowItemDetail(true)
+      return
+    }
+
+    updateItemQuantity(item, newQuantity, event)
+  }
+
   // Helper function to calculate final price after discount
   const getFinalPrice = (item) => {
     // If discount exists, calculate from originalPrice, otherwise use price directly
@@ -2380,7 +2395,7 @@ function RestaurantDetailsContent() {
                                   onBookmark={handleBookmarkClick}
                                   isFavorite={isDishFavorite(product?.id || product?._id, restaurant?.restaurantId || restaurant?._id || restaurant?.id)}
                                   onShare={handleShareClick}
-                                  onUpdateQuantity={updateItemQuantity}
+                                  onUpdateQuantity={handleCardQuantityUpdate}
                                   disabled={shouldShowGrayscale}
                                   showRecommended={isRecommendedItem(product)}
                                   foodImageFallback={FOOD_IMAGE_FALLBACK}
@@ -2596,7 +2611,7 @@ function RestaurantDetailsContent() {
                             onBookmark={handleBookmarkClick}
                             isFavorite={isDishFavorite(item.id, restaurant?.restaurantId || restaurant?._id || restaurant?.id)}
                             onShare={handleShareClick}
-                            onUpdateQuantity={updateItemQuantity}
+                            onUpdateQuantity={handleCardQuantityUpdate}
                             disabled={shouldShowGrayscale}
                             showRecommended={isRecommendedItem(item)}
                             foodImageFallback={FOOD_IMAGE_FALLBACK}
@@ -2680,7 +2695,7 @@ function RestaurantDetailsContent() {
                                       onBookmark={handleBookmarkClick}
                                       isFavorite={isDishFavorite(item.id, restaurant?.restaurantId || restaurant?._id || restaurant?.id)}
                                       onShare={handleShareClick}
-                                      onUpdateQuantity={updateItemQuantity}
+                                      onUpdateQuantity={handleCardQuantityUpdate}
                                       disabled={shouldShowGrayscale}
                                       showRecommended={isRecommendedItem(item)}
                                       foodImageFallback={FOOD_IMAGE_FALLBACK}

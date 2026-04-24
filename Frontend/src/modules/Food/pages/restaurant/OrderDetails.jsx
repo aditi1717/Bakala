@@ -42,6 +42,16 @@ const firstText = (...values) => {
   return ""
 }
 
+const getDeliveryPartnerName = (order = {}) =>
+  firstText(
+    order?.deliveryPartnerName,
+    order?.dispatch?.deliveryPartnerName,
+    order?.dispatch?.deliveryPartner?.name,
+    order?.dispatch?.deliveryPartnerId?.name,
+    order?.deliveryPartner?.name,
+    order?.deliveryPartnerId?.name,
+  )
+
 const formatMoney = (value) => `₹${Number(value || 0).toFixed(2)}`
 const formatDiscount = (value) => `-₹${Math.abs(Number(value || 0)).toFixed(2)}`
 
@@ -233,6 +243,13 @@ export default function OrderDetails() {
           }
           
           const statusLower = orderStatusRaw
+          const dispatchStatusLower = String(order.dispatch?.status || "").toLowerCase()
+          const deliveryPartnerNameRaw = getDeliveryPartnerName(order)
+          const shouldShowDeliveryPartner =
+            Boolean(deliveryPartnerNameRaw) &&
+            ["assigned", "accepted", "arrived", "picked", "on_the_way", "reached_drop", "delivered"].some((key) =>
+              dispatchStatusLower.includes(key),
+            )
           const reached = {
             confirmed: order.tracking?.confirmed?.status || ["confirmed", "preparing", "ready", "ready_for_pickup", "picked_up", "out_for_delivery", "delivered"].includes(statusLower),
             preparing: order.tracking?.preparing?.status || ["preparing", "ready", "ready_for_pickup", "picked_up", "out_for_delivery", "delivered"].includes(statusLower),
@@ -280,6 +297,7 @@ export default function OrderDetails() {
               String(order.dispatch?.status || "").toLowerCase() === "accepted"
                 ? (order.deliveryPartnerId || order.dispatch?.deliveryPartnerId || null)
                 : null,
+            deliveryPartnerName: shouldShowDeliveryPartner ? deliveryPartnerNameRaw : "",
             dispatchStatus: order.dispatch?.status || null,
             reason: order.cancellationReason || '',
             timeline: [
@@ -825,6 +843,23 @@ export default function OrderDetails() {
               <p className="text-sm text-gray-600">{orderData.customer.distance}</p>
             </div>
           </div>
+
+          {orderData.deliveryPartnerName ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-2">
+                Delivery Partner
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{orderData.deliveryPartnerName}</p>
+                  <p className="text-xs text-emerald-700">Assigned for this order</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
         </div>
 

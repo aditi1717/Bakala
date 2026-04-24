@@ -30,6 +30,48 @@ const persistRestaurantOnlineStatus = (isOnline) => {
   }
 }
 
+const parseTimeToMinutes = (timeValue) => {
+  if (!timeValue || typeof timeValue !== "string") return null
+  const match = String(timeValue).trim().match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null
+  return (hour * 60) + minute
+}
+
+const extractDaySlots = (dayData) => {
+  const rawSlots = Array.isArray(dayData?.slots) ? dayData.slots : []
+  const normalized = rawSlots
+    .map((slot) => {
+      const openingTime = String(slot?.openingTime || "").trim()
+      const closingTime = String(slot?.closingTime || "").trim()
+      const openingMinutes = parseTimeToMinutes(openingTime)
+      const closingMinutes = parseTimeToMinutes(closingTime)
+      if (openingMinutes === null || closingMinutes === null) return null
+      return { openingTime, closingTime, openingMinutes, closingMinutes }
+    })
+    .filter(Boolean)
+
+  if (normalized.length > 0) return normalized
+
+  const openingTime = String(dayData?.openingTime || "").trim()
+  const closingTime = String(dayData?.closingTime || "").trim()
+  const openingMinutes = parseTimeToMinutes(openingTime)
+  const closingMinutes = parseTimeToMinutes(closingTime)
+  if (openingMinutes === null || closingMinutes === null) return []
+  return [{ openingTime, closingTime, openingMinutes, closingMinutes }]
+}
+
+const isWithinSlot = (nowMinutes, slot) => {
+  const opening = slot?.openingMinutes
+  const closing = slot?.closingMinutes
+  if (opening === null || opening === undefined || closing === null || closing === undefined) return false
+  if (closing > opening) return nowMinutes >= opening && nowMinutes <= closing
+  return nowMinutes >= opening || nowMinutes <= closing
+}
+
 
 export default function RestaurantStatus() {
   const navigate = useNavigate()
@@ -127,24 +169,14 @@ export default function RestaurantStatus() {
         return
       }
 
-      if (!dayData.openingTime || !dayData.closingTime) {
+      const slots = extractDaySlots(dayData)
+      if (slots.length === 0) {
         setIsDayClosed(false)
         setIsWithinTimings(true)
         return
       }
 
-      const [openHour, openMinute] = dayData.openingTime.split(':').map(Number)
-      const [closeHour, closeMinute] = dayData.closingTime.split(':').map(Number)
-      
-      const openingTimeInMinutes = openHour * 60 + openMinute
-      const closingTimeInMinutes = closeHour * 60 + closeMinute
-
-      let isWithin = false
-      if (closingTimeInMinutes > openingTimeInMinutes) {
-        isWithin = currentTimeInMinutes >= openingTimeInMinutes && currentTimeInMinutes <= closingTimeInMinutes
-      } else {
-        isWithin = currentTimeInMinutes >= openingTimeInMinutes || currentTimeInMinutes <= closingTimeInMinutes
-      }
+      const isWithin = slots.some((slot) => isWithinSlot(currentTimeInMinutes, slot))
 
       setIsDayClosed(false)
       setIsWithinTimings(isWithin)
@@ -293,10 +325,12 @@ export default function RestaurantStatus() {
     // Single source of truth: outlet timings
     if (outletTimings && outletTimings[currentDayFull]) {
       const dayData = outletTimings[currentDayFull]
-      if (dayData.isOpen && dayData.openingTime && dayData.closingTime) {
+      const slots = extractDaySlots(dayData)
+      if (dayData.isOpen && slots.length > 0) {
         return {
-          openingTime: formatTime12Hour(dayData.openingTime),
-          closingTime: formatTime12Hour(dayData.closingTime)
+          slotsLabel: slots
+            .map((slot) => `${formatTime12Hour(slot.openingTime)} - ${formatTime12Hour(slot.closingTime)}`)
+            .join(", ")
         }
       }
     }
@@ -417,7 +451,7 @@ export default function RestaurantStatus() {
                   const timings = getCurrentDayTimings()
                   if (timings) {
                     const dateStr = currentDateTime.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
-                    return `${dateStr}, ${timings.openingTime} - ${timings.closingTime}`
+                    return `${dateStr}, ${timings.slotsLabel}`
                   }
                   return "Not configured"
                 })()

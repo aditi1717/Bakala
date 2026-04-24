@@ -1,6 +1,8 @@
-import { useMemo, useState, useEffect, useRef } from "react"
+import { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { Package, Truck, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react"
 import { adminAPI } from "@food/api"
+import { API_BASE_URL } from "@food/api/config"
+import io from "socket.io-client"
 import { toast } from "sonner"
 import BRAND_THEME from "@/config/brandTheme"
 import OrdersTopbar from "@food/components/admin/orders/OrdersTopbar"
@@ -12,18 +14,6 @@ import { useGenericTableManagement } from "@food/components/admin/orders/useGene
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
-const DELIVERY_ACCEPT_TIMEOUT_SECONDS = Math.max(
-  15,
-  Number(import.meta?.env?.VITE_DELIVERY_ACCEPT_TIMEOUT_SECONDS) || 60,
-)
-
-const hasAssignmentTimeoutElapsed = (assignedAt) => {
-  if (!assignedAt) return false
-  const assignedAtMs = new Date(assignedAt).getTime()
-  if (!Number.isFinite(assignedAtMs)) return false
-  return Date.now() - assignedAtMs >= DELIVERY_ACCEPT_TIMEOUT_SECONDS * 1000
-}
-
 const normalizeId = (value) => {
   if (!value) return ""
   if (typeof value === "string") return value.trim()
@@ -330,8 +320,6 @@ const transformOrder = (order, index) => {
   const displayStatus = mapOrderStatus(normalizedOrder)
   const statusHistory = buildStatusHistory(normalizedOrder)
 
-  const assignmentTimedOut = hasAssignmentTimeoutElapsed(order?.dispatch?.assignedAt)
-
   return {
     sl: index + 1,
     orderMongoId: order._id,
@@ -365,13 +353,11 @@ const transformOrder = (order, index) => {
     orderTime: timeStr,
     dispatchStatus: order?.dispatch?.status || "unassigned",
     rawOrderStatus: order?.orderStatus || order?.status || "",
-    canAssign:
-      isAssignmentEligibleStatus(order?.orderStatus || order?.status) &&
-      String(order?.dispatch?.status || "unassigned").toLowerCase() === "unassigned",
+    // Keep assign/reassign action visible for admin across order states.
+    canAssign: true,
     canResend:
       isAssignmentEligibleStatus(order?.orderStatus || order?.status) &&
       String(order?.dispatch?.status || "").toLowerCase() === "assigned" &&
-      assignmentTimedOut &&
       Boolean(order?.dispatch?.deliveryPartnerId),
     // Keep original order data for detail view
     originalOrder: order
@@ -399,7 +385,7 @@ export default function OrderDetectDelivery() {
   const [actionLoadingKey, setActionLoadingKey] = useState("")
   const orderStatusRef = useRef(new Map())
 
-  const fetchOrders = async ({ silent = false } = {}) => {
+  const fetchOrders = useCallback(async ({ silent = false } = {}) => {
     try {
       if (!silent) setIsLoading(true)
       setError(null)
@@ -429,12 +415,12 @@ export default function OrderDetectDelivery() {
     } finally {
       if (!silent) setIsLoading(false)
     }
-  }
+  }, [])
 
   // Fetch orders from backend
   useEffect(() => {
     fetchOrders()
-  }, [])
+  }, [fetchOrders])
 
   useEffect(() => {
     const fetchZones = async () => {
@@ -485,13 +471,60 @@ export default function OrderDetectDelivery() {
     orderStatusRef.current = nextMap
   }, [orders])
 
+  useEffect(() => {
+    const backendUrl = String(API_BASE_URL || "")
+      .replace(/\/api\/v1\/?$/i, "")
+      .replace(/\/api\/?$/i, "")
+      .replace(/\/$/, "")
+    if (!backendUrl || !backendUrl.startsWith("http")) return undefined
+
+    const token =
+      localStorage.getItem("admin_accessToken") ||
+      localStorage.getItem("accessToken")
+    if (!token) return undefined
+
+    const socket = io(backendUrl, {
+      path: "/socket.io/",
+      transports: ["websocket", "polling"],
+      auth: { token },
+      reconnection: true,
+    })
+
+    let lastRefreshAt = 0
+    const requestRefresh = () => {
+      const now = Date.now()
+      if (now - lastRefreshAt < 800) return
+      lastRefreshAt = now
+      fetchOrders({ silent: true })
+    }
+
+    socket.on("connect", requestRefresh)
+    socket.on("reconnect", requestRefresh)
+    socket.on("order_status_update", requestRefresh)
+    socket.on("admin_order_status_updated", requestRefresh)
+    socket.on("order_updated", requestRefresh)
+    socket.on("admin_new_order", requestRefresh)
+    socket.on("order_deleted", requestRefresh)
+
+    return () => {
+      socket.off("connect", requestRefresh)
+      socket.off("reconnect", requestRefresh)
+      socket.off("order_status_update", requestRefresh)
+      socket.off("admin_order_status_updated", requestRefresh)
+      socket.off("order_updated", requestRefresh)
+      socket.off("admin_new_order", requestRefresh)
+      socket.off("order_deleted", requestRefresh)
+      socket.disconnect()
+    }
+  }, [fetchOrders])
+
   // Keep action availability (like resend/reassign after timeout) fresh.
   useEffect(() => {
     const id = setInterval(() => {
       fetchOrders({ silent: true })
     }, 3000)
     return () => clearInterval(id)
-  }, [])
+  }, [fetchOrders])
 
   const {
     searchQuery,
@@ -569,6 +602,31 @@ export default function OrderDetectDelivery() {
     setSelectedOrderForAssignment(order)
     setIsAssignDialogOpen(true)
     toast.info("Reassign delivery partner for this order")
+  }
+
+  const handleAdminStatusChange = async (order, nextStatus) => {
+    const orderId = String(order?.orderMongoId || "").trim()
+    if (!orderId) return
+    if (!["picked_up", "delivered"].includes(String(nextStatus || "").toLowerCase())) return
+
+    const loadingKey = `status:${orderId}`
+    setActionLoadingKey(loadingKey)
+    try {
+      const response = await adminAPI.updateOrderStatus(orderId, { orderStatus: nextStatus })
+      if (!response?.data?.success) {
+        throw new Error(response?.data?.message || "Failed to update status")
+      }
+      toast.success(
+        nextStatus === "picked_up"
+          ? `Order #${order.orderId} marked as Picked Up`
+          : `Order #${order.orderId} marked as Delivered`,
+      )
+      await fetchOrders({ silent: true })
+    } catch (statusError) {
+      toast.error(statusError?.response?.data?.message || statusError?.message || "Failed to update status")
+    } finally {
+      setActionLoadingKey("")
+    }
   }
 
   const resetColumns = () => {
@@ -825,6 +883,7 @@ export default function OrderDetectDelivery() {
         onPrintOrder={handlePrintOrder}
         onAssignOrder={handleOpenAssignDialog}
         onResendOrder={handleResend}
+        onAdminStatusChange={handleAdminStatusChange}
         actionLoadingKey={actionLoadingKey}
       />
     </div>
