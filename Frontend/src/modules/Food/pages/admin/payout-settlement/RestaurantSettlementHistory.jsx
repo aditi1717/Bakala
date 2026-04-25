@@ -20,6 +20,12 @@ const toDisplayDate = (value = "") => {
   })
 }
 
+const beneficiaryNames = (row) => {
+  const list = Array.isArray(row?.beneficiaries) ? row.beneficiaries : []
+  const names = list.map((item) => String(item?.beneficiaryName || "").trim()).filter(Boolean)
+  return names.length ? names.join(", ") : ""
+}
+
 export default function RestaurantSettlementHistory() {
   const [searchQuery, setSearchQuery] = useState("")
   const [rows, setRows] = useState([])
@@ -166,7 +172,12 @@ export default function RestaurantSettlementHistory() {
                           <span className="text-xs text-slate-500">to {toDisplayDate(row.toAt)}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-slate-700">{Number(row.restaurantsCount || 0)}</td>
+                      <td className="px-5 py-4 text-sm text-slate-700">
+                        <div className="flex flex-col">
+                          <span>{Number(row.restaurantsCount || 0)}</span>
+                          {beneficiaryNames(row) ? <span className="text-xs text-slate-500">{beneficiaryNames(row)}</span> : null}
+                        </div>
+                      </td>
                       <td className="px-5 py-4 text-sm text-slate-700">{Number(row.totalOrders || 0)}</td>
                       <td className="px-5 py-4 text-sm font-semibold text-emerald-700">{toCurrency(row.totalPaidAmount)}</td>
                       <td className="px-5 py-4 text-sm text-slate-700">{row.paidByAdminName || "-"}</td>

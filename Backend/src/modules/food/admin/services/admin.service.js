@@ -6249,12 +6249,27 @@ export async function getRestaurantPayoutSettlementHistoryBatchDetails(batchId, 
 
     const docs = await FoodPayoutSettlement.find(match)
         .sort({ paidAmount: -1, ordersCount: -1 })
-        .populate('beneficiaryId', 'restaurantName')
         .lean();
 
     if (!docs.length) {
         return null;
     }
+
+    const restaurantIds = docs
+        .map((doc) => doc?.beneficiaryId)
+        .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+        .map((id) => new mongoose.Types.ObjectId(String(id)));
+    const restaurants = restaurantIds.length
+        ? await FoodRestaurant.find({ _id: { $in: restaurantIds } })
+            .select('_id restaurantName ownerName')
+            .lean()
+        : [];
+    const restaurantMap = new Map(
+        restaurants.map((restaurant) => [
+            String(restaurant._id),
+            String(restaurant.restaurantName || restaurant.ownerName || 'Unknown Restaurant')
+        ])
+    );
 
     const paidByAdminId = docs[0]?.paidByAdminId ? String(docs[0].paidByAdminId) : '';
     let paidByAdminName = paidByAdminId ? 'Unknown Admin' : 'System';
@@ -6267,8 +6282,8 @@ export async function getRestaurantPayoutSettlementHistoryBatchDetails(batchId, 
 
     const rows = docs.map((doc) => ({
         settlementId: String(doc._id),
-        beneficiaryId: String(doc.beneficiaryId?._id || doc.beneficiaryId),
-        beneficiaryName: String(doc.beneficiaryId?.restaurantName || 'Unknown Restaurant'),
+        beneficiaryId: String(doc.beneficiaryId),
+        beneficiaryName: restaurantMap.get(String(doc.beneficiaryId)) || 'Unknown Restaurant',
         ordersCount: Number(doc.ordersCount || 0),
         grossAmount: Number(doc.grossAmount || 0),
         paidAmount: Number(doc.paidAmount || 0),
@@ -6823,6 +6838,12 @@ export async function getDeliveryPayoutSettlementHistory(query = {}, adminScope 
                 totalCodAmount: { $sum: { $ifNull: ['$codAmount', 0] } },
                 totalCodPaidAmount: { $sum: { $ifNull: ['$codPaidAmount', 0] } },
                 partnersSet: { $addToSet: '$beneficiaryIdText' },
+                beneficiaries: {
+                    $addToSet: {
+                        beneficiaryId: '$beneficiaryIdText',
+                        beneficiaryName: '$beneficiaryName'
+                    }
+                },
                 settlementsCount: { $sum: 1 }
             }
         },
@@ -6844,7 +6865,8 @@ export async function getDeliveryPayoutSettlementHistory(query = {}, adminScope 
                 totalCodAmount: 1,
                 totalCodPaidAmount: 1,
                 settlementsCount: 1,
-                partnersCount: { $size: '$partnersSet' }
+                partnersCount: { $size: '$partnersSet' },
+                beneficiaries: { $slice: ['$beneficiaries', 5] }
             }
         },
         { $sort: { paidAt: -1, toAt: -1 } },
@@ -6919,12 +6941,30 @@ export async function getDeliveryPayoutSettlementHistoryBatchDetails(batchId, ad
 
     const docs = await FoodPayoutSettlement.find(match)
         .sort({ paidAmount: -1, ordersCount: -1 })
-        .populate('beneficiaryId', 'name phone')
         .lean();
 
     if (!docs.length) {
         return null;
     }
+
+    const partnerIds = docs
+        .map((doc) => doc?.beneficiaryId)
+        .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+        .map((id) => new mongoose.Types.ObjectId(String(id)));
+    const partners = partnerIds.length
+        ? await FoodDeliveryPartner.find({ _id: { $in: partnerIds } })
+            .select('_id name phone')
+            .lean()
+        : [];
+    const partnerMap = new Map(
+        partners.map((partner) => [
+            String(partner._id),
+            {
+                name: String(partner.name || 'Unknown Delivery Partner'),
+                phone: String(partner.phone || '')
+            }
+        ])
+    );
 
     const paidByAdminId = docs[0]?.paidByAdminId ? String(docs[0].paidByAdminId) : '';
     let paidByAdminName = paidByAdminId ? 'Unknown Admin' : 'System';
@@ -6935,21 +6975,24 @@ export async function getDeliveryPayoutSettlementHistoryBatchDetails(batchId, ad
         }
     }
 
-    const rows = docs.map((doc) => ({
-        settlementId: String(doc._id),
-        beneficiaryId: String(doc.beneficiaryId?._id || doc.beneficiaryId),
-        beneficiaryName: String(doc.beneficiaryId?.name || 'Unknown Delivery Partner'),
-        beneficiaryPhone: String(doc.beneficiaryId?.phone || ''),
-        ordersCount: Number(doc.ordersCount || 0),
-        codOrdersCount: Number(doc.codOrdersCount || 0),
-        grossAmount: Number(doc.grossAmount || 0),
-        codAmount: Number(doc.codAmount || 0),
-        codPaidAmount: Number(doc.codPaidAmount || 0),
-        paidAmount: Number(doc.paidAmount || 0),
-        adjustmentAmount: Number(doc.adjustmentAmount || 0),
-        note: String(doc.note || ''),
-        referenceNumber: String(doc.referenceNumber || '')
-    }));
+    const rows = docs.map((doc) => {
+        const partner = partnerMap.get(String(doc.beneficiaryId));
+        return {
+            settlementId: String(doc._id),
+            beneficiaryId: String(doc.beneficiaryId),
+            beneficiaryName: partner?.name || 'Unknown Delivery Partner',
+            beneficiaryPhone: partner?.phone || '',
+            ordersCount: Number(doc.ordersCount || 0),
+            codOrdersCount: Number(doc.codOrdersCount || 0),
+            grossAmount: Number(doc.grossAmount || 0),
+            codAmount: Number(doc.codAmount || 0),
+            codPaidAmount: Number(doc.codPaidAmount || 0),
+            paidAmount: Number(doc.paidAmount || 0),
+            adjustmentAmount: Number(doc.adjustmentAmount || 0),
+            note: String(doc.note || ''),
+            referenceNumber: String(doc.referenceNumber || '')
+        };
+    });
 
     const meta = docs[0];
     return {
