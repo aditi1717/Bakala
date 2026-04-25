@@ -18,6 +18,21 @@ const userAddressSchema = new mongoose.Schema(
             default: '',
             trim: true
         },
+        buildingName: {
+            type: String,
+            default: '',
+            trim: true
+        },
+        floor: {
+            type: String,
+            default: '',
+            trim: true
+        },
+        landmark: {
+            type: String,
+            default: '',
+            trim: true
+        },
         city: {
             type: String,
             required: true,

@@ -25,6 +25,8 @@ const formatOrderAddress = (address) => {
 
   const primaryParts = [
     address.label,
+    address.floor ? `Floor ${address.floor}` : "",
+    address.buildingName,
     address.street,
     address.additionalDetails,
     address.landmark,

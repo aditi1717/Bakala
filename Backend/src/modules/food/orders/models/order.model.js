@@ -21,10 +21,17 @@ const deliveryAddressSchema = new mongoose.Schema(
         label: { type: String, enum: ['Home', 'Office', 'Other'], default: 'Home' },
         street: { type: String, required: true, trim: true },
         additionalDetails: { type: String, default: '', trim: true },
+        buildingName: { type: String, default: '', trim: true },
+        floor: { type: String, default: '', trim: true },
+        landmark: { type: String, default: '', trim: true },
+        address: { type: String, default: '', trim: true },
+        formattedAddress: { type: String, default: '', trim: true },
         city: { type: String, required: true, trim: true },
         state: { type: String, required: true, trim: true },
         zipCode: { type: String, default: '', trim: true },
         phone: { type: String, default: '', trim: true },
+        name: { type: String, default: '', trim: true },
+        fullName: { type: String, default: '', trim: true },
         location: {
             type: { type: String, enum: ['Point'], default: 'Point' },
             coordinates: { type: [Number], default: undefined }

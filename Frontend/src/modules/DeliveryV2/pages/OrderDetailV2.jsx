@@ -179,8 +179,21 @@ const getCustomerMeta = (order) => {
 const getAddressLabel = (address) =>
   pickFirstText(
     address?.fullAddress,
+    address?.formattedAddress,
     address?.addressLine,
     address?.address,
+    [
+      address?.floor ? `Floor ${address.floor}` : '',
+      address?.buildingName,
+      address?.street,
+      address?.additionalDetails,
+      address?.landmark,
+      address?.city,
+      address?.state,
+      address?.zipCode,
+    ]
+      .filter(Boolean)
+      .join(', '),
     address?.street,
     address?.landmark,
     address?.label,

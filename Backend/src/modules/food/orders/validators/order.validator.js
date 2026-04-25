@@ -20,10 +20,17 @@ const addressSchema = z.object({
     fullName: z.string().optional(),
     street: z.string().min(1, 'Street required'),
     additionalDetails: z.string().optional(),
+    buildingName: z.string().optional(),
+    floor: z.string().optional(),
+    landmark: z.string().optional(),
+    address: z.string().optional(),
+    formattedAddress: z.string().optional(),
     city: z.string().min(1, 'City required'),
     state: z.string().min(1, 'State required'),
     zipCode: z.string().optional(),
     phone: z.string().optional(),
+    name: z.string().optional(),
+    fullName: z.string().optional(),
     location: z
         .object({
             type: z.literal('Point').optional(),

@@ -20,8 +20,11 @@ const formatFullAddress = (address) => {
   }
 
   const parts = [
+    address.floor ? `Floor ${address.floor}` : "",
+    address.buildingName,
     address.street,
     address.additionalDetails,
+    address.landmark,
     address.city,
     address.state,
     address.zipCode,
@@ -142,6 +145,11 @@ export default function QuickSharedCart() {
           label: selectedAddress.label || "Home",
           street: selectedAddress.street || selectedAddress.address || selectedAddress.formattedAddress || "",
           additionalDetails: selectedAddress.additionalDetails || "",
+          buildingName: selectedAddress.buildingName || "",
+          floor: selectedAddress.floor || "",
+          landmark: selectedAddress.landmark || "",
+          address: formatFullAddress(selectedAddress),
+          formattedAddress: formatFullAddress(selectedAddress),
           city: selectedAddress.city || "",
           state: selectedAddress.state || "",
           zipCode: selectedAddress.zipCode || "",

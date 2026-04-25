@@ -319,6 +319,59 @@ function toGeoPoint(lat, lng) {
   return { type: "Point", coordinates: [b, a] };
 }
 
+function buildDeliveryAddressSnapshot(address = {}) {
+  if (!address || typeof address !== "object") return undefined;
+
+  const label = String(address?.label || "Home").trim() || "Home";
+  const street = String(address?.street || "").trim();
+  const additionalDetails = String(address?.additionalDetails || "").trim();
+  const buildingName = String(address?.buildingName || "").trim();
+  const floor = String(address?.floor || "").trim();
+  const landmark = String(address?.landmark || "").trim();
+  const city = String(address?.city || "").trim();
+  const state = String(address?.state || "").trim();
+  const zipCode = String(address?.zipCode || "").trim();
+  const phone = String(address?.phone || "").trim();
+  const name = String(address?.name || "").trim();
+  const fullName = String(address?.fullName || name).trim();
+
+  const addressParts = [
+    floor ? `Floor ${floor}` : "",
+    buildingName,
+    street,
+    additionalDetails,
+    landmark,
+    city,
+    state,
+    zipCode,
+  ].filter(Boolean);
+
+  const formattedAddress =
+    String(address?.formattedAddress || "").trim() ||
+    String(address?.address || "").trim() ||
+    addressParts.join(", ");
+
+  return {
+    label,
+    street,
+    additionalDetails,
+    buildingName,
+    floor,
+    landmark,
+    address: String(address?.address || "").trim() || formattedAddress,
+    formattedAddress,
+    city,
+    state,
+    zipCode,
+    phone,
+    name,
+    fullName,
+    location: address?.location?.coordinates
+      ? { type: "Point", coordinates: address.location.coordinates }
+      : undefined,
+  };
+}
+
 async function getUnpaidDebtSummary(userId) {
   if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
     return { totalDue: 0, count: 0 };
@@ -624,7 +677,23 @@ function buildDeliverySocketPayload(orderDoc, restaurantDoc = null) {
       state: restaurantLocation?.state || restaurant?.state || "",
     },
     deliveryAddress: order?.deliveryAddress,
-    customerAddress: order?.deliveryAddress?.formattedAddress || order?.deliveryAddress?.addressLine1 || "",
+    customerAddress:
+      order?.deliveryAddress?.formattedAddress ||
+      order?.deliveryAddress?.address ||
+      [
+        order?.deliveryAddress?.floor
+          ? `Floor ${order.deliveryAddress.floor}`
+          : "",
+        order?.deliveryAddress?.buildingName,
+        order?.deliveryAddress?.street,
+        order?.deliveryAddress?.additionalDetails,
+        order?.deliveryAddress?.landmark,
+        order?.deliveryAddress?.city,
+        order?.deliveryAddress?.state,
+        order?.deliveryAddress?.zipCode,
+      ]
+        .filter(Boolean)
+        .join(", "),
     customerName: order?.userId?.name || order?.customerName || "",
     customerPhone: order?.userId?.phone || order?.deliveryAddress?.phone || "",
     userName: order?.userId?.name || order?.customerName || "",
@@ -1088,20 +1157,7 @@ export async function createOrder(userId, dto) {
   const settings = orderType === "food" ? await getDispatchSettings() : null;
   const dispatchMode = settings?.dispatchMode || "manual";
 
-  const deliveryAddress = dto.address
-    ? {
-        label: dto.address?.label || "Home",
-        street: dto.address?.street || "",
-        additionalDetails: dto.address?.additionalDetails || "",
-        city: dto.address?.city || "",
-        state: dto.address?.state || "",
-        zipCode: dto.address?.zipCode || "",
-        phone: dto.address?.phone || "",
-        location: dto.address?.location?.coordinates
-          ? { type: "Point", coordinates: dto.address.location.coordinates }
-          : undefined,
-      }
-    : undefined;
+  const deliveryAddress = buildDeliveryAddressSnapshot(dto.address);
 
   const paymentMethod =
     dto.paymentMethod === "card" ? "razorpay" : dto.paymentMethod;

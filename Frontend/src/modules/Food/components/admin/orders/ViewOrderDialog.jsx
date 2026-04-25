@@ -10,6 +10,32 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
+const formatAddressForMap = (address) => {
+  if (!address || typeof address !== "object") return ""
+  return [
+    address.floor ? `Floor ${address.floor}` : "",
+    address.buildingName,
+    address.street,
+    address.additionalDetails,
+    address.landmark,
+    address.city,
+    address.state,
+    address.zipCode,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(", ")
+}
+
+const getGoogleMapsHref = (address) => {
+  if (address?.location?.coordinates && Array.isArray(address.location.coordinates) && address.location.coordinates.length === 2) {
+    const [lng, lat] = address.location.coordinates
+    return `https://www.google.com/maps?q=${lat},${lng}`
+  }
+  const query = encodeURIComponent(formatAddressForMap(address))
+  return query ? `https://www.google.com/maps/search/?api=1&query=${query}` : ""
+}
+
 
 const getStatusColor = (orderStatus) => {
   const colors = {
@@ -67,6 +93,8 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
       formattedAddress,
       rawAddress,
       address.label,
+      address.floor ? `Floor ${address.floor}` : "",
+      address.buildingName,
       address.street,
       address.additionalDetails,
       address.landmark,
@@ -380,25 +408,42 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
           )}
 
           {/* Delivery Address */}
-          {order.address && (
+          {(order.address || order.deliveryAddress) && (
             <div className="border-t border-slate-200 pt-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
                 <MapPin className="w-4 h-4" />
                 Delivery Address
               </h3>
+              {(() => {
+                const deliveryAddress = order.address || order.deliveryAddress
+                const mapsHref = getGoogleMapsHref(deliveryAddress)
+                return (
               <div className="space-y-2 p-4 bg-slate-50 rounded-lg">
-                <p className="text-sm text-slate-900">{formatAddress(order.address)}</p>
-                {getCoordinates(order.address) && (
+                <p className="text-sm text-slate-900">{formatAddress(deliveryAddress)}</p>
+                {getCoordinates(deliveryAddress) && (
                   <p className="text-xs text-slate-500 mt-2">
-                    <span className="font-medium">Coordinates:</span> {getCoordinates(order.address)}
+                    <span className="font-medium">Coordinates:</span> {getCoordinates(deliveryAddress)}
                   </p>
                 )}
-                {order.address.label && (
+                {deliveryAddress.label && (
                   <p className="text-xs text-slate-500">
-                    <span className="font-medium">Label:</span> {order.address.label}
+                    <span className="font-medium">Label:</span> {deliveryAddress.label}
                   </p>
+                )}
+                {mapsHref && (
+                  <a
+                    href={mapsHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-xs font-semibold text-brand-600"
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    Open delivery route
+                  </a>
                 )}
               </div>
+                )
+              })()}
             </div>
           )}
 

@@ -60,8 +60,11 @@ const formatFullAddress = (address) => {
 
   // Priority 2: Build address from parts
   const addressParts = []
+  if (address.floor) addressParts.push(`Floor ${address.floor}`)
+  if (address.buildingName) addressParts.push(address.buildingName)
   if (address.street) addressParts.push(address.street)
   if (address.additionalDetails) addressParts.push(address.additionalDetails)
+  if (address.landmark) addressParts.push(address.landmark)
   if (address.city) addressParts.push(address.city)
   if (address.state) addressParts.push(address.state)
   if (address.zipCode) addressParts.push(address.zipCode)
@@ -77,6 +80,20 @@ const formatFullAddress = (address) => {
 
   return ""
 }
+
+const composeSavedAddressText = (address) =>
+  [
+    address?.floor ? `Floor ${address.floor}` : "",
+    address?.buildingName,
+    address?.street,
+    address?.additionalDetails,
+    address?.landmark,
+    address?.city,
+    address?.state,
+    address?.zipCode,
+  ]
+    .filter(Boolean)
+    .join(", ")
 
 const RUPEE_SYMBOL = "\u20B9"
 const CART_RECIPIENT_DETAILS_STORAGE_KEY = "food-cart-recipient-details-v1"
@@ -387,6 +404,9 @@ export default function Cart() {
       address: formattedAddress,
       street: loc?.street || loc?.address || loc?.area || "Current Location",
       additionalDetails: loc?.area || "",
+      buildingName: "",
+      floor: "",
+      landmark: "",
       city: loc?.city || loc?.area || "Current City",
       state: loc?.state || loc?.city || "Current State",
       zipCode: loc?.postalCode || loc?.zipCode || "",
@@ -1342,9 +1362,10 @@ export default function Cart() {
         city: address.city,
         state: address.state,
         area: address.additionalDetails || "",
-        formattedAddress: address.additionalDetails
-          ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
-          : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
+        buildingName: address.buildingName || "",
+        floor: address.floor || "",
+        landmark: address.landmark || "",
+        formattedAddress: composeSavedAddressText(address)
       })
 
       // Update the location in localStorage
@@ -1354,11 +1375,12 @@ export default function Cart() {
         address: `${address.street}, ${address.city}`,
         area: address.additionalDetails || "",
         zipCode: address.zipCode,
+        buildingName: address.buildingName || "",
+        floor: address.floor || "",
+        landmark: address.landmark || "",
         latitude,
         longitude,
-        formattedAddress: address.additionalDetails
-          ? `${address.additionalDetails}, ${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
-          : `${address.street}, ${address.city}, ${address.state}${address.zipCode ? ` ${address.zipCode}` : ''}`
+        formattedAddress: composeSavedAddressText(address)
       }
       localStorage.setItem("userLocation", JSON.stringify(locationData))
       // User selected a saved address from Cart; prefer saved mode.

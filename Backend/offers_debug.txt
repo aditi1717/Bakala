@@ -916,3 +916,27 @@
 [2026-04-24T06:40:40.753Z] auth header: Present, req.user: {"userId":"69d49be6868036e30fb25e37","role":"USER"}, userId: 69d49be6868036e30fb25e37
 
 [2026-04-24T06:40:41.068Z] auth header: Present, req.user: {"userId":"69d49be6868036e30fb25e37","role":"USER"}, userId: 69d49be6868036e30fb25e37
+
+[2026-04-25T05:09:37.061Z] auth header: Missing, req.user: undefined, userId: undefined
+
+[2026-04-25T05:09:37.107Z] auth header: Missing, req.user: undefined, userId: undefined
+
+[2026-04-25T05:30:33.631Z] auth header: Missing, req.user: undefined, userId: undefined
+
+[2026-04-25T05:30:33.729Z] auth header: Missing, req.user: undefined, userId: undefined
+
+[2026-04-25T05:30:59.497Z] auth header: Missing, req.user: undefined, userId: undefined
+
+[2026-04-25T05:30:59.535Z] auth header: Missing, req.user: undefined, userId: undefined
+
+[2026-04-25T05:31:50.482Z] auth header: Present, req.user: {"userId":"69c1264e755c891e06f5379c","role":"USER"}, userId: 69c1264e755c891e06f5379c
+
+[2026-04-25T05:31:50.557Z] auth header: Present, req.user: {"userId":"69c1264e755c891e06f5379c","role":"USER"}, userId: 69c1264e755c891e06f5379c
+
+[2026-04-25T05:35:15.633Z] auth header: Present, req.user: {"userId":"69c1264e755c891e06f5379c","role":"USER"}, userId: 69c1264e755c891e06f5379c
+
+[2026-04-25T05:35:15.908Z] auth header: Present, req.user: {"userId":"69c1264e755c891e06f5379c","role":"USER"}, userId: 69c1264e755c891e06f5379c
+
+[2026-04-25T05:35:23.885Z] auth header: Present, req.user: {"userId":"69c1264e755c891e06f5379c","role":"USER"}, userId: 69c1264e755c891e06f5379c
+
+[2026-04-25T05:35:23.948Z] auth header: Present, req.user: {"userId":"69c1264e755c891e06f5379c","role":"USER"}, userId: 69c1264e755c891e06f5379c
