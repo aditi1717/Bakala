@@ -12,7 +12,7 @@ import { createRazorpayOrder, getRazorpayKeyId, isRazorpayConfigured, verifyPaym
 
 const PAYABLE_DELIVERY_STATUSES = ['delivered'];
 const COD_CASH_METHODS = ['cash', 'cod', 'cash_on_delivery'];
-const AUTO_COD_SETTLEMENT_NOTE_REGEX = /^COD settled via payout batch/i;
+const AUTO_COD_SETTLEMENT_NOTE_REGEX = /^COD(?:\s+handover)?\s+settled via payout batch/i;
 
 /**
  * Enhanced wallet fetch for delivery partners.

@@ -28,7 +28,7 @@ import {
   HelpCircle, AlertTriangle,
   Wallet, History, User as UserIcon, LayoutGrid,
   Plus, Minus, Navigation2, Target, Play, Clock,
-  Contact, Package
+  Contact, Package, RefreshCcw
 } from 'lucide-react';
 
 const INCOMING_ORDER_STORAGE_KEY = 'delivery_v2_incoming_order';
@@ -234,6 +234,7 @@ function OrdersTabV2({
   incomingOrder,
   advancedOrders,
   todayHistoryOrders,
+  onRefreshOrders,
   onOpenOrderDetail,
   onAcceptQueuedOrder,
   onPassQueuedOrder,
@@ -453,10 +454,20 @@ function OrdersTabV2({
             Incoming and live requests stay here.
           </p>
           </div>
-        <div className="rounded-[16px] bg-slate-50 px-3 py-2 shadow-sm border border-slate-200 shrink-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Visible</p>
-          <p className="mt-1 text-lg font-black text-slate-950">{totalVisibleOrders}</p>
-        </div>
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onRefreshOrders}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 active:scale-[0.98] transition-all"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Refresh
+            </button>
+            <div className="rounded-[16px] bg-slate-50 px-3 py-2 shadow-sm border border-slate-200">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Visible</p>
+              <p className="mt-1 text-lg font-black text-slate-950">{totalVisibleOrders}</p>
+            </div>
+          </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700 border border-sky-100">Incoming {incomingOrders.length}</span>
@@ -602,6 +613,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   });
   const [currentTab, setCurrentTab] = useState(tab);
   const [orderActionBusy, setOrderActionBusy] = useState({ orderId: '', type: '' });
+  const [ordersRefreshTick, setOrdersRefreshTick] = useState(0);
 
   // Track URL changes (Prop changes) to update sub-page content
   useEffect(() => {
@@ -627,6 +639,10 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   const queueSyncInFlightRef = useRef(false);
 
   const isLoggingOut = useRef(false);
+
+  const handleOrdersRefresh = useCallback(() => {
+    setOrdersRefreshTick((prev) => prev + 1);
+  }, []);
 
   const persistIncomingOrder = useCallback((orderLike) => {
     const orderId = getOrderIdentity(orderLike);
@@ -1222,7 +1238,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       window.removeEventListener('focus', triggerSyncNow);
       document.removeEventListener('visibilitychange', triggerSyncNow);
     };
-  }, [activeOrderId, announceIncomingRequest, clearPersistedIncomingOrder, currentTab, incomingOrder, isOnline, isSocketConnected, persistIncomingOrder, setActiveOrder, updateTripStatus]);
+  }, [activeOrderId, announceIncomingRequest, clearPersistedIncomingOrder, currentTab, incomingOrder, isOnline, isSocketConnected, ordersRefreshTick, persistIncomingOrder, setActiveOrder, updateTripStatus]);
 
   useEffect(() => {
     if (currentTab !== 'orders') return;
@@ -1268,16 +1284,44 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       cancelled = true;
       window.clearInterval(poller);
     };
-  }, [currentTab]);
+  }, [currentTab, ordersRefreshTick]);
 
   useEffect(() => {
     if (orderStatusUpdate) {
-      const eventStatus = String(orderStatusUpdate.status || '').toLowerCase();
+      const eventStatus = String(
+        orderStatusUpdate.orderStatus ||
+        orderStatusUpdate.status ||
+        orderStatusUpdate.deliveryStatus ||
+        '',
+      ).toLowerCase();
       const eventOrderId = getOrderIdentity(orderStatusUpdate);
       const isActiveOrderUpdate = eventOrderId && eventOrderId === activeOrderId;
       const isIncomingOrderUpdate = eventOrderId && eventOrderId === getOrderIdentity(incomingOrder);
+      const isCancelledEvent = eventStatus.includes('cancel') || eventStatus === 'deleted';
+      const isDeliveredEvent = ['delivered', 'completed'].includes(eventStatus);
 
-      if (['cancelled', 'deleted'].includes(eventStatus)) {
+      const applyRealtimeStatus = (orderLike) => {
+        if (!orderLike || getOrderIdentity(orderLike) !== eventOrderId) return orderLike;
+        return {
+          ...orderLike,
+          orderStatus: eventStatus || orderLike.orderStatus,
+          status: eventStatus || orderLike.status,
+          deliveryStatus: eventStatus || orderLike.deliveryStatus,
+        };
+      };
+
+      if (eventOrderId && eventStatus) {
+        setIncomingOrder((prev) => applyRealtimeStatus(prev));
+        setAdvancedOrders((prev) => prev.map((item) => applyRealtimeStatus(item)));
+
+        if (isActiveOrderUpdate && activeOrder) {
+          const nextActiveOrder = applyRealtimeStatus(activeOrder);
+          setActiveOrder(nextActiveOrder);
+          updateTripStatus(deriveTripStatusFromOrder(nextActiveOrder));
+        }
+      }
+
+      if (isCancelledEvent) {
         if (isIncomingOrderUpdate) {
           persistFocusedOrder('');
           setIncomingOrder(null);
@@ -1298,7 +1342,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
         }
       }
 
-      if (['delivered', 'completed'].includes(eventStatus)) {
+      if (isDeliveredEvent) {
         if (isIncomingOrderUpdate) {
           persistFocusedOrder('');
           setIncomingOrder(null);
@@ -1315,9 +1359,12 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           }
         }
       }
+      if (currentTab === 'orders') {
+        setOrdersRefreshTick((prev) => prev + 1);
+      }
       clearOrderStatusUpdate();
     }
-  }, [activeOrderId, clearOrderStatusUpdate, clearPersistedIncomingOrder, incomingOrder, orderStatusUpdate, persistFocusedOrder, promoteNextAcceptedOrder, removeAdvancedOrder, resetTrip]);
+  }, [activeOrder, activeOrderId, clearOrderStatusUpdate, clearPersistedIncomingOrder, currentTab, incomingOrder, orderStatusUpdate, persistFocusedOrder, promoteNextAcceptedOrder, removeAdvancedOrder, resetTrip, setActiveOrder, updateTripStatus]);
 
   const handleAdvancedOrderAccept = useCallback(async (order) => {
     const acceptedOrder = await acceptOrder(order, { keepCurrentActive: Boolean(activeOrder) });
@@ -1591,6 +1638,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
             incomingOrder={incomingOrder}
             advancedOrders={advancedOrders}
             todayHistoryOrders={todayHistoryOrders}
+            onRefreshOrders={handleOrdersRefresh}
             onAcceptQueuedOrder={handleOrdersTabDirectAccept}
             onPassQueuedOrder={handleOrdersTabDirectPass}
             actionBusyOrderId={orderActionBusy.orderId}

@@ -2346,6 +2346,8 @@ export async function updateOrderStatusAdmin(
   }
 
   const from = String(order.orderStatus || "").toLowerCase();
+  const prevPayStatus = String(order?.payment?.status || "");
+  const payMethod = String(order?.payment?.method || "");
   const terminalStatuses = new Set([
     "delivered",
     "cancelled_by_user",
@@ -2361,6 +2363,15 @@ export async function updateOrderStatusAdmin(
   if (from === normalizedStatus) return order.toObject();
 
   order.orderStatus = normalizedStatus;
+  if (normalizedStatus === "delivered") {
+    order.payment.status = "paid";
+    order.deliveryState = {
+      ...(order.deliveryState?.toObject?.() || order.deliveryState || {}),
+      currentPhase: "delivered",
+      status: "delivered",
+      deliveredAt: new Date(),
+    };
+  }
   pushStatusHistory(order, {
     byRole: "ADMIN",
     byId: adminId,
@@ -2369,6 +2380,15 @@ export async function updateOrderStatusAdmin(
     note: reason || "",
   });
   await order.save();
+  if (normalizedStatus === "delivered" && order.payment?.status === "paid" && order.userId) {
+    try {
+      await settleUnpaidDebtsForOrder(order.userId, order._id);
+    } catch (debtErr) {
+      logger.warn(
+        `updateOrderStatusAdmin debt settlement failed for order ${order._id}: ${debtErr?.message || debtErr}`,
+      );
+    }
+  }
 
   if (normalizedStatus === "cancelled_by_admin") {
     try {
@@ -2466,6 +2486,31 @@ export async function updateOrderStatusAdmin(
     } catch (err) {
       logger.warn(`updateOrderStatusAdmin transaction sync failed: ${err?.message || err}`);
     }
+  }
+  if (normalizedStatus === "delivered") {
+    try {
+      const ledgerKind =
+        payMethod === "cash" && prevPayStatus === "cod_pending"
+          ? "cod_marked_paid_on_delivery"
+          : "payment_snapshot_sync";
+      await foodTransactionService.updateTransactionStatus(order._id, ledgerKind, {
+        status: "captured",
+        recordedByRole: "ADMIN",
+        recordedById: adminId,
+        note: `Delivery marked complete by admin. Prev status: ${prevPayStatus}`,
+      });
+    } catch (err) {
+      logger.warn(`updateOrderStatusAdmin delivery transaction sync failed: ${err?.message || err}`);
+    }
+
+    enqueueOrderEvent("delivery_completed", {
+      orderMongoId: order._id?.toString?.(),
+      orderId: order.orderId,
+      deliveryPartnerId: order.dispatch?.deliveryPartnerId?.toString?.() || "",
+      payMethod,
+      prevPayStatus,
+      paymentStatus: order.payment?.status,
+    });
   }
 
   enqueueOrderEvent("admin_order_status_updated", {

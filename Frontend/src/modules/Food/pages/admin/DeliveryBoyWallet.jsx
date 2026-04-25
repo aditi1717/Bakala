@@ -331,7 +331,7 @@ export default function DeliveryBoyWallet() {
         }
 
         try {
-          const orderCountMap = new Map()
+          const orderStatsMap = new Map()
           let nextOrdersPage = 1
           let totalOrderPages = 1
           let guard = 0
@@ -340,6 +340,7 @@ export default function DeliveryBoyWallet() {
             const ordersRes = await adminAPI.getOrders({
               page: nextOrdersPage,
               limit: 100,
+              status: "delivered",
               fromDate: resolvedFromDate || undefined,
               toDate: resolvedToDate || undefined,
             })
@@ -378,6 +379,12 @@ export default function DeliveryBoyWallet() {
                 (dispatchPartner && typeof dispatchPartner === "object" ? dispatchPartner?.name : "") ||
                 (directPartner && typeof directPartner === "object" ? directPartner?.name : "")
 
+              const earningAmount = toNumber(
+                order?.riderEarning,
+                order?.deliveryPartnerSettlement,
+                order?.pricing?.deliveryFee,
+              )
+
               const keys = [
                 normalizeKey(partnerId),
                 normalizeKey(order?.assignedDeliveryPartnerId),
@@ -386,10 +393,11 @@ export default function DeliveryBoyWallet() {
               ].filter(Boolean)
 
               keys.forEach((key) => {
-                const prev = orderCountMap.get(key) || { cash: 0, online: 0 }
+                const prev = orderStatsMap.get(key) || { cash: 0, online: 0, earning: 0 }
                 if (isCod) prev.cash += 1
                 else prev.online += 1
-                orderCountMap.set(key, prev)
+                prev.earning += earningAmount
+                orderStatsMap.set(key, prev)
               })
             })
 
@@ -398,7 +406,7 @@ export default function DeliveryBoyWallet() {
             guard += 1
           } while (nextOrdersPage <= totalOrderPages && guard < 100)
 
-          if (orderCountMap.size > 0) {
+          if (orderStatsMap.size > 0) {
             nextRows = nextRows.map((row) => {
               const keyCandidates = [
                 normalizeKey(row.deliveryId),
@@ -410,13 +418,17 @@ export default function DeliveryBoyWallet() {
                 normalizeKey(row.name),
               ].filter(Boolean)
 
-              const countMatch = keyCandidates.map((key) => orderCountMap.get(key)).find(Boolean)
-              if (!countMatch) return row
+              const statsMatch = keyCandidates.map((key) => orderStatsMap.get(key)).find(Boolean)
+              if (!statsMatch) return row
+              const totalEarning = toNumber(statsMatch.earning)
+              const paid = getPaidAmount(row)
 
               return {
                 ...row,
-                totalCashOrders: toNumber(countMatch.cash),
-                totalOnlineOrders: toNumber(countMatch.online),
+                totalCashOrders: toNumber(statsMatch.cash),
+                totalOnlineOrders: toNumber(statsMatch.online),
+                totalEarning,
+                unpaid: Math.max(0, totalEarning - paid),
               }
             })
           }
@@ -450,9 +462,7 @@ export default function DeliveryBoyWallet() {
 
       const walletRows = (walletsRes?.data?.data?.wallets || []).map(normalizeWalletRow)
       const totalCashInHand = walletRows.reduce((sum, row) => sum + toNumber(row.cashInHand), 0)
-      const totalEarning = walletRows.reduce((sum, row) => sum + toNumber(row.totalEarning), 0)
       const totalPaid = walletRows.reduce((sum, row) => sum + getPaidAmount(row), 0)
-      const totalUnpaid = walletRows.reduce((sum, row) => sum + getUnpaidAmount(row), 0)
 
       const totalSubmittedToAdmin = walletRows.reduce(
         (sum, row) => sum + toNumber(row.cashSubmittedToAdmin, row.totalSubmittedToAdmin),
@@ -462,12 +472,13 @@ export default function DeliveryBoyWallet() {
 
       let totalCodOrders = 0
       let totalOnlineOrders = 0
+      let totalEarningFromDeliveredOrders = 0
       let nextPage = 1
       let totalPages = 1
       let guard = 0
 
       do {
-        const ordersRes = await adminAPI.getOrders({ page: nextPage, limit: 100 })
+        const ordersRes = await adminAPI.getOrders({ page: nextPage, limit: 100, status: "delivered" })
         const orderRows =
           ordersRes?.data?.data?.orders ??
           ordersRes?.data?.orders ??
@@ -485,12 +496,21 @@ export default function DeliveryBoyWallet() {
           const isCod = ["cash", "cod"].includes(method)
           if (isCod) totalCodOrders += 1
           else totalOnlineOrders += 1
+
+          totalEarningFromDeliveredOrders += toNumber(
+            order?.riderEarning,
+            order?.deliveryPartnerSettlement,
+            order?.pricing?.deliveryFee,
+          )
         })
 
         totalPages = Number(ordersRes?.data?.data?.meta?.totalPages || ordersRes?.data?.meta?.totalPages || 1)
         nextPage += 1
         guard += 1
       } while (nextPage <= totalPages && guard < 100)
+
+      const totalEarning = toNumber(totalEarningFromDeliveredOrders)
+      const totalUnpaid = Math.max(0, totalEarning - totalPaid)
 
       setSummary({
         totalCollectedByDeliveryBoys,

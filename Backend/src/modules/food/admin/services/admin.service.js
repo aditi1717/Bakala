@@ -5630,7 +5630,7 @@ export async function getDeliveryWallets(query = {}) {
     const cashLimitSettings = await FoodDeliveryCashLimit.findOne({ isActive: true }).lean();
     const globalLimit = Number(cashLimitSettings?.deliveryCashLimit || 0);
     const COD_CASH_METHODS = ['cash', 'cod', 'cash_on_delivery'];
-    const AUTO_COD_SETTLEMENT_NOTE_REGEX = /^COD settled via payout batch/i;
+    const AUTO_COD_SETTLEMENT_NOTE_REGEX = /^COD(?:\s+handover)?\s+settled via payout batch/i;
 
     const partnerIds = partners.map((p) => p?._id).filter(Boolean);
 
@@ -5748,7 +5748,7 @@ export async function getCashLimitSettlements(query = {}) {
     const page = parseInt(query.page, 10) || 1;
     const skip = (page - 1) * limit;
 
-    const AUTO_COD_SETTLEMENT_NOTE_REGEX = /^COD settled via payout batch/i;
+    const AUTO_COD_SETTLEMENT_NOTE_REGEX = /^COD(?:\s+handover)?\s+settled via payout batch/i;
     const filter = {
         $or: [
             { adminNote: { $exists: false } },
@@ -7161,7 +7161,7 @@ export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}
                 paymentMethod: 'cash',
                 status: 'Completed',
                 adminId: paidByAdminId || null,
-                adminNote: `COD handover settled via payout batch ${String(settlementBatchId)}`
+                adminNote: `COD settled via payout batch ${String(settlementBatchId)}`
             });
         }
     }
