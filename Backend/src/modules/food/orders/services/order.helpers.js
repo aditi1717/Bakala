@@ -108,6 +108,37 @@ export function toGeoPoint(lat, lng) {
   return { type: "Point", coordinates: [b, a] };
 }
 
+export function formatDeliveryAddressWithLabels(address = {}) {
+  if (!address || typeof address !== "object") return "";
+
+  const fieldValue = (value) => String(value || "").trim();
+  const building = fieldValue(address.buildingName || address.addressLine1);
+  const floor = fieldValue(address.floor);
+  const street = fieldValue(address.street || address.addressLine2);
+  const area = fieldValue(address.additionalDetails || address.area);
+  const landmark = fieldValue(address.landmark);
+  const city = fieldValue(address.city);
+  const state = fieldValue(address.state);
+  const zipCode = fieldValue(address.zipCode || address.postalCode);
+  const label = fieldValue(address.label);
+
+  const labeledParts = [
+    label ? `Type: ${label}` : "",
+    building ? `Building: ${building}` : "",
+    floor ? `Floor/Flat: ${floor}` : "",
+    street ? `Street: ${street}` : "",
+    area ? `Area: ${area}` : "",
+    landmark ? `Landmark: ${landmark}` : "",
+    city ? `City: ${city}` : "",
+    state ? `State: ${state}` : "",
+    zipCode ? `Pincode: ${zipCode}` : "",
+  ].filter(Boolean);
+
+  if (labeledParts.length > 0) return labeledParts.join(", ");
+
+  return fieldValue(address.formattedAddress || address.address);
+}
+
 export function pushStatusHistory(order, { byRole, byId, from, to, note = "" }) {
   order.statusHistory.push({
     at: new Date(),
@@ -165,15 +196,6 @@ export function buildDeliverySocketPayload(orderDoc, restaurantDoc = null) {
   const restaurant = restaurantDoc || order?.restaurantId || null;
   const restaurantLocation = restaurant?.location || {};
   const deliveryAddress = order?.deliveryAddress || {};
-  const customerAddressParts = [
-    deliveryAddress.street,
-    deliveryAddress.additionalDetails,
-    deliveryAddress.city,
-    deliveryAddress.state,
-    deliveryAddress.zipCode,
-  ]
-    .map((v) => String(v || '').trim())
-    .filter(Boolean);
 
   return {
     orderMongoId:
@@ -209,7 +231,11 @@ export function buildDeliverySocketPayload(orderDoc, restaurantDoc = null) {
       state: restaurantLocation?.state || restaurant?.state || "",
     },
     deliveryAddress: order?.deliveryAddress,
-    customerAddress: customerAddressParts.length ? customerAddressParts.join(', ') : "",
+    customerAddress:
+      formatDeliveryAddressWithLabels(deliveryAddress) ||
+      String(deliveryAddress?.formattedAddress || "").trim() ||
+      String(deliveryAddress?.address || "").trim() ||
+      "",
     customerName: order?.customerName || order?.deliveryAddress?.fullName || order?.deliveryAddress?.name || order?.userId?.name || "",
     customerPhone: order?.customerPhone || order?.deliveryAddress?.phone || order?.userId?.phone || "",
     userName: order?.customerName || order?.deliveryAddress?.fullName || order?.deliveryAddress?.name || order?.userId?.name || "",

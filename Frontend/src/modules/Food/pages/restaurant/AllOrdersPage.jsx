@@ -16,6 +16,7 @@ import {
 import { DateRangeCalendar } from "@food/components/ui/date-range-calendar"
 import { restaurantAPI } from "@food/api"
 import { useRestaurantNotifications } from "@food/hooks/useRestaurantNotifications"
+import { formatOrderAddressWithLabels } from "@food/utils/orderAddressFormatter"
 import BRAND_THEME from "@/config/brandTheme"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
@@ -178,12 +179,8 @@ export default function AllOrdersPage() {
     const time = createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     
     // Format address (backend: deliveryAddress)
-    const addr = order.deliveryAddress || order.address || null
-    const address =
-      addr?.formattedAddress ||
-      addr?.address ||
-      (addr?.street ? `${addr.street}, ${addr.city || ""}`.trim() : "") ||
-      "Address not available"
+    const addr = order.deliveryAddress || order.address || order.customerAddress || null
+    const address = formatOrderAddressWithLabels(addr)
     
     // Get restaurant name
     const restaurantName = restaurantData?.name || order.restaurantId?.name || 'Restaurant'
@@ -271,7 +268,6 @@ export default function AllOrdersPage() {
     const tags = []
     if (order.scheduledAt) tags.push('SCHEDULED')
     if (order.sendCutlery) tags.push('CUTLERY')
-    tags.push('HOME DELIVERY')
     // Check if all items are veg
     const allVeg = items.every(item => item.isVeg !== false)
     if (allVeg && items.length > 0) tags.push('VEG ONLY')
@@ -706,14 +702,15 @@ export default function AllOrdersPage() {
               </button>
             </div>
 
-            {/* Restaurant Info */}
-            <p className="text-sm text-gray-900 mb-1">
-              {order.restaurant}, {order.address}
+            {/* Restaurant + Address Info */}
+            <p className="text-sm text-gray-900 mb-0.5">{order.restaurant}</p>
+            <p className="text-sm text-gray-600 mb-1 line-clamp-2 overflow-hidden">
+              {order.address}
             </p>
 
             {/* Customer Info */}
-            <p className="text-sm text-gray-600 mb-3">
-              Ordered by {order.customer}
+            <p className="text-sm text-gray-700 mb-3">
+              Ordered by <span className="font-semibold text-black">{order.customer}</span>
             </p>
 
             {/* Divider */}

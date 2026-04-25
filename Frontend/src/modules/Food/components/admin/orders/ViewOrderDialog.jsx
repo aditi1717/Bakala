@@ -6,25 +6,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@food/components/ui/dialog"
+import { formatOrderAddressForMap, formatOrderAddressWithLabels } from "@food/utils/orderAddressFormatter"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
 const formatAddressForMap = (address) => {
-  if (!address || typeof address !== "object") return ""
-  return [
-    address.floor ? `Floor ${address.floor}` : "",
-    address.buildingName,
-    address.street,
-    address.additionalDetails,
-    address.landmark,
-    address.city,
-    address.state,
-    address.zipCode,
-  ]
-    .map((value) => String(value || "").trim())
-    .filter(Boolean)
-    .join(", ")
+  return formatOrderAddressForMap(address)
 }
 
 const getGoogleMapsHref = (address) => {
@@ -85,42 +73,42 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
 
   // Format address for display
   const formatAddress = (address) => {
-    if (!address || typeof address !== "object") return "N/A"
+    const formatted = formatOrderAddressWithLabels(address)
+    return formatted === "Address not available" ? "N/A" : formatted
+  }
 
-    const formattedAddress = String(address.formattedAddress || "").trim()
-    const rawAddress = String(address.address || "").trim()
-    const parts = [
-      formattedAddress,
-      rawAddress,
-      address.label,
-      address.floor ? `Floor ${address.floor}` : "",
-      address.buildingName,
-      address.street,
-      address.additionalDetails,
-      address.landmark,
-      address.addressLine1,
-      address.addressLine2,
-      address.area,
-      address.city,
-      address.state,
-      address.zipCode,
-      address.postalCode,
+  const parseAddressSegments = (formattedAddressText) => {
+    const text = String(formattedAddressText || "").trim()
+    if (!text || text === "N/A") return []
+
+    const knownLabels = [
+      "Type",
+      "Building",
+      "Floor/Flat",
+      "Street",
+      "Area",
+      "Landmark",
+      "City",
+      "State",
+      "Pincode",
     ]
-      .map((value) => String(value || "").trim())
-      .filter(Boolean)
+    const labelPattern = new RegExp(`(${knownLabels.map((l) => l.replace("/", "\\/")).join("|")}):`, "g")
 
-    const uniqueParts = []
-    parts.forEach((part) => {
-      const key = part.toLowerCase()
-      const isContained = uniqueParts.some((existingPart) => {
-        const existingKey = existingPart.toLowerCase()
-        return existingKey === key || existingKey.includes(key) || key.includes(existingKey)
+    const matches = [...text.matchAll(labelPattern)]
+    if (matches.length === 0) return [{ label: "", value: text }]
+
+    return matches
+      .map((match, index) => {
+        const label = String(match[1] || "").trim()
+        const start = match.index + match[0].length
+        const end = index + 1 < matches.length ? matches[index + 1].index : text.length
+        const value = String(text.slice(start, end) || "")
+          .trim()
+          .replace(/^,\s*/, "")
+          .replace(/,\s*$/, "")
+        return { label, value }
       })
-      if (isContained) return
-      uniqueParts.push(part)
-    })
-
-    return uniqueParts.length > 0 ? uniqueParts.join(", ") : "Address not available"
+      .filter((segment) => segment.value)
   }
 
   // Get coordinates if available
@@ -417,17 +405,39 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
               {(() => {
                 const deliveryAddress = order.address || order.deliveryAddress
                 const mapsHref = getGoogleMapsHref(deliveryAddress)
+                const formattedAddress = formatAddress(deliveryAddress)
+                const addressSegments = parseAddressSegments(formattedAddress)
                 return (
               <div className="space-y-2 p-4 bg-slate-50 rounded-lg">
-                <p className="text-sm text-slate-900">{formatAddress(deliveryAddress)}</p>
+                {addressSegments.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {addressSegments.map((segment, idx) => (
+                      <p
+                        key={`${segment.label}-${idx}`}
+                        className={`text-sm text-slate-900 leading-6 ${
+                          segment.label.toLowerCase() === "street" ? "whitespace-nowrap" : ""
+                        }`}
+                      >
+                        {segment.label ? (
+                          <span className="mr-1.5 text-sm font-bold text-indigo-700">
+                            {segment.label}
+                          </span>
+                        ) : null}
+                        <span>{segment.value}</span>
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-900">{formattedAddress}</p>
+                )}
                 {getCoordinates(deliveryAddress) && (
                   <p className="text-xs text-slate-500 mt-2">
-                    <span className="font-medium">Coordinates:</span> {getCoordinates(deliveryAddress)}
+                    <span className="font-semibold text-indigo-700">Coordinates:</span> {getCoordinates(deliveryAddress)}
                   </p>
                 )}
                 {deliveryAddress.label && (
                   <p className="text-xs text-slate-500">
-                    <span className="font-medium">Label:</span> {deliveryAddress.label}
+                    <span className="font-semibold text-emerald-700">Label:</span> {deliveryAddress.label}
                   </p>
                 )}
                 {mapsHref && (

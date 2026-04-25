@@ -28,6 +28,7 @@ import RestaurantNavbar from "@food/components/restaurant/RestaurantNavbar";
 import notificationSound from "@food/assets/audio/alert.mp3";
 import { restaurantAPI } from "@food/api";
 import { useRestaurantNotifications } from "@food/hooks/useRestaurantNotifications";
+import { formatOrderAddressWithLabels } from "@food/utils/orderAddressFormatter";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import BRAND_THEME from "@/config/brandTheme";
@@ -794,6 +795,7 @@ export default function OrdersMain() {
   const showNewOrderPopupRef = useRef(showNewOrderPopup);
   const isMutedRef = useRef(isMuted);
   const newOrderRef = useRef(null);
+  const popupOrderRef = useRef(null);
   const popupHydrationRef = useRef("");
   const selectedOrderHydrationRef = useRef("");
 
@@ -1259,6 +1261,10 @@ export default function OrdersMain() {
     newOrderRef.current = newOrder;
   }, [newOrder]);
 
+  useEffect(() => {
+    popupOrderRef.current = popupOrder;
+  }, [popupOrder]);
+
   // Hydrate popup with latest backend order details so fields stay linked
   // with tracking/report data (items variants, payment snapshot, pricing, earnings).
   useEffect(() => {
@@ -1495,6 +1501,46 @@ export default function OrdersMain() {
       if (hasDispatchUpdate || hasOrderStatusUpdate) {
         requestOrdersRefresh();
       }
+
+      const statusLower = String(
+        payload?.orderStatus || payload?.status || "",
+      ).toLowerCase();
+      const isPendingReviewStatus =
+        statusLower === "created" || statusLower === "confirmed";
+      if (!statusLower || isPendingReviewStatus || !showNewOrderPopupRef.current) {
+        return;
+      }
+
+      const eventKeys = Array.from(
+        new Set(
+          [
+            payload?.orderMongoId,
+            payload?.order_mongo_id,
+            payload?.orderId,
+            payload?.order_id,
+            payload?._id,
+            payload?.id,
+          ]
+            .filter(Boolean)
+            .map((value) => String(value).trim())
+            .filter(Boolean),
+        ),
+      );
+      if (eventKeys.length === 0) return;
+
+      const matchesPopupOrder =
+        hasMatchingOrderKey(eventKeys, popupOrderRef.current) ||
+        hasMatchingOrderKey(eventKeys, newOrderRef.current);
+
+      if (!matchesPopupOrder) return;
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setShowNewOrderPopup(false);
+      setPopupOrder(null);
+      clearNewOrder();
     };
 
     window.addEventListener(
@@ -1961,18 +2007,9 @@ export default function OrdersMain() {
           ? "Cash on Delivery"
           : "Online";
 
-      const addressText =
-        typeof orderToPrint.customerAddress === "string"
-          ? orderToPrint.customerAddress
-          : [
-              orderToPrint.customerAddress?.street,
-              orderToPrint.customerAddress?.area,
-              orderToPrint.customerAddress?.city,
-              orderToPrint.customerAddress?.state,
-              orderToPrint.customerAddress?.pincode,
-            ]
-              .filter(Boolean)
-              .join(", ");
+      const addressText = formatOrderAddressWithLabels(
+        orderToPrint.customerAddress || orderToPrint.deliveryAddress || orderToPrint.address || null,
+      );
 
       doc.setFillColor(15, 23, 42);
       doc.rect(0, 0, 210, 28, "F");
@@ -1993,7 +2030,7 @@ export default function OrdersMain() {
       doc.text(`Payment: ${paymentLabel}`, 14, 52);
 
       let yPos = 62;
-      if (addressText) {
+      if (addressText && addressText !== "Address not available") {
         doc.setFont("helvetica", "bold");
         doc.text("Delivery address", 14, yPos);
         doc.setFont("helvetica", "normal");

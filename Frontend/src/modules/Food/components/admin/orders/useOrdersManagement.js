@@ -2,6 +2,7 @@ import { useState, useMemo } from "react"
 import { exportToCSV, exportToExcel, exportToPDF, exportToJSON } from "./ordersExportUtils"
 import quickSpicyLogo from "@food/assets/quicky-spicy-logo.png"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
+import { formatOrderAddressWithLabels } from "@food/utils/orderAddressFormatter"
 const debugError = () => {}
 
 
@@ -18,49 +19,8 @@ const formatDisplayText = (value, fallback = "N/A") => {
 }
 
 const formatOrderAddress = (address) => {
-  if (!address || typeof address !== "object") return "Not available"
-
-  const formattedAddress = String(address.formattedAddress || "").trim()
-  const rawAddress = String(address.address || "").trim()
-
-  const primaryParts = [
-    address.label,
-    address.floor ? `Floor ${address.floor}` : "",
-    address.buildingName,
-    address.street,
-    address.additionalDetails,
-    address.landmark,
-    address.addressLine1,
-    address.addressLine2,
-    address.area,
-    address.city,
-    address.state,
-    address.zipCode,
-    address.postalCode,
-  ]
-    .map((value) => String(value || "").trim())
-    .filter(Boolean)
-
-  const orderedParts = []
-  const pushPart = (value) => {
-    const normalized = String(value || "").trim()
-    if (!normalized) return
-    const key = normalized.toLowerCase()
-
-    const isContained = orderedParts.some((existingPart) => {
-      const existingKey = existingPart.toLowerCase()
-      return existingKey === key || existingKey.includes(key) || key.includes(existingKey)
-    })
-    if (isContained) return
-
-    orderedParts.push(normalized)
-  }
-
-  if (formattedAddress) pushPart(formattedAddress)
-  if (rawAddress && rawAddress.toLowerCase() !== formattedAddress.toLowerCase()) pushPart(rawAddress)
-  primaryParts.forEach(pushPart)
-
-  return orderedParts.join(", ") || "Not available"
+  const formatted = formatOrderAddressWithLabels(address)
+  return formatted === "Address not available" ? "Not available" : formatted
 }
 
 const blobToDataUrl = (blob) =>

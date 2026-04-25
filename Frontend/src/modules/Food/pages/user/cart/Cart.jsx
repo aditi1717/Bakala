@@ -29,6 +29,19 @@ const debugLog = (...args) => { }
 const debugWarn = (...args) => { }
 const debugError = (...args) => { }
 
+const getUniqueAddressParts = (parts = []) => {
+  const seen = new Set()
+  return parts
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .filter((part) => {
+      const key = part.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+}
+
 
 
 // Removed hardcoded suggested items - now fetching approved addons from backend
@@ -49,12 +62,15 @@ const formatFullAddress = (address) => {
     return /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(v)
   }
 
+  const dedupeAddressSegments = (text) =>
+    getUniqueAddressParts(String(text || "").split(",")).join(", ")
+
   // Priority 1: Use formattedAddress if available (for live location addresses)
   if (address.formattedAddress && address.formattedAddress !== "Select location") {
     // If formattedAddress is still raw coordinates, don't show it as-is.
     // Fall back to composing from city/state/area instead.
     if (!looksLikeLatLng(address.formattedAddress)) {
-      return address.formattedAddress
+      return dedupeAddressSegments(address.formattedAddress)
     }
   }
 
@@ -70,7 +86,7 @@ const formatFullAddress = (address) => {
   if (address.zipCode) addressParts.push(address.zipCode)
 
   if (addressParts.length > 0) {
-    return addressParts.join(', ')
+    return dedupeAddressSegments(addressParts.join(', '))
   }
 
   // Priority 3: Use address field if available
@@ -82,7 +98,7 @@ const formatFullAddress = (address) => {
 }
 
 const composeSavedAddressText = (address) =>
-  [
+  getUniqueAddressParts([
     address?.floor ? `Floor ${address.floor}` : "",
     address?.buildingName,
     address?.street,
@@ -91,8 +107,7 @@ const composeSavedAddressText = (address) =>
     address?.city,
     address?.state,
     address?.zipCode,
-  ]
-    .filter(Boolean)
+  ])
     .join(", ")
 
 const RUPEE_SYMBOL = "\u20B9"

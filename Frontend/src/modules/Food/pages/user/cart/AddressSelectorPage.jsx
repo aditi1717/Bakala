@@ -76,7 +76,7 @@ const composeAddressText = (address = {}) => {
     return formattedAddress
   }
 
-  return [
+  const parts = [
     address.floor ? `Floor ${String(address.floor).trim()}` : "",
     address.buildingName,
     address.street,
@@ -88,7 +88,17 @@ const composeAddressText = (address = {}) => {
   ]
     .map((value) => String(value || "").trim())
     .filter(Boolean)
-    .join(", ")
+
+  // Prevent repeated values when area/additionalDetails and landmark are same text.
+  const seen = new Set()
+  const uniqueParts = parts.filter((part) => {
+    const key = part.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  return uniqueParts.join(", ")
 }
 
 // Get icon based on address type/label
@@ -879,7 +889,7 @@ export default function AddressSelectorPage() {
 
           <div className="relative bg-white dark:bg-[#0a0a0a] rounded-t-[32px] -mt-8 z-10 p-4 space-y-6 shadow-[0_-12px_24px_-10px_rgba(0,0,0,0.1)]">
             <div>
-              <Label className="text-sm font-bold mb-2 block">Complete Address</Label>
+              <Label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 block">Complete Address</Label>
               <Input 
                 placeholder="House no, street, colony" 
                 value={addressFormData.street} 
@@ -893,7 +903,7 @@ export default function AddressSelectorPage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <Label className="text-xs mb-1 block">Building / Apartment</Label>
+                <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">Building / Apartment</Label>
                 <Input
                   placeholder="Apartment, building, tower"
                   value={addressFormData.buildingName || ""}
@@ -905,7 +915,7 @@ export default function AddressSelectorPage() {
                 />
               </div>
               <div>
-                <Label className="text-xs mb-1 block">Floor / Flat / Unit</Label>
+                <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">Floor / Flat / Unit</Label>
                 <Input
                   placeholder="Floor 3, Flat 302"
                   value={addressFormData.floor || ""}
@@ -919,7 +929,7 @@ export default function AddressSelectorPage() {
             </div>
 
             <div>
-              <Label className="text-xs mb-1 block">Landmark / Area details</Label>
+              <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">Landmark / Area details</Label>
               <Input
                 placeholder="Near metro, gate no 2, backside lane"
                 value={addressFormData.landmark || addressFormData.additionalDetails || ""}
@@ -937,7 +947,7 @@ export default function AddressSelectorPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-xs mb-1 block">City</Label>
+                <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">City</Label>
                 <Input 
                   value={addressFormData.city} 
                   onChange={e => setAddressFormData({...addressFormData, city: e.target.value})} 
@@ -948,7 +958,7 @@ export default function AddressSelectorPage() {
                 />
               </div>
               <div>
-                <Label className="text-xs mb-1 block">State</Label>
+                <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">State</Label>
                 <Input 
                   value={addressFormData.state} 
                   onChange={e => setAddressFormData({...addressFormData, state: e.target.value})} 
@@ -961,7 +971,7 @@ export default function AddressSelectorPage() {
             </div>
 
             <div>
-              <Label className="text-xs mb-1 block">Pincode / ZIP</Label>
+              <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">Pincode / ZIP</Label>
               <Input 
                 placeholder="Pincode" 
                 value={addressFormData.zipCode || ""} 
@@ -973,7 +983,7 @@ export default function AddressSelectorPage() {
             </div>
 
             <div>
-               <Label className="text-sm font-bold mb-2 block">Save address as</Label>
+               <Label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 block">Save address as</Label>
                <div className="flex gap-2">
                  {["Home", "Work", "Other"].map(l => (
                    <Button 

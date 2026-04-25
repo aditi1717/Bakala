@@ -319,6 +319,37 @@ function toGeoPoint(lat, lng) {
   return { type: "Point", coordinates: [b, a] };
 }
 
+function formatDeliveryAddressWithLabels(address = {}) {
+  if (!address || typeof address !== "object") return "";
+
+  const fieldValue = (value) => String(value || "").trim();
+  const building = fieldValue(address.buildingName || address.addressLine1);
+  const floor = fieldValue(address.floor);
+  const street = fieldValue(address.street || address.addressLine2);
+  const area = fieldValue(address.additionalDetails || address.area);
+  const landmark = fieldValue(address.landmark);
+  const city = fieldValue(address.city);
+  const state = fieldValue(address.state);
+  const zipCode = fieldValue(address.zipCode || address.postalCode);
+  const label = fieldValue(address.label);
+
+  const labeledParts = [
+    label ? `Type: ${label}` : "",
+    building ? `Building: ${building}` : "",
+    floor ? `Floor/Flat: ${floor}` : "",
+    street ? `Street: ${street}` : "",
+    area ? `Area: ${area}` : "",
+    landmark ? `Landmark: ${landmark}` : "",
+    city ? `City: ${city}` : "",
+    state ? `State: ${state}` : "",
+    zipCode ? `Pincode: ${zipCode}` : "",
+  ].filter(Boolean);
+
+  if (labeledParts.length > 0) return labeledParts.join(", ");
+
+  return fieldValue(address.formattedAddress || address.address);
+}
+
 function buildDeliveryAddressSnapshot(address = {}) {
   if (!address || typeof address !== "object") return undefined;
 
@@ -350,6 +381,19 @@ function buildDeliveryAddressSnapshot(address = {}) {
     String(address?.formattedAddress || "").trim() ||
     String(address?.address || "").trim() ||
     addressParts.join(", ");
+  const labeledAddress = formatDeliveryAddressWithLabels({
+    label,
+    buildingName,
+    floor,
+    street,
+    additionalDetails,
+    landmark,
+    city,
+    state,
+    zipCode,
+    formattedAddress,
+    address: String(address?.address || "").trim(),
+  });
 
   return {
     label,
@@ -358,7 +402,7 @@ function buildDeliveryAddressSnapshot(address = {}) {
     buildingName,
     floor,
     landmark,
-    address: String(address?.address || "").trim() || formattedAddress,
+    address: labeledAddress || String(address?.address || "").trim() || formattedAddress,
     formattedAddress,
     city,
     state,
@@ -678,22 +722,10 @@ function buildDeliverySocketPayload(orderDoc, restaurantDoc = null) {
     },
     deliveryAddress: order?.deliveryAddress,
     customerAddress:
+      formatDeliveryAddressWithLabels(order?.deliveryAddress || {}) ||
       order?.deliveryAddress?.formattedAddress ||
       order?.deliveryAddress?.address ||
-      [
-        order?.deliveryAddress?.floor
-          ? `Floor ${order.deliveryAddress.floor}`
-          : "",
-        order?.deliveryAddress?.buildingName,
-        order?.deliveryAddress?.street,
-        order?.deliveryAddress?.additionalDetails,
-        order?.deliveryAddress?.landmark,
-        order?.deliveryAddress?.city,
-        order?.deliveryAddress?.state,
-        order?.deliveryAddress?.zipCode,
-      ]
-        .filter(Boolean)
-        .join(", "),
+      "",
     customerName: order?.userId?.name || order?.customerName || "",
     customerPhone: order?.userId?.phone || order?.deliveryAddress?.phone || "",
     userName: order?.userId?.name || order?.customerName || "",

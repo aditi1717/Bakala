@@ -200,6 +200,42 @@ const getAddressLabel = (address) =>
     'Address unavailable',
   );
 
+const getAddressLabeledSegments = (address) => {
+  if (!address || typeof address !== 'object') return [];
+
+  const clean = (value) => String(value ?? '').trim();
+  const label = clean(address?.label);
+  const building = clean(address?.buildingName || address?.addressLine1);
+  const floor = clean(address?.floor);
+  const street = clean(address?.street || address?.addressLine2);
+  const area = clean(address?.additionalDetails || address?.area);
+  const landmark = clean(address?.landmark);
+  const city = clean(address?.city);
+  const state = clean(address?.state);
+  const zipCode = clean(address?.zipCode || address?.postalCode || address?.pincode);
+  const hasDistinctLandmark =
+    landmark && (!area || landmark.toLowerCase() !== area.toLowerCase());
+
+  const segments = [
+    label ? { key: 'type', label: 'Type', value: label } : null,
+    building ? { key: 'building', label: 'Building', value: building } : null,
+    floor ? { key: 'floor', label: 'Floor/Flat', value: floor } : null,
+    street ? { key: 'street', label: 'Street', value: street } : null,
+    area ? { key: 'area', label: 'Area', value: area } : null,
+    hasDistinctLandmark ? { key: 'landmark', label: 'Landmark', value: landmark } : null,
+    city ? { key: 'city', label: 'City', value: city } : null,
+    state ? { key: 'state', label: 'State', value: state } : null,
+    zipCode ? { key: 'pincode', label: 'Pincode', value: zipCode } : null,
+  ].filter(Boolean);
+
+  if (segments.length > 0) return segments;
+
+  const fallback = clean(getAddressLabel(address));
+  return fallback && fallback !== 'Address unavailable'
+    ? [{ key: 'address', label: 'Address', value: fallback }]
+    : [];
+};
+
 const getGoogleMapsHref = (location, addressText = '') => {
   const lat = Number(location?.lat);
   const lng = Number(location?.lng);
@@ -479,6 +515,10 @@ const OrderDetailV2 = () => {
     'Restaurant location unavailable',
   );
   const customerAddress = getAddressLabel(order?.deliveryAddress || order?.address || {});
+  const customerAddressSegments = useMemo(
+    () => getAddressLabeledSegments(order?.deliveryAddress || order?.address || {}),
+    [order],
+  );
   const dropMapHref = getGoogleMapsHref(customerLocation, customerAddress);
   const pickupMeta = useMemo(() => getPickupContactMeta(order), [order]);
   const pickupDisplayPhone = getDisplayPhone(pickupMeta.phone);
@@ -822,9 +862,15 @@ const OrderDetailV2 = () => {
             >
               <p className="text-sm leading-5 text-slate-800">{restaurantAddress}</p>
               <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-slate-600">
-                <p><span className="font-medium text-slate-700">Recipient:</span> {pickupMeta.name || '--'}</p>
+                <p>
+                  <span className="mr-1 inline-flex items-center rounded-md bg-[#E6F4EC] px-1.5 py-0.5 text-[11px] font-bold text-[#005128]">Recipient</span>
+                  <span className="font-semibold text-slate-900">{pickupMeta.name || '--'}</span>
+                </p>
                 <p className="flex items-center gap-2">
-                  <span><span className="font-medium text-slate-700">Number:</span> {pickupDisplayPhone || '--'}</span>
+                  <span>
+                    <span className="mr-1 inline-flex items-center rounded-md bg-[#E6F4EC] px-1.5 py-0.5 text-[11px] font-bold text-[#005128]">Number</span>
+                    <span className="font-semibold text-slate-900">{pickupDisplayPhone || '--'}</span>
+                  </span>
                   {pickupMeta.dialPhone && (
                     <a href={`tel:${pickupMeta.dialPhone}`} className="inline-flex items-center font-medium text-[#005128]">
                       <Phone className="mr-1 h-3.5 w-3.5" /> Call
@@ -838,11 +884,16 @@ const OrderDetailV2 = () => {
               title="Delivered Address"
               icon={User}
             >
-              <p className="text-sm leading-5 text-slate-800">{customerAddress}</p>
-              <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-slate-600">
-                <p><span className="font-medium text-slate-700">Recipient:</span> {customerMeta.name || '--'}</p>
+              <div className="mb-2 grid grid-cols-1 gap-1 text-xs text-slate-600">
+                <p>
+                  <span className="mr-1 inline-flex items-center rounded-md bg-[#E6F4EC] px-1.5 py-0.5 text-[11px] font-bold text-[#005128]">Recipient</span>
+                  <span className="font-semibold text-slate-900">{customerMeta.name || '--'}</span>
+                </p>
                 <p className="flex items-center gap-2">
-                  <span><span className="font-medium text-slate-700">Number:</span> {customerDisplayPhone || '--'}</span>
+                  <span>
+                    <span className="mr-1 inline-flex items-center rounded-md bg-[#E6F4EC] px-1.5 py-0.5 text-[11px] font-bold text-[#005128]">Number</span>
+                    <span className="font-semibold text-slate-900">{customerDisplayPhone || '--'}</span>
+                  </span>
                   {customerMeta.dialPhone && (
                     <a href={`tel:${customerMeta.dialPhone}`} className="inline-flex items-center font-medium text-[#005128]">
                       <Phone className="mr-1 h-3.5 w-3.5" /> Call
@@ -850,6 +901,20 @@ const OrderDetailV2 = () => {
                   )}
                 </p>
               </div>
+              {customerAddressSegments.length > 0 ? (
+                <div className="space-y-1.5">
+                  {customerAddressSegments.map((segment) => (
+                    <p key={segment.key} className="text-sm leading-5 text-slate-900">
+                      <span className="mr-1.5 rounded-md bg-[#E6F4EC] px-1.5 py-0.5 text-xs font-bold text-[#005128]">
+                        {segment.label}
+                      </span>
+                      <span className="font-semibold text-slate-900">{segment.value}</span>
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm leading-5 text-slate-800">{customerAddress}</p>
+              )}
             </CompactSection>
 
             <section className="rounded-2xl border border-slate-200 bg-white p-4">

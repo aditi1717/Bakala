@@ -581,7 +581,7 @@ export default function OrdersPage({ statusKey = "all" }) {
         deliveryPartnerPhone,
         deliveryType: order.deliveryType || "Home Delivery",
         orderOtp: order.deliveryOtp,
-        address: order.address || order.customerAddress || order.deliveryAddress,
+        address: order.deliveryAddress || order.address || order.customerAddress,
         refundStatus: order.payment?.refund?.status || (order.payment?.status === 'refunded' ? 'processed' : null)
       }
     })

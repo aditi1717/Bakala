@@ -6,6 +6,7 @@ import Lenis from "lenis"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
 import { restaurantAPI } from "@food/api"
+import { formatOrderAddressWithLabels } from "@food/utils/orderAddressFormatter"
 import {
   ArrowLeft,
   Printer,
@@ -185,27 +186,9 @@ export default function OrderDetails() {
                 offerByRestaurant
             )
 
-          const addressParts = [
-            order.address?.street,
-            order.address?.area,
-            order.address?.city,
-            order.address?.state,
-            order.address?.pincode
-          ].filter(Boolean)
-
-          const fullAddress =
-            order.address?.formattedAddress ||
-            order.address?.address ||
-            order.deliveryAddress?.formattedAddress ||
-            order.deliveryAddress?.address ||
-            [
-              order.deliveryAddress?.street,
-              order.deliveryAddress?.city,
-              order.deliveryAddress?.state,
-              order.deliveryAddress?.zipCode
-            ].filter(Boolean).join(", ") ||
-            (addressParts.length > 0 ? addressParts.join(", ") : "") ||
-            "Address not available"
+          const fullAddress = formatOrderAddressWithLabels(
+            order.deliveryAddress || order.address || order.customerAddress || null
+          )
 
           const customerName = firstText(
             order.userId?.name,
@@ -665,16 +648,34 @@ export default function OrderDetails() {
   }
 
   const getStatusColor = (status) => {
-    switch (status) {
+    const normalized = String(status || "").toUpperCase()
+    switch (normalized) {
+      case "CREATED":
+        return "bg-indigo-100 text-indigo-800 border border-indigo-200"
+      case "PENDING":
+        return "bg-amber-100 text-amber-800 border border-amber-200"
+      case "ACCEPTED":
+      case "CONFIRMED":
+      case "PROCESSING":
+        return "bg-sky-100 text-sky-800 border border-sky-200"
       case "REJECTED":
-        return "bg-red-700 text-white"
+        return "bg-red-100 text-red-800 border border-red-200"
       case "DELIVERED":
-        return "bg-green-600 text-white"
+        return "bg-emerald-100 text-emerald-800 border border-emerald-200"
       default:
-        return String(status || "").startsWith("CANCELLED")
-          ? "bg-red-700 text-white"
-          : "bg-gray-600 text-white"
+        return normalized.startsWith("CANCELLED")
+          ? "bg-rose-100 text-rose-800 border border-rose-200"
+          : "bg-slate-100 text-slate-700 border border-slate-200"
     }
+  }
+
+  const getPaymentStatusBadgeColor = (status) => {
+    const normalized = String(status || "").toUpperCase()
+    if (normalized === "PAID") return "bg-emerald-100 text-emerald-800 border border-emerald-200"
+    if (normalized === "FAILED") return "bg-red-100 text-red-800 border border-red-200"
+    if (normalized === "REFUNDED") return "bg-violet-100 text-violet-800 border border-violet-200"
+    if (normalized === "COD") return "bg-amber-100 text-amber-800 border border-amber-200"
+    return "bg-slate-100 text-slate-700 border border-slate-200"
   }
 
   // Loading state
@@ -804,9 +805,7 @@ export default function OrderDetails() {
           </div>
 
           {/* Restaurant Info */}
-          <p className="text-sm text-gray-900 mb-3">
-            {orderData.restaurant}, {orderData.address}
-          </p>
+          <p className="text-sm text-gray-900 mb-3">{orderData.restaurant}</p>
 
           {/* Divider */}
           <div className="border-t border-gray-200 my-3"></div>
@@ -948,7 +947,7 @@ export default function OrderDetails() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-gray-900">Total bill</span>
-                <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs font-medium rounded">
+                <span className={`px-2 py-0.5 text-xs font-medium rounded ${getPaymentStatusBadgeColor(orderData.billing.paymentStatus)}`}>
                   {orderData.billing.paymentStatus}
                 </span>
               </div>

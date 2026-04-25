@@ -114,6 +114,20 @@ export const useRestaurantNotifications = () => {
     ).trim()
   );
 
+  const getOrderKeys = (payload = {}) =>
+    [
+      payload?.orderMongoId,
+      payload?.order_mongo_id,
+      payload?.orderId,
+      payload?.order_id,
+      payload?._id,
+      payload?.id,
+      payload?.mongoId,
+    ]
+      .filter(Boolean)
+      .map((value) => String(value).trim())
+      .filter(Boolean);
+
   const shouldProcessOrderAlert = (orderData = {}) => {
     const key = getOrderAlertKey(orderData);
     if (!key) return true;
@@ -630,18 +644,9 @@ export const useRestaurantNotifications = () => {
         );
       }
       const status = String(data?.orderStatus || data?.status || '').toLowerCase();
+      const eventOrderKeys = getOrderKeys(data);
       if (status.includes('cancel')) {
-        const orderKeys = [
-          data?.orderMongoId,
-          data?.orderId,
-          data?.order_mongo_id,
-          data?.order_id,
-          data?._id,
-          data?.id,
-        ]
-          .filter(Boolean)
-          .map((value) => String(value).trim())
-          .filter(Boolean);
+        const orderKeys = eventOrderKeys;
         const primaryOrderId = orderKeys[0] || '';
         if (primaryOrderId) {
           const cancelledByRaw = String(
@@ -665,6 +670,31 @@ export const useRestaurantNotifications = () => {
             message: data?.message || '',
           });
         }
+      }
+
+      // If order is no longer waiting for restaurant review, immediately clear
+      // the active new-order notification for the same order.
+      const isPendingReviewStatus = status === 'created' || status === 'confirmed';
+      if (eventOrderKeys.length > 0 && status && !isPendingReviewStatus) {
+        if (activeOrderRef.current) {
+          const activeOrderKeys = getOrderKeys(activeOrderRef.current);
+          const matchesActive = activeOrderKeys.some((key) =>
+            eventOrderKeys.includes(key),
+          );
+          if (matchesActive) {
+            stopAlertLoop();
+            activeOrderRef.current = null;
+          }
+        }
+
+        setNewOrder((prev) => {
+          if (!prev) return prev;
+          const prevOrderKeys = getOrderKeys(prev);
+          const matchesCurrent = prevOrderKeys.some((key) =>
+            eventOrderKeys.includes(key),
+          );
+          return matchesCurrent ? null : prev;
+        });
       }
     });
 
