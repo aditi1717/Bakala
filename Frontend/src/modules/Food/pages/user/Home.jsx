@@ -2900,11 +2900,11 @@ export default function Home() {
                                         )}
                                     </div>
                                   </div>
-                                  <div className={`flex-shrink-0 ${Number(restaurant.rating) > 0 ? BRAND_THEME.tokens.homepage.home.restaurantCard.ratingActive : BRAND_THEME.tokens.homepage.home.restaurantCard.ratingIdle} px-3 py-1.5 rounded-2xl flex items-center gap-1.5 shadow-md transform transition-transform duration-300 group-hover:scale-110`}>
+                                  <div className={`flex-shrink-0 ${Number(restaurant.rating) > 0 ? "border border-emerald-100 bg-emerald-50 text-emerald-700" : BRAND_THEME.tokens.homepage.home.restaurantCard.ratingIdle} px-3 py-1.5 rounded-2xl flex items-center gap-1.5 shadow-md transform transition-transform duration-300 group-hover:scale-110`}>
+                                    {Number(restaurant.rating) > 0 && <Star className="h-3.5 w-3.5 lg:h-4.5 lg:w-4.5 fill-emerald-500 text-emerald-500" strokeWidth={0} />}
                                     <span className="text-sm lg:text-lg font-medium tracking-tight">
                                       {Number(restaurant.rating) > 0 ? Number(restaurant.rating).toFixed(1) : "NEW"}
                                     </span>
-                                    {Number(restaurant.rating) > 0 && <Star className="h-3.5 w-3.5 lg:h-4.5 lg:w-4.5 fill-white text-white" strokeWidth={0} />}
                                   </div>
                                 </div>
 

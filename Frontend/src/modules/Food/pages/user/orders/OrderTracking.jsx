@@ -10,6 +10,7 @@ import {
   User,
   ChevronRight,
   MessageSquare,
+  RotateCcw,
   X,
   Check,
   Shield,
@@ -28,6 +29,7 @@ import {
 import { Textarea } from "@food/components/ui/textarea"
 import { useOrders } from "@food/context/OrdersContext"
 import { useProfile } from "@food/context/ProfileContext"
+import { useCart } from "@food/context/CartContext"
 import { orderAPI } from "@food/api"
 import { useCompanyName } from "@food/hooks/useCompanyName"
 import circleIcon from "@food/assets/circleicon.png"
@@ -428,12 +430,28 @@ function normalizeLookupId(value) {
   return raw
 }
 
+function extractOrderFromDetailsResponse(response) {
+  const data = response?.data
+  if (data?.data?.order) return data.data.order
+  if (data?.order) return data.order
+  if (data?.data && typeof data.data === "object" && !Array.isArray(data.data)) {
+    return data.data
+  }
+  return null
+}
+
+function shouldFallbackToOrderList(error) {
+  const status = Number(error?.response?.status)
+  return status === 400 || status === 404
+}
+
 export default function OrderTracking() {
   const companyName = useCompanyName()
   const navigate = useNavigate()
   const { orderId } = useParams()
   const { getOrderById } = useOrders()
   const { profile, getDefaultAddress } = useProfile()
+  const { replaceCart } = useCart()
   const [isSocketConnected, setIsSocketConnected] = useState(
     typeof window !== "undefined" ? Boolean(window.orderSocketConnected) : false
   )
@@ -557,6 +575,71 @@ export default function OrderTracking() {
     }
     navigate("/food/orders")
   }, [navigate])
+
+  const handleOpenRestaurantComplaint = useCallback(() => {
+    const orderMongoId = order?.mongoId || order?._id || order?.orderMongoId || order?.id || orderId
+    if (!orderMongoId) {
+      toast.error("Order ID not available. Please refresh the page.")
+      return
+    }
+
+    navigate(`/food/complaints/submit/${encodeURIComponent(String(orderMongoId))}`)
+  }, [navigate, order?.mongoId, order?._id, order?.orderMongoId, order?.id, orderId])
+
+  const handleOpenInvoice = useCallback(() => {
+    const invoiceOrderId = order?.mongoId || order?._id || order?.orderMongoId || order?.id || order?.orderId || orderId
+    if (!invoiceOrderId) {
+      toast.error("Order ID not available. Please refresh the page.")
+      return
+    }
+
+    navigate(`/food/orders/${encodeURIComponent(String(invoiceOrderId))}/invoice`)
+  }, [navigate, order?.mongoId, order?._id, order?.orderMongoId, order?.id, order?.orderId, orderId])
+
+  const handleReorder = useCallback(() => {
+    const items = Array.isArray(order?.items) ? order.items : []
+    const restaurantRef = order?.restaurantId
+    const restaurantTarget =
+      order?.restaurantSlug ||
+      order?.restaurant?.slug ||
+      (restaurantRef && typeof restaurantRef === "object"
+        ? restaurantRef.slug || restaurantRef._id || restaurantRef.id
+        : restaurantRef)
+
+    if (!restaurantTarget || !items.length) {
+      toast.error("Order items or restaurant information not available")
+      return
+    }
+
+    const reorderItems = items
+      .map((item, index) => {
+        const itemId = item?.id || item?.itemId || item?._id || item?.foodId
+        if (!itemId) return null
+
+        return {
+          id: itemId,
+          name: item?.name || item?.foodName || "Item",
+          price: Number(item?.price) || 0,
+          image: item?.image || "",
+          restaurant: order?.restaurant || order?.restaurantName || "Restaurant",
+          restaurantId: restaurantRef,
+          description: item?.description || "",
+          isVeg: isItemVeg(item),
+          quantity: Math.max(1, Number(item?.quantity || item?.qty) || 1),
+          reorderIndex: index,
+        }
+      })
+      .filter(Boolean)
+
+    if (!reorderItems.length) {
+      toast.error("No reorderable items found in this order")
+      return
+    }
+
+    replaceCart(reorderItems)
+    toast.success("Items added to cart")
+    navigate(`/food/restaurants/${encodeURIComponent(String(restaurantTarget))}`)
+  }, [navigate, order, replaceCart])
 
   const defaultAddress = getDefaultAddress()
 
@@ -757,11 +840,9 @@ export default function OrderTracking() {
         const response = await fetchOrderDetailsWithFallback({ force: isInitial });
         if (!isSubscribed) return;
 
-        let finalOrderData = null;
+        let finalOrderData = extractOrderFromDetailsResponse(response);
 
-        if (response.data?.success && response.data.data?.order) {
-          finalOrderData = response.data.data.order;
-        } else if (isInitial) {
+        if (!finalOrderData && isInitial) {
           const matchedOrder = await resolveOrderFromList(orderId);
           if (matchedOrder) finalOrderData = matchedOrder;
         }
@@ -783,7 +864,7 @@ export default function OrderTracking() {
           terminalPollStopRef.current = true;
         }
       } catch (err) {
-        if (isInitial && !order) {
+        if (isInitial && !order && shouldFallbackToOrderList(err)) {
           try {
             const matchedOrder = await resolveOrderFromList(orderId);
             if (matchedOrder) {
@@ -794,6 +875,9 @@ export default function OrderTracking() {
               return;
             }
           } catch {}
+        }
+
+        if (isInitial && !order) {
           if (!isSubscribed) return;
           setError(err.response?.data?.message || 'Failed to fetch order details');
           terminalPollStopRef.current = true;
@@ -1530,6 +1614,15 @@ export default function OrderTracking() {
               <ChevronRight className="w-5 h-5 text-gray-400" />
             </div>
           </div>
+
+          {isDeliveredLikeOrder && (
+            <SectionItem
+              icon={MessageSquare}
+              title="Restaurant Complaint"
+              subtitle="Raise or view complaint for this order"
+              onClick={handleOpenRestaurantComplaint}
+            />
+          )}
         </motion.div>
 
         {canShowCancelOrderAction && (
@@ -1549,6 +1642,31 @@ export default function OrderTracking() {
         )}
 
       </div>
+
+      {isDeliveredLikeOrder && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 p-4 shadow-[0_-12px_30px_-24px_rgba(15,23,42,0.55)]">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleReorder}
+                className={`flex-1 ${BRAND_THEME.tokens.orders.primaryButton} py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors`}
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reorder
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenInvoice}
+                className={`flex-1 ${BRAND_THEME.tokens.orders.primaryButtonAlt} py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors`}
+              >
+                <Receipt className="w-4 h-4" />
+                Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cancel Order Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>

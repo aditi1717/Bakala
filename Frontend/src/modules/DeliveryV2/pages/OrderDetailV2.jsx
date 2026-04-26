@@ -6,6 +6,7 @@ import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import {
   ArrowLeft,
   Clock3,
+  MessageSquareText,
   Phone,
   RefreshCcw,
   Store,
@@ -235,6 +236,20 @@ const getAddressLabeledSegments = (address) => {
     ? [{ key: 'address', label: 'Address', value: fallback }]
     : [];
 };
+
+const getDeliveryInstructions = (order) =>
+  pickFirstText(
+    order?.note,
+    order?.instructions,
+    order?.deliveryInstructions,
+    order?.deliveryInstruction,
+    order?.customerInstruction,
+    order?.customerInstructions,
+    order?.notes?.delivery,
+    order?.notes?.customer,
+    order?.deliveryAddress?.instructions,
+    order?.deliveryAddress?.note,
+  );
 
 const getGoogleMapsHref = (location, addressText = '') => {
   const lat = Number(location?.lat);
@@ -519,6 +534,7 @@ const OrderDetailV2 = () => {
     () => getAddressLabeledSegments(order?.deliveryAddress || order?.address || {}),
     [order],
   );
+  const deliveryInstructions = useMemo(() => getDeliveryInstructions(order), [order]);
   const dropMapHref = getGoogleMapsHref(customerLocation, customerAddress);
   const pickupMeta = useMemo(() => getPickupContactMeta(order), [order]);
   const pickupDisplayPhone = getDisplayPhone(pickupMeta.phone);
@@ -916,6 +932,22 @@ const OrderDetailV2 = () => {
                 <p className="text-sm leading-5 text-slate-800">{customerAddress}</p>
               )}
             </CompactSection>
+
+            {deliveryInstructions && (
+              <CompactSection
+                title="Delivery Instructions"
+                icon={MessageSquareText}
+              >
+                <div className="rounded-2xl border border-amber-100 bg-amber-50 px-3.5 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-amber-700">
+                    Customer note
+                  </p>
+                  <p className="mt-1.5 whitespace-pre-wrap break-words text-sm font-semibold leading-5 text-slate-900">
+                    "{deliveryInstructions}"
+                  </p>
+                </div>
+              </CompactSection>
+            )}
 
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
               <h3 className="text-sm font-semibold text-slate-900">Order Details</h3>

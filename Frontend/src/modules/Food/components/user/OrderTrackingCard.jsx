@@ -37,7 +37,7 @@ import { useOrders } from "@food/context/OrdersContext";
 import { orderAPI } from "@food/api";
 
 const getOrderKey = (order) => order?.orderId || order?._id || order?.id || null;
-const getOrderRouteId = (order) => order?.orderId || order?._id || order?.id || null;
+const getOrderRouteId = (order) => order?.mongoId || order?._id || order?.id || order?.orderId || null;
 const getCustomerToken = () =>
   localStorage.getItem("auth_customer") ||
   localStorage.getItem("user_accessToken") ||
@@ -368,7 +368,7 @@ function OrderTrackingCardInner({ hasBottomNav = true }) {
         <div 
           onClick={() =>
             navigate(
-              `/orders/${orderRouteId}`,
+              `/food/orders/${encodeURIComponent(String(orderRouteId))}`,
             )
           }
           className="relative bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-xl rounded-[20px] p-4 shadow-[0_8px_30px_rgba(41,121,251,0.16)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] border border-brand-100/70 dark:border-white/10 overflow-visible cursor-pointer group"

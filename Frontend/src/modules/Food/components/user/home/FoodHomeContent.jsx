@@ -129,16 +129,18 @@ const FoodRestaurantCard = memo(function FoodRestaurantCard({
                     </div>
                   </div>
                   <div
-                    className={`flex-shrink-0 rounded-2xl px-3 py-1.5 text-white shadow-md transition-transform duration-300 group-hover:scale-110 ${
-                      Number(restaurant.rating) > 0 ? "bg-[#259539]" : "bg-gray-400"
+                    className={`flex-shrink-0 rounded-2xl px-3 py-1.5 shadow-md transition-transform duration-300 group-hover:scale-110 ${
+                      Number(restaurant.rating) > 0
+                        ? "border border-emerald-100 bg-emerald-50 text-emerald-700"
+                        : "bg-gray-400 text-white"
                     } flex items-center gap-1.5`}
                   >
+                    {Number(restaurant.rating) > 0 && (
+                      <Star className="h-3.5 w-3.5 fill-emerald-500 text-emerald-500 lg:h-4.5 lg:w-4.5" strokeWidth={0} />
+                    )}
                     <span className="text-sm font-medium tracking-tight lg:text-lg">
                       {Number(restaurant.rating) > 0 ? Number(restaurant.rating).toFixed(1) : "NEW"}
                     </span>
-                    {Number(restaurant.rating) > 0 && (
-                      <Star className="h-3.5 w-3.5 fill-white text-white lg:h-4.5 lg:w-4.5" strokeWidth={0} />
-                    )}
                   </div>
                 </div>
 
@@ -334,12 +336,15 @@ function FoodHomeContent({
                         loading="lazy"
                       />
                       <div
-                        className={`absolute bottom-2 left-2 rounded-lg border border-white/10 px-2 py-0.5 text-[10px] shadow-lg ${
+                        className={`absolute bottom-2 left-2 flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] shadow-lg ${
                           Number(restaurant.rating) > 0
-                            ? "bg-black/80 font-medium text-white backdrop-blur-md"
+                            ? "border border-emerald-100 bg-emerald-50 font-medium text-emerald-700"
                             : "bg-gray-200/90 font-medium text-gray-600"
                         }`}
                       >
+                        {Number(restaurant.rating) > 0 && (
+                          <Star className="h-2.5 w-2.5 fill-emerald-500 text-emerald-500" strokeWidth={0} />
+                        )}
                         {Number(restaurant.rating) > 0 ? Number(restaurant.rating).toFixed(1) : "NEW"}
                       </div>
                     </div>

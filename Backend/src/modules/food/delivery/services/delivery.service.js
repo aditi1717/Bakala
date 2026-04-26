@@ -295,6 +295,67 @@ export const getSupportTicketByIdAndPartner = async (ticketId, deliveryPartnerId
     return ticket;
 };
 
+export const getDeliveryPartnerReviews = async (deliveryPartnerId, query = {}) => {
+    if (!deliveryPartnerId || !mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {
+        throw new ValidationError('Delivery partner not found');
+    }
+
+    const partnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
+    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 100, 1), 500);
+    const page = Math.max(parseInt(query.page, 10) || 1, 1);
+    const skip = (page - 1) * limit;
+    const filter = {
+        'dispatch.deliveryPartnerId': partnerId,
+        'ratings.deliveryPartner.rating': { $exists: true, $ne: null }
+    };
+
+    const [orders, total, aggregate] = await Promise.all([
+        FoodOrder.find(filter)
+            .sort({ 'ratings.deliveryPartner.ratedAt': -1, createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate('userId', 'name phone profileImage')
+            .populate('restaurantId', 'restaurantName profileImage area city')
+            .select('orderId userId restaurantId ratings.deliveryPartner createdAt deliveryState.deliveredAt')
+            .lean(),
+        FoodOrder.countDocuments(filter),
+        FoodOrder.aggregate([
+            { $match: filter },
+            {
+                $group: {
+                    _id: null,
+                    averageRating: { $avg: '$ratings.deliveryPartner.rating' },
+                    totalRatings: { $sum: 1 }
+                }
+            }
+        ])
+    ]);
+
+    const reviews = orders.map((order, index) => {
+        const rating = order?.ratings?.deliveryPartner || {};
+        return {
+            sl: skip + index + 1,
+            orderId: order.orderId,
+            customer: order.userId?.name || 'Customer',
+            restaurant: order.restaurantId?.restaurantName || 'Restaurant',
+            restaurantArea: [order.restaurantId?.area, order.restaurantId?.city].filter(Boolean).join(', '),
+            rating: Number(rating.rating) || 0,
+            review: rating.comment || '',
+            submittedAt: rating.ratedAt || order.createdAt,
+            deliveredAt: order.deliveryState?.deliveredAt || null
+        };
+    });
+
+    return {
+        reviews,
+        total,
+        page,
+        limit,
+        averageRating: Number(aggregate?.[0]?.averageRating || 0),
+        totalRatings: Number(aggregate?.[0]?.totalRatings || 0)
+    };
+};
+
 export const updateDeliveryAvailability = async (userId, payload) => {
     const partner = await FoodDeliveryPartner.findById(userId);
     if (!partner) {

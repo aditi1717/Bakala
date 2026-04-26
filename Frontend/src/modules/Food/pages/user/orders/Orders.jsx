@@ -34,6 +34,9 @@ const isDispatchAccepted = (orderLike) =>
   String(orderLike?.dispatch?.status || orderLike?.dispatchStatus || "")
     .toLowerCase() === "accepted" || Boolean(orderLike?.dispatch?.acceptedAt)
 
+const getOrderRouteId = (order) =>
+  order?.mongoId || order?._id || order?.id || order?.orderId || ""
+
 
 export default function Orders() {
   const navigate = useNavigate()
@@ -592,9 +595,10 @@ export default function Orders() {
       order.restaurantLocation ||
       `${order.address?.city || ""}, ${order.address?.state || ""}`.trim()
     const restaurantPath = order.restaurantSlug || order.restaurantId
+    const orderRouteId = getOrderRouteId(order)
     const shareUrl = restaurantPath
       ? `${window.location.origin}/food/user/restaurants/${restaurantPath}`
-      : `${window.location.origin}/orders/${order.id}`
+      : `${window.location.origin}/food/orders/${orderRouteId}`
 
     const shareText = `Check out ${order.restaurant} on ${companyName}.
 Location: ${location || "Location not available"}
@@ -626,7 +630,12 @@ Order again from this restaurant in the ${companyName} app.`
 
   const handleViewOrderDetails = (order) => {
     setActiveMenuOrderId(null)
-    navigate(`/orders/${order.id}`)
+    const orderRouteId = getOrderRouteId(order)
+    if (!orderRouteId) {
+      toast.error("Order ID not available")
+      return
+    }
+    navigate(`/food/orders/${encodeURIComponent(String(orderRouteId))}`)
   }
 
   // Open rating modal for an order
@@ -1028,7 +1037,7 @@ Order again from this restaurant in the ${companyName} app.`
                     )}
                   </div>
                   <div className="flex items-center ml-4">
-                    <Link to={`/orders/${order.id}`}>
+                    <Link to={`/food/orders/${encodeURIComponent(String(getOrderRouteId(order)))}`}>
                       <button className="text-xs font-medium flex items-center gap-1 hover:opacity-80" style={{ color: BRAND_THEME.tokens.orders.primaryText }}>
                         View Details
                         <ChevronRight className="w-4 h-4" />

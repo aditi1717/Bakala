@@ -297,15 +297,15 @@ export default function RestaurantComplaints() {
 
       {/* Update Modal */}
       <Dialog open={!!editingComplaint} onOpenChange={(open) => !open && setEditingComplaint(null)}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white p-0 shadow-2xl">
+          <DialogHeader className="border-b border-gray-100 px-6 py-5">
             <DialogTitle>Update Complaint</DialogTitle>
             <DialogDescription>
               Update the status and provide a response for this complaint.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
+          <div className="space-y-5 px-6 py-5">
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-2">
               <label className="text-sm font-medium">Status</label>
               <Select value={updateData.status} onValueChange={(val) => setUpdateData({ ...updateData, status: val })}>
                 <SelectTrigger>
@@ -318,18 +318,18 @@ export default function RestaurantComplaints() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-2">
               <label className="text-sm font-medium">Admin Response</label>
               <textarea
-                className="w-full min-h-[100px] p-3 border rounded-md"
+                className="w-full min-h-[130px] rounded-lg border border-gray-200 bg-white p-4 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                 placeholder="Type your response here..."
                 value={updateData.adminResponse}
                 onChange={(e) => setUpdateData({ ...updateData, adminResponse: e.target.value })}
               />
             </div>
           </div>
-          <DialogFooter>
-            <button onClick={() => setEditingComplaint(null)} className="px-4 py-2 border rounded-md">Cancel</button>
+          <DialogFooter className="border-t border-gray-100 bg-gray-50 px-6 py-4">
+            <button onClick={() => setEditingComplaint(null)} className="px-4 py-2 border rounded-md bg-white">Cancel</button>
             <button onClick={handleUpdateComplaint} className="px-4 py-2 bg-brand-600 text-white rounded-md hover:bg-brand-700">Save Changes</button>
           </DialogFooter>
         </DialogContent>

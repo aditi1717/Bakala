@@ -1774,6 +1774,12 @@ export const deliveryAPI = {
     apiClient.get(`/food/delivery/support-tickets/${id}`, {
       contextModule: "delivery",
     }),
+  /** GET /food/delivery/reviews - list reviews for logged-in delivery partner. */
+  getReviews: (params = {}) =>
+    apiClient.get("/food/delivery/reviews", {
+      params,
+      contextModule: "delivery",
+    }),
   /** PATCH /food/delivery/availability - set online/offline (and optional lat/lng). */
   updateOnlineStatus: (isOnline) =>
     apiClient.patch(

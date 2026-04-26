@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom"
+import { Routes, Route, Navigate, useParams } from "react-router-dom"
 import UserLayout from "./UserLayout"
 import { Suspense, lazy } from "react"
 import Loader from "@food/components/Loader"
@@ -24,7 +24,6 @@ const AddressSelectorPage = lazy(() => import("@food/pages/user/cart/AddressSele
 const Orders = lazy(() => import("@food/pages/user/orders/Orders"))
 const OrderTracking = lazy(() => import("@food/pages/user/orders/OrderTracking"))
 const OrderInvoice = lazy(() => import("@food/pages/user/orders/OrderInvoice"))
-const UserOrderDetails = lazy(() => import("@food/pages/user/orders/UserOrderDetails"))
 
 // Offers
 const Offers = lazy(() => import("@food/pages/user/Offers"))
@@ -77,6 +76,11 @@ const Wallet = lazy(() => import("@food/pages/user/Wallet"))
 
 // Complaints
 const SubmitComplaint = lazy(() => import("@food/pages/user/complaints/SubmitComplaint"))
+
+function OrderDetailsRedirect() {
+  const { orderId } = useParams()
+  return <Navigate to={`/food/orders/${encodeURIComponent(String(orderId || ""))}`} replace />
+}
 
 export default function UserRouter() {
   return (
@@ -131,7 +135,7 @@ export default function UserRouter() {
             path="orders/:orderId/details"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <UserOrderDetails />
+                <OrderDetailsRedirect />
               </ProtectedRoute>
             }
           />

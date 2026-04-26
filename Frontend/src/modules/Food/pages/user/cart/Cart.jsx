@@ -2070,7 +2070,7 @@ export default function Cart() {
 
   const handleGoToOrders = () => {
     setShowOrderSuccess(false)
-    navigate(`/user/orders/${placedOrderId}?confirmed=true`)
+    navigate(`/food/orders/${encodeURIComponent(String(placedOrderId))}?confirmed=true`)
   }
 
   // Empty cart state - but don't show if order success or placing order modal is active

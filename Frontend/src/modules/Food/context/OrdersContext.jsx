@@ -65,7 +65,22 @@ export function OrdersProvider({ children }) {
   }
 
   const getOrderById = useCallback((orderId) => {
-    return orders.find(order => order.id === orderId)
+    const lookup = String(orderId || "").trim()
+    if (!lookup) return undefined
+
+    return orders.find((order) => {
+      const candidates = [
+        order?.id,
+        order?._id,
+        order?.mongoId,
+        order?.orderMongoId,
+        order?.orderId,
+      ]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+
+      return candidates.includes(lookup)
+    })
   }, [orders])
 
   const getAllOrders = useCallback(() => {

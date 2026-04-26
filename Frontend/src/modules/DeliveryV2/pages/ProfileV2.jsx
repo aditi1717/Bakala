@@ -7,10 +7,8 @@ import {
   Ticket,
   ChevronRight,
   LogOut,
-  X,
   Loader2,
-  Share2,
-  Gift,
+  Star,
   ShieldAlert,
   FileText
 } from "lucide-react"
@@ -23,7 +21,6 @@ export const ProfileV2 = () => {
   const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [referralReward, setReferralReward] = useState(0)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [logoutSubmitting, setLogoutSubmitting] = useState(false)
 
@@ -44,30 +41,6 @@ export const ProfileV2 = () => {
     }
     fetchProfile()
   }, [])
-
-  useEffect(() => {
-    deliveryAPI.getReferralStats().then((res) => {
-      const reward = res?.data?.data?.stats?.rewardAmount
-      setReferralReward(Number(reward) || 0)
-    }).catch(() => {})
-  }, [])
-
-  const refId = profile?._id || profile?.id || profile?.referralCode || ""
-  const referralLink = refId ? `${window.location.origin}/food/delivery/signup?ref=${encodeURIComponent(String(refId))}` : ""
-
-  const handleShareReferral = async () => {
-    if (!referralLink) return
-    const rewardText = referralReward > 0 ? `₹${referralReward}` : "rewards"
-    const shareText = `Join as a delivery partner and earn ${rewardText}.`
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "Delivery referral", text: shareText, url: referralLink })
-      } else {
-        const fallbackUrl = `https://wa.me/?text=${encodeURIComponent(`${shareText} ${referralLink}`)}`
-        window.open(fallbackUrl, "_blank", "noopener,noreferrer")
-      }
-    } catch (e) {}
-  }
 
   const handleLogout = async () => {
     if (logoutSubmitting) return
@@ -152,27 +125,19 @@ export const ProfileV2 = () => {
            </button>
         </div>
 
-        {/* Share & Earn Banner (Compact) */}
-        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 shadow-sm flex items-center justify-between gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-            <Gift className="w-4 h-4" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-xs font-bold text-emerald-900 mb-0.5 truncate">
-               Refer & Earn{referralReward > 0 ? ` ₹${referralReward}` : ""}
-            </h3>
-            <p className="text-[10px] text-emerald-700 font-medium truncate">Share code, get rewards</p>
-          </div>
-          <button
-            onClick={handleShareReferral}
-            className="shrink-0 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold active:bg-emerald-700 transition-colors"
-          >
-            Share
-          </button>
-        </div>
-
         {/* Settings List (Compact) */}
         <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+            <div 
+              onClick={() => navigate("/food/delivery/profile/reviews")}
+              className="px-4 py-3.5 border-b border-gray-50 flex items-center justify-between cursor-pointer active:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                 <Star className="w-4 h-4 text-amber-500" />
+                 <span className="text-sm font-medium text-gray-800">Reviews</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </div>
+
             <div 
               onClick={() => navigate("/food/delivery/help/tickets")}
               className="px-4 py-3.5 border-b border-gray-50 flex items-center justify-between cursor-pointer active:bg-gray-50 transition-colors"
@@ -251,3 +216,5 @@ export const ProfileV2 = () => {
 }
 
 export default ProfileV2;
+
+

@@ -379,9 +379,9 @@ export default function Feedback() {
         </div>
       </div>
 
-      <div className="flex-1 p-4">
+      <div className="flex-1 p-3">
         {activeTab === "complaints" ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex gap-2">
               <div className="flex-1 bg-white p-3 rounded-xl border border-gray-200 flex items-center gap-2">
                 <Search className="w-4 h-4 text-gray-400" />
@@ -415,9 +415,9 @@ export default function Feedback() {
                   <p className="text-sm text-gray-500 font-medium">No complaints found</p>
                 </div>
               ) : (
-                <div className="space-y-4 pb-20">
+                <div className="space-y-2.5 pb-20">
                   {filteredComplaints.map((complaint) => (
-                    <div key={complaint._id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3">
+                    <div key={complaint._id} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm space-y-2">
                       <div className="flex justify-between items-center">
                         <span
                           className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter ${
@@ -433,27 +433,27 @@ export default function Feedback() {
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-400">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-xs text-gray-400">
                           {complaint.userId?.name?.[0] || "U"}
                         </div>
                         <div>
-                          <p className="font-bold text-gray-900 text-sm">{complaint.userId?.name || "Customer"}</p>
+                          <p className="font-bold text-gray-900 text-[13px] leading-tight">{complaint.userId?.name || "Customer"}</p>
                           <p className="text-[10px] text-gray-500 font-bold uppercase">
                             Order #{complaint.orderId?.orderId || "N/A"}
                           </p>
                         </div>
                       </div>
 
-                      <div className="bg-gray-50 rounded-xl p-3 relative">
-                        <p className="text-[10px] font-black text-red-500 uppercase mb-1">{complaint.issueType || "Issue"}</p>
-                        <p className="text-sm text-gray-800 font-semibold leading-relaxed">{complaint.description || "-"}</p>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 relative">
+                        <p className="text-[9px] font-black text-red-500 uppercase mb-0.5">{complaint.issueType || "Issue"}</p>
+                        <p className="text-[13px] text-gray-800 font-semibold leading-snug">{complaint.description || "-"}</p>
                       </div>
 
                       {complaint.adminResponse && (
-                        <div className="bg-brand-50 rounded-xl p-3 border border-brand-100">
-                          <p className="text-[9px] font-black text-brand-600 uppercase mb-1">Admin Response</p>
-                          <p className="text-sm text-brand-900 font-medium">{complaint.adminResponse}</p>
+                        <div className="bg-brand-50 rounded-lg px-3 py-2 border border-brand-100">
+                          <p className="text-[9px] font-black text-brand-600 uppercase mb-0.5">Admin Response</p>
+                          <p className="text-[13px] text-brand-900 font-medium leading-snug">{complaint.adminResponse}</p>
                         </div>
                       )}
                     </div>
@@ -463,7 +463,7 @@ export default function Feedback() {
             </AnimatePresence>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex gap-2">
               <div className="flex-1 bg-white p-3 rounded-xl border border-gray-200 flex items-center gap-2">
                 <Search className="w-4 h-4 text-gray-400" />
@@ -496,22 +496,22 @@ export default function Feedback() {
                 <p className="text-sm text-gray-500 font-medium">No reviews found</p>
               </div>
             ) : (
-              <div className="space-y-4 pb-20">
+              <div className="space-y-2.5 pb-20">
                 {filteredReviews.map((review) => (
-                  <div key={review.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3">
+                  <div key={review.id} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm space-y-2">
                     <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold uppercase">
                       <span>Order #{review.orderNumber}</span>
                       <span>{review.dateLabel}</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <img src={review.userImage} alt={review.userName} className="w-8 h-8 rounded-full border border-gray-100" />
-                      <p className="font-bold text-gray-900 text-sm">{review.userName}</p>
+                    <div className="flex items-center gap-2.5">
+                      <img src={review.userImage} alt={review.userName} className="w-7 h-7 rounded-full border border-gray-100" />
+                      <p className="font-bold text-gray-900 text-[13px] leading-tight">{review.userName}</p>
                       <div className="ml-auto flex items-center gap-1 bg-green-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">
                         {review.rating ?? "-"} <Star className="w-2 h-2 fill-current" />
                       </div>
                     </div>
-                    <div className="bg-gray-50 rounded-xl p-3">
-                      <p className="text-sm text-gray-800 font-medium italic">"{review.reviewText}"</p>
+                    <div className="bg-gray-50 rounded-lg px-3 py-2">
+                      <p className="text-[13px] text-gray-800 font-medium italic leading-snug">"{review.reviewText}"</p>
                     </div>
                   </div>
                 ))}
