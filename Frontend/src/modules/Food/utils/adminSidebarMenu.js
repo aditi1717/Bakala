@@ -107,13 +107,6 @@ export const adminSidebarMenu = [
   },
   {
     type: "section",
-    label: "REFERRAL & REWARDS",
-    items: [
-      { type: "link", label: "Referral Settings", path: "/admin/food/referral-settings", icon: "Gift" },
-    ],
-  },
-  {
-    type: "section",
     label: "CUSTOMER MANAGEMENT",
     items: [
       {

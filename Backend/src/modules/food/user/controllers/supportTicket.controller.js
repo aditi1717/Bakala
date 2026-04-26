@@ -7,12 +7,14 @@ export async function createSupportTicketController(req, res, next) {
         const userId = req.user?.userId;
         const body = req.body || {};
         const type = String(body.type || '').trim();
-        const issueType = String(body.issueType || '').trim();
+        const issueType = String(body.issueType || '').trim() || (type === 'order' ? 'Order issue' : type === 'restaurant' ? 'Restaurant issue' : 'Other issue');
         const description = String(body.description || '').trim();
         if (!['order', 'restaurant', 'other'].includes(type)) {
             return sendError(res, 400, 'Invalid ticket type');
         }
-        if (!issueType) return sendError(res, 400, 'issueType required');
+        if (!description) {
+            return sendError(res, 400, 'description required');
+        }
         const doc = {
             userId: new mongoose.Types.ObjectId(userId),
             type,
@@ -20,22 +22,30 @@ export async function createSupportTicketController(req, res, next) {
             description
         };
         if (type === 'order') {
-            if (!body.orderId || !mongoose.Types.ObjectId.isValid(body.orderId)) {
+            const rawOrderId = String(body.orderId || body.orderMongoId || body.displayOrderId || '').trim();
+            if (!rawOrderId) {
                 return sendError(res, 400, 'orderId required');
             }
-            const orderMongoId = new mongoose.Types.ObjectId(body.orderId);
-            const existing = await FoodSupportTicket.findOne({
-                userId: new mongoose.Types.ObjectId(userId),
-                type: 'order',
-                orderId: orderMongoId
-            }).lean();
-            if (existing) {
-                return sendResponse(res, 200, 'Ticket already exists', { ticket: existing, alreadyExists: true });
-            }
-            doc.orderId = orderMongoId;
-            // Also try to link restaurantId automatically if possible
             const { FoodOrder } = await import('../../orders/models/order.model.js');
-            const order = await FoodOrder.findById(orderMongoId).select('restaurantId').lean();
+            const order = mongoose.Types.ObjectId.isValid(rawOrderId)
+                ? await FoodOrder.findOne({
+                      _id: new mongoose.Types.ObjectId(rawOrderId),
+                      userId: new mongoose.Types.ObjectId(userId)
+                  })
+                      .select('_id restaurantId')
+                      .lean()
+                : await FoodOrder.findOne({
+                      orderId: rawOrderId,
+                      userId: new mongoose.Types.ObjectId(userId)
+                  })
+                      .select('_id restaurantId')
+                      .lean();
+
+            if (!order?._id) {
+                return sendError(res, 400, 'orderId required');
+            }
+            const orderMongoId = order._id;
+            doc.orderId = orderMongoId;
             if (order?.restaurantId) {
                 doc.restaurantId = order.restaurantId;
             }
@@ -64,6 +74,15 @@ export async function listMySupportTicketsController(req, res, next) {
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
+                .populate({
+                    path: 'orderId',
+                    select: 'orderId displayOrderId pricing totalAmount restaurantId',
+                    populate: {
+                        path: 'restaurantId',
+                        select: 'restaurantName name area city'
+                    }
+                })
+                .populate('restaurantId', 'restaurantName name area city')
                 .lean(),
             FoodSupportTicket.countDocuments({ userId: new mongoose.Types.ObjectId(userId) })
         ]);

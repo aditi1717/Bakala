@@ -3,7 +3,15 @@ import { FoodRestaurantSupportTicket } from '../models/supportTicket.model.js';
 import { sendError, sendResponse } from '../../../../utils/response.js';
 
 const ALLOWED_CATEGORIES = ['orders', 'payments', 'menu', 'restaurant', 'technical', 'other'];
-const ALLOWED_PRIORITIES = ['low', 'medium', 'high'];
+const ALLOWED_ISSUE_TYPES = [
+    'order_status_issue',
+    'new_order_issue',
+    'payment_settlement_issue',
+    'menu_item_issue',
+    'restaurant_profile_issue',
+    'app_technical_issue',
+    'other'
+];
 const ALLOWED_STATUSES = ['open', 'in-progress', 'resolved'];
 
 export const createRestaurantSupportTicketController = async (req, res, next) => {
@@ -16,19 +24,21 @@ export const createRestaurantSupportTicketController = async (req, res, next) =>
         const body = req.body || {};
         const category = String(body.category || '').trim().toLowerCase();
         const issueType = String(body.issueType || '').trim();
-        const subject = String(body.subject || '').trim();
-        const description = String(body.description || '').trim();
+        const description = String(body.description || body.subject || '').trim();
+        const subject = String(body.subject || description.slice(0, 180)).trim();
         const orderRef = String(body.orderRef || body.orderId || '').trim();
-        const priority = String(body.priority || 'medium').trim().toLowerCase();
 
         if (!ALLOWED_CATEGORIES.includes(category)) {
             return sendError(res, 400, 'Invalid category');
         }
-        if (!issueType) {
-            return sendError(res, 400, 'issueType required');
+        if (!ALLOWED_ISSUE_TYPES.includes(issueType)) {
+            return sendError(res, 400, 'Invalid issueType');
         }
-        if (!ALLOWED_PRIORITIES.includes(priority)) {
-            return sendError(res, 400, 'Invalid priority');
+        if (!description) {
+            return sendError(res, 400, 'description required');
+        }
+        if (!orderRef) {
+            return sendError(res, 400, 'orderRef required');
         }
 
         const created = await FoodRestaurantSupportTicket.create({
@@ -37,8 +47,7 @@ export const createRestaurantSupportTicketController = async (req, res, next) =>
             issueType,
             subject,
             description,
-            orderRef,
-            priority
+            orderRef
         });
 
         return sendResponse(res, 201, 'Support ticket created successfully', {

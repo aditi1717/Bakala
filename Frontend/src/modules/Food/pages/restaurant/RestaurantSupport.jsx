@@ -16,10 +16,14 @@ const CATEGORY_OPTIONS = [
   { value: "other", label: "Other" },
 ]
 
-const PRIORITY_OPTIONS = [
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
+const ISSUE_TYPE_OPTIONS = [
+  { value: "order_status_issue", label: "Order status issue" },
+  { value: "new_order_issue", label: "New order issue" },
+  { value: "payment_settlement_issue", label: "Payment / settlement issue" },
+  { value: "menu_item_issue", label: "Menu / item issue" },
+  { value: "restaurant_profile_issue", label: "Restaurant profile issue" },
+  { value: "app_technical_issue", label: "App / technical issue" },
+  { value: "other", label: "Other" },
 ]
 
 const STATUS_OPTIONS = [
@@ -35,6 +39,10 @@ const getStatusStyle = (status) => {
   return "bg-amber-100 text-amber-700 border-amber-200"
 }
 
+const getIssueLabel = (value) =>
+  ISSUE_TYPE_OPTIONS.find((option) => option.value === value)?.label ||
+  String(value || "Issue").replace(/_/g, " ")
+
 export default function RestaurantSupport() {
   const navigate = useNavigate()
   const goBack = useRestaurantBackNavigation()
@@ -42,13 +50,13 @@ export default function RestaurantSupport() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [statusFilter, setStatusFilter] = useState("")
+  const [orders, setOrders] = useState([])
+  const [loadingOrders, setLoadingOrders] = useState(false)
   const [form, setForm] = useState({
     category: "orders",
     issueType: "",
-    subject: "",
-    orderRef: "",
-    priority: "medium",
     description: "",
+    orderRef: "",
   })
 
   const stats = useMemo(() => {
@@ -77,9 +85,44 @@ export default function RestaurantSupport() {
     }
   }
 
+  const getOrderCode = (order) =>
+    order?.displayOrderId ||
+    order?.orderId ||
+    order?.mongoId ||
+    order?._id ||
+    order?.id ||
+    ""
+
+  const getOrderLabel = (order) => {
+    const code = getOrderCode(order)
+    const dateValue = order?.createdAt || order?.updatedAt
+    const dateLabel = dateValue ? new Date(dateValue).toLocaleDateString("en-IN") : "No date"
+    const amount = Number(order?.pricing?.total ?? order?.totalAmount ?? order?.total ?? 0)
+    const status = String(order?.orderStatus || order?.status || "").replace(/_/g, " ")
+    return `#${code} | ${dateLabel} | Rs ${amount.toFixed(0)}${status ? ` | ${status}` : ""}`
+  }
+
+  const loadOrders = async () => {
+    try {
+      setLoadingOrders(true)
+      const response = await restaurantAPI.getOrders({ page: 1, limit: 100 })
+      const list = response?.data?.data?.orders || response?.data?.orders || []
+      setOrders(Array.isArray(list) ? list : [])
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to load orders")
+      setOrders([])
+    } finally {
+      setLoadingOrders(false)
+    }
+  }
+
   useEffect(() => {
     loadTickets()
   }, [statusFilter])
+
+  useEffect(() => {
+    loadOrders()
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -87,18 +130,24 @@ export default function RestaurantSupport() {
       toast.error("Issue type is required")
       return
     }
+    if (!form.description.trim()) {
+      toast.error("Issue details are required")
+      return
+    }
+    if (!form.orderRef.trim()) {
+      toast.error("Order/reference ID is required")
+      return
+    }
     try {
       setSubmitting(true)
       await restaurantAPI.createSupportTicket({
         category: form.category,
         issueType: form.issueType.trim(),
-        subject: form.subject.trim(),
-        orderRef: form.orderRef.trim(),
-        priority: form.priority,
         description: form.description.trim(),
+        orderRef: form.orderRef.trim(),
       })
       toast.success("Support ticket submitted")
-      setForm((prev) => ({ ...prev, issueType: "", subject: "", orderRef: "", description: "" }))
+      setForm((prev) => ({ ...prev, issueType: "", description: "", orderRef: "" }))
       await loadTickets()
     } catch (error) {
       toast.error(error?.response?.data?.message || "Failed to submit support ticket")
@@ -147,11 +196,12 @@ export default function RestaurantSupport() {
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
           <h2 className="text-sm font-bold text-slate-900">Raise support ticket</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <select
               value={form.category}
               onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+              required
             >
               {CATEGORY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -159,45 +209,45 @@ export default function RestaurantSupport() {
                 </option>
               ))}
             </select>
-            <select
-              value={form.priority}
-              onChange={(e) => setForm((prev) => ({ ...prev, priority: e.target.value }))}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
-            >
-              {PRIORITY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
           </div>
-          <input
+          <select
             value={form.issueType}
             onChange={(e) => setForm((prev) => ({ ...prev, issueType: e.target.value }))}
-            placeholder="Issue type (required)"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            maxLength={120}
-          />
-          <input
-            value={form.subject}
-            onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
-            placeholder="Short subject"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            maxLength={180}
-          />
-          <input
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+            required
+          >
+            <option value="">Select issue type</option>
+            {ISSUE_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
             value={form.orderRef}
             onChange={(e) => setForm((prev) => ({ ...prev, orderRef: e.target.value }))}
-            placeholder="Order ID (optional)"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            maxLength={80}
-          />
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+            required
+            disabled={loadingOrders}
+          >
+            <option value="">{loadingOrders ? "Loading orders..." : "Select order ID"}</option>
+            {orders.map((order) => {
+              const code = getOrderCode(order)
+              return (
+                <option key={String(order?._id || order?.id || code)} value={String(code)}>
+                  {getOrderLabel(order)}
+                </option>
+              )
+            })}
+          </select>
           <textarea
             value={form.description}
             onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-            placeholder="Describe your issue"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm min-h-24 resize-none"
+            placeholder="Write the full issue here"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            rows={4}
             maxLength={1000}
+            required
           />
           <button
             type="submit"
@@ -241,20 +291,15 @@ export default function RestaurantSupport() {
                 <div key={ticket._id} className="rounded-xl border border-slate-200 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-semibold text-slate-500">
-                      #{String(ticket._id).slice(-6)} • {new Date(ticket.createdAt).toLocaleString()}
+                      #{String(ticket._id).slice(-6)} | {new Date(ticket.createdAt).toLocaleString()}
                     </p>
                     <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold capitalize ${getStatusStyle(ticket.status)}`}>
                       {ticket.status}
                     </span>
                   </div>
                   <p className="mt-2 text-sm font-semibold text-slate-900">
-                    {ticket.issueType}
+                    {getIssueLabel(ticket.issueType)}
                   </p>
-                  {ticket.subject ? (
-                    <p className="text-xs text-slate-600 mt-1">
-                      Subject: {ticket.subject}
-                    </p>
-                  ) : null}
                   {ticket.orderRef ? (
                     <p className="text-xs text-slate-600 mt-1">
                       Order: {ticket.orderRef}

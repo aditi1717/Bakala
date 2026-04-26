@@ -1798,7 +1798,7 @@ export async function getSupportTickets(query = {}) {
                   .populate('restaurantId', 'restaurantName city area')
                   .populate({
                       path: 'orderId',
-                      select: 'restaurantId',
+                      select: 'orderId displayOrderId restaurantId',
                       populate: { path: 'restaurantId', select: 'restaurantName city area' }
                   })
                   .lean()
@@ -1865,6 +1865,10 @@ export async function getSupportTickets(query = {}) {
             userId,
             type: t.type,
             orderId: t.orderId || null,
+            orderRef:
+                t.orderId && typeof t.orderId === 'object' && t.orderId !== null
+                    ? t.orderId.displayOrderId || t.orderId.orderId || String(t.orderId._id || '').slice(-6)
+                    : '',
             restaurantId,
             issueType: t.issueType,
             description: t.description,

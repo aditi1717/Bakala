@@ -850,14 +850,6 @@ export const adminAPI = {
       contextModule: "admin",
     }),
 
-  /** Referral Settings (admin) */
-  getReferralSettings: () =>
-    apiClient.get("/food/admin/referral-settings", { contextModule: "admin" }),
-  createOrUpdateReferralSettings: (body) =>
-    apiClient.put("/food/admin/referral-settings", body ?? {}, {
-      contextModule: "admin",
-    }),
-
   /** Safety / Emergency Reports (admin) */
   getSafetyEmergencyReports: (params) =>
     apiClient.get("/food/admin/safety-emergency-reports", {

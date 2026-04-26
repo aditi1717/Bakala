@@ -37,6 +37,18 @@ export default function SupportTickets() {
     return "-"
   }
 
+  const getIssueLabel = (value) =>
+    String(value || "Issue")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+
+  const getOrderLabel = (ticket) => {
+    if (ticket.orderRef) return ticket.orderRef
+    const order = ticket.orderId || {}
+    if (typeof order === "string") return order.slice(-6)
+    return order.displayOrderId || order.orderId || String(order._id || "").slice(-6)
+  }
+
   const load = async () => {
     setLoading(true)
     try {
@@ -165,9 +177,14 @@ export default function SupportTickets() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-sm">{t.issueType}</div>
+                      <div className="text-sm">{getIssueLabel(t.issueType)}</div>
                       {t.subject ? <div className="text-xs text-slate-500 mt-0.5">Subject: {t.subject}</div> : null}
-                      {t.orderRef ? <div className="text-xs text-slate-500 mt-0.5">Order: {t.orderRef}</div> : null}
+                      {getOrderLabel(t) ? <div className="text-xs text-slate-500 mt-0.5">Order: #{getOrderLabel(t)}</div> : null}
+                      {t.description ? (
+                        <div className="mt-2 max-w-md whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700">
+                          {t.description}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <select

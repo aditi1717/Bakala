@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+ï»¿import { useCallback, useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import { Button } from "@food/components/ui/button"
@@ -26,6 +26,12 @@ export default function Support() {
   const [orderSearch, setOrderSearch] = useState("")
   const [restaurantSearch, setRestaurantSearch] = useState("")
 
+  const loadTickets = useCallback(async () => {
+    const res = await supportAPI.getMyTickets()
+    const list = res?.data?.data?.tickets || res?.data?.tickets || []
+    setTickets(list)
+  }, [])
+
   useEffect(() => {
     setLoadingTickets(true)
     authAPI
@@ -33,13 +39,11 @@ export default function Support() {
       .catch(() => null)
       .finally(async () => {
         try {
-          const res = await supportAPI.getMyTickets()
-          const list = res?.data?.data?.tickets || res?.data?.tickets || []
-          setTickets(list)
+          await loadTickets()
         } catch (_) {}
         setLoadingTickets(false)
       })
-  }, [])
+  }, [loadTickets])
 
   const orderIssues = ["Item missing", "Wrong item", "Not delivered", "Payment issue"]
   const restaurantIssues = ["Bad service", "Wrong info", "Other"]
@@ -80,13 +84,17 @@ export default function Support() {
   }
 
   const submitTicket = async (payload) => {
+    if (!String(payload?.description || "").trim()) {
+      toast.error("Please describe the issue")
+      return
+    }
     setSubmitting(true)
     try {
       const res = await supportAPI.createTicket(payload)
       const data = res?.data
       if (!data?.success) throw new Error(data?.message || "Failed")
       toast.success("Ticket created")
-      setTickets((prev) => [data?.data?.ticket, ...prev])
+      await loadTickets()
       setStep("pick")
       setType("")
       setSelectedOrder(null)
@@ -113,24 +121,64 @@ export default function Support() {
   }
 
   const getOrderLabel = (order) => {
-    const restaurantName = order?.restaurantName || order?.restaurant?.restaurantName || "Restaurant"
+    const restaurantName =
+      order?.restaurantName ||
+      order?.restaurant?.restaurantName ||
+      order?.restaurantId?.restaurantName ||
+      order?.restaurantId?.name ||
+      "Restaurant"
     const dateValue = order?.createdAt || order?.date
-    const dateLabel = dateValue ? new Date(dateValue).toLocaleDateString() : "No date"
-    const amount = order?.pricing?.total ?? order?.total ?? 0
-    return `${restaurantName} • ${dateLabel} • ?${amount}`
+    const dateLabel = dateValue ? new Date(dateValue).toLocaleDateString("en-IN") : "No date"
+    const amount = Number(order?.pricing?.total ?? order?.totalAmount ?? order?.total ?? 0)
+    const orderCode = order?.displayOrderId || order?.orderId || String(order?._id || order?.id || "").slice(-6)
+    return `${restaurantName} | ${dateLabel} | #${orderCode} | Rs ${amount.toFixed(0)}`
   }
+  const getOrderSubmitId = (order) =>
+    order?.mongoId ||
+    order?._id ||
+    (String(order?.id || "").match(/^[a-f\d]{24}$/i) ? order.id : "") ||
+    order?.orderMongoId ||
+    order?.orderId ||
+    order?.displayOrderId ||
+    ""
 
   const getRestaurantLabel = (restaurant) => {
     const name = restaurant?.restaurantName || restaurant?.name || "Restaurant"
     const location = restaurant?.city || restaurant?.area || ""
-    return `${name}${location ? ` • ${location}` : ""}`
+    return `${name}${location ? ` | ${location}` : ""}`
+  }
+
+  const getTicketTitle = (ticket) => {
+    const id = String(ticket?._id || ticket?.id || "").slice(-6)
+    const typeLabel = String(ticket?.type || "other").replace(/_/g, " ")
+    const issueLabel = ticket?.issueType || "Issue"
+    const restaurantName =
+      ticket?.restaurantId?.restaurantName ||
+      ticket?.restaurant?.restaurantName ||
+      ticket?.orderId?.restaurantId?.restaurantName ||
+      ""
+    const orderCode = ticket?.orderId?.displayOrderId || ticket?.orderId?.orderId || ""
+    const context =
+      ticket?.type === "order" && orderCode
+        ? `Order #${orderCode}`
+        : ticket?.type === "restaurant" && restaurantName
+        ? restaurantName
+        : restaurantName
+
+    return `#${id} | ${typeLabel}${context ? ` | ${context}` : ""} | ${issueLabel}`
   }
 
   const filteredOrders = orders.filter((order) => {
     const q = orderSearch.trim().toLowerCase()
     if (!q) return true
-    const restaurantName = (order?.restaurantName || order?.restaurant?.restaurantName || "").toLowerCase()
-    const orderId = String(order?._id || order?.id || "").toLowerCase()
+    const restaurantName = String(
+      order?.restaurantName ||
+        order?.restaurant?.restaurantName ||
+        order?.restaurantId?.restaurantName ||
+        order?.restaurantId?.name ||
+        "",
+    ).toLowerCase()
+    const orderId = String(order?._id || order?.id || order?.orderId || "").toLowerCase()
     return restaurantName.includes(q) || orderId.includes(q)
   })
 
@@ -186,7 +234,7 @@ export default function Support() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                      #{String(t._id || t.id).slice(-6)} • {t.type} • {t.issueType}
+                      {getTicketTitle(t)}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">{new Date(t.createdAt).toLocaleDateString()}</p>
                   </div>
@@ -196,6 +244,11 @@ export default function Support() {
                 </div>
                 {t.adminResponse ? (
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">Reply: {t.adminResponse}</p>
+                ) : null}
+                {t.description ? (
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">
+                    Description: {t.description}
+                  </p>
                 ) : null}
               </div>
             ))}
@@ -291,9 +344,9 @@ export default function Support() {
                     <Button key={it} variant={issueType === it ? "default" : "outline"} className={issueType === it ? BRAND_THEME.tokens.profile.primaryButton : ""} onClick={() => setIssueType(it)}>{it}</Button>
                   ))}
                 </div>
-                <Textarea placeholder="Describe the issue (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
+                <Textarea placeholder="Describe the issue" value={description} onChange={(e) => setDescription(e.target.value)} required />
                 <div className="flex gap-2">
-                  <Button className={BRAND_THEME.tokens.profile.primaryButton} onClick={() => submitTicket({ type: "order", orderId: selectedOrder._id || selectedOrder.id, issueType, description })} disabled={!issueType || submitting}>
+                  <Button className={BRAND_THEME.tokens.profile.primaryButton} onClick={() => submitTicket({ type: "order", orderId: getOrderSubmitId(selectedOrder), issueType: issueType || "Order issue", description })} disabled={!description.trim() || submitting}>
                     {submitting ? "Submitting..." : "Submit Ticket"}
                   </Button>
                   <Button variant="outline" onClick={() => setStep("pick")}>Cancel</Button>
@@ -336,9 +389,9 @@ export default function Support() {
                     <Button key={it} variant={issueType === it ? "default" : "outline"} className={issueType === it ? BRAND_THEME.tokens.profile.primaryButton : ""} onClick={() => setIssueType(it)}>{it}</Button>
                   ))}
                 </div>
-                <Textarea placeholder="Describe the issue (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
+                <Textarea placeholder="Describe the issue" value={description} onChange={(e) => setDescription(e.target.value)} required />
                 <div className="flex gap-2">
-                  <Button className={BRAND_THEME.tokens.profile.primaryButton} onClick={() => submitTicket({ type: "restaurant", restaurantId: selectedRestaurant._id || selectedRestaurant.id, issueType, description })} disabled={!issueType || submitting}>
+                  <Button className={BRAND_THEME.tokens.profile.primaryButton} onClick={() => submitTicket({ type: "restaurant", restaurantId: selectedRestaurant._id || selectedRestaurant.id, issueType: issueType || "Restaurant issue", description })} disabled={!description.trim() || submitting}>
                     {submitting ? "Submitting..." : "Submit Ticket"}
                   </Button>
                   <Button variant="outline" onClick={() => setStep("pick")}>Cancel</Button>
@@ -349,9 +402,9 @@ export default function Support() {
             {step === "other_form" && (
               <div className="space-y-3">
                 <Input placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
-                <Textarea placeholder="Describe your issue" value={description} onChange={(e) => setDescription(e.target.value)} />
+                <Textarea placeholder="Describe your issue" value={description} onChange={(e) => setDescription(e.target.value)} required />
                 <div className="flex gap-2">
-                  <Button className={BRAND_THEME.tokens.profile.primaryButton} onClick={() => submitTicket({ type: "other", issueType: subject || "Other", description })} disabled={!subject || submitting}>
+                  <Button className={BRAND_THEME.tokens.profile.primaryButton} onClick={() => submitTicket({ type: "other", issueType: subject || "Other", description })} disabled={!subject || !description.trim() || submitting}>
                     {submitting ? "Submitting..." : "Submit Ticket"}
                   </Button>
                   <Button variant="outline" onClick={() => setStep("pick")}>Cancel</Button>
@@ -366,3 +419,4 @@ export default function Support() {
     </AnimatedPage>
   )
 }
+
