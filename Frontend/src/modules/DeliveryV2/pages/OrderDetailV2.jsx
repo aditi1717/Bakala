@@ -145,27 +145,27 @@ const getCustomerMeta = (order) => {
   const name = pickFirstText(
     order?.recipientName,
     recipient?.name,
+    order?.customerName,
+    deliveryAddress?.fullName,
+    deliveryAddress?.name,
     deliveryAddress?.recipientName,
     deliveryAddress?.receiverName,
     deliveryAddress?.contactPersonName,
     order?.userName,
-    order?.customerName,
     userObj?.name,
-    deliveryAddress?.name,
-    deliveryAddress?.fullName,
     'Customer',
   );
 
   const phone = pickFirstText(
     order?.recipientPhone,
     recipient?.phone,
+    order?.customerPhone,
+    deliveryAddress?.phone,
     deliveryAddress?.recipientPhone,
     deliveryAddress?.receiverPhone,
     deliveryAddress?.contactPersonPhone,
     order?.userPhone,
-    order?.customerPhone,
     userObj?.phone,
-    deliveryAddress?.phone,
     deliveryAddress?.contactNumber,
     deliveryAddress?.mobile,
   );

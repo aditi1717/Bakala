@@ -116,11 +116,36 @@ const getDispatchPartnerName = (orderLike) => {
   return "";
 };
 
+const pickFirstText = (...values) => {
+  for (const value of values) {
+    const text = String(value ?? "").trim();
+    if (text) return text;
+  }
+  return "";
+};
+
+const resolveCustomerName = (order = {}) =>
+  pickFirstText(
+    order?.customerName,
+    order?.deliveryAddress?.fullName,
+    order?.deliveryAddress?.name,
+    order?.address?.fullName,
+    order?.address?.name,
+    order?.user?.name,
+    order?.userId?.name,
+    order?.customer?.name,
+    order?.customerInfo?.name,
+    order?.customerPhone,
+    order?.deliveryAddress?.phone,
+    order?.userId?.phone,
+    "Guest",
+  );
+
 const transformOrderForList = (order) => ({
   orderId: order.orderId || order._id,
   mongoId: order._id,
   status: order.status || "pending",
-  customerName: order.userId?.name || order.user?.name || order.customerName || order.userId?.phone || 'Guest',
+  customerName: resolveCustomerName(order),
   type: "Home Delivery",
   tableOrToken: null,
   timePlaced: formatOrderDateTime(order.createdAt),
@@ -167,7 +192,7 @@ function CompletedOrders({ onSelectOrder, refreshToken = 0 }) {
             orderId: order.orderId || order._id,
             mongoId: order._id,
             status: order.status || "delivered",
-            customerName: order.userId?.name || order.user?.name || order.customerName || order.userId?.phone || 'Guest',
+            customerName: resolveCustomerName(order),
             type: "Home Delivery",
             tableOrToken: null,
             timePlaced: formatOrderDateTime(order.createdAt),
@@ -373,7 +398,7 @@ function CancelledOrders({ onSelectOrder, refreshToken = 0 }) {
             orderId: order.orderId || order._id,
             mongoId: order._id,
             status: order.status || "cancelled",
-            customerName: order.userId?.name || order.user?.name || order.customerName || order.userId?.phone || 'Guest',
+            customerName: resolveCustomerName(order),
             type: "Home Delivery",
             tableOrToken: null,
             timePlaced: formatOrderDateTime(order.createdAt),
@@ -3686,7 +3711,7 @@ function PreparingOrders({
               orderId: order.orderId || order._id,
               mongoId: order._id,
               status: order.status || "preparing",
-              customerName: order.userId?.name || order.user?.name || order.customerName || order.userId?.phone || 'Guest',
+              customerName: resolveCustomerName(order),
               type:
                 order.deliveryFleet === "standard"
                   ? "Home Delivery"
@@ -3997,7 +4022,7 @@ function ReadyOrders({ onSelectOrder, refreshToken = 0 }) {
             orderId: order.orderId || order._id,
             mongoId: order._id,
             status: order.status || "ready",
-            customerName: order.userId?.name || order.user?.name || order.customerName || order.userId?.phone || 'Guest',
+            customerName: resolveCustomerName(order),
             type:
               order.deliveryFleet === "standard"
                 ? "Home Delivery"
@@ -4120,7 +4145,7 @@ const OutForDeliveryOrders = ({ onSelectOrder, refreshToken = 0 }) => {
             orderId: order.orderId || order._id,
             mongoId: order._id,
             status: order.status || "picked_up",
-            customerName: order.userId?.name || order.user?.name || order.customerName || order.userId?.phone || 'Guest',
+            customerName: resolveCustomerName(order),
             type:
               order.deliveryFleet === "standard"
                 ? "Home Delivery"

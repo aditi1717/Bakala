@@ -248,8 +248,22 @@ const transformOrderForTracking = (apiOrder, previousOrder = null, explicitResta
     restaurantAddress,
     restaurantId: apiOrder?.restaurantId || previousOrder?.restaurantId || null,
     userId: apiOrder?.userId || previousOrder?.userId || null,
-    userName: apiOrder?.userName || apiOrder?.userId?.name || apiOrder?.userId?.fullName || previousOrder?.userName || '',
-    userPhone: apiOrder?.userPhone || apiOrder?.userId?.phone || previousOrder?.userPhone || '',
+    userName:
+      apiOrder?.userName ||
+      apiOrder?.customerName ||
+      addr?.fullName ||
+      addr?.name ||
+      apiOrder?.userId?.name ||
+      apiOrder?.userId?.fullName ||
+      previousOrder?.userName ||
+      '',
+    userPhone:
+      apiOrder?.userPhone ||
+      apiOrder?.customerPhone ||
+      addr?.phone ||
+      apiOrder?.userId?.phone ||
+      previousOrder?.userPhone ||
+      '',
     address: {
       street: addr?.street || previousOrder?.address?.street || '',
       city: addr?.city || previousOrder?.address?.city || '',
@@ -472,7 +486,6 @@ export default function OrderTracking() {
   const [deliveryInstructions, setDeliveryInstructions] = useState("")
   const [isUpdatingInstructions, setIsUpdatingInstructions] = useState(false)
   const [resolvedLookupId, setResolvedLookupId] = useState("")
-  const [timerNow, setTimerNow] = useState(Date.now())
   const lastRealtimeRefreshRef = useRef(0)
   const trackingOrderIdsRef = useRef(new Set())
   const terminalPollStopRef = useRef(false)
@@ -773,32 +786,6 @@ export default function OrderTracking() {
     orderStatus
   ])
 
-  const acceptedAtMs = useMemo(() => {
-    const timestamp =
-      order?.tracking?.confirmed?.timestamp ||
-      order?.tracking?.preparing?.timestamp ||
-      order?.updatedAt ||
-      order?.createdAt
-
-    const parsed = timestamp ? new Date(timestamp).getTime() : NaN
-    return Number.isFinite(parsed) ? parsed : null
-  }, [order?.tracking?.confirmed?.timestamp, order?.tracking?.preparing?.timestamp, order?.updatedAt, order?.createdAt])
-
-  const editWindowRemainingMs = useMemo(() => {
-    if (!isAdminAccepted || !acceptedAtMs) return 0
-    const remaining = 60000 - (timerNow - acceptedAtMs)
-    return Math.max(0, remaining)
-  }, [isAdminAccepted, acceptedAtMs, timerNow])
-
-  const isEditWindowOpen = editWindowRemainingMs > 0
-
-  const editWindowText = useMemo(() => {
-    const totalSeconds = Math.ceil(editWindowRemainingMs / 1000)
-    const minutes = Math.floor(totalSeconds / 60)
-    const seconds = totalSeconds % 60
-    return `${minutes}:${String(seconds).padStart(2, '0')}`
-  }, [editWindowRemainingMs])
-
   const normalizedBackendOrderStatus = useMemo(
     () => String(order?.orderStatus || order?.status || "").toLowerCase(),
     [order?.orderStatus, order?.status],
@@ -896,14 +883,6 @@ export default function OrderTracking() {
       window.location.assign(`tel:${cleanPhone}`);
     }
   };
-
-  useEffect(() => {
-    if (!isEditWindowOpen) return
-    const interval = setInterval(() => {
-      setTimerNow(Date.now())
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [isEditWindowOpen])
 
   // Poll for order updates (especially when delivery partner accepts)
 
@@ -1014,8 +993,8 @@ export default function OrderTracking() {
     // Check if order can be cancelled (only Razorpay orders that aren't delivered/cancelled)
     if (!order) return;
 
-    if (isAdminAccepted && !isEditWindowOpen) {
-      toast.error('Cancellation window ended. You can no longer cancel this order.');
+    if (isAdminAccepted) {
+      toast.error('Order can be cancelled only before restaurant accepts it.');
       return;
     }
 
@@ -1333,38 +1312,6 @@ export default function OrderTracking() {
 
       {/* Scrollable Content */}
       <div className="max-w-4xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
-        {/* 1-minute cancellation window after admin acceptance */}
-        {isAdminAccepted && isEditWindowOpen && (
-          <motion.div
-            className="bg-white rounded-xl p-4 shadow-sm border border-brand-100"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-gray-900">
-                Cancel order
-              </p>
-              <span className={`text-sm font-bold px-2 py-1 rounded-md ${isEditWindowOpen ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-500'}`}>
-                {isEditWindowOpen ? editWindowText : 'Expired'}
-              </span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Available for 1 minute after admin acceptance.
-            </p>
-            <div className="mt-3">
-              <Button
-                type="button"
-                onClick={handleCancelOrder}
-                disabled={!isEditWindowOpen}
-                className="w-full bg-red-600 hover:bg-red-700 text-white"
-              >
-                Cancel Order
-              </Button>
-            </div>
-          </motion.div>
-        )}
-
         {/* Dynamic Status Card */}
         <motion.div
           className="bg-white rounded-xl p-4 shadow-sm"

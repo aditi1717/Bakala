@@ -9,6 +9,49 @@ import { toast } from 'sonner';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
 import { BRAND_THEME } from '@/config/brandTheme';
 
+const pickFirstText = (...values) => {
+  for (const value of values) {
+    const text = String(value ?? '').trim();
+    if (text) return text;
+  }
+  return '';
+};
+
+const getRecipientMeta = (order) => {
+  const userObj = order?.user || order?.userId || order?.customer || order?.customerId || {};
+  const deliveryAddress = order?.deliveryAddress || order?.address || {};
+  const recipient = order?.recipient || order?.deliveryRecipient || {};
+
+  return {
+    name: pickFirstText(
+      order?.recipientName,
+      recipient?.name,
+      order?.customerName,
+      deliveryAddress?.fullName,
+      deliveryAddress?.name,
+      deliveryAddress?.recipientName,
+      deliveryAddress?.receiverName,
+      deliveryAddress?.contactPersonName,
+      order?.userName,
+      userObj?.name,
+      'Customer',
+    ),
+    phone: pickFirstText(
+      order?.recipientPhone,
+      recipient?.phone,
+      order?.customerPhone,
+      deliveryAddress?.phone,
+      deliveryAddress?.recipientPhone,
+      deliveryAddress?.receiverPhone,
+      deliveryAddress?.contactPersonPhone,
+      order?.userPhone,
+      userObj?.phone,
+      deliveryAddress?.contactNumber,
+      deliveryAddress?.mobile,
+    ),
+  };
+};
+
 const Backdrop = ({ onClose }) => (
   <motion.div 
     initial={{ opacity: 0 }} 
@@ -168,9 +211,10 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
   const generateQr = async () => {
     setIsGeneratingQr(true);
     try {
+      const recipient = getRecipientMeta(order);
       const res = await deliveryAPI.createCollectQr(orderId, {
-        name: order.userName || 'Customer',
-        phone: order.userPhone || ''
+        name: recipient.name || 'Customer',
+        phone: recipient.phone || '',
       });
       const link = res?.data?.data?.shortUrl || res?.data?.shortUrl || null;
       if (link) {

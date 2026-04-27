@@ -120,6 +120,34 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
     return null
   }
 
+  const pickFirstText = (...values) => {
+    for (const value of values) {
+      const text = String(value ?? "").trim()
+      if (text) return text
+    }
+    return ""
+  }
+
+  const recipientSourceAddress = order.address || order.deliveryAddress || order.customerAddress || {}
+  const recipientName = pickFirstText(
+    order.recipientName,
+    order.deliveryRecipient?.name,
+    recipientSourceAddress.fullName,
+    recipientSourceAddress.name,
+    recipientSourceAddress.recipientName,
+    recipientSourceAddress.receiverName,
+  )
+  const recipientPhone = pickFirstText(
+    order.recipientPhone,
+    order.deliveryRecipient?.phone,
+    recipientSourceAddress.phone,
+    recipientSourceAddress.recipientPhone,
+    recipientSourceAddress.receiverPhone,
+    recipientSourceAddress.contactPersonPhone,
+    recipientSourceAddress.mobile,
+    recipientSourceAddress.contactNumber,
+  )
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] bg-white p-0 overflow-y-auto">
@@ -271,6 +299,10 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer Name</p>
                 <p className="text-sm font-medium text-slate-900">{order.customerName || "N/A"}</p>
               </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Recipient Name</p>
+                <p className="text-sm font-medium text-slate-900">{recipientName || "N/A"}</p>
+              </div>
               {order.customerPhone && (
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
@@ -280,6 +312,13 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                   <p className="text-sm font-medium text-slate-900">{order.customerPhone}</p>
                 </div>
               )}
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <Phone className="w-4 h-4" />
+                  Recipient Phone
+                </p>
+                <p className="text-sm font-medium text-slate-900">{recipientPhone || "N/A"}</p>
+              </div>
               {order.customerEmail && (
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">

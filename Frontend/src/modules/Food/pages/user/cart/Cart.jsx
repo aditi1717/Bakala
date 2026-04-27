@@ -21,7 +21,6 @@ import { initRazorpayPayment } from "@food/utils/razorpay"
 import { toast } from "sonner"
 import { getCompanyNameAsync } from "@food/utils/businessSettings"
 import { useCompanyName } from "@food/hooks/useCompanyName"
-import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
 import zoopSound from "@food/assets/audio/zomato_sms.mp3"
 import BRAND_THEME from "@/config/brandTheme"
@@ -234,9 +233,6 @@ export default function Cart() {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [showBillDetails, setShowBillDetails] = useState(true)
   const [showPlacingOrder, setShowPlacingOrder] = useState(false)
-  const [isScheduled, setIsScheduled] = useState(false)
-  const [scheduledDate, setScheduledDate] = useState("")
-  const [scheduledTime, setScheduledTime] = useState("")
   const [orderProgress, setOrderProgress] = useState(0)
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
   const [placedOrderId, setPlacedOrderId] = useState(null)
@@ -296,71 +292,6 @@ export default function Cart() {
     platformFee: 5,
     gstRate: 5,
   })
-
-
-  const availableTimeSlots = useMemo(() => {
-    if (!isScheduled || !scheduledDate || !restaurantData) return []
-
-    try {
-      const targetDate = new Date(scheduledDate)
-      const status = getRestaurantAvailabilityStatus(restaurantData, targetDate)
-
-      let openingHour = 9
-      let closingHour = 22
-
-      if (status.openingTime) {
-        const [h] = status.openingTime.split(':')
-        openingHour = parseInt(h, 10)
-      }
-
-      if (status.closingTime) {
-        const [h] = status.closingTime.split(':')
-        closingHour = parseInt(h, 10)
-      }
-
-      if (closingHour < openingHour) {
-        closingHour += 24 // Handle overnight slots
-      }
-
-      const slots = []
-      const now = new Date()
-      // Fix timezone date comparison by comparing date strings YYYY-MM-DD
-      const nowStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-      const targetStr = scheduledDate
-      const isToday = targetStr === nowStr
-      const currentHour = now.getHours()
-
-      for (let h = openingHour; h <= closingHour; h++) {
-        const actualHour = h % 24
-        // Skip past hours if today. Add 1 hour buffer so they can't order right at the boundary
-        if (isToday && h <= currentHour) continue
-
-        const period = actualHour >= 12 ? 'PM' : 'AM'
-        const display12 = actualHour % 12 || 12
-        const timeString = `${String(actualHour).padStart(2, '0')}:00`
-        const displayString = `${display12}:00 ${period}`
-
-        slots.push({ value: timeString, label: displayString })
-      }
-
-      return slots
-    } catch {
-      return []
-    }
-  }, [isScheduled, scheduledDate, restaurantData])
-
-  // Reset scheduledTime if it's no longer valid in the new slots
-  useEffect(() => {
-    if (isScheduled && availableTimeSlots.length > 0) {
-      const isValid = availableTimeSlots.some(slot => slot.value === scheduledTime)
-      if (!isValid) {
-        setScheduledTime(availableTimeSlots[0].value)
-      }
-    } else if (!isScheduled) {
-      setScheduledDate("")
-      setScheduledTime("")
-    }
-  }, [isScheduled, availableTimeSlots, scheduledTime])
 
   const cartCount = getCartCount()
   const getAddressId = (address) => address?.id || address?._id || null
@@ -1606,19 +1537,6 @@ export default function Cart() {
       return
     }
 
-    if (isScheduled) {
-      if (!scheduledDate || !scheduledTime) {
-        toast.error("Please select both date and time to schedule your order")
-        return
-      }
-      const scheduleString = `${scheduledDate}T${scheduledTime}:00`
-      const scheduleDateObj = new Date(scheduleString)
-      if (scheduleDateObj < new Date()) {
-        toast.error("Scheduled time must be in the future")
-        return
-      }
-    }
-
     if (cart.length === 0) {
       alert("Your cart is empty")
       return
@@ -1862,7 +1780,6 @@ export default function Cart() {
         paymentMethod: selectedPaymentMethod,
         // `useZone()` can return `null`. Zod expects string/undefined, not null.
         zoneId: zoneId || undefined,
-        scheduledAt: isScheduled ? new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString() : undefined,
       };
       // Log final order details (including paymentMethod for COD debugging)
       debugLog('?? FINAL: Sending order to backend with:', {
@@ -2562,53 +2479,8 @@ export default function Cart() {
                     <p className="text-base text-gray-800 dark:text-gray-200">
                       Delivery in <span className="text-green-600 font-bold">{restaurantData?.estimatedDeliveryTime || "15-20 mins"}</span>
                     </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 flex items-center gap-1">
-                      Want this later?
-                      <button onClick={() => setIsScheduled(!isScheduled)} className="border-b border-dashed border-gray-500 font-medium outline-none">
-                        Schedule it
-                      </button>
-                    </p>
                   </div>
                 </div>
-
-                {isScheduled && (
-                  <div className="mt-5 flex flex-col sm:flex-row gap-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-                    <div className="flex-1">
-                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Date (Up to Tomorrow)</label>
-                      <input
-                        type="date"
-                        min={new Date().toLocaleDateString('en-CA')}
-                        max={new Date(Date.now() + 86400000).toLocaleDateString('en-CA')}
-                        value={scheduledDate}
-                        onChange={(e) => setScheduledDate(e.target.value)}
-                    className="w-full text-sm p-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-[#0a0a0a] text-gray-800 dark:text-gray-200 focus:outline-none"
-                    style={{ borderColor: `${BRAND_THEME.colors.brand.primary}33`, outlineColor: BRAND_THEME.colors.brand.primary }}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Time</label>
-                      {availableTimeSlots.length > 0 ? (
-                        <div className="relative">
-                          <select
-                            value={scheduledTime}
-                            onChange={(e) => setScheduledTime(e.target.value)}
-                            className="w-full text-sm p-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-[#0a0a0a] text-gray-800 dark:text-gray-200 focus:outline-none appearance-none pr-8"
-                            style={{ borderColor: `${BRAND_THEME.colors.brand.primary}33`, outlineColor: BRAND_THEME.colors.brand.primary }}
-                          >
-                            {availableTimeSlots.map(slot => (
-                              <option key={slot.value} value={slot.value}>{slot.label}</option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
-                        </div>
-                      ) : (
-                        <div className="w-full text-sm p-2 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-md text-center border border-gray-200 dark:border-gray-700">
-                          {scheduledDate ? "No slots available" : "Select date first"}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Delivery Address */}
@@ -2836,7 +2708,7 @@ export default function Cart() {
                       />
                     </div>
                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      Agar aap kisi aur ke liye order kar rahe ho, to yahan uska naam aur phone save kar do.
+                      If you are ordering for someone else, save their name and phone number here.
                     </p>
                   </div>
                 )}

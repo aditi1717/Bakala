@@ -191,13 +191,15 @@ export default function OrderDetails() {
           )
 
           const customerName = firstText(
-            order.userId?.name,
             order.customerName,
+            order.userName,
+            order.deliveryAddress?.fullName,
+            order.deliveryAddress?.name,
+            order.address?.fullName,
+            order.address?.name,
+            order.userId?.name,
             order.customer?.name,
             order.customerInfo?.name,
-            order.deliveryAddress?.name,
-            order.deliveryAddress?.fullName,
-            order.address?.name
           ) || "Customer"
 
           const restaurantName = firstText(

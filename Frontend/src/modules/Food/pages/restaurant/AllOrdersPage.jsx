@@ -24,6 +24,33 @@ const debugError = (...args) => {}
 
 const formatMoney = (value) => `₹${Number(value || 0).toFixed(2)}`
 
+const pickFirstText = (...values) => {
+  for (const value of values) {
+    const text = String(value ?? "").trim()
+    if (text) return text
+  }
+  return ""
+}
+
+const resolveCustomerName = (order = {}) =>
+  pickFirstText(
+    order?.customerName,
+    order?.userName,
+    order?.deliveryAddress?.fullName,
+    order?.deliveryAddress?.name,
+    order?.address?.fullName,
+    order?.address?.name,
+    order?.user?.name,
+    order?.userId?.name,
+    order?.customer?.name,
+    order?.customerInfo?.name,
+    order?.customerPhone,
+    order?.deliveryAddress?.phone,
+    order?.userId?.phone,
+    order?.userId?.email,
+    'Guest'
+  )
+
 // Initialize with current week if needed
 const getCurrentWeek = () => {
   const today = new Date()
@@ -186,7 +213,7 @@ export default function AllOrdersPage() {
     const restaurantName = restaurantData?.name || order.restaurantId?.name || 'Restaurant'
     
     // Get customer name
-    const customerName = order.userId?.name || order.user?.name || order.customerName || order.userId?.phone || order.userId?.email || 'Guest'
+    const customerName = resolveCustomerName(order)
     
     // Format items
     const items = (order.items || []).map(item => ({

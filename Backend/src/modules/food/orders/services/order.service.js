@@ -726,10 +726,28 @@ function buildDeliverySocketPayload(orderDoc, restaurantDoc = null) {
       order?.deliveryAddress?.formattedAddress ||
       order?.deliveryAddress?.address ||
       "",
-    customerName: order?.userId?.name || order?.customerName || "",
-    customerPhone: order?.userId?.phone || order?.deliveryAddress?.phone || "",
-    userName: order?.userId?.name || order?.customerName || "",
-    userPhone: order?.userId?.phone || order?.deliveryAddress?.phone || "",
+    customerName:
+      order?.customerName ||
+      order?.deliveryAddress?.fullName ||
+      order?.deliveryAddress?.name ||
+      order?.userId?.name ||
+      "",
+    customerPhone:
+      order?.customerPhone ||
+      order?.deliveryAddress?.phone ||
+      order?.userId?.phone ||
+      "",
+    userName:
+      order?.customerName ||
+      order?.deliveryAddress?.fullName ||
+      order?.deliveryAddress?.name ||
+      order?.userId?.name ||
+      "",
+    userPhone:
+      order?.customerPhone ||
+      order?.deliveryAddress?.phone ||
+      order?.userId?.phone ||
+      "",
     riderEarning: order?.riderEarning || 0,
     earnings: order?.riderEarning || order?.pricing?.deliveryFee || 0,
     deliveryFee: order?.pricing?.deliveryFee || 0,
