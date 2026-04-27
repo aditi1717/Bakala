@@ -1095,11 +1095,15 @@ export const adminAPI = {
           return true;
         })
         .map((o) => {
-          const isPct = o.discountType === "percentage";
+          const rawDiscountType = String(o.discountType || "").toLowerCase();
+          const isPct = rawDiscountType === "percentage" || rawDiscountType === "percent";
+          const normalizedDiscountType = isPct ? "percentage" : "flat-price";
+          const discountValue = Number(o.discountValue ?? o.discountAmount ?? 0);
           return {
             couponCode: o.couponCode,
-            discountType: o.discountType,
-            discountPercentage: isPct ? Number(o.discountValue) || 0 : 0,
+            discountType: normalizedDiscountType,
+            discountValue,
+            discountPercentage: isPct ? discountValue : 0,
             originalPrice: 0,
             discountedPrice: 0,
             minOrderValue: Number(o.minOrderValue || 0),

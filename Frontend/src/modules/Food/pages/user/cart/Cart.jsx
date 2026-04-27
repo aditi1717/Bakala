@@ -906,18 +906,42 @@ export default function Cart() {
             coupons.forEach(coupon => {
               if (!uniqueCouponCodes.has(coupon.couponCode)) {
                 uniqueCouponCodes.add(coupon.couponCode)
+                const rawDiscountType = String(coupon.discountType || "").toLowerCase()
+                const isPercentageCoupon = rawDiscountType === "percentage" || rawDiscountType === "percent"
+                const discountType = isPercentageCoupon ? "percentage" : "flat-price"
+                const discountValue = Number(coupon.discountValue ?? coupon.discountAmount ?? coupon.discount ?? 0)
+                const discountPercentage = Number(
+                  coupon.discountPercentage || (discountType === "percentage" ? discountValue : 0),
+                )
+                const fallbackFlatDiscount = Math.max(
+                  0,
+                  Number(coupon.originalPrice || 0) - Number(coupon.discountedPrice || 0),
+                )
+                const flatDiscount = discountType === "flat-price"
+                  ? Math.max(0, discountValue, fallbackFlatDiscount)
+                  : fallbackFlatDiscount
+                const maxDiscount = coupon.maxDiscount != null ? Number(coupon.maxDiscount) : null
+                const effectiveDiscount =
+                  discountType === "percentage"
+                    ? (maxDiscount && maxDiscount > 0
+                      ? maxDiscount
+                      : Math.max(0, (subtotal * discountPercentage) / 100))
+                    : flatDiscount
                 // Convert backend coupon format to frontend format
                 allCoupons.push({
                   code: coupon.couponCode,
-                  discount: coupon.originalPrice - coupon.discountedPrice,
-                  discountPercentage: coupon.discountPercentage,
-                  discountDisplay: coupon.discountType === "percentage"
-                    ? `${coupon.discountPercentage}% OFF`
-                    : `${RUPEE_SYMBOL}${Math.max(0, (coupon.originalPrice || 0) - (coupon.discountedPrice || 0))} OFF`,
+                  discount: effectiveDiscount,
+                  discountType,
+                  discountValue,
+                  discountPercentage,
+                  discountDisplay: discountType === "percentage"
+                    ? `${discountPercentage}% OFF${maxDiscount && maxDiscount > 0 ? ` (up to ${RUPEE_SYMBOL}${maxDiscount})` : ""}`
+                    : `${RUPEE_SYMBOL}${flatDiscount} OFF`,
                   minOrder: coupon.minOrderValue || 0,
-                  description: coupon.discountType === "percentage"
-                    ? `${coupon.discountPercentage}% OFF with '${coupon.couponCode}'`
-                    : `Save ${RUPEE_SYMBOL}${Math.max(0, (coupon.originalPrice || 0) - (coupon.discountedPrice || 0))} with '${coupon.couponCode}'`,
+                  maxDiscount,
+                  description: discountType === "percentage"
+                    ? `${discountPercentage}% OFF${maxDiscount && maxDiscount > 0 ? ` up to ${RUPEE_SYMBOL}${maxDiscount}` : ""} with '${coupon.couponCode}'`
+                    : `Save ${RUPEE_SYMBOL}${flatDiscount} with '${coupon.couponCode}'`,
                   originalPrice: coupon.originalPrice,
                   discountedPrice: coupon.discountedPrice,
                   customerGroup: coupon.customerGroup || "all",
