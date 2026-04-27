@@ -1507,6 +1507,7 @@ export const publicGetOnce = (url, config = {}) => {
 const getPublicRestaurantsOnce = (params = {}, config = {}) => {
   const { noCache, ...axiosConfig } = config || {};
   const normalizedParams = { ...(params || {}) };
+  const defaultLimit = 20;
   if (!normalizedParams.zoneId && typeof window !== "undefined") {
     const storedZoneId = window.localStorage?.getItem("userZoneId");
     if (storedZoneId) {
@@ -1515,11 +1516,11 @@ const getPublicRestaurantsOnce = (params = {}, config = {}) => {
   }
   if (noCache) {
     return apiClient.get("/food/restaurant/restaurants", {
-      params: { limit: 1000, ...normalizedParams },
+      params: { limit: defaultLimit, ...normalizedParams },
       ...axiosConfig,
     });
   }
-  const keyParams = { limit: 1000, ...normalizedParams };
+  const keyParams = { limit: defaultLimit, ...normalizedParams };
   // `_ts` is an explicit cache-buster in many call sites; ignore it for dedupe purposes.
   if (keyParams && typeof keyParams === "object") {
     delete keyParams._ts;
@@ -1527,7 +1528,7 @@ const getPublicRestaurantsOnce = (params = {}, config = {}) => {
   const key = `restaurants:${stableStringify(keyParams)}`;
   return publicRestaurantsCache.getOrCreate(key, () =>
     apiClient.get("/food/restaurant/restaurants", {
-      params: { limit: 1000, ...normalizedParams },
+      params: { limit: defaultLimit, ...normalizedParams },
       ...axiosConfig,
     }),
   );

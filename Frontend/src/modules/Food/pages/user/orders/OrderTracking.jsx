@@ -478,15 +478,32 @@ export default function OrderTracking() {
   const terminalPollStopRef = useRef(false)
   const lookupIdsRef = useRef([])
   const isInitialPollRequestedRef = useRef(null)
-  const lastPollExecutionRef = useRef(0) // New: Hard throttle for extreme cases
+  const lastPollExecutionRef = useRef(0)
+  const lastNetworkFetchAtRef = useRef(0)
+  const activeFetchPromiseRef = useRef(null)
+  const latestOrderRef = useRef(null)
+  const latestRefreshStateRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined
     const syncSocketState = () => setIsSocketConnected(Boolean(window.orderSocketConnected))
+    const handleSocketStateChange = (event) => {
+      setIsSocketConnected(Boolean(event?.detail?.connected))
+    }
     syncSocketState()
-    const intervalId = window.setInterval(syncSocketState, 1500)
-    return () => window.clearInterval(intervalId)
+    window.addEventListener("userSocketConnectionChange", handleSocketStateChange)
+    return () => {
+      window.removeEventListener("userSocketConnectionChange", handleSocketStateChange)
+    }
   }, [])
+
+  useEffect(() => {
+    latestOrderRef.current = order
+  }, [order])
+
+  useEffect(() => {
+    latestRefreshStateRef.current = isRefreshing
+  }, [isRefreshing])
 
 
   // --------------------------------------------------------------------------
@@ -567,6 +584,87 @@ export default function OrderTracking() {
 
   const resolveOrderFromList = useCallback((id) => stableOpsRef.current.resolveOrderFromList(id), [])
   const fetchOrderDetailsWithFallback = useCallback((opts) => stableOpsRef.current.fetchOrderDetailsWithFallback(opts), [])
+  const refreshOrderData = useCallback(async ({
+    isInitial = false,
+    force = false,
+    allowListFallback = true,
+  } = {}) => {
+    if (!orderId) return null
+    if (activeFetchPromiseRef.current) return activeFetchPromiseRef.current
+    if (terminalPollStopRef.current && !isInitial) return null
+
+    const now = Date.now()
+    const minFetchGap = force ? 1000 : 2000
+    if (!isInitial && now - lastNetworkFetchAtRef.current < minFetchGap) {
+      return null
+    }
+
+    if (isInitial) {
+      const rawContext = getOrderById(orderId)
+      if (rawContext) {
+        setOrder((prev) => transformOrderForTracking(rawContext, prev))
+        setLoading(false)
+      }
+    }
+
+    lastNetworkFetchAtRef.current = now
+
+    const task = (async () => {
+      try {
+        const response = await fetchOrderDetailsWithFallback({ force })
+        let finalOrderData = extractOrderFromDetailsResponse(response)
+
+        if (!finalOrderData && allowListFallback) {
+          const matchedOrder = await resolveOrderFromList(orderId)
+          if (matchedOrder) finalOrderData = matchedOrder
+        }
+
+        if (finalOrderData) {
+          setOrder((prev) => {
+            const transformedOrder = transformOrderForTracking(finalOrderData, prev)
+            const ui = mapOrderToTrackingUiStatus(transformedOrder)
+            terminalPollStopRef.current = ui === 'delivered' || ui === 'cancelled'
+            return transformedOrder
+          })
+          setError(null)
+          return response
+        }
+
+        if (isInitial && !latestOrderRef.current) {
+          setError(response?.data?.message || 'Order not found')
+          terminalPollStopRef.current = true
+        }
+
+        return response
+      } catch (err) {
+        if (isInitial && !latestOrderRef.current && allowListFallback && shouldFallbackToOrderList(err)) {
+          try {
+            const matchedOrder = await resolveOrderFromList(orderId)
+            if (matchedOrder) {
+              setOrder((prev) => transformOrderForTracking(matchedOrder, prev))
+              setError(null)
+              return { data: { success: true, data: { order: matchedOrder } } }
+            }
+          } catch {
+            // Fall through to shared error handling.
+          }
+        }
+
+        if (isInitial && !latestOrderRef.current) {
+          setError(err.response?.data?.message || 'Failed to fetch order details')
+          terminalPollStopRef.current = true
+        }
+
+        throw err
+      } finally {
+        if (isInitial) setLoading(false)
+        activeFetchPromiseRef.current = null
+      }
+    })()
+
+    activeFetchPromiseRef.current = task
+    return task
+  }, [orderId, getOrderById, fetchOrderDetailsWithFallback, resolveOrderFromList])
 
   const handleBackToOrders = useCallback(() => {
     if (window.history.length > 1) {
@@ -815,76 +913,14 @@ export default function OrderTracking() {
   useEffect(() => {
     if (!orderId) return;
 
-    let isSubscribed = true;
-    let requestInProgress = false;
-
     const poll = async (isInitial = false) => {
-      if (!isSubscribed || requestInProgress) return;
-      if (terminalPollStopRef.current && !isInitial) return;
-
       const now = Date.now();
       if (isInitial && now - lastPollExecutionRef.current < 1000) return;
       if (isInitial) lastPollExecutionRef.current = now;
-
-      // Check context immediately to avoid loaders if data exists locally
-      if (isInitial) {
-        const rawContext = getOrderById(orderId);
-        if (rawContext) {
-          setOrder(transformOrderForTracking(rawContext));
-          setLoading(false);
-        }
-      }
-
-      requestInProgress = true;
       try {
-        const response = await fetchOrderDetailsWithFallback({ force: isInitial });
-        if (!isSubscribed) return;
-
-        let finalOrderData = extractOrderFromDetailsResponse(response);
-
-        if (!finalOrderData && isInitial) {
-          const matchedOrder = await resolveOrderFromList(orderId);
-          if (matchedOrder) finalOrderData = matchedOrder;
-        }
-
-        if (finalOrderData) {
-          setOrder(prev => {
-            const transformedOrder = transformOrderForTracking(finalOrderData, prev);
-            const ui = mapOrderToTrackingUiStatus(transformedOrder);
-            terminalPollStopRef.current = ui === 'delivered' || ui === 'cancelled';
-            return transformedOrder;
-          });
-          setError(null);
-          setLoading(false);
-          return;
-        }
-
-        if (isInitial && !order) {
-          setError(response.data?.message || 'Order not found');
-          terminalPollStopRef.current = true;
-        }
-      } catch (err) {
-        if (isInitial && !order && shouldFallbackToOrderList(err)) {
-          try {
-            const matchedOrder = await resolveOrderFromList(orderId);
-            if (matchedOrder) {
-              if (!isSubscribed) return;
-              setOrder(prev => transformOrderForTracking(matchedOrder, prev));
-              setError(null);
-              setLoading(false);
-              return;
-            }
-          } catch {}
-        }
-
-        if (isInitial && !order) {
-          if (!isSubscribed) return;
-          setError(err.response?.data?.message || 'Failed to fetch order details');
-          terminalPollStopRef.current = true;
-        }
-      } finally {
-        requestInProgress = false;
-        if (isInitial && isSubscribed) setLoading(false);
+        await refreshOrderData({ isInitial, force: false });
+      } catch {
+        // Initial-load error state is handled inside refreshOrderData.
       }
     };
 
@@ -896,10 +932,8 @@ export default function OrderTracking() {
       poll(true);
     }
 
-    return () => {
-      isSubscribed = false;
-    };
-  }, [orderId, fetchOrderDetailsWithFallback, resolveOrderFromList]);
+    return undefined;
+  }, [orderId, refreshOrderData]);
 
   // Interval Manager (dynamically adapts based on socket connection state independently)
   useEffect(() => {
@@ -912,7 +946,7 @@ export default function OrderTracking() {
       if (pollRef.current) pollRef.current(false);
     };
     
-    const pollInterval = (isSocketConnected || window.orderSocketConnected) ? 12000 : 5000;
+    const pollInterval = (isSocketConnected || window.orderSocketConnected) ? 15000 : 8000;
     const interval = setInterval(tick, pollInterval);
 
     return () => clearInterval(interval);
@@ -955,7 +989,7 @@ export default function OrderTracking() {
 
         // Pull latest order state without refresh spam on bursty socket events.
         const now = Date.now();
-        if (now - lastRealtimeRefreshRef.current > 1500 && !isRefreshing) {
+        if (now - lastRealtimeRefreshRef.current > 3000 && !latestRefreshStateRef.current) {
           lastRealtimeRefreshRef.current = now;
           handleRefresh();
         }
@@ -1041,11 +1075,7 @@ export default function OrderTracking() {
         setShowCancelDialog(false);
         setCancellationReason("");
         // Refresh order data
-        const orderResponse = await fetchOrderDetailsWithFallback({ force: true });
-        if (orderResponse.data?.success && orderResponse.data.data?.order) {
-          const apiOrder = orderResponse.data.data.order;
-          setOrder(transformOrderForTracking(apiOrder, order));
-        }
+        await refreshOrderData({ force: true });
       } else {
         toast.error(response.data?.message || 'Failed to cancel order');
       }
@@ -1111,11 +1141,7 @@ export default function OrderTracking() {
   const handleRefresh = async () => {
     setIsRefreshing(true)
     try {
-      const response = await fetchOrderDetailsWithFallback({ force: true })
-      if (response.data?.success && response.data.data?.order) {
-        const apiOrder = response.data.data.order
-        setOrder(transformOrderForTracking(apiOrder, order))
-      }
+      await refreshOrderData({ force: true })
     } catch (err) {
       debugError('Error refreshing order:', err)
     } finally {

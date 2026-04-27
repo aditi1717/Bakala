@@ -262,8 +262,8 @@ function RestaurantDetailsContent() {
             debugLog('? Direct lookup failed, trying search by name...')
 
               const searchVariants = zoneId
-                ? [{ limit: 100, zoneId: zoneId, _ts: Date.now() }, { limit: 100, _ts: Date.now() }]
-                : [{ limit: 100, _ts: Date.now() }]
+                ? [{ limit: 20, page: 1, zoneId: zoneId, _ts: Date.now() }, { limit: 20, page: 1, _ts: Date.now() }]
+                : [{ limit: 20, page: 1, _ts: Date.now() }]
 
               for (const searchParams of searchVariants) {
                 try {
@@ -639,8 +639,8 @@ function RestaurantDetailsContent() {
             debugWarn('? No restaurant ID available, searching for restaurant by name...')
             try {
               const searchVariants = zoneId
-                ? [{ limit: 100, zoneId: zoneId, _ts: Date.now() }, { limit: 100, _ts: Date.now() }]
-                : [{ limit: 100, _ts: Date.now() }]
+                ? [{ limit: 20, page: 1, zoneId: zoneId, _ts: Date.now() }, { limit: 20, page: 1, _ts: Date.now() }]
+                : [{ limit: 20, page: 1, _ts: Date.now() }]
 
               for (const searchParams of searchVariants) {
                 const searchResponse = await restaurantAPI.getRestaurants(searchParams, { noCache: true })

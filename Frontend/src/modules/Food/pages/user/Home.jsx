@@ -128,6 +128,28 @@ const HOME_FILTER_ACTIVE_ICON_FILL_CLASS =
 const WEBVIEW_SESSION_CACHE_BUSTER = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const UNDER_PRICE_DEFAULT_STORAGE_KEY = "food-under-price-default";
 const DEFAULT_UNDER_PRICE_LIMIT = 250;
+const HOME_RESTAURANT_CACHE_TTL_MS = 5 * 60 * 1000;
+const homeRestaurantsCache = new Map();
+const homeRestaurantsInFlightCache = new Map();
+const homeMenuUnionCache = new Map();
+
+const roundCacheCoordinate = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Number(parsed.toFixed(3));
+};
+
+const buildHomeRestaurantCacheKey = (params = {}) => {
+  const entries = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .map(([key, value]) => [
+      key,
+      key === "lat" || key === "lng" ? roundCacheCoordinate(value) : value,
+    ])
+    .sort(([a], [b]) => a.localeCompare(b));
+  return JSON.stringify(entries);
+};
+
 const resolveUnderPriceLimit = (value, fallback = DEFAULT_UNDER_PRICE_LIMIT) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
@@ -1345,7 +1367,7 @@ export default function Home() {
   const rightContentRef = useRef(null);
   const restaurantsRequestSeqRef = useRef(0);
   const menuUnionRequestSeqRef = useRef(0);
-  const menuUnionCacheRef = useRef(new Map());
+  const menuUnionCacheRef = useRef(homeMenuUnionCache);
 
   // Scroll tracking effect
   useEffect(() => {
@@ -1381,6 +1403,7 @@ export default function Home() {
   const fetchRestaurants = useCallback(
     async (filters = {}) => {
       const requestSeq = ++restaurantsRequestSeqRef.current;
+      let cacheKey = "";
       try {
         setLoadingRestaurants(true);
 
@@ -1456,8 +1479,38 @@ export default function Home() {
           params.zoneId = zoneId;
         }
 
+        cacheKey = buildHomeRestaurantCacheKey(params);
+        const now = Date.now();
+        const cachedEntry = homeRestaurantsCache.get(cacheKey);
+        if (cachedEntry && now - cachedEntry.at < HOME_RESTAURANT_CACHE_TTL_MS) {
+          debugLog("Using cached homepage restaurants:", cacheKey);
+          startTransition(() => {
+            setRestaurantsData(cachedEntry.data);
+          });
+          setLoadingRestaurants(false);
+          return;
+        }
+
+        const pendingRequest = homeRestaurantsInFlightCache.get(cacheKey);
+        if (pendingRequest) {
+          debugLog("Reusing in-flight homepage restaurant request:", cacheKey);
+          const sharedResponse = await pendingRequest;
+          if (requestSeq !== restaurantsRequestSeqRef.current) return;
+          if (sharedResponse?.data?.success) {
+            const sharedCachedEntry = homeRestaurantsCache.get(cacheKey);
+            if (sharedCachedEntry?.data) {
+              startTransition(() => {
+                setRestaurantsData(sharedCachedEntry.data);
+              });
+              return;
+            }
+          }
+        }
+
         debugLog("Fetching restaurants with params:", params);
-        const response = await restaurantAPI.getRestaurants(params);
+        const responsePromise = restaurantAPI.getRestaurants(params);
+        homeRestaurantsInFlightCache.set(cacheKey, responsePromise);
+        const response = await responsePromise;
         debugLog("Restaurants API response:", response.data);
 
         // If a newer request started, ignore this response to avoid races/flicker.
@@ -1671,8 +1724,13 @@ export default function Home() {
             "Transformed and sorted restaurants:",
             transformedRestaurants,
           );
+          const sortedRestaurants = sortRestaurantsForDisplay(transformedRestaurants);
+          homeRestaurantsCache.set(cacheKey, {
+            at: Date.now(),
+            data: sortedRestaurants,
+          });
           startTransition(() => {
-            setRestaurantsData(sortRestaurantsForDisplay(transformedRestaurants));
+            setRestaurantsData(sortedRestaurants);
           });
 
           const restaurantsNeedingOutletTimings = transformedRestaurants.filter(
@@ -1722,9 +1780,17 @@ export default function Home() {
                     return { ...restaurant, outletTimings };
                   });
 
-                  return hasChanges
-                    ? sortRestaurantsForDisplay(nextRestaurants)
-                    : currentRestaurants;
+                  if (hasChanges) {
+                    const sortedNextRestaurants =
+                      sortRestaurantsForDisplay(nextRestaurants);
+                    homeRestaurantsCache.set(cacheKey, {
+                      at: Date.now(),
+                      data: sortedNextRestaurants,
+                    });
+                    return sortedNextRestaurants;
+                  }
+
+                  return currentRestaurants;
                 });
               });
             })();
@@ -1740,6 +1806,7 @@ export default function Home() {
         // This way, if API succeeds later, it will show the real data
         setRestaurantsData([]);
       } finally {
+        homeRestaurantsInFlightCache.delete(cacheKey);
         if (requestSeq === restaurantsRequestSeqRef.current) {
           setLoadingRestaurants(false);
         }
