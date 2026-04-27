@@ -74,7 +74,7 @@ export default function ContactMessages() {
 
   const renderStars = (rating) => {
     const stars = []
-    const count = Math.floor(rating || 0)
+    const count = Math.max(0, Math.min(5, Math.round((Number(rating) || 0) / 2)))
     
     for (let i = 0; i < count; i++) {
       stars.push(<Star key={i} className="w-5 h-5 fill-amber-500 text-amber-500" />)
@@ -84,7 +84,7 @@ export default function ContactMessages() {
 
   const getRatingBadge = (rating) => {
     const stars = []
-    const count = Math.floor(rating || 0)
+    const count = Math.max(0, Math.min(5, Math.round((Number(rating) || 0) / 2)))
     
     for (let i = 0; i < count; i++) {
       stars.push(<Star key={i} className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />)
@@ -96,10 +96,33 @@ export default function ContactMessages() {
           {stars}
         </div>
         <span className="text-xs font-bold text-amber-700 leading-none">
-          {rating}
+          {rating}/10
         </span>
       </div>
     )
+  }
+
+  const getModuleLabel = (module) => {
+    const key = String(module || "").trim().toLowerCase()
+    if (key === "restaurant") return "Restaurant App"
+    if (!key) return "N/A"
+    return key.charAt(0).toUpperCase() + key.slice(1)
+  }
+
+  const getDisplayRating = (feedback) => {
+    const comment = String(feedback?.comment || "")
+    const match = comment.match(/rated\s+(\d{1,2})\s*\/\s*10/i)
+    if (match) {
+      const parsed = Number(match[1])
+      if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 10) return parsed
+    }
+
+    const raw = Number(feedback?.rating)
+    if (!Number.isFinite(raw)) return 0
+
+    // Backward compatibility for old records where rating was stored on a 1-5 scale.
+    if (raw <= 5) return Math.min(10, Math.max(0, raw * 2))
+    return Math.min(10, Math.max(0, raw))
   }
 
   if (loading && feedbacks.length === 0) {
@@ -107,7 +130,7 @@ export default function ContactMessages() {
       <div className="p-4 lg:p-6 bg-slate-50 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-brand-600 mx-auto mb-4" />
-          <p className="text-slate-600">Loading feedbacks...</p>
+          <p className="text-slate-600">Loading restaurant feedback...</p>
         </div>
       </div>
     )
@@ -119,7 +142,10 @@ export default function ContactMessages() {
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900">User Feedback</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Restaurant Share Feedback</h1>
+              <p className="text-xs text-slate-500 mt-1">Source: /food/restaurant/share-feedback</p>
+            </div>
             <span className="px-3 py-1 rounded-full text-sm font-semibold bg-slate-100 text-slate-700">
               {feedbacks.length}
             </span>
@@ -136,18 +162,24 @@ export default function ContactMessages() {
               className="px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
             >
               <option value="all">All Ratings</option>
-              <option value="5">5 Stars</option>
-              <option value="4">4 Stars</option>
-              <option value="3">3 Stars</option>
-              <option value="2">2 Stars</option>
-              <option value="1">1 Star</option>
+              <option value="10">10/10</option>
+              <option value="9">9/10</option>
+              <option value="8">8/10</option>
+              <option value="7">7/10</option>
+              <option value="6">6/10</option>
+              <option value="5">5/10</option>
+              <option value="4">4/10</option>
+              <option value="3">3/10</option>
+              <option value="2">2/10</option>
+              <option value="1">1/10</option>
+              <option value="0">0/10</option>
             </select>
 
             {/* Search */}
             <div className="relative flex-1 sm:flex-initial min-w-[250px]">
               <input
                 type="text"
-                placeholder="Ex: Search by name, email, order ID, restaurant, food items"
+                placeholder="Ex: Search by restaurant name, owner phone, feedback text"
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value)
@@ -175,13 +207,7 @@ export default function ContactMessages() {
                 </th>
                 <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                   <div className="flex items-center gap-2">
-                    <span>Name</span>
-                    <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  <div className="flex items-center gap-2">
-                    <span>Email</span>
+                    <span>Submitted By</span>
                     <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
                   </div>
                 </th>
@@ -197,6 +223,12 @@ export default function ContactMessages() {
                     <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
                   </div>
                 </th>
+                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <span>Source</span>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
+                  </div>
+                </th>
                 <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                   <div className="flex items-center justify-center gap-2">
                     <span>Action</span>
@@ -208,7 +240,7 @@ export default function ContactMessages() {
             <tbody className="bg-white divide-y divide-slate-100">
               {feedbacks.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-20">
+                  <td colSpan={6} className="px-6 py-20">
                     <div className="flex flex-col items-center justify-center">
                       <div className="relative mb-6">
                         <div className="w-32 h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center shadow-inner">
@@ -221,7 +253,7 @@ export default function ContactMessages() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-lg font-semibold text-slate-700">No Feedback Found</p>
+                      <p className="text-lg font-semibold text-slate-700">No Restaurant Feedback Found</p>
                     </div>
                   </td>
                 </tr>
@@ -239,16 +271,18 @@ export default function ContactMessages() {
                     <td className="px-6 py-4">
                       <span className="text-sm font-medium text-slate-900">{feedback.customer?.name || 'N/A'}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-slate-700">{feedback.customer?.email || 'N/A'}</span>
-                    </td>
                     <td className="px-6 py-4 max-w-md">
                       <span className="text-sm text-slate-700 line-clamp-2">
                         {feedback.comment || 'No comment provided'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getRatingBadge(feedback.rating)}
+                      {getRatingBadge(getDisplayRating(feedback))}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700">
+                        {getModuleLabel(feedback.module)}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <DropdownMenu>
@@ -304,9 +338,9 @@ export default function ContactMessages() {
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-200 dark:border-slate-700">
-            <DialogTitle className="text-2xl font-bold text-slate-900 dark:text-white">Feedback Details</DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-slate-900 dark:text-white">Restaurant Feedback Details</DialogTitle>
             <DialogDescription className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              Complete information about the user and their feedback
+              Complete information about the source account and feedback
             </DialogDescription>
           </DialogHeader>
           {selectedFeedback && (
@@ -315,23 +349,21 @@ export default function ContactMessages() {
               <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-xl p-5 border border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-5 flex items-center gap-3">
                   <div className="w-1 h-6 bg-gradient-to-b from-brand-500 to-brand-600 rounded-full"></div>
-                  Customer Information
+                  Restaurant Account Information
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Customer Name</label>
+                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</label>
                     <p className="text-base font-semibold text-slate-900 dark:text-white">{selectedFeedback.customer?.name || 'N/A'}</p>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email Address</label>
-                    <p className="text-base font-semibold text-slate-900 dark:text-white break-all">{selectedFeedback.customer?.email || 'N/A'}</p>
+                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Source</label>
+                    <p className="text-base font-semibold text-slate-900 dark:text-white">{getModuleLabel(selectedFeedback.module)}</p>
                   </div>
-                  {selectedFeedback.customer?.phone && (
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Phone Number</label>
-                      <p className="text-base font-semibold text-slate-900 dark:text-white">{selectedFeedback.customer.phone}</p>
-                    </div>
-                  )}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Owner Phone Number</label>
+                    <p className="text-base font-semibold text-slate-900 dark:text-white">{selectedFeedback.customer?.phone || "N/A"}</p>
+                  </div>
                 </div>
               </div>
 
@@ -344,29 +376,14 @@ export default function ContactMessages() {
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1">
-                      {renderStars(selectedFeedback.rating)}
+                      {renderStars(getDisplayRating(selectedFeedback))}
                     </div>
                     <span className="text-lg font-bold text-slate-900 dark:text-white">
-                      {selectedFeedback.rating} / 5
+                      {getDisplayRating(selectedFeedback)} / 10
                     </span>
                   </div>
                 </div>
               </div>
-
-              {/* Feedback Message Section */}
-              {selectedFeedback.comment && (
-                <div className="bg-gradient-to-br from-brand-50 to-indigo-50 dark:from-brand-900/20 dark:to-indigo-900/20 rounded-xl p-5 border border-brand-200 dark:border-brand-800">
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-5 flex items-center gap-3">
-                    <div className="w-1 h-6 bg-gradient-to-b from-brand-500 to-indigo-600 rounded-full"></div>
-                    Feedback Comment
-                  </h3>
-                  <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                      {selectedFeedback.comment}
-                    </p>
-                  </div>
-                </div>
-              )}
 
               {/* Order Details Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

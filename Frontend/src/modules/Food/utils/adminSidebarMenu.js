@@ -149,7 +149,7 @@ export const adminSidebarMenu = [
     type: "section",
     label: "HELP & SUPPORT",
     items: [
-      { type: "link", label: "User Feedback", path: "/admin/food/contact-messages", icon: "Mail" },
+      { type: "link", label: "Restaurant Share Feedback", path: "/admin/food/contact-messages", icon: "Mail" },
       { type: "link", label: "Safety Emergency Reports", path: "/admin/food/safety-emergency-reports", icon: "AlertTriangle" },
     ],
   },
@@ -179,12 +179,6 @@ export const adminSidebarMenu = [
           { label: "Delivery Settlement", path: "/admin/food/delivery-report/settlement" },
           { label: "Delivery Settlement History", path: "/admin/food/delivery-report/settlement-history" },
         ],
-      },
-      {
-        type: "expandable",
-        label: "Customer Report",
-        icon: "FileText",
-        subItems: [{ label: "Feedback Experience", path: "/admin/food/customer-report/feedback-experience" }],
       },
     ],
   },

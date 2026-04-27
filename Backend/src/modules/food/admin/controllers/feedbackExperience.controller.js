@@ -10,7 +10,7 @@ export const createFeedbackExperience = async (req, res) => {
         const { rating, comment, module } = req.body;
         const userId = req.user?.userId; // Sahi field 'userId' hai, '_id' nahi
 
-        if (!rating || !module) {
+        if (rating === undefined || rating === null || rating === '' || !module) {
             return sendError(res, 400, 'Rating and module are required');
         }
 
@@ -18,9 +18,14 @@ export const createFeedbackExperience = async (req, res) => {
             return sendError(res, 401, 'User ID not found in token');
         }
 
+        const parsedRating = Number(rating);
+        if (!Number.isFinite(parsedRating) || parsedRating < 0 || parsedRating > 10) {
+            return sendError(res, 400, 'Rating must be a number between 0 and 10');
+        }
+
         const feedbackData = {
             userId,
-            rating,
+            rating: Math.round(parsedRating),
             comment: comment || '',
             module
         };
@@ -70,21 +75,24 @@ export const getFeedbackExperiences = async (req, res) => {
             }
         }
 
-        // Rating filter (frontend sends 0-10, backend stores 1-5)
-        if (rating) {
-            query.rating = Math.ceil(parseInt(rating) / 2) || 1;
+        // Rating filter (frontend sends and backend stores 0-10)
+        if (rating !== undefined && rating !== null && rating !== '') {
+            const parsed = parseInt(rating, 10);
+            if (!Number.isNaN(parsed)) {
+                query.rating = parsed;
+            }
         }
 
-        // Experience filter (mapping experience labels to rating ranges)
+        // Experience filter (mapping experience labels to 0-10 scale)
         if (experience) {
             switch (experience) {
-                case 'very_bad': query.rating = 1; break;
-                case 'bad': query.rating = 1; break;
-                case 'below_average': query.rating = 2; break;
-                case 'average': query.rating = 3; break;
-                case 'above_average': query.rating = 4; break;
-                case 'good': query.rating = 4; break;
-                case 'very_good': query.rating = 5; break;
+                case 'very_bad': query.rating = { $gte: 0, $lte: 2 }; break;
+                case 'bad': query.rating = { $gte: 3, $lte: 4 }; break;
+                case 'below_average': query.rating = { $gte: 5, $lte: 5 }; break;
+                case 'average': query.rating = { $gte: 6, $lte: 7 }; break;
+                case 'above_average': query.rating = { $gte: 8, $lte: 8 }; break;
+                case 'good': query.rating = { $gte: 9, $lte: 9 }; break;
+                case 'very_good': query.rating = { $gte: 10, $lte: 10 }; break;
             }
         }
 
@@ -108,10 +116,10 @@ export const getFeedbackExperiences = async (req, res) => {
         let maxRating = 0;
 
         if (totalCount > 0) {
-            const sum = allFeedbacksForStats.reduce((acc, curr) => acc + (curr.rating * 2), 0);
+            const sum = allFeedbacksForStats.reduce((acc, curr) => acc + curr.rating, 0);
             avgRating = sum / totalCount;
-            minRating = Math.min(...allFeedbacksForStats.map(f => f.rating * 2));
-            maxRating = Math.max(...allFeedbacksForStats.map(f => f.rating * 2));
+            minRating = Math.min(...allFeedbacksForStats.map(f => f.rating));
+            maxRating = Math.max(...allFeedbacksForStats.map(f => f.rating));
         }
 
         const statistics = {

@@ -29,17 +29,23 @@ const normalizeCouponPayload = (body = {}) => {
         maxDiscount = maxDiscountRaw;
     }
 
-    const usageLimit = body.usageLimit !== undefined && body.usageLimit !== '' ? Number(body.usageLimit) : null;
-    if (usageLimit !== null && (!Number.isFinite(usageLimit) || usageLimit <= 0)) {
+    if (body.usageLimit === undefined || body.usageLimit === null || body.usageLimit === '') {
+        throw new ValidationError('Usage limit is required');
+    }
+    const usageLimit = Number(body.usageLimit);
+    if (!Number.isFinite(usageLimit) || usageLimit <= 0) {
         throw new ValidationError('Usage limit must be greater than 0');
     }
 
-    const perUserLimit = body.perUserLimit !== undefined && body.perUserLimit !== '' ? Number(body.perUserLimit) : null;
-    if (perUserLimit !== null && (!Number.isFinite(perUserLimit) || perUserLimit <= 0)) {
+    if (body.perUserLimit === undefined || body.perUserLimit === null || body.perUserLimit === '') {
+        throw new ValidationError('Per user limit is required');
+    }
+    const perUserLimit = Number(body.perUserLimit);
+    if (!Number.isFinite(perUserLimit) || perUserLimit <= 0) {
         throw new ValidationError('Per user limit must be greater than 0');
     }
 
-    if (usageLimit !== null && perUserLimit !== null && usageLimit <= perUserLimit) {
+    if (usageLimit <= perUserLimit) {
         throw new ValidationError('Total usage limit must be greater than per-user limit');
     }
 

@@ -361,6 +361,30 @@ export default function OrderDetails() {
     const rightMargin = 15
     const bottomMargin = 20
     let yPosition = 20
+    // Keep receipt-only money formatter ASCII-safe for jsPDF default font.
+    const formatReceiptMoney = (value) => `Rs ${Number(value || 0).toFixed(2)}`
+    const formatReceiptDiscount = (value) => `-Rs ${Math.abs(Number(value || 0)).toFixed(2)}`
+    const collapseReceiptAddress = (rawAddress) => {
+      const normalized = String(rawAddress || "")
+        .replace(/\b(?:building|floor\/flat|street|area|city|state|country)\s*:\s*/gi, "")
+        .replace(/\s+/g, " ")
+        .replace(/,\s*,+/g, ", ")
+        .trim()
+
+      if (!normalized) return "-"
+
+      const uniqueParts = Array.from(
+        new Set(
+          normalized
+            .split(",")
+            .map((part) => part.trim())
+            .filter(Boolean),
+        ),
+      )
+
+      const concise = uniqueParts.slice(0, 4).join(", ")
+      return concise.length > 90 ? `${concise.slice(0, 87)}...` : concise
+    }
 
     const ensureSpace = (requiredHeight = 0, resetY = 20) => {
       if (yPosition + requiredHeight > pageHeight - bottomMargin) {
@@ -377,7 +401,12 @@ export default function OrderDetails() {
 
     doc.setFontSize(10)
     doc.setFont("helvetica", "normal")
-    doc.text(orderData.address, pageWidth / 2, yPosition, { align: "center" })
+    const collapsedAddress = collapseReceiptAddress(orderData.address)
+    const addressLine = doc.splitTextToSize(
+      collapsedAddress,
+      pageWidth - leftMargin - rightMargin,
+    )[0] || "-"
+    doc.text(addressLine, pageWidth / 2, yPosition, { align: "center" })
     yPosition += 15
 
     // Order Receipt Title
@@ -465,7 +494,7 @@ export default function OrderDetails() {
       `${item.quantity}x`,
       item.variantLabel ? `${item.name} (${item.variantLabel})` : item.name,
       item.type || "-",
-      formatMoney(item.price)
+      formatReceiptMoney(item.price)
     ])
 
     // Use autoTable with the doc instance
@@ -502,26 +531,26 @@ export default function OrderDetails() {
     doc.setFontSize(10)
     doc.setFont("helvetica", "normal")
     const billRows = [
-      ["Item Subtotal:", formatMoney(orderData.billing.itemSubtotal)],
-      ["Taxes:", formatMoney(orderData.billing.taxes)],
+      ["Item Subtotal:", formatReceiptMoney(orderData.billing.itemSubtotal)],
+      ["Taxes:", formatReceiptMoney(orderData.billing.taxes)],
     ]
     if (Number(orderData.billing.packagingFee) > 0) {
-      billRows.push(["Packaging Fee:", formatMoney(orderData.billing.packagingFee)])
+      billRows.push(["Packaging Fee:", formatReceiptMoney(orderData.billing.packagingFee)])
     }
     if (Number(orderData.billing.deliveryFee) > 0) {
-      billRows.push(["Delivery Fee:", formatMoney(orderData.billing.deliveryFee)])
+      billRows.push(["Delivery Fee:", formatReceiptMoney(orderData.billing.deliveryFee)])
     }
     if (Number(orderData.billing.platformFee) > 0) {
-      billRows.push(["Platform Fee:", formatMoney(orderData.billing.platformFee)])
+      billRows.push(["Platform Fee:", formatReceiptMoney(orderData.billing.platformFee)])
     }
     if (Number(orderData.billing.discount) > 0) {
-      billRows.push(["Discount:", formatDiscount(orderData.billing.discount)])
+      billRows.push(["Discount:", formatReceiptDiscount(orderData.billing.discount)])
     }
     if (Number(orderData.billing.couponDiscount) > 0) {
-      billRows.push(["Coupon Discount:", formatDiscount(orderData.billing.couponDiscount)])
+      billRows.push(["Coupon Discount:", formatReceiptDiscount(orderData.billing.couponDiscount)])
     }
     if (Number(orderData.billing.referralDiscount) > 0) {
-      billRows.push(["Referral Discount:", formatDiscount(orderData.billing.referralDiscount)])
+      billRows.push(["Referral Discount:", formatReceiptDiscount(orderData.billing.referralDiscount)])
     }
     billRows.forEach(([label, value]) => {
       doc.text(label, 15, yPosition)
@@ -538,18 +567,13 @@ export default function OrderDetails() {
     doc.setFont("helvetica", "bold")
     doc.setFontSize(11)
     doc.text("Total Bill:", leftMargin, yPosition)
-    doc.text(formatMoney(orderData.billing.total), pageWidth - rightMargin, yPosition, { align: "right" })
-    yPosition += 6
-    doc.setTextColor(22, 163, 74)
-    doc.text("Your Earning:", leftMargin, yPosition)
-    doc.text(formatMoney(orderData.billing.restaurantEarning), pageWidth - rightMargin, yPosition, { align: "right" })
-    doc.setTextColor(0, 0, 0)
+    doc.text(formatReceiptMoney(orderData.billing.total), pageWidth - rightMargin, yPosition, { align: "right" })
     yPosition += 6
     if (Number(orderData.billing.paidAmount) > 0) {
       doc.setFont("helvetica", "normal")
       doc.setFontSize(10)
       doc.text("Amount Paid:", leftMargin, yPosition)
-      doc.text(formatMoney(orderData.billing.paidAmount), pageWidth - rightMargin, yPosition, { align: "right" })
+      doc.text(formatReceiptMoney(orderData.billing.paidAmount), pageWidth - rightMargin, yPosition, { align: "right" })
       yPosition += 6
     }
 

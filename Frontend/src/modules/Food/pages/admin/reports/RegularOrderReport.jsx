@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, useRef } from "react"
 import { BarChart3, ChevronDown, Settings, FileText, FileSpreadsheet, Code, Loader2 } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { API_BASE_URL } from "@food/api/config"
@@ -38,7 +38,6 @@ const statusMeta = {
 }
 
 const PAGE_SIZE = 25
-const AUTO_REFRESH_MS = 5000
 const INR_SYMBOL = "\u20B9"
 const toAmountNumber = (value) => {
   if (value == null) return 0
@@ -117,6 +116,7 @@ export default function RegularOrderReport() {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [refreshTick, setRefreshTick] = useState(0)
+  const hasLoadedOnceRef = useRef(false)
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
@@ -182,25 +182,34 @@ export default function RegularOrderReport() {
   // Fetch orders from backend
   useEffect(() => {
     const fetchOrders = async () => {
-      setLoading(true)
+      const isInitialLoad = !hasLoadedOnceRef.current
+      if (isInitialLoad) {
+        setLoading(true)
+      }
       setError(null)
       try {
         if (filters.fromDate && filters.toDate && filters.fromDate > filters.toDate) {
           toast.error("Start Date cannot be after End Date")
           setOrders([])
-          setLoading(false)
+          if (isInitialLoad) {
+            setLoading(false)
+          }
           return
         }
         if (filters.fromDate && filters.fromDate > todayDate) {
           toast.error("Start Date cannot be in the future")
           setOrders([])
-          setLoading(false)
+          if (isInitialLoad) {
+            setLoading(false)
+          }
           return
         }
         if (filters.toDate && filters.toDate > todayDate) {
           toast.error("End Date cannot be in the future")
           setOrders([])
-          setLoading(false)
+          if (isInitialLoad) {
+            setLoading(false)
+          }
           return
         }
         const { fromDate, toDate } = getDateRange()
@@ -310,21 +319,15 @@ export default function RegularOrderReport() {
         setError(err.response?.data?.message || "Failed to fetch orders")
         toast.error(err.response?.data?.message || "Failed to fetch orders")
       } finally {
-        setLoading(false)
+        if (isInitialLoad) {
+          setLoading(false)
+          hasLoadedOnceRef.current = true
+        }
       }
     }
 
     fetchOrders()
   }, [filters, searchQuery, refreshTick])
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      if (typeof document !== "undefined" && document.hidden) return
-      setRefreshTick((prev) => prev + 1)
-    }, AUTO_REFRESH_MS)
-
-    return () => clearInterval(intervalId)
-  }, [])
 
   useEffect(() => {
     const backendUrl = String(API_BASE_URL || "")

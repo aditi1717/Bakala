@@ -21,8 +21,8 @@ const feedbackExperienceSchema = new mongoose.Schema(
         rating: { 
             type: Number, 
             required: true,
-            min: 1,
-            max: 5
+            min: 0,
+            max: 10
         },
         comment: { 
             type: String, 

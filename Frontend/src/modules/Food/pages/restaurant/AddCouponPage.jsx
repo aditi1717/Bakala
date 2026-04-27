@@ -25,7 +25,6 @@ const defaultForm = {
   startDate: "",
   endDate: "",
   customerScope: "all",
-  isFirstOrderOnly: false,
 }
 
 export default function AddCouponPage(props) {
@@ -70,7 +69,6 @@ export default function AddCouponPage(props) {
             startDate: match.startDate ? new Date(match.startDate).toISOString().slice(0, 10) : "",
             endDate: match.endDate ? new Date(match.endDate).toISOString().slice(0, 10) : "",
             customerScope: match.customerScope || "all",
-            isFirstOrderOnly: !!match.isFirstOrderOnly,
           })
           setApprovalStatus(match.approvalStatus || "")
         }
@@ -108,15 +106,11 @@ export default function AddCouponPage(props) {
       if (!Number.isFinite(max) || max <= 0) return "Max discount is required for percentage coupons"
     }
     if (form.minOrderValue && Number(form.minOrderValue) < 0) return "Min order cannot be negative"
-    if (form.usageLimit) {
-      if (Number(form.usageLimit) <= 0) return "Global usage limit must be greater than 0"
-    }
-    if (form.perUserLimit) {
-      if (Number(form.perUserLimit) <= 0) return "Per user limit must be greater than 0"
-    }
-    if (form.usageLimit && form.perUserLimit) {
-      if (Number(form.usageLimit) <= Number(form.perUserLimit)) return "Total usage limit must be greater than per-user limit"
-    }
+    if (form.usageLimit === "") return "Usage limit is required"
+    if (Number(form.usageLimit) <= 0) return "Usage limit must be greater than 0"
+    if (form.perUserLimit === "") return "Per user limit is required"
+    if (Number(form.perUserLimit) <= 0) return "Per user limit must be greater than 0"
+    if (Number(form.usageLimit) <= Number(form.perUserLimit)) return "Total usage limit must be greater than per-user limit"
     if (form.startDate && form.endDate && new Date(form.endDate) <= new Date(form.startDate)) {
       return "End date must be after start date"
     }
@@ -137,11 +131,10 @@ export default function AddCouponPage(props) {
       restaurantScope: "selected",
       minOrderValue: form.minOrderValue === "" ? undefined : Number(form.minOrderValue),
       maxDiscount: form.discountType === "percentage" ? maxDiscountNum : undefined,
-      usageLimit: form.usageLimit === "" ? undefined : Number(form.usageLimit),
-      perUserLimit: form.perUserLimit === "" ? undefined : Number(form.perUserLimit),
+      usageLimit: Number(form.usageLimit),
+      perUserLimit: Number(form.perUserLimit),
       startDate: form.startDate || undefined,
       endDate: form.endDate || undefined,
-      isFirstOrderOnly: !!form.isFirstOrderOnly,
     }
     return base
   }
@@ -296,13 +289,12 @@ export default function AddCouponPage(props) {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Usage Limit (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Usage Limit *</label>
                 <Input
                   type="number"
-                  min="0"
+                  min="1"
                   value={form.usageLimit}
                   onChange={(e) => updateField("usageLimit", e.target.value)}
-                  placeholder="e.g. 100"
                   disabled={loading || saving}
                 />
               </div>
@@ -310,13 +302,12 @@ export default function AddCouponPage(props) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Per User Limit (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Per User Limit *</label>
                 <Input
                   type="number"
-                  min="0"
+                  min="1"
                   value={form.perUserLimit}
                   onChange={(e) => updateField("perUserLimit", e.target.value)}
-                  placeholder="e.g. 1"
                   disabled={loading || saving}
                 />
               </div>
@@ -363,17 +354,6 @@ export default function AddCouponPage(props) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                id="isFirstOrderOnly"
-                type="checkbox"
-                checked={form.isFirstOrderOnly}
-                onChange={(e) => updateField("isFirstOrderOnly", e.target.checked)}
-                className="h-4 w-4"
-                disabled={loading || saving}
-              />
-              <label htmlFor="isFirstOrderOnly" className="text-sm text-gray-700">Only for first order</label>
-            </div>
           </CardContent>
         </Card>
       </div>

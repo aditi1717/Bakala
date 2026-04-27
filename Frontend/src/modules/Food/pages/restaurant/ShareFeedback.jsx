@@ -35,9 +35,9 @@ export default function ShareFeedback() {
       setIsSubmitting(true)
       // Save feedback experience to backend
       const response = await api.post(API_ENDPOINTS.ADMIN.FEEDBACK_EXPERIENCE_CREATE, {
-        rating: Math.ceil(rating / 2) || 1, // Convert 0-10 to 1-5 for backend
+        rating, // Persist exact 0-10 value selected by restaurant
         module: 'restaurant',
-        comment: `User rated ${rating}/10 overall experience`
+        comment: `Restaurant rated ${rating}/10 overall experience`
       })
       
       if (response.data?.success) {

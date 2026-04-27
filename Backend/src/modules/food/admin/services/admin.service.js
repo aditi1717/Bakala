@@ -2278,12 +2278,27 @@ export async function getSafetyEmergencyReports(query = {}) {
     }
 
     const [list, total] = await Promise.all([
-        FoodSafetyEmergencyReport.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        FoodSafetyEmergencyReport.find(filter)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate('userId', 'name email phone')
+            .lean(),
         FoodSafetyEmergencyReport.countDocuments(filter)
     ]);
 
+    const safetyEmergencies = (list || []).map((doc) => {
+        const user = doc?.userId && typeof doc.userId === 'object' ? doc.userId : {};
+        return {
+            ...doc,
+            userName: doc?.userName || user?.name || '',
+            userEmail: doc?.userEmail || user?.email || '',
+            userPhone: doc?.userPhone || user?.phone || ''
+        };
+    });
+
     return {
-        safetyEmergencies: list || [],
+        safetyEmergencies,
         pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 }
     };
 }
@@ -2327,8 +2342,8 @@ export async function getContactMessages(query = {}) {
     await FeedbackExperience.updateMany({ userModel: 'User' }, { $set: { userModel: 'FoodUser' } });
 
     const filter = {};
-    if (query.rating && !isNaN(query.rating)) {
-        filter.rating = parseInt(query.rating);
+    if (query.rating !== undefined && query.rating !== null && query.rating !== '' && !isNaN(query.rating)) {
+        filter.rating = parseInt(query.rating, 10);
     }
 
     if (query.search && String(query.search).trim()) {

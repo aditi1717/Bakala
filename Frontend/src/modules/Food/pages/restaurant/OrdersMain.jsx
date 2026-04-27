@@ -2988,7 +2988,7 @@ export default function OrdersMain() {
                         <span className="relative z-10 text-sm font-semibold text-white text-center">
                           {isAcceptingOrder
                             ? "Accepting order..."
-                            : `Slide to accept (${formatTime(countdown)})`}
+                            : "Slide to accept"}
                         </span>
                       </div>
                       <motion.button
