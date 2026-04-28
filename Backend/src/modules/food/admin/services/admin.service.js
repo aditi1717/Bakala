@@ -5946,8 +5946,8 @@ export async function getRestaurantPayoutSettlementPreview(query = {}, adminScop
 
     const txMatch = {
         createdAt: { $lte: end },
-        status: 'captured',
-        'settlement.isRestaurantSettled': { $ne: true }
+        'settlement.isRestaurantSettled': { $ne: true },
+        orderId: { $exists: true, $ne: null }
     };
     if (Array.isArray(scopedRestaurantIds)) {
         txMatch.restaurantId = { $in: scopedRestaurantIds };
@@ -5955,6 +5955,27 @@ export async function getRestaurantPayoutSettlementPreview(query = {}, adminScop
 
     const rowsRaw = await FoodTransaction.aggregate([
         { $match: txMatch },
+        // Join with FoodOrder to check delivery status
+        {
+            $lookup: {
+                from: 'food_orders',
+                localField: 'orderId',
+                foreignField: '_id',
+                as: 'order'
+            }
+        },
+        {
+            $unwind: {
+                path: '$order',
+                preserveNullAndEmptyArrays: false
+            }
+        },
+        // Only include delivered orders
+        {
+            $match: {
+                'order.orderStatus': 'delivered'
+            }
+        },
         {
             $group: {
                 _id: '$restaurantId',
@@ -6385,16 +6406,45 @@ export async function markAllRestaurantPayoutSettled(payload = {}, adminScope = 
 
     const txFilter = {
         createdAt: { $lte: end },
-        status: 'captured',
-        'settlement.isRestaurantSettled': { $ne: true }
+        'settlement.isRestaurantSettled': { $ne: true },
+        orderId: { $exists: true, $ne: null }
     };
     if (Array.isArray(candidateRestaurantIds)) {
         txFilter.restaurantId = { $in: candidateRestaurantIds };
     }
 
-    const pendingTransactions = await FoodTransaction.find(txFilter)
-        .select('_id restaurantId amounts.restaurantShare')
-        .lean();
+    // Use aggregation to join with orders and filter by delivery status
+    const pendingTransactions = await FoodTransaction.aggregate([
+        { $match: txFilter },
+        // Join with FoodOrder to check delivery status
+        {
+            $lookup: {
+                from: 'food_orders',
+                localField: 'orderId',
+                foreignField: '_id',
+                as: 'order'
+            }
+        },
+        {
+            $unwind: {
+                path: '$order',
+                preserveNullAndEmptyArrays: false
+            }
+        },
+        // Only include delivered orders
+        {
+            $match: {
+                'order.orderStatus': 'delivered'
+            }
+        },
+        {
+            $project: {
+                _id: 1,
+                restaurantId: 1,
+                'amounts.restaurantShare': 1
+            }
+        }
+    ]).exec();
 
     if (!pendingTransactions.length) {
         return { updatedTransactions: 0, settlementsCreated: 0, totalPaidAmount: 0 };
