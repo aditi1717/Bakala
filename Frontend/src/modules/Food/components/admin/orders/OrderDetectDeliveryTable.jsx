@@ -247,23 +247,23 @@ export default function OrderDetectDeliveryTable({
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => onAssignOrder(order)}
-                        className="p-1.5 rounded text-violet-600 hover:bg-violet-50 transition-colors"
-                        title={order.deliveryBoyName ? "Reassign Delivery Partner" : "Assign Delivery Partner"}
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
-                      {order.canResend && (
-                        <button
-                          onClick={() => onResendOrder(order)}
-                          disabled={actionLoadingKey === `resend:${order.orderMongoId}`}
-                          className="p-1.5 rounded text-emerald-600 hover:bg-emerald-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                          title="Resend Notification"
-                        >
-                          <RefreshCw className={`w-4 h-4 ${actionLoadingKey === `resend:${order.orderMongoId}` ? "animate-spin" : ""}`} />
-                        </button>
-                      )}
+                      {(() => {
+                        const rawStatus = String(order?.rawOrderStatus || "").toLowerCase()
+                        const isCompleted = rawStatus === "delivered" || rawStatus === "completed" || rawStatus === "rejected" || rawStatus === "cancelled" || rawStatus === "cancelled_by_user" || rawStatus === "cancelled_by_restaurant" || rawStatus === "cancelled_by_admin"
+                        
+                        // Hide assign button completely for completed orders
+                        if (isCompleted) return null
+                        
+                        return (
+                          <button
+                            onClick={() => onAssignOrder(order)}
+                            className="p-1.5 rounded text-violet-600 hover:bg-violet-50 transition-colors"
+                            title={order.deliveryBoyName ? "Reassign Delivery Partner" : "Assign Delivery Partner"}
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                        )
+                      })()}
                       <button 
                         onClick={() => onPrintOrder(order)}
                         className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
