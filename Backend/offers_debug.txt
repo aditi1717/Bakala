@@ -1114,3 +1114,7 @@
 [2026-04-28T06:47:48.909Z] auth header: Present, req.user: {"userId":"69d49be6868036e30fb25e37","role":"USER"}, userId: 69d49be6868036e30fb25e37
 
 [2026-04-28T06:47:49.155Z] auth header: Present, req.user: {"userId":"69d49be6868036e30fb25e37","role":"USER"}, userId: 69d49be6868036e30fb25e37
+
+[2026-04-29T09:41:51.964Z] auth header: Missing, req.user: undefined, userId: undefined
+
+[2026-04-29T09:41:52.013Z] auth header: Missing, req.user: undefined, userId: undefined

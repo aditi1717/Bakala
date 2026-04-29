@@ -196,6 +196,44 @@ const emitRealtimeNotifications = (targets = [], broadcast) => {
     }
 };
 
+const runBroadcastSideEffectsInBackground = ({ resolvedTargets = [], title, message, link, broadcastId } = {}) => {
+    if (!broadcastId || !resolvedTargets.length) return;
+
+    Promise.resolve()
+        .then(async () => {
+            await createInboxNotifications({
+                notifications: resolvedTargets.map((target) =>
+                    buildNotificationPayload({
+                        title,
+                        message,
+                        link,
+                        broadcastId,
+                        target
+                    })
+                )
+            });
+
+            await notifyOwnersSafely(
+                resolvedTargets.map((target) => ({
+                    ownerType: target.ownerType,
+                    ownerId: target.ownerId
+                })),
+                {
+                    title,
+                    body: message,
+                    data: {
+                        type: 'admin_broadcast',
+                        broadcastId: String(broadcastId),
+                        link
+                    }
+                }
+            );
+        })
+        .catch((error) => {
+            console.error('Broadcast notification side effects failed:', error?.message || error);
+        });
+};
+
 const paginationMeta = ({ page = 1, limit = 10 } = {}) => {
     const nextPage = Math.max(1, Number(page) || 1);
     const nextLimit = Math.max(1, Math.min(100, Number(limit) || 10));
@@ -239,35 +277,14 @@ export const createBroadcastNotification = async ({ body = {}, adminId } = {}) =
         targetCount: resolvedTargets.length
     });
 
-    await createInboxNotifications({
-        notifications: resolvedTargets.map((target) =>
-            buildNotificationPayload({
-                title,
-                message,
-                link,
-                broadcastId: broadcast._id,
-                target
-            })
-        )
-    });
-
-    await notifyOwnersSafely(
-        resolvedTargets.map((target) => ({
-            ownerType: target.ownerType,
-            ownerId: target.ownerId
-        })),
-        {
-            title,
-            body: message,
-            data: {
-                type: 'admin_broadcast',
-                broadcastId: String(broadcast._id),
-                link
-            }
-        }
-    );
-
     emitRealtimeNotifications(resolvedTargets, broadcast);
+    runBroadcastSideEffectsInBackground({
+        resolvedTargets,
+        title,
+        message,
+        link,
+        broadcastId: broadcast._id
+    });
 
     return {
         broadcast,
