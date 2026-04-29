@@ -54,6 +54,22 @@ const applyZoneVisibilityFilter = (filterAndList, zoneIdRaw) => {
     });
 };
 
+const buildZoneVisibilityCondition = (zoneIdRaw) => {
+    if (zoneIdRaw && mongoose.Types.ObjectId.isValid(zoneIdRaw)) {
+        return {
+            $or: [
+                { zoneId: new mongoose.Types.ObjectId(zoneIdRaw) },
+                { zoneId: { $exists: false } },
+                { zoneId: null }
+            ]
+        };
+    }
+
+    return {
+        $or: [{ zoneId: { $exists: false } }, { zoneId: null }]
+    };
+};
+
 export async function listRestaurantCategories(restaurantId, query = {}) {
     const context = await getRestaurantContext(restaurantId);
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 1000, 1), 1000);
@@ -75,7 +91,8 @@ export async function listRestaurantCategories(restaurantId, query = {}) {
                 {
                     $and: [
                         { $or: GLOBAL_CATEGORY_FILTER },
-                        { $or: APPROVED_CATEGORY_FILTER }
+                        { $or: APPROVED_CATEGORY_FILTER },
+                        buildZoneVisibilityCondition(zoneIdRaw)
                     ]
                 },
                 {
@@ -89,7 +106,8 @@ export async function listRestaurantCategories(restaurantId, query = {}) {
                 {
                     $and: [
                         { $or: GLOBAL_CATEGORY_FILTER },
-                        { $or: APPROVED_CATEGORY_FILTER }
+                        { $or: APPROVED_CATEGORY_FILTER },
+                        buildZoneVisibilityCondition(zoneIdRaw)
                     ]
                 },
                 { restaurantId: context.restaurantId },
@@ -102,7 +120,6 @@ export async function listRestaurantCategories(restaurantId, query = {}) {
         const term = escapeRegex(search.slice(0, 80));
         filter.$and.push({ name: { $regex: term, $options: 'i' } });
     }
-    applyZoneVisibilityFilter(filter.$and, zoneIdRaw);
 
     if (compact && context.pureVegRestaurant) {
         filter.$and.push({ foodTypeScope: 'Veg' });

@@ -6,7 +6,55 @@ import { FoodCategory } from '../../admin/models/category.model.js';
 import { getFoodDisplayPrice, serializeFoodVariants } from '../../admin/services/foodVariant.service.js';
 import { isCategoryVisibleNow } from '../../shared/categoryWorkflow.js';
 
-const buildMenuFromFoods = async (foods = []) => {
+const parse12HourTimeToMinutes = (value) => {
+    const text = String(value || '').trim();
+    const match = text.match(/^(0?[1-9]|1[0-2]):([0-5]\d)\s?(AM|PM)$/i);
+    if (!match) return null;
+    let hour = Number(match[1]);
+    const minute = Number(match[2]);
+    const meridiem = String(match[3] || '').toUpperCase();
+    if (meridiem === 'AM') {
+        if (hour === 12) hour = 0;
+    } else if (hour !== 12) {
+        hour += 12;
+    }
+    return hour * 60 + minute;
+};
+
+const getCurrentMinutesForTimezone = (timezone = 'Asia/Kolkata') => {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: timezone
+    });
+    const parts = formatter.formatToParts(new Date());
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value || 0);
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value || 0);
+    return hour * 60 + minute;
+};
+
+const isFoodVisibleNow = (food = {}, options = {}) => {
+    const start = String(food?.availabilityTimeStart || '').trim();
+    const end = String(food?.availabilityTimeEnd || '').trim();
+    if (!start && !end) return true;
+
+    const nowMinutes = Number.isFinite(options.currentMinutes)
+        ? Number(options.currentMinutes)
+        : getCurrentMinutesForTimezone(options.timezone || 'Asia/Kolkata');
+    const startMinutes = parse12HourTimeToMinutes(start);
+    const endMinutes = parse12HourTimeToMinutes(end);
+
+    if (start && !end && startMinutes !== null) return nowMinutes >= startMinutes;
+    if (!start && end && endMinutes !== null) return nowMinutes <= endMinutes;
+    if (startMinutes === null || endMinutes === null) return true;
+    if (startMinutes <= endMinutes) {
+        return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+    }
+    return nowMinutes >= startMinutes || nowMinutes <= endMinutes;
+};
+
+const buildMenuFromFoods = async (foods = [], options = {}) => {
     const categoryIds = Array.from(
         new Set(
             (foods || [])
@@ -33,6 +81,9 @@ const buildMenuFromFoods = async (foods = []) => {
 
     const byCategory = new Map();
     for (const food of foods) {
+        if (options.onlyCurrentlyVisible === true && !isFoodVisibleNow(food, { timezone: options.timezone || 'Asia/Kolkata' })) {
+            continue;
+        }
         const categoryId = food?.categoryId ? String(food.categoryId) : '';
         if (categoryId && !visibleCategoryIdSet.has(categoryId)) {
             continue;
@@ -71,6 +122,8 @@ const buildMenuFromFoods = async (foods = []) => {
             approvedAt: food.approvedAt,
             rejectedAt: food.rejectedAt,
             preparationTime: food.preparationTime || '',
+            availabilityTimeStart: food.availabilityTimeStart || '',
+            availabilityTimeEnd: food.availabilityTimeEnd || '',
             createdAt: food.createdAt,
             updatedAt: food.updatedAt
         });
@@ -148,7 +201,7 @@ export async function getPublicApprovedRestaurantMenu(restaurantIdOrSlug) {
         .sort({ createdAt: -1 })
         .limit(2000)
         .lean();
-    return buildMenuFromFoods(foods);
+    return buildMenuFromFoods(foods, { onlyCurrentlyVisible: true, timezone: 'Asia/Kolkata' });
 }
 
 export async function syncMenuItemApprovalStatus(restaurantId, itemId, status, rejectionReason = '') {
