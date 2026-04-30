@@ -23,6 +23,7 @@ import {
   ShoppingCart,
   MapPin,
   Share2,
+  Bell,
 } from "lucide-react";
 
 import AnimatedPage from "@food/components/user/AnimatedPage";
@@ -445,6 +446,22 @@ export default function Profile() {
     }
   };
 
+  const handleTestNotification = async () => {
+    const loadingToast = toast.loading("Sending test notification...");
+    try {
+      const isMobile = !!window.flutter_inappwebview;
+      const res = await userAPI.testFcmNotification({ platform: isMobile ? "mobile" : "web" });
+      if (res.data?.success) {
+        toast.success("Test notification triggered successfully!", { id: loadingToast });
+      } else {
+        toast.error(res.data?.message || "Failed to send test notification.", { id: loadingToast });
+      }
+    } catch (error) {
+      debugError("Test notification error:", error);
+      toast.error("Failed to trigger test notification. Make sure notifications are enabled.", { id: loadingToast });
+    }
+  };
+
   const handleLogoutClick = () => {
     if (isLoggingOut) return;
     setLogoutConfirmOpen(true);
@@ -786,6 +803,35 @@ export default function Profile() {
                     transition={{ duration: 0.2 }}>
                     {appearance}
                   </motion.span>
+                  <motion.div
+                    whileHover={{ x: 2 }}
+                    transition={{ duration: 0.2 }}>
+                    <ChevronRight className={chevronClass} />
+                  </motion.div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ x: 2 }}
+            transition={{ duration: 0.2, type: "spring", stiffness: 300 }}>
+            <Card
+              className={optionCardClass}
+              onClick={handleTestNotification}>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <motion.div
+                    className={iconWrapClass}
+                    whileHover={{ scale: 1.03 }}
+                    transition={{ duration: 0.3 }}>
+                    <Bell className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                  </motion.div>
+                  <span className={rowLabelClass}>
+                    Test Notification
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
                   <motion.div
                     whileHover={{ x: 2 }}
                     transition={{ duration: 0.2 }}>

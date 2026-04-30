@@ -1697,18 +1697,25 @@ export default function Cart() {
       if (cartRestaurantIds.length > 0) {
         const cartRestaurantId = cartRestaurantIds[0];
 
-        // Check if cart restaurantId matches restaurantData
+        // Check if cart restaurantId matches restaurantData (include slug in comparison)
         const restaurantIdMatches =
           cartRestaurantId === finalRestaurantId ||
           cartRestaurantId === restaurantData?._id?.toString() ||
-          cartRestaurantId === restaurantData?.restaurantId;
+          cartRestaurantId === restaurantData?.restaurantId ||
+          cartRestaurantId === restaurantData?.slug;
 
-        if (!restaurantIdMatches) {
-          debugError('? CRITICAL ERROR: Cart restaurantId does not match restaurantData!', {
+        // Also check name match as a fallback (very reliable if IDs are in different formats)
+        const cartRestaurantNameLower = cartRestaurantNames[0]?.toLowerCase().trim();
+        const currentRestaurantNameLower = restaurantData?.name?.toLowerCase().trim();
+        const restaurantNameMatches = cartRestaurantNameLower && currentRestaurantNameLower && cartRestaurantNameLower === currentRestaurantNameLower;
+
+        if (!restaurantIdMatches && !restaurantNameMatches) {
+          debugError('? CRITICAL ERROR: Cart restaurantId and name do not match restaurantData!', {
             cartRestaurantId: cartRestaurantId,
             finalRestaurantId: finalRestaurantId,
             restaurantDataId: restaurantData?._id?.toString(),
             restaurantDataRestaurantId: restaurantData?.restaurantId,
+            restaurantDataSlug: restaurantData?.slug,
             restaurantDataName: restaurantData?.name,
             cartRestaurantName: cartRestaurantNames[0]
           });
@@ -1718,17 +1725,31 @@ export default function Cart() {
         }
       }
 
-      // Validate restaurant name matches
+      // Validate restaurant name matches (if not already handled by ID match)
       if (cartRestaurantNames.length > 0 && finalRestaurantName) {
         const cartRestaurantName = cartRestaurantNames[0];
-        if (cartRestaurantName.toLowerCase().trim() !== finalRestaurantName.toLowerCase().trim()) {
-          debugError('? CRITICAL ERROR: Restaurant name mismatch!', {
-            cartRestaurantName: cartRestaurantName,
-            finalRestaurantName: finalRestaurantName
-          });
-          alert(`Error: Cart items belong to "${cartRestaurantName}" but restaurant data shows "${finalRestaurantName}". Please refresh the page and try again.`);
-          setIsPlacingOrder(false);
-          return;
+        const cartRestaurantNameLower = cartRestaurantName.toLowerCase().trim();
+        const finalRestaurantNameLower = finalRestaurantName.toLowerCase().trim();
+        
+        if (cartRestaurantNameLower !== finalRestaurantNameLower) {
+          // Double check if ID matched - if ID matched but names differ slightly, it might be OK
+          // but if NEITHER match, then it's definitely an error
+          const cartRestaurantId = cart[0]?.restaurantId;
+          const restaurantIdMatches = 
+            cartRestaurantId === finalRestaurantId ||
+            cartRestaurantId === restaurantData?._id?.toString() ||
+            cartRestaurantId === restaurantData?.restaurantId ||
+            cartRestaurantId === restaurantData?.slug;
+
+          if (!restaurantIdMatches) {
+            debugError('? CRITICAL ERROR: Restaurant name mismatch!', {
+              cartRestaurantName: cartRestaurantName,
+              finalRestaurantName: finalRestaurantName
+            });
+            alert(`Error: Cart items belong to "${cartRestaurantName}" but restaurant data shows "${finalRestaurantName}". Please refresh the page and try again.`);
+            setIsPlacingOrder(false);
+            return;
+          }
         }
       }
 
@@ -1745,15 +1766,27 @@ export default function Cart() {
 
       // FINAL VALIDATION: Double-check restaurantId before sending to backend
       const cartRestaurantId = cart[0]?.restaurantId;
-      if (cartRestaurantId && cartRestaurantId !== finalRestaurantId &&
-        cartRestaurantId !== restaurantData?._id?.toString() &&
-        cartRestaurantId !== restaurantData?.restaurantId) {
-        debugError('? CRITICAL: Final validation failed - restaurantId mismatch!', {
+      const cartRestaurantName = cart[0]?.restaurant;
+      
+      const finalIdMatches = 
+        !cartRestaurantId || 
+        cartRestaurantId === finalRestaurantId ||
+        cartRestaurantId === restaurantData?._id?.toString() ||
+        cartRestaurantId === restaurantData?.restaurantId ||
+        cartRestaurantId === restaurantData?.slug;
+        
+      const finalNameMatches = 
+        !cartRestaurantName || 
+        !finalRestaurantName || 
+        cartRestaurantName.toLowerCase().trim() === finalRestaurantName.toLowerCase().trim();
+
+      if (!finalIdMatches && !finalNameMatches) {
+        debugError('? CRITICAL: Final validation failed - restaurant mismatch!', {
           cartRestaurantId: cartRestaurantId,
           finalRestaurantId: finalRestaurantId,
           restaurantDataId: restaurantData?._id?.toString(),
           restaurantDataRestaurantId: restaurantData?.restaurantId,
-          cartRestaurantName: cart[0]?.restaurant,
+          cartRestaurantName: cartRestaurantName,
           finalRestaurantName: finalRestaurantName
         });
         alert('Error: Restaurant information mismatch detected. Please refresh the page and try again.');

@@ -27,7 +27,9 @@ let pushSoundContext = null;
 const PUSH_DEBUG_PREFIX = "[push-debug]";
 const notificationDedupWindowMs = 8000;
 const pushDebugLog = (prefix, message, data = {}) => {
-  console.log(`${prefix} ${message}`, data);
+  if (import.meta.env.DEV || localStorage.getItem('push_debug') === 'true') {
+    console.log(`${prefix} ${message}`, data);
+  }
 };
 const pushDebugWarn = (prefix, message, data = {}) => {
   console.warn(`${prefix} ${message}`, data);
@@ -420,17 +422,35 @@ function getMessagingFirebaseApp(config) {
   };
 
   if (!appConfig.apiKey || !appConfig.projectId || !appConfig.appId || !appConfig.messagingSenderId) {
+    pushDebugWarn(PUSH_DEBUG_PREFIX, "Firebase config is incomplete. Push notifications will be disabled.", { 
+      hasApiKey: !!appConfig.apiKey,
+      hasProjectId: !!appConfig.projectId,
+      hasAppId: !!appConfig.appId,
+      hasSenderId: !!appConfig.messagingSenderId
+    });
     return null;
   }
 
-  const existing = getApps().find((a) => a.name === MESSAGING_APP_NAME);
-  if (existing) return existing;
-
-  try {
-    return getApp(MESSAGING_APP_NAME);
-  } catch {
-    return initializeApp(appConfig, MESSAGING_APP_NAME);
+  // Use the default app to ensure consistency across the entire application
+  const allApps = getApps();
+  let app = allApps.find((a) => a.name === "[DEFAULT]");
+  
+  if (!app) {
+    try {
+      pushDebugLog(PUSH_DEBUG_PREFIX, "Initializing default Firebase app for messaging");
+      app = initializeApp(appConfig);
+    } catch (error) {
+      pushDebugWarn(PUSH_DEBUG_PREFIX, "Failed to initialize default app", { error: error.message });
+      // Fallback to named app if default fails (e.g. if already initialized but not found)
+      try {
+        app = initializeApp(appConfig, MESSAGING_APP_NAME);
+      } catch (e2) {
+        return null;
+      }
+    }
   }
+
+  return app;
 }
 
 function getSavedToken(moduleName) {
@@ -725,13 +745,29 @@ export async function registerWebPushForCurrentModule(pathname = window.location
       });
       const messaging = getMessaging(app);
 
+      const vapidKey = String(firebasePublicEnv.vapidKey || "").trim();
+      
+      pushDebugLog(PUSH_DEBUG_PREFIX, "Requesting FCM token...", {
+        projectId: firebasePublicEnv.projectId,
+        senderId: firebasePublicEnv.messagingSenderId,
+        hasVapidKey: !!vapidKey,
+        vapidKeyLength: vapidKey.length
+      });
+
+      if (!vapidKey) {
+        throw new Error("VAPID Key (Web Push Certificate) is missing. Please check your .env and Firebase Console.");
+      }
+
       const token = await getToken(messaging, {
-        vapidKey: firebasePublicEnv.vapidKey,
+        vapidKey: vapidKey,
         serviceWorkerRegistration: registration,
       });
 
-      if (!token) return;
-      pushDebugLog(PUSH_DEBUG_PREFIX, "FCM token resolved", {
+      if (!token) {
+        throw new Error("No FCM token returned from Google");
+      }
+
+      pushDebugLog(PUSH_DEBUG_PREFIX, "FCM token resolved successfully", {
         moduleName,
         tokenPreview: `${token.slice(0, 12)}...`,
       });
