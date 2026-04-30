@@ -1,6 +1,5 @@
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { deliveryAPI } from '@food/api';
-import { toast } from 'sonner';
 
 /**
  * useOrderManager - Professional hook for real-world trip lifecycle actions.
@@ -53,7 +52,6 @@ export const useOrderManager = () => {
   const acceptOrder = async (order, options = {}) => {
     const orderId = order?.orderId || order?._id || order?.id;
     if (!orderId) {
-      toast.error('Invalid order data');
       return;
     }
 
@@ -71,12 +69,10 @@ export const useOrderManager = () => {
 
         return hydratedOrder;
       } else {
-        toast.error('Order is already taken or unavailable');
         throw new Error('Accept failed');
       }
     } catch (error) {
       console.error('Accept Order Error:', error);
-      toast.error('Network error. Please try again.');
       throw error;
     }
   };
@@ -84,7 +80,6 @@ export const useOrderManager = () => {
   const rejectOrder = async (order, reasonType = "passed") => {
     const orderId = order?.orderId || order?._id || order?.id;
     if (!orderId) {
-      toast.error('Invalid order data');
       return;
     }
 
@@ -115,7 +110,6 @@ export const useOrderManager = () => {
         throw new Error('Confirm pickup failed');
       }
     } catch (error) {
-      toast.error('Failed to update status');
       throw error;
     }
   };
@@ -141,7 +135,6 @@ export const useOrderManager = () => {
         throw new Error('Confirm order ID failed');
       }
     } catch (error) {
-      toast.error('Error confirming pickup');
       throw error;
     }
   };
@@ -162,7 +155,6 @@ export const useOrderManager = () => {
       }
     } catch (error) {
       console.error('Completion Error:', error);
-      toast.error('Failed to complete delivery');
       throw error;
     }
   };
