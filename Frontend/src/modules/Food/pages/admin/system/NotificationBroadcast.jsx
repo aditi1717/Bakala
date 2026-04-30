@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BellRing, Loader2, Search, Send, Trash2 } from "lucide-react";
 import { adminAPI } from "@food/api";
+import { toast } from "sonner";
 
 const TARGET_OPTIONS = [
   { value: "ALL", label: "All" },
@@ -177,8 +178,16 @@ export default function NotificationBroadcast() {
       setForm({ title: "", message: "", targetType: "ALL" });
       setSelectedRecipients([]);
       setSearch("");
+      toast.success("Broadcast notification queued successfully.");
       window.dispatchEvent(new Event("adminBroadcastUpdated"));
       await loadHistory();
+    } catch (error) {
+      const isTimeout = error?.code === "ECONNABORTED" || String(error?.message || "").toLowerCase().includes("timeout");
+      toast.error(
+        isTimeout
+          ? "Broadcast request took too long. Please try again in a moment."
+          : error?.response?.data?.message || "Failed to send broadcast notification."
+      );
     } finally {
       setSubmitting(false);
     }

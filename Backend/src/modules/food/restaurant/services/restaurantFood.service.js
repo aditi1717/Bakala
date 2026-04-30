@@ -30,6 +30,21 @@ const normalizeFoodType = (v) => {
     return 'Non-Veg';
 };
 
+const TIME_12H_REGEX = /^(0?[1-9]|1[0-2]):([0-5]\d)\s?(AM|PM)$/i;
+
+const normalizeAvailabilityTime = (value) => {
+    const text = toStr(value);
+    if (!text) return '';
+    const match = text.match(TIME_12H_REGEX);
+    if (!match) {
+        throw new ValidationError('Availability time must be in 12-hour format like 09:30 AM');
+    }
+    const hour = String(match[1]).padStart(2, '0');
+    const minute = match[2];
+    const meridiem = String(match[3] || '').toUpperCase();
+    return `${hour}:${minute} ${meridiem}`;
+};
+
 const getCreateFoodPricing = (body = {}) => {
     const variants = normalizeFoodVariantsInput(extractRawFoodVariants(body));
     if (variants.length > 0) {
@@ -190,6 +205,8 @@ export async function createRestaurantFood(restaurantId, body = {}) {
     const isAvailable = body.isAvailable !== false;
     const foodType = normalizeFoodType(body.foodType);
     const preparationTime = toStr(body.preparationTime);
+    const availabilityTimeStart = normalizeAvailabilityTime(body.availabilityTimeStart);
+    const availabilityTimeEnd = normalizeAvailabilityTime(body.availabilityTimeEnd);
     const { categoryObjectId, categoryName } = await resolveCategoryForRestaurant(context, { ...body, foodType });
 
     const doc = await FoodItem.create({
@@ -204,6 +221,8 @@ export async function createRestaurantFood(restaurantId, body = {}) {
         foodType,
         isAvailable,
         preparationTime,
+        availabilityTimeStart,
+        availabilityTimeEnd,
         approvalStatus: 'pending',
         requestedAt: new Date()
     });
@@ -249,6 +268,8 @@ export async function updateRestaurantFood(restaurantId, foodId, body = {}) {
     Object.assign(update, getUpdatedFoodPricing(existing, body));
     if (body.isAvailable !== undefined) update.isAvailable = body.isAvailable !== false;
     if (body.preparationTime !== undefined) update.preparationTime = toStr(body.preparationTime);
+    if (body.availabilityTimeStart !== undefined) update.availabilityTimeStart = normalizeAvailabilityTime(body.availabilityTimeStart);
+    if (body.availabilityTimeEnd !== undefined) update.availabilityTimeEnd = normalizeAvailabilityTime(body.availabilityTimeEnd);
 
     const targetFoodType = body.foodType !== undefined ? normalizeFoodType(body.foodType) : normalizeFoodType(existing.foodType);
     if (body.foodType !== undefined) update.foodType = targetFoodType;

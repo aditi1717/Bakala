@@ -604,8 +604,7 @@ export default function Category() {
                           <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${category?.status ? "translate-x-6" : "translate-x-1"}`} />
                         </button>
                       </td>
-                      {/* COMMENTED OUT: Approval column removed - categories are auto-approved */}
-                      {/* <td className="px-4 py-5">
+                      <td className="px-4 py-5">
                         <div className="space-y-2">
                           <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${approvalBadgeClass(approvalStatus)}`}>
                             {approvalStatus === "approved" && <BadgeCheck className="mr-1 h-3.5 w-3.5" />}
@@ -615,12 +614,11 @@ export default function Category() {
                             <p className="max-w-[180px] text-xs leading-5 text-rose-600">{category.rejectionReason}</p>
                           )}
                         </div>
-                      </td> */}
+                      </td>
                       <td className="px-5 py-5">
                         <div className="flex flex-col items-end gap-2">
                           <div className="flex flex-wrap justify-end gap-2">
-                            {/* COMMENTED OUT: Categories are auto-approved now */}
-                            {/* {approvalStatus !== "approved" && (
+                            {approvalStatus !== "approved" && (
                               <button
                                 onClick={() => handleApprove(category.id)}
                                 className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
@@ -635,7 +633,7 @@ export default function Category() {
                               >
                                 Reject
                               </button>
-                            )} */}
+                            )}
                             {isRestaurantCategory && !category?.isGlobal && approvalStatus === "approved" && (
                               <button
                                 onClick={() => handleMakeGlobal(category)}

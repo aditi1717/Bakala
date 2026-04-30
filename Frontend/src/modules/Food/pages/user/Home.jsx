@@ -2515,6 +2515,77 @@ export default function Home() {
     );
   }, [heroBannerImages, currentBannerIndex, showBannerSkeleton, heroBannersData, navigate]);
 
+  const InlineHeroBannerSection = useMemo(() => {
+    if (showBannerSkeleton) {
+      return (
+        <section className="content-auto pt-2 sm:pt-3 lg:pt-4 px-4">
+          <div className="overflow-hidden rounded-[28px]">
+            <HeroBannerSkeleton className="h-40 sm:h-44 lg:h-52 w-full" />
+          </div>
+        </section>
+      );
+    }
+
+    if (!Array.isArray(heroBannersData) || heroBannersData.length === 0) return null;
+
+    return (
+      <motion.section
+        className="content-auto pt-2 sm:pt-3 lg:pt-4 px-4"
+        initial={false}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div className="space-y-3">
+          {heroBannersData.map((banner, index) => {
+            const image = String(banner?.imageUrl || "").trim();
+            if (!image) return null;
+            const linkedRestaurants = Array.isArray(banner?.linkedRestaurants) ? banner.linkedRestaurants : [];
+            const firstRestaurant = linkedRestaurants[0];
+            const restaurantSlug = firstRestaurant?.slug || firstRestaurant?.restaurantId || firstRestaurant?._id || "";
+            const isVideo = banner?.type === "video" || image.toLowerCase().endsWith(".mp4");
+
+            return (
+              <motion.button
+                key={String(banner?._id || banner?.id || `inline-hero-${index}`)}
+                type="button"
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.35, delay: index * 0.06 }}
+                onClick={() => {
+                  if (restaurantSlug) {
+                    navigate(`/food/user/restaurants/${restaurantSlug}`);
+                  }
+                }}
+                className="relative block w-full overflow-hidden rounded-[28px] border border-gray-100 bg-white text-left shadow-[0_14px_34px_-22px_rgba(15,23,42,0.45)]"
+              >
+                <div className="relative h-40 sm:h-44 lg:h-52 w-full overflow-hidden">
+                  {isVideo ? (
+                    <video
+                      src={image}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={image}
+                      alt={String(banner?.title || `Hero banner ${index + 1}`)}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-black/5 to-transparent" />
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      </motion.section>
+    );
+  }, [heroBannersData, navigate, showBannerSkeleton]);
+
   // Memoized Category Rail Component
   const homeUnderRoute = useMemo(
     () => "/user/under-price",
@@ -2708,6 +2779,8 @@ export default function Home() {
                   </div>
                 </motion.section>
               )}
+
+              {InlineHeroBannerSection}
 
               <motion.section
                 className="content-auto pt-2 sm:pt-3 lg:pt-4"
