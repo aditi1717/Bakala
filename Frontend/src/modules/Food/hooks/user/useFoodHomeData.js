@@ -116,7 +116,19 @@ export const useFoodHomeData = ({ location, zoneId, vegMode }) => {
         setHeaderVideoUrl(settings.headerVideoUrl || "");
         const savedUnderPrice = resolveUnderPriceLimit(settings.defaultUnderPriceLimit);
         setUnderPriceLimit(savedUnderPrice);
-        setRecommendedRestaurants(settings.recommendedRestaurants || []);
+        const recommended = (settings.recommendedRestaurants || []).map(r => {
+          const image = r.image 
+            || r.profileImage?.url 
+            || r.profileImage 
+            || (Array.isArray(r.coverImages) && r.coverImages.length > 0 ? (r.coverImages[0]?.url || r.coverImages[0]) : null);
+          return {
+            ...r,
+            name: r.name || r.restaurantName || "Recommended",
+            image,
+            rating: r.rating || 4.5
+          };
+        });
+        setRecommendedRestaurants(recommended);
 
         // Process Categories
         const catList = categoriesRes?.data?.data?.categories || categoriesRes?.data?.categories || [];
@@ -196,12 +208,38 @@ export const useFoodHomeData = ({ location, zoneId, vegMode }) => {
             distanceInKm = calculateDistance(location.latitude, location.longitude, rLat, rLng);
           }
 
+          // Robust Image Resolution
+          let image = r.image;
+          if (!image || typeof image !== 'string') {
+            if (r.profileImage?.url) image = r.profileImage.url;
+            else if (typeof r.profileImage === 'string') image = r.profileImage;
+            else if (Array.isArray(r.coverImages) && r.coverImages.length > 0) {
+              image = r.coverImages[0]?.url || r.coverImages[0];
+            } else if (Array.isArray(r.menuImages) && r.menuImages.length > 0) {
+              image = r.menuImages[0]?.url || r.menuImages[0];
+            }
+          }
+          
+          // Final check - if it's still an object, try to extract string
+          if (image && typeof image === 'object' && image.url) image = image.url;
+          if (typeof image !== 'string') image = "";
+
           return {
             ...r,
             id: r.restaurantId || r._id,
-            distanceInKm
+            name: r.name || r.restaurantName || "Unknown Restaurant",
+            image,
+            distanceInKm,
+            deliveryTime: r.deliveryTime || r.estimatedDeliveryTime || "25-30 min",
+            featuredPrice: r.featuredPrice || 249,
+            cuisines: Array.isArray(r.cuisines) ? r.cuisines : [],
+            rating: r.rating || 0
           };
         });
+
+        if (transformed.length > 0) {
+          console.log("Normalized first restaurant image:", transformed[0].name, transformed[0].image);
+        }
 
         homeRestaurantsCache.set(cacheKey, { at: Date.now(), data: transformed });
         startTransition(() => {

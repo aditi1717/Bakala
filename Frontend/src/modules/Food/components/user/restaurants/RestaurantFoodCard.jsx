@@ -1,6 +1,7 @@
 import { motion } from "framer-motion"
 import { Bookmark, Clock, Minus, Plus, Share2 } from "lucide-react"
 import BRAND_THEME from "@/config/brandTheme"
+import OptimizedImage from "@food/components/OptimizedImage"
 
 export default function RestaurantFoodCard({
   item,
@@ -143,22 +144,12 @@ export default function RestaurantFoodCard({
       </div>
 
       <div className="relative w-32 h-32 flex-shrink-0">
-        {item?.image ? (
-          <img
-            src={item.image}
-            alt={item?.name || "Item"}
-            className="w-full h-full object-cover rounded-2xl shadow-sm"
-            onError={(e) => {
-              if (foodImageFallback && e.currentTarget.src !== foodImageFallback) {
-                e.currentTarget.src = foodImageFallback
-              }
-            }}
-          />
-        ) : (
-          <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
-            <span className="text-xs text-gray-400">No image</span>
-          </div>
-        )}
+        <OptimizedImage
+          src={item?.image}
+          alt={item?.name || "Item"}
+          className="w-full h-full object-cover rounded-2xl shadow-sm"
+          fallbackSrc={foodImageFallback}
+        />
 
         {showCartControls ? (
           quantity > 0 ? (

@@ -254,7 +254,17 @@ export default function Home() {
         placeholders={placeholders}
         vegMode={vegMode}
         onVegModeChange={handleVegModeChange}
-        bannerContent={headerVideoUrl ? <video src={headerVideoUrl} autoPlay loop muted playsInline className="h-full w-full object-cover" /> : HeroBannerSection}
+        bannerContent={headerVideoUrl ? (
+          <video 
+            src={headerVideoUrl.replace('/upload/', '/upload/q_auto,vc_auto/')} 
+            poster={headerVideoUrl.replace(/\.[^/.]+$/, ".jpg").replace('/upload/', '/upload/q_auto,f_auto,so_0/')}
+            autoPlay 
+            loop 
+            muted 
+            playsInline 
+            className="h-full w-full object-cover" 
+          />
+        ) : HeroBannerSection}
       />
 
       <div className="bg-white dark:bg-[#0a0a0a] relative z-10">

@@ -24,6 +24,7 @@ const OptimizedImage = React.memo(({
   blurDataURL,
   onLoad,
   onError,
+  fallbackSrc = '',
   ...props
 }) => {
   const [isLoaded, setIsLoaded] = useState(false)
@@ -135,6 +136,15 @@ const OptimizedImage = React.memo(({
 
   // Don't render if src is empty or null
   if (!src || src === '') {
+    if (fallbackSrc) {
+      return (
+        <img 
+          src={fallbackSrc} 
+          alt={alt} 
+          className={`w-full h-full ${objectFit === 'cover' ? 'object-cover' : 'object-contain'} ${className}`} 
+        />
+      );
+    }
     return (
       <div className={`relative overflow-hidden ${className}`}>
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
@@ -144,7 +154,7 @@ const OptimizedImage = React.memo(({
     )
   }
 
-  const imageSrc = hasError ? 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23e5e7eb" width="400" height="300"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" x="50%25" y="50%25" text-anchor="middle"%3EImage not found%3C/text%3E%3C/svg%3E' : src
+  const imageSrc = hasError ? (fallbackSrc || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23e5e7eb" width="400" height="300"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="14" x="50%25" y="50%25" text-anchor="middle"%3EImage not found%3C/text%3E%3C/svg%3E') : src
 
   return (
     <div className={`relative overflow-hidden ${className}`} ref={imgRef}>
