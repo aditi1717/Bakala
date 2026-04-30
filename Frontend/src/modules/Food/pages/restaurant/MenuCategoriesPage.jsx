@@ -21,6 +21,44 @@ const defaultFormData = {
   image: "",
   isActive: true,
   foodTypeScope: "Veg",
+  visibilityStartHour: "",
+  visibilityStartMinute: "",
+  visibilityStartMeridiem: "AM",
+  visibilityEndHour: "",
+  visibilityEndMinute: "",
+  visibilityEndMeridiem: "AM",
+}
+
+const HOURS_12 = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+const MINUTES_60 = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"))
+
+const parse24To12 = (time24) => {
+  const value = String(time24 || "").trim()
+  const match = value.match(/^([01]\d|2[0-3]):([0-5]\d)$/)
+  if (!match) return { hour: "", minute: "", meridiem: "AM" }
+
+  const hour24 = Number(match[1])
+  const minute = match[2]
+  const meridiem = hour24 >= 12 ? "PM" : "AM"
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+  return { hour: String(hour12).padStart(2, "0"), minute, meridiem }
+}
+
+const to24From12 = (hour, minute, meridiem) => {
+  const hh = String(hour || "").trim()
+  const mm = String(minute || "").trim()
+  const ap = String(meridiem || "").trim().toUpperCase()
+
+  if (!hh && !mm) return ""
+  if (!HOURS_12.includes(hh) || !MINUTES_60.includes(mm) || !["AM", "PM"].includes(ap)) return null
+
+  let hour24 = Number(hh)
+  if (ap === "AM") {
+    if (hour24 === 12) hour24 = 0
+  } else if (hour24 !== 12) {
+    hour24 += 12
+  }
+  return `${String(hour24).padStart(2, "0")}:${mm}`
 }
 
 const approvalBadgeClass = (status) => {
@@ -51,6 +89,15 @@ const isRestaurantOwnedCategory = (category) => {
   return Boolean(restaurantObjectId || creatorObjectId)
 }
 
+const getApiErrorMessage = (error, fallback) => {
+  return (
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    fallback
+  )
+}
+
 export default function MenuCategoriesPage() {
   const goBack = useRestaurantBackNavigation()
   const fileInputRef = useRef(null)
@@ -74,7 +121,7 @@ export default function MenuCategoriesPage() {
         : []
       setCategories(restaurantOwnedCategories)
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to load categories")
+      toast.error(getApiErrorMessage(error, "Failed to load categories"))
       setCategories([])
     } finally {
       setLoading(false)
@@ -103,6 +150,8 @@ export default function MenuCategoriesPage() {
   }
 
   const handleEdit = (category) => {
+    const start = parse24To12(category?.visibilityStartTime || "")
+    const end = parse24To12(category?.visibilityEndTime || "")
     setEditingCategory(category)
     setFormData({
       name: category?.name || "",
@@ -110,6 +159,12 @@ export default function MenuCategoriesPage() {
       image: category?.image || "",
       isActive: category?.isActive !== false,
       foodTypeScope: category?.foodTypeScope || "Veg",
+      visibilityStartHour: start.hour,
+      visibilityStartMinute: start.minute,
+      visibilityStartMeridiem: start.meridiem,
+      visibilityEndHour: end.hour,
+      visibilityEndMinute: end.minute,
+      visibilityEndMeridiem: end.meridiem,
     })
     setSelectedImageFile(null)
     setImagePreview(category?.image || null)
@@ -147,6 +202,23 @@ export default function MenuCategoriesPage() {
       setSaving(true)
       let imageUrl = String(formData.image || "").trim()
 
+      const startTime24 = to24From12(
+        formData.visibilityStartHour,
+        formData.visibilityStartMinute,
+        formData.visibilityStartMeridiem,
+      )
+      const endTime24 = to24From12(
+        formData.visibilityEndHour,
+        formData.visibilityEndMinute,
+        formData.visibilityEndMeridiem,
+      )
+
+      if (startTime24 === null || endTime24 === null) {
+        toast.error("Please select valid time in 12-hour format (AM/PM)")
+        setSaving(false)
+        return
+      }
+
       if (selectedImageFile) {
         const uploadRes = await uploadAPI.uploadMedia(selectedImageFile, { folder: "appzeto/categories" })
         const payload = uploadRes?.data?.data || uploadRes?.data
@@ -159,6 +231,8 @@ export default function MenuCategoriesPage() {
         image: imageUrl || undefined,
         isActive: formData.isActive !== false,
         foodTypeScope: formData.foodTypeScope || "Veg",
+        visibilityStartTime: startTime24,
+        visibilityEndTime: endTime24,
       }
 
       if (editingCategory?.id || editingCategory?._id) {
@@ -172,7 +246,7 @@ export default function MenuCategoriesPage() {
       resetModal()
       await loadCategories()
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to save category")
+      toast.error(getApiErrorMessage(error, "Failed to save category"))
     } finally {
       setSaving(false)
     }
@@ -186,7 +260,7 @@ export default function MenuCategoriesPage() {
       toast.success("Category status updated")
       await loadCategories()
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to update category status")
+      toast.error(getApiErrorMessage(error, "Failed to update category status"))
     }
   }
 
@@ -200,7 +274,7 @@ export default function MenuCategoriesPage() {
       toast.success("Category deleted successfully")
       await loadCategories()
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to delete category")
+      toast.error(getApiErrorMessage(error, "Failed to delete category"))
     }
   }
 
@@ -281,6 +355,11 @@ export default function MenuCategoriesPage() {
                       </div>
 
                       {category?.type ? <p className="mt-1 text-sm text-slate-500">{category.type}</p> : null}
+                      <p className="mt-1 text-xs text-slate-500">
+                        Timings: {category?.visibilityStartTime && category?.visibilityEndTime
+                          ? `${category.visibilityStartTime} - ${category.visibilityEndTime}`
+                          : "All day"}
+                      </p>
 
                       {approvalStatus === "rejected" && category?.rejectionReason ? (
                         <p className="mt-2 text-xs text-rose-600">{category.rejectionReason}</p>
@@ -377,6 +456,81 @@ export default function MenuCategoriesPage() {
                       <option value="Non-Veg">Non-Veg</option>
                       <option value="Both">Both</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Category Timings (Optional)</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Start Time</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <select
+                            value={formData.visibilityStartHour}
+                            onChange={(event) => setFormData((prev) => ({ ...prev, visibilityStartHour: event.target.value }))}
+                            className="rounded-xl border border-slate-300 px-2 py-2.5 text-sm outline-none focus:border-slate-900"
+                          >
+                            <option value="">HH</option>
+                            {HOURS_12.map((hour) => (
+                              <option key={`start-hour-${hour}`} value={hour}>{hour}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={formData.visibilityStartMinute}
+                            onChange={(event) => setFormData((prev) => ({ ...prev, visibilityStartMinute: event.target.value }))}
+                            className="rounded-xl border border-slate-300 px-2 py-2.5 text-sm outline-none focus:border-slate-900"
+                          >
+                            <option value="">MM</option>
+                            {MINUTES_60.map((minute) => (
+                              <option key={`start-minute-${minute}`} value={minute}>{minute}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={formData.visibilityStartMeridiem}
+                            onChange={(event) => setFormData((prev) => ({ ...prev, visibilityStartMeridiem: event.target.value }))}
+                            className="rounded-xl border border-slate-300 px-2 py-2.5 text-sm outline-none focus:border-slate-900"
+                          >
+                            <option value="AM">AM</option>
+                            <option value="PM">PM</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">End Time</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <select
+                            value={formData.visibilityEndHour}
+                            onChange={(event) => setFormData((prev) => ({ ...prev, visibilityEndHour: event.target.value }))}
+                            className="rounded-xl border border-slate-300 px-2 py-2.5 text-sm outline-none focus:border-slate-900"
+                          >
+                            <option value="">HH</option>
+                            {HOURS_12.map((hour) => (
+                              <option key={`end-hour-${hour}`} value={hour}>{hour}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={formData.visibilityEndMinute}
+                            onChange={(event) => setFormData((prev) => ({ ...prev, visibilityEndMinute: event.target.value }))}
+                            className="rounded-xl border border-slate-300 px-2 py-2.5 text-sm outline-none focus:border-slate-900"
+                          >
+                            <option value="">MM</option>
+                            {MINUTES_60.map((minute) => (
+                              <option key={`end-minute-${minute}`} value={minute}>{minute}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={formData.visibilityEndMeridiem}
+                            onChange={(event) => setFormData((prev) => ({ ...prev, visibilityEndMeridiem: event.target.value }))}
+                            className="rounded-xl border border-slate-300 px-2 py-2.5 text-sm outline-none focus:border-slate-900"
+                          >
+                            <option value="AM">AM</option>
+                            <option value="PM">PM</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                      If you do not set timings, this category will stay visible all day.
+                    </p>
                   </div>
 
                   <div>

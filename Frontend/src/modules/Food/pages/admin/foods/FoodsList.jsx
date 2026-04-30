@@ -31,6 +31,15 @@ const createVariantDraft = (variant = {}) => ({
   price: variant?.price != null ? String(variant.price) : "",
 })
 
+const normalizeEntityId = (value) => {
+  if (!value) return ""
+  if (typeof value === "string") return value.trim()
+  if (typeof value === "object") {
+    return String(value?._id || value?.id || value?.restaurantId || "").trim()
+  }
+  return String(value).trim()
+}
+
 export default function FoodsList() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedRestaurant, setSelectedRestaurant] = useState("all")
@@ -128,7 +137,7 @@ export default function FoodsList() {
               name: f.name || "Unnamed Item",
               image: f.image || "https://via.placeholder.com/40",
               status: f.isAvailable !== false && String(f.approvalStatus || "").toLowerCase() !== "rejected",
-              restaurantId: String(f.restaurantId || ""),
+              restaurantId: normalizeEntityId(f.restaurantId),
               restaurantName: f.restaurantName || "Unknown Restaurant",
               categoryId: String(f.categoryId || ""),
               categoryName: f.categoryName || "",
@@ -249,6 +258,51 @@ export default function FoodsList() {
     return restaurantsForFilter
   }, [restaurantsForFilter])
 
+  const visibleCategoryOptions = useMemo(() => {
+    const selectedRestaurantId = String(foodForm.restaurantId || "").trim()
+    if (!selectedRestaurantId) return categoryOptions
+
+    const selectedCategoryId = String(foodForm.categoryId || "").trim()
+    const selectedCategoryName = String(foodForm.categoryName || "").trim().toLowerCase()
+
+    const filtered = categoryOptions.filter((category) => {
+      const categoryRestaurantId = String(
+        category?.restaurantId?._id ||
+        category?.restaurantId?.id ||
+        category?.restaurantId ||
+        category?.restaurant?._id ||
+        category?.restaurant?.id ||
+        category?.createdByRestaurantId?._id ||
+        category?.createdByRestaurantId?.id ||
+        category?.createdByRestaurantId ||
+        category?.createdByRestaurant?._id ||
+        category?.createdByRestaurant?.id ||
+        "",
+      ).trim()
+
+      const isGlobalCategory = category?.isGlobal === true || !categoryRestaurantId
+      return isGlobalCategory || categoryRestaurantId === selectedRestaurantId
+    })
+
+    const withSelected = filtered.slice()
+    const selectedInFiltered = withSelected.some((category) => {
+      const cid = String(category?.id || "").trim()
+      const cname = String(category?.name || "").trim().toLowerCase()
+      return (selectedCategoryId && cid === selectedCategoryId) || (selectedCategoryName && cname === selectedCategoryName)
+    })
+
+    if (!selectedInFiltered && (selectedCategoryId || selectedCategoryName)) {
+      const selectedCategory = categoryOptions.find((category) => {
+        const cid = String(category?.id || "").trim()
+        const cname = String(category?.name || "").trim().toLowerCase()
+        return (selectedCategoryId && cid === selectedCategoryId) || (selectedCategoryName && cname === selectedCategoryName)
+      })
+      if (selectedCategory) withSelected.unshift(selectedCategory)
+    }
+
+    return withSelected
+  }, [categoryOptions, foodForm.restaurantId, foodForm.categoryId, foodForm.categoryName])
+
   const openAddFoodModal = () => {
     setFoodFormMode("add")
     setEditingFood(null)
@@ -297,10 +351,20 @@ export default function FoodsList() {
     const loadCategoryOptions = async () => {
       try {
         const res = await adminAPI.getCategories({ limit: 1000 })
-        const list = res?.data?.data?.categories || []
+        const list =
+          res?.data?.data?.categories ||
+          res?.data?.categories ||
+          res?.data?.data?.data?.categories ||
+          []
         const options = Array.isArray(list)
           ? list
-              .map((c) => ({ id: String(c.id || c._id || c.name), name: String(c.name || "").trim() }))
+              .map((c) => ({
+                id: String(c.id || c._id || c.name),
+                name: String(c.name || "").trim(),
+                isGlobal: c?.isGlobal === true || (!c?.restaurantId && !c?.createdByRestaurantId),
+                restaurantId: c?.restaurantId,
+                createdByRestaurantId: c?.createdByRestaurantId,
+              }))
               .filter((c) => c.name)
           : []
         if (!cancelled) setCategoryOptions(options)
@@ -804,7 +868,7 @@ export default function FoodsList() {
                       autoFocus
                     />
                     <div className="max-h-56 overflow-y-auto">
-                      {categoryOptions
+                      {visibleCategoryOptions
                         .filter((c) => {
                           const q = String(categorySearch || "").trim().toLowerCase()
                           if (!q) return true
@@ -825,7 +889,7 @@ export default function FoodsList() {
                             {c.name}
                           </button>
                         ))}
-                      {categoryOptions.length === 0 && (
+                      {visibleCategoryOptions.length === 0 && (
                         <div className="px-3 py-2 text-sm text-slate-500">No categories found</div>
                       )}
                     </div>

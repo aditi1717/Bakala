@@ -48,33 +48,6 @@ const createVariantDraft = (variant = {}) => ({
   price: variant?.price != null ? String(variant.price) : "",
 })
 
-const HOURS_12 = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-const MINUTES_60 = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"))
-
-const parse12HourTime = (value) => {
-  const text = String(value || "").trim()
-  const match = text.match(/^(0?[1-9]|1[0-2]):([0-5]\d)\s?(AM|PM)$/i)
-  if (!match) {
-    return { hour: "", minute: "", meridiem: "AM" }
-  }
-  return {
-    hour: String(match[1]).padStart(2, "0"),
-    minute: match[2],
-    meridiem: String(match[3] || "AM").toUpperCase(),
-  }
-}
-
-const format12HourTime = (hour, minute, meridiem) => {
-  const hh = String(hour || "").trim()
-  const mm = String(minute || "").trim()
-  const ap = String(meridiem || "").trim().toUpperCase()
-  if (!hh && !mm) return ""
-  if (!HOURS_12.includes(hh) || !MINUTES_60.includes(mm) || !["AM", "PM"].includes(ap)) {
-    return null
-  }
-  return `${hh}:${mm} ${ap}`
-}
-
 export default function ItemDetailsPage() {
   const navigate = useNavigate()
   const goBack = useRestaurantBackNavigation()
@@ -100,12 +73,6 @@ export default function ItemDetailsPage() {
   const [basePrice, setBasePrice] = useState("")
   const [variants, setVariants] = useState([])
   const [preparationTime, setPreparationTime] = useState("")
-  const [availabilityStartHour, setAvailabilityStartHour] = useState("")
-  const [availabilityStartMinute, setAvailabilityStartMinute] = useState("")
-  const [availabilityStartMeridiem, setAvailabilityStartMeridiem] = useState("AM")
-  const [availabilityEndHour, setAvailabilityEndHour] = useState("")
-  const [availabilityEndMinute, setAvailabilityEndMinute] = useState("")
-  const [availabilityEndMeridiem, setAvailabilityEndMeridiem] = useState("AM")
   const [gst, setGst] = useState("5.0")
   const [isRecommended, setIsRecommended] = useState(false)
   const [isInStock, setIsInStock] = useState(true)
@@ -161,14 +128,6 @@ export default function ItemDetailsPage() {
     setVariants(itemVariants.map(createVariantDraft))
     setBasePrice(itemVariants.length === 0 ? item.price?.toString() || "" : "")
     setPreparationTime(item.preparationTime || "")
-    const startTime = parse12HourTime(item.availabilityTimeStart || "")
-    const endTime = parse12HourTime(item.availabilityTimeEnd || "")
-    setAvailabilityStartHour(startTime.hour)
-    setAvailabilityStartMinute(startTime.minute)
-    setAvailabilityStartMeridiem(startTime.meridiem)
-    setAvailabilityEndHour(endTime.hour)
-    setAvailabilityEndMinute(endTime.minute)
-    setAvailabilityEndMeridiem(endTime.meridiem)
     setGst(item.gst?.toString() || "5.0")
     setIsRecommended(item.isRecommended || false)
     setIsInStock(item.isAvailable !== false)
@@ -687,23 +646,6 @@ export default function ItemDetailsPage() {
         price: variant.price,
       }))
 
-      const availabilityTimeStart = format12HourTime(
-        availabilityStartHour,
-        availabilityStartMinute,
-        availabilityStartMeridiem,
-      )
-      const availabilityTimeEnd = format12HourTime(
-        availabilityEndHour,
-        availabilityEndMinute,
-        availabilityEndMeridiem,
-      )
-
-      if (availabilityTimeStart === null || availabilityTimeEnd === null) {
-        toast.error("Please select a valid show time with hour, minute, and AM/PM")
-        setUploadingImages(false)
-        return
-      }
-
       // Create/update FoodItem in DB (single call per explicit Save; no autosave spam)
       let itemId
       if (isNewItem) {
@@ -716,8 +658,6 @@ export default function ItemDetailsPage() {
           foodType: foodType,
           isAvailable: isInStock,
           preparationTime: preparationTime || "",
-          availabilityTimeStart,
-          availabilityTimeEnd,
           categoryId: categoryId || undefined,
           categoryName,
         })
@@ -740,8 +680,6 @@ export default function ItemDetailsPage() {
           foodType: foodType,
           isAvailable: isInStock,
           preparationTime: preparationTime || "",
-          availabilityTimeStart,
-          availabilityTimeEnd,
           categoryId: categoryId || undefined,
           categoryName,
         })
@@ -1208,72 +1146,6 @@ export default function ItemDetailsPage() {
                 </button>
               </div> */}
 
-              <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Item visibility time</p>
-                  <p className="text-xs text-gray-500">Blank chhodoge to item pure time visible rahega.</p>
-                </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Show From (12-hour)</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <select
-                        value={availabilityStartHour}
-                        onChange={(e) => setAvailabilityStartHour(e.target.value)}
-                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        <option value="">HH</option>
-                        {HOURS_12.map((hour) => <option key={`start-hour-${hour}`} value={hour}>{hour}</option>)}
-                      </select>
-                      <select
-                        value={availabilityStartMinute}
-                        onChange={(e) => setAvailabilityStartMinute(e.target.value)}
-                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        <option value="">MM</option>
-                        {MINUTES_60.map((minute) => <option key={`start-minute-${minute}`} value={minute}>{minute}</option>)}
-                      </select>
-                      <select
-                        value={availabilityStartMeridiem}
-                        onChange={(e) => setAvailabilityStartMeridiem(e.target.value)}
-                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Show Till (12-hour)</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <select
-                        value={availabilityEndHour}
-                        onChange={(e) => setAvailabilityEndHour(e.target.value)}
-                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        <option value="">HH</option>
-                        {HOURS_12.map((hour) => <option key={`end-hour-${hour}`} value={hour}>{hour}</option>)}
-                      </select>
-                      <select
-                        value={availabilityEndMinute}
-                        onChange={(e) => setAvailabilityEndMinute(e.target.value)}
-                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        <option value="">MM</option>
-                        {MINUTES_60.map((minute) => <option key={`end-minute-${minute}`} value={minute}>{minute}</option>)}
-                      </select>
-                      <select
-                        value={availabilityEndMeridiem}
-                        onChange={(e) => setAvailabilityEndMeridiem(e.target.value)}
-                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
           </div>

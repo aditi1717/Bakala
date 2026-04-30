@@ -8,6 +8,7 @@ import {
     GLOBAL_CATEGORY_FILTER,
     isCategoryVisibleNow,
     normalizeCategoryFoodTypeScope,
+    normalizeCategoryVisibilityTime,
     serializeCategoryForResponse,
     toObjectId
 } from '../../shared/categoryWorkflow.js';
@@ -238,11 +239,16 @@ export async function createRestaurantCategory(restaurantId, body = {}) {
         throw new ValidationError('Pure veg restaurants can only create veg categories');
     }
 
+    const visibilityStartTime = normalizeCategoryVisibilityTime(body.visibilityStartTime);
+    const visibilityEndTime = normalizeCategoryVisibilityTime(body.visibilityEndTime);
+
     const doc = new FoodCategory({
         name,
         image: typeof body.image === 'string' ? body.image.trim() : '',
         type: typeof body.type === 'string' ? body.type.trim() : '',
         foodTypeScope,
+        visibilityStartTime,
+        visibilityEndTime,
         isActive: body.isActive !== false,
         sortOrder: Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0,
         restaurantId: context.restaurantId,
@@ -288,6 +294,12 @@ export async function updateRestaurantCategory(restaurantId, id, body = {}) {
     if (body.type !== undefined) doc.type = String(body.type || '').trim();
     if (body.isActive !== undefined) doc.isActive = body.isActive !== false;
     if (body.sortOrder !== undefined) doc.sortOrder = Number(body.sortOrder) || 0;
+    if (body.visibilityStartTime !== undefined) {
+        doc.visibilityStartTime = normalizeCategoryVisibilityTime(body.visibilityStartTime);
+    }
+    if (body.visibilityEndTime !== undefined) {
+        doc.visibilityEndTime = normalizeCategoryVisibilityTime(body.visibilityEndTime);
+    }
     if (body.foodTypeScope !== undefined) {
         const incompatibleFoods = nextFoodTypeScope === 'Both'
             ? 0
