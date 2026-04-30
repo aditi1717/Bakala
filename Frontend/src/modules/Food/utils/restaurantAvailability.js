@@ -68,6 +68,12 @@ const getTodayTiming = (restaurant, dayName) => {
   return null
 }
 
+const getPreviousDayName = (dayName) => {
+  const index = DAY_NAMES.indexOf(dayName)
+  if (index < 0) return null
+  return DAY_NAMES[(index + DAY_NAMES.length - 1) % DAY_NAMES.length]
+}
+
 const extractDaySlots = (timing) => {
   const rawSlots = Array.isArray(timing?.slots) ? timing.slots : []
   const normalizedFromSlots = rawSlots
@@ -198,6 +204,8 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
 
   const dayName = DAY_NAMES[now.getDay()]
   const todayTiming = getTodayTiming(restaurant, dayName)
+  const previousDayName = getPreviousDayName(dayName)
+  const previousDayTiming = previousDayName ? getTodayTiming(restaurant, previousDayName) : null
 
   // Legacy openDays can get stale; enforce only when no explicit outlet timing exists for today.
   const openDays = Array.isArray(restaurant.openDays) ? restaurant.openDays : []
@@ -215,6 +223,30 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
   }
 
   if (todayTiming?.isOpen === false) {
+    const prevSlots = extractDaySlots(previousDayTiming)
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    const activeFromPreviousDay = prevSlots.find((slot) =>
+      slot.closingMinutes < slot.openingMinutes && nowMinutes <= slot.closingMinutes
+    )
+    if (activeFromPreviousDay) {
+      const minutesUntilClose = getMinutesUntilClosing(
+        nowMinutes,
+        activeFromPreviousDay.openingMinutes,
+        activeFromPreviousDay.closingMinutes
+      )
+      return {
+        isOpen: true,
+        isActive,
+        isAcceptingOrders,
+        isWithinTimings: true,
+        reason: null,
+        openingTime: activeFromPreviousDay.openingTime,
+        closingTime: activeFromPreviousDay.closingTime,
+        activeSlot: activeFromPreviousDay,
+        slots: prevSlots,
+        closingCountdownLabel: formatClosingCountdown(minutesUntilClose, activeFromPreviousDay.closingTime),
+      }
+    }
     return {
       isOpen: false,
       isActive,

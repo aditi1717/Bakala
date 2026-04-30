@@ -132,6 +132,7 @@ router.get('/restaurants/:id/analytics', adminController.getRestaurantAnalytics)
 router.get('/restaurants/:id/menu', adminController.getRestaurantMenuById);
 router.post('/restaurants', adminController.createRestaurant);
 router.patch('/restaurants/:id', adminController.updateRestaurantById);
+router.delete('/restaurants/:id', adminController.deleteRestaurantById);
 router.put('/restaurants/:id/outlet-timings', adminController.updateRestaurantOutletTimings);
 router.patch('/restaurants/:id/status', adminController.updateRestaurantStatus);
 router.patch('/restaurants/:id/location', adminController.updateRestaurantLocation);

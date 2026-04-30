@@ -52,15 +52,28 @@ const normalizeSlots = (rawSlots = [], openingFallback = '09:00', closingFallbac
         }
         const openingMinutes = timeToMinutes(openingTime);
         const closingMinutes = timeToMinutes(closingTime);
-        if (openingMinutes === null || closingMinutes === null || closingMinutes <= openingMinutes) {
-            throw new ValidationError('Slot closingTime must be greater than openingTime');
+        if (openingMinutes === null || closingMinutes === null || closingMinutes === openingMinutes) {
+            throw new ValidationError('Slot openingTime and closingTime cannot be the same');
         }
-        return { openingTime, closingTime, openingMinutes, closingMinutes };
+        const isOvernight = closingMinutes < openingMinutes;
+        return {
+            openingTime,
+            closingTime,
+            openingMinutes,
+            closingMinutes,
+            isOvernight,
+            effectiveClosingMinutes: isOvernight ? closingMinutes + (24 * 60) : closingMinutes,
+        };
     });
+
+    const overnightCount = normalized.filter((slot) => slot.isOvernight).length;
+    if (overnightCount > 0 && normalized.length > 1) {
+        throw new ValidationError('Overnight slot must be the only slot for that day');
+    }
 
     const sorted = [...normalized].sort((a, b) => a.openingMinutes - b.openingMinutes);
     for (let i = 1; i < sorted.length; i += 1) {
-        if (sorted[i].openingMinutes < sorted[i - 1].closingMinutes) {
+        if (sorted[i].openingMinutes < sorted[i - 1].effectiveClosingMinutes) {
             throw new ValidationError('Time slots cannot overlap');
         }
     }

@@ -10,6 +10,27 @@ import { restaurantAPI } from "@food/api"
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 const MAX_SLOTS = 5
+const normalizeOpenDays = (days = []) => {
+  if (!Array.isArray(days)) return []
+  const dayAliases = {
+    mon: "monday",
+    tue: "tuesday",
+    tues: "tuesday",
+    wed: "wednesday",
+    thu: "thursday",
+    thur: "thursday",
+    thurs: "thursday",
+    fri: "friday",
+    sat: "saturday",
+    sun: "sunday",
+  }
+  const normalizedSet = new Set(days.map((day) => {
+    const raw = String(day || "").trim().toLowerCase()
+    if (!raw) return ""
+    return dayAliases[raw] || raw
+  }).filter(Boolean))
+  return DAY_NAMES.filter((day) => normalizedSet.has(day.toLowerCase()))
+}
 
 const toTimeValue = (timeString, fallbackHour = 9, fallbackMinute = 0) => {
   if (!timeString || !String(timeString).includes(":")) {
@@ -101,12 +122,21 @@ const validateSlots = (slots = []) => {
   const hasInvalid = normalized.some((slot) => slot.openingMinutes === null || slot.closingMinutes === null)
   if (hasInvalid) return "Please select valid opening and closing times."
 
-  const hasReverse = normalized.some((slot) => slot.closingMinutes <= slot.openingMinutes)
-  if (hasReverse) return "Each slot's closing time must be greater than opening time."
+  const hasEqual = normalized.some((slot) => slot.closingMinutes === slot.openingMinutes)
+  if (hasEqual) return "Opening and closing time cannot be same."
 
-  const sorted = [...normalized].sort((a, b) => a.openingMinutes - b.openingMinutes)
+  const overnightCount = normalized.filter((slot) => slot.closingMinutes < slot.openingMinutes).length
+  if (overnightCount > 0 && normalized.length > 1) return "Overnight slot can only be used alone for that day."
+
+  const sorted = [...normalized]
+    .map((slot) => ({
+      ...slot,
+      effectiveClosingMinutes:
+        slot.closingMinutes < slot.openingMinutes ? slot.closingMinutes + 24 * 60 : slot.closingMinutes,
+    }))
+    .sort((a, b) => a.openingMinutes - b.openingMinutes)
   for (let i = 1; i < sorted.length; i += 1) {
-    if (sorted[i].openingMinutes < sorted[i - 1].closingMinutes) {
+    if (sorted[i].openingMinutes < sorted[i - 1].effectiveClosingMinutes) {
       return "Time slots cannot overlap."
     }
   }
@@ -116,6 +146,7 @@ const validateSlots = (slots = []) => {
 
 const buildPayloadForAllDays = (schedule) => {
   const isOpen = schedule?.isOpen !== false
+  const selectedOpenDays = Array.isArray(schedule?.openDays) ? schedule.openDays : []
   const slots = isOpen
     ? (schedule?.slots || []).map((slot) => ({
       openingTime: slot.openingTime,
@@ -127,7 +158,13 @@ const buildPayloadForAllDays = (schedule) => {
   const closingTime = isOpen ? (slots[0]?.closingTime || "22:00") : ""
 
   return DAY_NAMES.reduce((acc, day) => {
-    acc[day] = { isOpen, openingTime, closingTime, slots }
+    const isDayOpen = isOpen && selectedOpenDays.includes(day)
+    acc[day] = {
+      isOpen: isDayOpen,
+      openingTime: isDayOpen ? openingTime : "",
+      closingTime: isDayOpen ? closingTime : "",
+      slots: isDayOpen ? slots : [],
+    }
     return acc
   }, {})
 }
@@ -140,6 +177,7 @@ export default function OutletTimings() {
   const [savingState, setSavingState] = useState("idle")
   const [schedule, setSchedule] = useState(getDefaultSchedule)
   const [validationError, setValidationError] = useState("")
+  const [isEditingDays, setIsEditingDays] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -148,11 +186,32 @@ export default function OutletTimings() {
         setLoading(true)
         const res = await restaurantAPI.getOutletTimings()
         const outletTimings = res?.data?.data?.outletTimings || res?.data?.outletTimings
+        let openDaysFromApi = []
+        if (outletTimings && typeof outletTimings === "object") {
+          openDaysFromApi = DAY_NAMES.filter((day) => outletTimings?.[day]?.isOpen !== false)
+        }
         if (!active) return
-        setSchedule(normalizeScheduleFromApi(outletTimings))
+        const baseSchedule = normalizeScheduleFromApi(outletTimings)
+        try {
+          const profileRes = await restaurantAPI.getCurrentRestaurant()
+          const restaurant = profileRes?.data?.data?.restaurant || profileRes?.data?.restaurant
+          if (restaurant) {
+            const normalizedOnboardingOpenDays = normalizeOpenDays(restaurant?.openDays || restaurant?.onboarding?.step2?.openDays || [])
+            const resolvedOpenDays = openDaysFromApi.length > 0
+              ? openDaysFromApi
+              : (normalizedOnboardingOpenDays.length > 0 ? normalizedOnboardingOpenDays : [...DAY_NAMES])
+            setSchedule({ ...baseSchedule, openDays: resolvedOpenDays })
+          } else {
+            const resolvedOpenDays = openDaysFromApi.length > 0 ? openDaysFromApi : [...DAY_NAMES]
+            setSchedule({ ...baseSchedule, openDays: resolvedOpenDays })
+          }
+        } catch (_) {
+          const resolvedOpenDays = openDaysFromApi.length > 0 ? openDaysFromApi : [...DAY_NAMES]
+          setSchedule({ ...baseSchedule, openDays: resolvedOpenDays })
+        }
       } catch (_) {
         if (!active) return
-        setSchedule(getDefaultSchedule())
+        setSchedule({ ...getDefaultSchedule(), openDays: [...DAY_NAMES] })
       } finally {
         if (active) setLoading(false)
       }
@@ -168,6 +227,10 @@ export default function OutletTimings() {
     if (loading) return
     if (!schedule.isOpen) {
       setValidationError("")
+      return
+    }
+    if (!Array.isArray(schedule.openDays) || schedule.openDays.length === 0) {
+      setValidationError("Please select at least one open day.")
       return
     }
     setValidationError(validateSlots(schedule.slots))
@@ -201,6 +264,14 @@ export default function OutletTimings() {
     if (savingState === "error") return "Save failed"
     return ""
   }, [savingState])
+  const selectedOpenDays = useMemo(
+    () => normalizeOpenDays(schedule?.openDays || []),
+    [schedule?.openDays],
+  )
+  const selectedClosedDays = useMemo(
+    () => DAY_NAMES.filter((day) => !selectedOpenDays.includes(day)),
+    [selectedOpenDays],
+  )
 
   const handleSlotTimeChange = (slotId, field, dateValue) => {
     const nextTime = fromTimeValue(dateValue)
@@ -262,7 +333,7 @@ export default function OutletTimings() {
             </button>
             <div className="min-w-0 flex-1">
               <h1 className="text-lg font-bold text-gray-900">Outlet timings</h1>
-              <p className="text-xs text-gray-500">One schedule applied to all 7 days</p>
+              <p className="text-xs text-gray-500">One timing schedule applied to selected open days</p>
             </div>
             {statusLabel ? (
               <p className={`text-xs font-medium ${savingState === "error" ? "text-red-600" : "text-emerald-600"}`}>
@@ -277,14 +348,12 @@ export default function OutletTimings() {
             <div className="mb-3">
               <h2 className="text-sm font-semibold text-brand-700">{companyName} delivery timings</h2>
               <p className="text-xs text-slate-600 mt-1">
-                Same timing Monday to Sunday. Add multiple slots if you close in between.
+                Select open/closed days, then set one timing schedule for open days.
               </p>
             </div>
-
             <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
               <div>
                 <p className="text-sm font-semibold text-slate-900">Outlet status</p>
-                <p className="text-xs text-slate-500">{schedule.isOpen ? "Open for all days" : "Closed for all days"}</p>
               </div>
               <Switch
                 checked={schedule.isOpen}
@@ -294,6 +363,56 @@ export default function OutletTimings() {
                 }}
                 className="data-[state=checked]:bg-green-600 data-[state=unchecked]:bg-gray-300"
               />
+            </div>
+
+            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-slate-800">Open / Closed Days</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    {isEditingDays ? "Tap a day to toggle open or closed." : "Use Edit Days to update open/closed days."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingDays((prev) => !prev)}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  {isEditingDays ? "Done" : "Edit Days"}
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {DAY_NAMES.map((day) => {
+                  const isOpenDay = selectedOpenDays.includes(day)
+                  return (
+                    <button
+                      key={`editable-day-${day}`}
+                      type="button"
+                      onClick={() => {
+                        if (!isEditingDays) return
+                        setSavingState("idle")
+                        setSchedule((prev) => {
+                          const current = normalizeOpenDays(prev?.openDays || [])
+                          const next = current.includes(day)
+                            ? current.filter((d) => d !== day)
+                            : [...current, day]
+                          return { ...prev, openDays: normalizeOpenDays(next) }
+                        })
+                      }}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold border transition-colors ${
+                        isOpenDay
+                          ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                          : "bg-slate-100 text-slate-600 border-slate-200"
+                      } ${isEditingDays ? "cursor-pointer" : "cursor-default"}`}
+                    >
+                      {day}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="mt-2 text-[11px] text-slate-500">
+                Open: {selectedOpenDays.length} | Closed: {selectedClosedDays.length}
+              </p>
             </div>
 
             {schedule.isOpen ? (

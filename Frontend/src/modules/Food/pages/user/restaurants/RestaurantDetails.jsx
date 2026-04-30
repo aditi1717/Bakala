@@ -231,7 +231,12 @@ function RestaurantDetailsContent() {
   // Fetch restaurant data from API
   useEffect(() => {
     const fetchRestaurant = async () => {
-      if (!slug) return
+      const normalizedSlug = String(slug || "").trim().toLowerCase()
+      if (!slug || normalizedSlug === "undefined" || normalizedSlug === "null") {
+        setRestaurantError("Invalid restaurant link")
+        setLoadingRestaurant(false)
+        return
+      }
 
       // Prevent re-fetching for the same slug. Mobile location/zone updates can
       // trigger transient refetch failures that clear already-rendered content.

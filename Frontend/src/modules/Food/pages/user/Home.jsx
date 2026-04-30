@@ -38,6 +38,19 @@ const placeholders = [
 
 const HERO_BANNER_AUTO_SLIDE_MS = 3500;
 const RESTAURANTS_BATCH_SIZE = 9;
+const getRestaurantRouteParam = (restaurant, fallbackIndex = 0) => {
+  const slug = typeof restaurant?.slug === "string" ? restaurant.slug.trim() : "";
+  if (slug && slug.toLowerCase() !== "undefined" && slug.toLowerCase() !== "null") return slug;
+
+  const idCandidates = [restaurant?._id, restaurant?.restaurantId, restaurant?.id, restaurant?.mongoId];
+  const id = idCandidates.find((value) => typeof value === "string" && value.trim());
+  if (id) return id.trim();
+
+  const name = typeof restaurant?.name === "string" ? restaurant.name.trim() : "";
+  if (name) return name.toLowerCase().replace(/\s+/g, "-");
+
+  return `restaurant-${fallbackIndex}`;
+};
 
 export default function Home() {
   const navigate = useNavigate();
@@ -232,7 +245,12 @@ export default function Home() {
     return (
       <section className="pt-4 px-4 space-y-3 content-auto">
         {heroBanners.map((banner, i) => (
-          <motion.button key={banner.id || i} whileHover={{ scale: 0.98 }} onClick={() => banner.linkedRestaurants?.[0] && navigate(`/food/user/restaurants/${banner.linkedRestaurants[0].slug}`)} className="relative block w-full h-40 sm:h-44 lg:h-52 overflow-hidden rounded-[28px] shadow-sm">
+          <motion.button key={banner.id || i} whileHover={{ scale: 0.98 }} onClick={() => {
+            const linkedRestaurant = banner.linkedRestaurants?.[0];
+            if (!linkedRestaurant) return;
+            const routeParam = getRestaurantRouteParam(linkedRestaurant, i);
+            navigate(`/food/user/restaurants/${routeParam}`);
+          }} className="relative block w-full h-40 sm:h-44 lg:h-52 overflow-hidden rounded-[28px] shadow-sm">
             <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" loading="lazy" />
           </motion.button>
         ))}
@@ -275,7 +293,7 @@ export default function Home() {
             <h2 className="text-sm font-semibold text-gray-500 tracking-widest uppercase mb-4">Recommended For You</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {recommendedRestaurants.filter(r => !vegMode || r.pureVegRestaurant).slice(0, 4).map((r, i) => (
-                <Link key={i} to={`/food/user/restaurants/${r.slug}`} className="block rounded-[20px] overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
+                <Link key={i} to={`/food/user/restaurants/${getRestaurantRouteParam(r, i)}`} className="block rounded-[20px] overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">
                   <div className="relative h-28 bg-gray-50">
                     <OptimizedImage 
                       src={r.image} 
@@ -323,7 +341,7 @@ export default function Home() {
             {showRestaurantSkeleton && <div className="absolute inset-0 z-20 bg-white/80 backdrop-blur-sm flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-500" /></div>}
             
             {visibleRestaurants.map((r, i) => (
-              <Link key={r.id || i} to={`/food/user/restaurants/${r.slug}`} className="group block bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300">
+              <Link key={r.id || i} to={`/food/user/restaurants/${getRestaurantRouteParam(r, i)}`} className="group block bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300">
                 <div className="relative h-48 sm:h-56 overflow-hidden">
                   <OptimizedImage 
                     src={r.image} 

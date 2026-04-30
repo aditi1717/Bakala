@@ -33,6 +33,20 @@ const PRIMARY_FILTERS = [
   { id: "distance-under-2km", label: "Under 2km", icon: MapPin },
 ];
 
+const getRestaurantRouteParam = (restaurant, fallbackIndex = 0) => {
+  const slug = typeof restaurant?.slug === "string" ? restaurant.slug.trim() : "";
+  if (slug && slug.toLowerCase() !== "undefined" && slug.toLowerCase() !== "null") return slug;
+
+  const idCandidates = [restaurant?._id, restaurant?.restaurantId, restaurant?.id, restaurant?.mongoId];
+  const id = idCandidates.find((value) => typeof value === "string" && value.trim());
+  if (id) return id.trim();
+
+  const name = typeof restaurant?.name === "string" ? restaurant.name.trim() : "";
+  if (name) return name.toLowerCase().replace(/\s+/g, "-");
+
+  return `restaurant-${fallbackIndex}`;
+};
+
 const FoodRestaurantCard = memo(function FoodRestaurantCard({
   restaurant,
   index,
@@ -315,7 +329,7 @@ function FoodHomeContent({
 
           <div className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 lg:grid-cols-4">
             {recommendedForYouRestaurants.map((restaurant, index) => {
-              const restaurantSlug = restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, "-");
+              const restaurantSlug = getRestaurantRouteParam(restaurant, index);
               return (
                 <motion.div
                   key={`recommended-${restaurant.mongoId || restaurant.id || restaurantSlug}`}

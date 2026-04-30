@@ -33,6 +33,9 @@ import { FoodUserDebt } from '../../orders/models/userDebt.model.js';
 import { StoreProduct } from '../models/storeProduct.model.js';
 import { StoreOrder } from '../models/storeOrder.model.js';
 import { FoodRestaurantWithdrawal } from '../../restaurant/models/foodRestaurantWithdrawal.model.js';
+import { FoodRestaurantMenu } from '../../restaurant/models/restaurantMenu.model.js';
+import { FoodRestaurantOutletTimings } from '../../restaurant/models/outletTimings.model.js';
+import { FoodRestaurantWallet } from '../../restaurant/models/restaurantWallet.model.js';
 import { FoodDeliveryWithdrawal } from '../../delivery/models/foodDeliveryWithdrawal.model.js';
 import { FoodDeliveryWallet } from '../../delivery/models/deliveryWallet.model.js';
 import { FoodDeliveryCashDeposit } from '../../delivery/models/foodDeliveryCashDeposit.model.js';
@@ -302,9 +305,6 @@ const validateOpeningClosingTimes = (openingTime, closingTime) => {
     if (open === null || close === null) return;
     if (open === close) {
         throw new ValidationError('Opening time and closing time cannot be same');
-    }
-    if (close < open) {
-        throw new ValidationError('Closing time cannot be less than opening time');
     }
 };
 
@@ -2831,6 +2831,116 @@ export async function updateRestaurantById(id, body = {}, adminScope = {}) {
 
     await doc.save();
     return FoodRestaurant.findById(id).select('-__v').populate('zoneId', 'name zoneName serviceLocation isActive').lean();
+}
+
+export async function deleteRestaurantById(id, adminScope = {}) {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+
+    const restaurant = await FoodRestaurant.findById(id).select('_id zoneId').lean();
+    if (!restaurant) return null;
+    assertZoneAccess(adminScope, restaurant.zoneId);
+
+    const restaurantId = new mongoose.Types.ObjectId(String(id));
+
+    const offers = await FoodOffer.find(
+        {
+            $or: [
+                { restaurantId },
+                { createdByRestaurantId: restaurantId },
+            ],
+        },
+        { _id: 1 },
+    ).lean();
+    const offerIds = offers
+        .map((offer) => offer?._id)
+        .filter((offerId) => offerId && mongoose.Types.ObjectId.isValid(String(offerId)))
+        .map((offerId) => new mongoose.Types.ObjectId(String(offerId)));
+
+    const foodItems = await FoodItem.find({ restaurantId }, { _id: 1 }).lean();
+    const foodItemIds = foodItems
+        .map((item) => item?._id)
+        .filter((itemId) => itemId && mongoose.Types.ObjectId.isValid(String(itemId)))
+        .map((itemId) => new mongoose.Types.ObjectId(String(itemId)));
+
+    const [
+        deletedRestaurant,
+        deletedOrders,
+        deletedTransactions,
+        deletedFoods,
+        deletedCategories,
+        deletedFoodOffers,
+        deletedRestaurantOffers,
+        deletedOfferUsages,
+        deletedAddons,
+        deletedUserSupportTickets,
+        deletedRestaurantSupportTickets,
+        deletedWithdrawals,
+        deletedCommissions,
+        deletedPayoutSettlements,
+        deletedMenus,
+        deletedOutletTimings,
+        deletedWallets,
+        deletedRefreshTokens,
+    ] = await Promise.all([
+        FoodRestaurant.findByIdAndDelete(restaurantId).lean(),
+        FoodOrder.deleteMany({ restaurantId }),
+        FoodTransaction.deleteMany({ restaurantId }),
+        FoodItem.deleteMany({ restaurantId }),
+        FoodCategory.deleteMany({
+            $or: [
+                { restaurantId },
+                { createdByRestaurantId: restaurantId },
+            ],
+        }),
+        FoodOffer.deleteMany({
+            $or: [
+                { restaurantId },
+                { createdByRestaurantId: restaurantId },
+            ],
+        }),
+        RestaurantOffer.deleteMany({ restaurantId }),
+        offerIds.length ? FoodOfferUsage.deleteMany({ offerId: { $in: offerIds } }) : Promise.resolve({ deletedCount: 0 }),
+        FoodAddon.deleteMany({ restaurantId }),
+        FoodSupportTicket.deleteMany({ restaurantId }),
+        FoodRestaurantSupportTicket.deleteMany({ restaurantId }),
+        FoodRestaurantWithdrawal.deleteMany({ restaurantId }),
+        FoodRestaurantCommission.deleteMany({ restaurantId }),
+        FoodPayoutSettlement.deleteMany({ beneficiaryType: 'restaurant', beneficiaryId: restaurantId }),
+        FoodRestaurantMenu.deleteMany({ restaurantId }),
+        FoodRestaurantOutletTimings.deleteMany({ restaurantId }),
+        FoodRestaurantWallet.deleteMany({ restaurantId }),
+        FoodRefreshToken.deleteMany({ userId: restaurantId }),
+    ]);
+
+    if (!deletedRestaurant) return null;
+
+    let deletedRestaurantOffersByFood = { deletedCount: 0 };
+    if (foodItemIds.length) {
+        deletedRestaurantOffersByFood = await RestaurantOffer.deleteMany({ productId: { $in: foodItemIds } });
+    }
+
+    return {
+        deletedRestaurantId: String(restaurantId),
+        cascade: {
+            orders: Number(deletedOrders?.deletedCount || 0),
+            transactions: Number(deletedTransactions?.deletedCount || 0),
+            foods: Number(deletedFoods?.deletedCount || 0),
+            categories: Number(deletedCategories?.deletedCount || 0),
+            offers: Number(deletedFoodOffers?.deletedCount || 0),
+            restaurantOffers: Number((deletedRestaurantOffers?.deletedCount || 0) + (deletedRestaurantOffersByFood?.deletedCount || 0)),
+            offerUsages: Number(deletedOfferUsages?.deletedCount || 0),
+            addons: Number(deletedAddons?.deletedCount || 0),
+            userSupportTickets: Number(deletedUserSupportTickets?.deletedCount || 0),
+            restaurantSupportTickets: Number(deletedRestaurantSupportTickets?.deletedCount || 0),
+            withdrawals: Number(deletedWithdrawals?.deletedCount || 0),
+            commissions: Number(deletedCommissions?.deletedCount || 0),
+            payoutSettlements: Number(deletedPayoutSettlements?.deletedCount || 0),
+            menus: Number(deletedMenus?.deletedCount || 0),
+            outletTimings: Number(deletedOutletTimings?.deletedCount || 0),
+            wallets: Number(deletedWallets?.deletedCount || 0),
+            refreshTokens: Number(deletedRefreshTokens?.deletedCount || 0),
+        },
+    };
 }
 
 export async function updateRestaurantStatus(id, body = {}, adminScope = {}) {

@@ -80,6 +80,27 @@ const formatTime12Hour = (value) => {
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 const MAX_TIMING_SLOTS = 5
+const normalizeOpenDays = (days = []) => {
+  if (!Array.isArray(days)) return []
+  const dayAliases = {
+    mon: "monday",
+    tue: "tuesday",
+    tues: "tuesday",
+    wed: "wednesday",
+    thu: "thursday",
+    thur: "thursday",
+    thurs: "thursday",
+    fri: "friday",
+    sat: "saturday",
+    sun: "sunday",
+  }
+  const normalizedSet = new Set(days.map((day) => {
+    const raw = String(day || "").trim().toLowerCase()
+    if (!raw) return ""
+    return dayAliases[raw] || raw
+  }).filter(Boolean))
+  return DAY_NAMES.filter((day) => normalizedSet.has(day.toLowerCase()))
+}
 
 const DEFAULT_OPENING_TIME = "09:00 AM"
 const DEFAULT_CLOSING_TIME = "10:00 PM"
@@ -157,12 +178,22 @@ const validateScheduleSlots = (schedule) => {
   if (normalized.some((slot) => slot.openingMinutes === null || slot.closingMinutes === null)) {
     return "Please provide valid opening and closing time."
   }
-  if (normalized.some((slot) => slot.closingMinutes <= slot.openingMinutes)) {
-    return "Each slot closing time must be greater than opening time."
+  if (normalized.some((slot) => slot.closingMinutes === slot.openingMinutes)) {
+    return "Opening and closing time cannot be same."
   }
-  const sorted = [...normalized].sort((a, b) => a.openingMinutes - b.openingMinutes)
+  const overnightCount = normalized.filter((slot) => slot.closingMinutes < slot.openingMinutes).length
+  if (overnightCount > 0 && normalized.length > 1) {
+    return "Overnight slot can only be used alone for that day."
+  }
+  const sorted = [...normalized]
+    .map((slot) => ({
+      ...slot,
+      effectiveClosingMinutes:
+        slot.closingMinutes < slot.openingMinutes ? slot.closingMinutes + 24 * 60 : slot.closingMinutes,
+    }))
+    .sort((a, b) => a.openingMinutes - b.openingMinutes)
   for (let i = 1; i < sorted.length; i += 1) {
-    if (sorted[i].openingMinutes < sorted[i - 1].closingMinutes) {
+    if (sorted[i].openingMinutes < sorted[i - 1].effectiveClosingMinutes) {
       return "Time slots cannot overlap."
     }
   }
@@ -228,6 +259,7 @@ export default function RestaurantsList() {
   const [savingDetails, setSavingDetails] = useState(false)
   const [loadingOutletTimings, setLoadingOutletTimings] = useState(false)
   const [outletSchedule, setOutletSchedule] = useState(createDefaultAdminSchedule)
+  const [outletTimingsByDay, setOutletTimingsByDay] = useState(null)
   const [outletTimingsError, setOutletTimingsError] = useState("")
   const [detailsForm, setDetailsForm] = useState({
     name: "",
@@ -240,6 +272,7 @@ export default function RestaurantsList() {
     estimatedDeliveryTime: "",
     openingTime: "",
     closingTime: "",
+    openDays: [],
     isActive: true,
   })
   const [profileImageFile, setProfileImageFile] = useState(null)
@@ -734,6 +767,7 @@ export default function RestaurantsList() {
     setProfileImagePreview("")
     setIsEditingLocation(false)
     setOutletTimingsError("")
+    setOutletTimingsByDay(null)
     setOutletSchedule(normalizeScheduleFromOutletTimings(null, restaurant?.originalData || restaurant))
     setSelectedRestaurant(restaurant)
     setLoadingDetails(true)
@@ -747,6 +781,7 @@ export default function RestaurantsList() {
       if (!restaurantId || !adminAPI.getRestaurantById) {
         const fallbackData = restaurant.originalData || restaurant
         setRestaurantDetails(fallbackData)
+        setOutletTimingsByDay(null)
         setOutletSchedule(normalizeScheduleFromOutletTimings(null, fallbackData))
         return
       }
@@ -769,8 +804,10 @@ export default function RestaurantsList() {
         const outletTimings =
           timingsResult.value?.data?.data?.outletTimings ||
           timingsResult.value?.data?.outletTimings
+        setOutletTimingsByDay(outletTimings && typeof outletTimings === "object" ? outletTimings : null)
         setOutletSchedule(normalizeScheduleFromOutletTimings(outletTimings, resolvedRestaurant))
       } else {
+        setOutletTimingsByDay(null)
         setOutletSchedule(normalizeScheduleFromOutletTimings(null, resolvedRestaurant))
       }
     } catch (err) {
@@ -778,6 +815,7 @@ export default function RestaurantsList() {
       // Use the restaurant data we already have
       const fallbackData = restaurant.originalData || restaurant
       setRestaurantDetails(fallbackData)
+      setOutletTimingsByDay(null)
       setOutletSchedule(normalizeScheduleFromOutletTimings(null, fallbackData))
     } finally {
       setLoadingDetails(false)
@@ -921,6 +959,7 @@ export default function RestaurantsList() {
         estimatedDeliveryTime: "",
         openingTime: "",
         closingTime: "",
+        openDays: [],
         isActive: true,
       }
     }
@@ -954,6 +993,7 @@ export default function RestaurantsList() {
       estimatedDeliveryTime: estimatedDeliveryTimeValue,
       openingTime: openingTimeValue,
       closingTime: closingTimeValue,
+      openDays: normalizeOpenDays(restaurant.openDays || restaurant.onboarding?.step2?.openDays || []),
       isActive: restaurant.isActive !== false,
     }
   }
@@ -1023,6 +1063,7 @@ export default function RestaurantsList() {
         estimatedDeliveryTime: detailsForm.estimatedDeliveryTime.trim(),
         openingTime: normalizedOpeningTime,
         closingTime: normalizedClosingTime,
+        openDays: Array.isArray(detailsForm.openDays) ? detailsForm.openDays : [],
         isActive: detailsForm.isActive,
       }
 
@@ -1730,6 +1771,40 @@ export default function RestaurantsList() {
                         </p>
                       ) : null}
                     </div>
+                    <div className="md:col-span-2 rounded-xl border border-slate-200 p-4 bg-white">
+                      <p className="text-sm font-semibold text-slate-900">Open Days</p>
+                      <p className="text-xs text-slate-500 mt-1">Choose days when restaurant should stay open.</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {DAY_NAMES.map((day) => {
+                          const isActive = Array.isArray(detailsForm.openDays) && detailsForm.openDays.includes(day)
+                          return (
+                            <button
+                              key={`edit-open-day-${day}`}
+                              type="button"
+                              onClick={() =>
+                                setDetailsForm((prev) => {
+                                  const current = Array.isArray(prev.openDays) ? prev.openDays : []
+                                  const next = current.includes(day)
+                                    ? current.filter((d) => d !== day)
+                                    : [...current, day]
+                                  return { ...prev, openDays: normalizeOpenDays(next) }
+                                })
+                              }
+                              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                                isActive
+                                  ? "bg-emerald-600 text-white border-emerald-600"
+                                  : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                              }`}
+                            >
+                              {day}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        Selected: {(detailsForm.openDays || []).length} / {DAY_NAMES.length}
+                      </p>
+                    </div>
                     <div>
                       <label className="block text-xs text-slate-500 mb-1">Estimated Delivery Time</label>
                       <input type="text" value={detailsForm.estimatedDeliveryTime} onChange={(e) => setDetailsForm((prev) => ({ ...prev, estimatedDeliveryTime: e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm" />
@@ -1768,6 +1843,19 @@ export default function RestaurantsList() {
                   ? (outletSchedule?.slots?.[0]?.closingTime || r?.closingTime || r?.deliveryTimings?.closingTime || r?.onboarding?.step2?.deliveryTimings?.closingTime || "")
                   : ""
                 const timingSlotsVal = Array.isArray(outletSchedule?.slots) ? outletSchedule.slots : []
+                const openDaysFromOnboarding = normalizeOpenDays(
+                  r?.openDays || r?.onboarding?.step2?.openDays || [],
+                )
+                const openDaysFromOutletTimings = outletTimingsByDay && typeof outletTimingsByDay === "object"
+                  ? DAY_NAMES.filter((day) => outletTimingsByDay?.[day]?.isOpen !== false)
+                  : []
+                const openDaysVal =
+                  openDaysFromOnboarding.length > 0
+                    ? openDaysFromOnboarding
+                    : (openDaysFromOutletTimings.length > 0
+                      ? openDaysFromOutletTimings
+                      : (outletSchedule?.isOpen === false ? [] : [...DAY_NAMES]))
+                const closedDaysVal = DAY_NAMES.filter((day) => !openDaysVal.includes(day))
                 const offerVal = r?.offer || r?.onboarding?.step4?.offer || ""
                 const estimatedDeliveryTimeVal = r?.estimatedDeliveryTime || r?.onboarding?.step4?.estimatedDeliveryTime || ""
                 const featuredDishVal = r?.featuredDish || r?.onboarding?.step4?.featuredDish || ""
@@ -1977,6 +2065,30 @@ export default function RestaurantsList() {
                                 </span>
                               ))}
                             </div>
+                          </div>
+                        )}
+                        {openDaysVal.length > 0 && (
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Open Days (Onboarding)</p>
+                            <div className="flex flex-wrap gap-2">
+                              {openDaysVal.map((day) => (
+                                <span key={`open-day-${day}`} className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-semibold">
+                                  {day}
+                                </span>
+                              ))}
+                            </div>
+                            {closedDaysVal.length > 0 && (
+                              <>
+                                <p className="text-xs text-slate-500 mt-3 mb-1">Closed Days (Onboarding)</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {closedDaysVal.map((day) => (
+                                    <span key={`closed-day-${day}`} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
+                                      {day}
+                                    </span>
+                                  ))}
+                                </div>
+                              </>
+                            )}
                           </div>
                         )}
                         {estimatedDeliveryTimeVal && (

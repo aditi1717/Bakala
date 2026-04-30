@@ -72,6 +72,14 @@ const isWithinSlot = (nowMinutes, slot) => {
   return nowMinutes >= opening || nowMinutes <= closing
 }
 
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
+const getPreviousDayName = (dayName) => {
+  const index = DAY_NAMES.indexOf(dayName)
+  if (index < 0) return null
+  return DAY_NAMES[(index + DAY_NAMES.length - 1) % DAY_NAMES.length]
+}
+
 
 export default function RestaurantStatus() {
   const navigate = useNavigate()
@@ -162,6 +170,19 @@ export default function RestaurantStatus() {
       }
 
       const dayData = outletTimingsData[currentDayFull]
+      const previousDayName = getPreviousDayName(currentDayFull)
+      const previousDayData = previousDayName ? outletTimingsData[previousDayName] : null
+      const previousDaySlots = previousDayData?.isOpen === false ? [] : extractDaySlots(previousDayData)
+      const activeFromPreviousDay = previousDaySlots.some(
+        (slot) => slot.closingMinutes < slot.openingMinutes && currentTimeInMinutes <= slot.closingMinutes
+      )
+
+      if (activeFromPreviousDay) {
+        setIsDayClosed(false)
+        setIsWithinTimings(true)
+        return
+      }
+
       if (dayData.isOpen === false) {
         setIsDayClosed(true)
         setIsWithinTimings(false)
