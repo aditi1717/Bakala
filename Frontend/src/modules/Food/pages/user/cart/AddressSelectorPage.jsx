@@ -362,20 +362,23 @@ export default function AddressSelectorPage() {
   const handleUseCurrentLocation = async () => {
     try {
       toast.loading("Getting location...", { id: "geo" })
-      const loc = await requestLocation()
-      if (loc?.latitude) {
+      // Use forceFresh: false for faster response (uses recent cache if available)
+      const loc = await requestLocation({ forceFresh: false })
+      if (loc?.latitude && loc?.longitude) {
         applyResolvedLocationToMap(loc)
         persistSelectedLocation(loc)
         queueReverseGeocode(Number(loc.latitude), Number(loc.longitude), { immediate: true, force: true })
         try { localStorage.setItem("deliveryAddressMode", "current") } catch {}
         toast.success("Location updated", { id: "geo" })
-        // On selector list screen, auto-close and return so Home shows updated live location immediately.
+        // On selector list screen, redirect back to homepage as requested by user
         if (!showAddressForm) {
-          handleBack()
+          navigate("/food/user")
         }
+      } else {
+        toast.error("Unable to get accurate location. Please try again or select manually.", { id: "geo" })
       }
     } catch (e) {
-      toast.error("Failed to get location", { id: "geo" })
+      toast.error("Failed to get location. Please check your browser permissions.", { id: "geo" })
     }
   }
 
@@ -402,7 +405,7 @@ export default function AddressSelectorPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const loc = await requestLocation()
+        const loc = await requestLocation({ forceFresh: false })
         if (!cancelled && loc?.latitude && loc?.longitude) {
           applyResolvedLocationToMap(loc)
           persistSelectedLocation(loc)

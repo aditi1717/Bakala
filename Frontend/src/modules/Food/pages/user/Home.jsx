@@ -63,8 +63,6 @@ export default function Home() {
   const { zoneId } = useZone(location);
   const routerLocation = useRouterLocation();
   
-  const [showVegModePopup, setShowVegModePopup] = useState(false);
-  const [showSwitchOffPopup, setShowSwitchOffPopup] = useState(false);
   const [hasScrolledPastBanner, setHasScrolledPastBanner] = useState(false);
   const [visibleRestaurantCount, setVisibleRestaurantCount] = useState(RESTAURANTS_BATCH_SIZE);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -74,7 +72,6 @@ export default function Home() {
   const stickyHeaderRef = useRef(null);
   const categoryScrollRef = useRef(null);
   const restaurantLoadMoreRef = useRef(null);
-  const isHandlingSwitchOff = useRef(false);
 
   // High-performance data fetching hook
   const {
@@ -135,10 +132,7 @@ export default function Home() {
   }, [heroSearch, openSearch, setSearchValue]);
 
   const handleVegModeChange = (newValue) => {
-    if (isHandlingSwitchOff.current) return;
-    if (newValue && !vegMode) setShowVegModePopup(true);
-    else if (!newValue && vegMode) { isHandlingSwitchOff.current = true; setShowSwitchOffPopup(true); }
-    else setVegModeContext(newValue);
+    setVegModeContext(newValue);
   };
 
   // Scroll Tracking
