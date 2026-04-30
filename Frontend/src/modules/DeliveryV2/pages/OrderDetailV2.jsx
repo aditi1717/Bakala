@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { deliveryAPI } from '@food/api';
-import { toast } from 'sonner';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import {
   ArrowLeft,
@@ -479,9 +478,6 @@ const OrderDetailV2 = () => {
       }
     } catch (error) {
       console.warn('[OrderDetailV2] Failed to load order details:', error?.message || error);
-      if (!silent) {
-        toast.error('Failed to load order details');
-      }
     } finally {
       if (!silent) setLoading(false);
     }
@@ -577,13 +573,12 @@ const OrderDetailV2 = () => {
     navigate('/food/delivery/feed');
   }, [navigate, order, orderId, syncStoreWithOrder]);
 
-  const runAction = useCallback(async (actionKey, runner, successMessage, options = {}) => {
+  const runAction = useCallback(async (actionKey, runner, options = {}) => {
     const { skipRefresh = false, onSuccess } = options;
     if (!order) return;
     setBusyAction(actionKey);
     try {
       await runner();
-      toast.success(successMessage);
       if (typeof onSuccess === 'function') {
         onSuccess();
       }
@@ -591,7 +586,7 @@ const OrderDetailV2 = () => {
         await fetchOrderDetails(true);
       }
     } catch (error) {
-      toast.error('Status update failed');
+      // Keep UI silent for delivery status actions.
     } finally {
       setBusyAction('');
     }
@@ -619,7 +614,6 @@ const OrderDetailV2 = () => {
       const nextOrder = response?.data?.data?.order || order;
       syncStoreWithOrder(nextOrder);
     },
-    'Order accepted',
   ), [order, orderId, runAction, syncStoreWithOrder]);
 
   const handlePassTask = useCallback(() => {
@@ -630,7 +624,6 @@ const OrderDetailV2 = () => {
         await deliveryAPI.rejectOrder(orderId, { reasonType: 'passed' });
         clearActiveOrder();
       },
-      'Task passed to admin',
       {
         skipRefresh: true,
         onSuccess: () => {
@@ -668,7 +661,6 @@ const OrderDetailV2 = () => {
         {},
       );
     },
-    'Order marked as picked',
   ), [order, orderId, runAction]);
 
   const handleArriveDrop = useCallback(() => runAction(
@@ -676,7 +668,6 @@ const OrderDetailV2 = () => {
     async () => {
       await deliveryAPI.confirmReachedDrop(orderId);
     },
-    'Customer arrival updated',
   ), [orderId, runAction]);
 
   const handleDelivered = useCallback(() => runAction(
@@ -685,7 +676,6 @@ const OrderDetailV2 = () => {
       await deliveryAPI.completeDelivery(orderId, { rating: 5 });
       clearActiveOrder();
     },
-    'Order delivered',
   ), [clearActiveOrder, orderId, runAction]);
 
   const handleReachedAndDelivered = useCallback(() => runAction(
@@ -697,7 +687,6 @@ const OrderDetailV2 = () => {
       await deliveryAPI.completeDelivery(orderId, { rating: 5 });
       clearActiveOrder();
     },
-    'Reached location and delivered',
   ), [clearActiveOrder, hasReachedDrop, orderId, runAction]);
   const isPassedTaskFlow = dispatchStatus === 'unassigned' && !isClosedOrder;
 

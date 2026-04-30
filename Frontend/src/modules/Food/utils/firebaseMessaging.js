@@ -530,6 +530,26 @@ function showForegroundNotification(payload = {}) {
     payload?.data?.imageUrl ||
     undefined;
 
+  const isOrderRelatedNotification = (() => {
+    const titleText = String(title || "").toLowerCase();
+    const bodyText = String(body || "").toLowerCase();
+    const targetUrl = String(payload?.data?.targetUrl || payload?.data?.link || "").toLowerCase();
+    const hasOrderId =
+      Boolean(payload?.data?.orderId) ||
+      Boolean(payload?.data?.orderMongoId) ||
+      Boolean(payload?.data?.order_id) ||
+      Boolean(payload?.data?.order_mongo_id);
+
+    return (
+      hasOrderId ||
+      titleText.includes("order") ||
+      bodyText.includes("order") ||
+      titleText.includes("rider") ||
+      bodyText.includes("rider") ||
+      targetUrl.includes("/order")
+    );
+  })();
+
   playPushSound(payload);
 
   // Force system notification even when the tab is in focus
@@ -586,8 +606,15 @@ function showForegroundNotification(payload = {}) {
     }
   }
 
-  // Still show in-app toast for immediate context if we are in focus
-  if (typeof document !== "undefined" && document.visibilityState === "visible") {
+  // Still show in-app toast for immediate context if we are in focus.
+  // Delivery app requested: do not show foreground toast popups.
+  const currentModule = normalizeModuleFromPath();
+  if (
+    currentModule !== "delivery" &&
+    !(currentModule === "user" && isOrderRelatedNotification) &&
+    typeof document !== "undefined" &&
+    document.visibilityState === "visible"
+  ) {
     if (body) {
       toast.success(`${title}: ${body}`);
     } else {

@@ -3,7 +3,7 @@ import { motion } from "framer-motion"
 import { Link, useNavigate } from "react-router-dom"
 import { Phone, ShieldCheck, Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import { authAPI } from "@food/api"
+import { authAPI, userAPI } from "@food/api"
 import { setAuthData } from "@food/utils/auth"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
 import BRAND_THEME from "@/config/brandTheme"
@@ -12,6 +12,7 @@ export default function UnifiedOTPFastLogin() {
   const RESEND_COOLDOWN_SECONDS = 60
   const [phoneNumber, setPhoneNumber] = useState("")
   const [otp, setOtp] = useState("")
+  const [fullName, setFullName] = useState("")
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [otpSent, setOtpSent] = useState(false)
@@ -106,6 +107,7 @@ export default function UnifiedOTPFastLogin() {
   const handleEditNumber = () => {
     setStep(1)
     setOtp("")
+    setFullName("")
     setResendTimer(0)
   }
 
@@ -152,7 +154,23 @@ export default function UnifiedOTPFastLogin() {
       const refreshToken = data.refreshToken || null
       const user = data.user
 
-      if (!accessToken || !user) {
+      if (!user) {
+        throw new Error("Invalid response from server")
+      }
+
+      const hasName = user.name && String(user.name).trim().length > 0 && String(user.name).toLowerCase() !== "null"
+      const needsName = data.isNewUser === true || !hasName
+
+      if (needsName) {
+        if (!accessToken) {
+          throw new Error("Invalid response from server")
+        }
+        setAuthData("user", accessToken, user, refreshToken)
+        setStep(3)
+        return
+      }
+
+      if (!accessToken) {
         throw new Error("Invalid response from server")
       }
 
@@ -169,6 +187,37 @@ export default function UnifiedOTPFastLogin() {
           msg = "Invalid or expired code, or account not active."
         }
       }
+      toast.error(msg)
+    } finally {
+      setLoading(false)
+      submitting.current = false
+    }
+  }
+
+  const handleSubmitName = async (e) => {
+    e.preventDefault()
+    const trimmedName = String(fullName || "").trim()
+    if (trimmedName.length < 2) {
+      toast.error("Please enter your full name")
+      return
+    }
+    if (submitting.current) return
+    submitting.current = true
+    setLoading(true)
+    try {
+      await userAPI.updateProfile({ name: trimmedName })
+      try {
+        const raw = localStorage.getItem("user_user")
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          localStorage.setItem("user_user", JSON.stringify({ ...parsed, name: trimmedName }))
+        }
+      } catch (_) {
+      }
+      toast.success("Welcome! Account setup complete.")
+      navigate("/food/user", { replace: true })
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to save name."
       toast.error(msg)
     } finally {
       setLoading(false)
@@ -222,20 +271,22 @@ export default function UnifiedOTPFastLogin() {
                 className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-medium uppercase tracking-[0.08em] mb-1"
                 style={{ backgroundColor: authTheme.accentSoft, color: authTheme.accent }}
               >
-                {step === 1 ? "Secure Login" : "OTP Verification"}
+                {step === 1 ? "Secure Login" : step === 2 ? "OTP Verification" : "Profile Setup"}
               </div>
               <h2 className="text-[20px] sm:text-[22px] font-semibold text-gray-900 dark:text-white leading-tight">
-                {step === 1 ? "Login or Signup" : "Enter OTP"}
+                {step === 1 ? "Login or Signup" : step === 2 ? "Enter OTP" : "Add Your Name"}
               </h2>
               <p className="text-[13px] text-slate-700 dark:text-slate-300 font-medium">
                 {step === 1
                   ? "Continue with your phone number."
-                  : `Code sent to +91 ${phoneNumber}`}
+                  : step === 2
+                    ? `Code sent to +91 ${phoneNumber}`
+                    : "New account detected. Please add your name to continue."}
               </p>
               <div className="h-[2px] w-10 rounded-full mt-1" style={{ backgroundColor: authTheme.accent }} />
            </div>
 
-           <form onSubmit={step === 1 ? handleSendOTP : handleVerifyOTP} className="space-y-4">
+           <form onSubmit={step === 1 ? handleSendOTP : step === 2 ? handleVerifyOTP : handleSubmitName} className="space-y-4">
              {step === 1 ? (
                <div className="space-y-3">
                  <div className="rounded-[0.9rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 relative transition-all focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/20">
@@ -263,7 +314,7 @@ export default function UnifiedOTPFastLogin() {
                    We will send verification updates via SMS.
                  </div>
                </div>
-             ) : (
+             ) : step === 2 ? (
                <div className="space-y-4">
                  <div className="space-y-3 text-center">
                     <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
@@ -352,6 +403,23 @@ export default function UnifiedOTPFastLogin() {
                    </div>
                  </div>
                </div>
+             ) : (
+               <div className="space-y-3">
+                 <div className="rounded-[0.9rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 relative transition-all focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/20">
+                   <label className="block text-[9px] font-medium uppercase tracking-[0.08em] text-slate-600 dark:text-slate-300 mb-2">
+                     Full Name
+                   </label>
+                   <input
+                     type="text"
+                     required
+                     autoFocus
+                     value={fullName}
+                     onChange={(e) => setFullName(e.target.value)}
+                     className="w-full bg-transparent text-gray-900 dark:text-white outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 font-medium text-[15px]"
+                     placeholder="Enter your full name"
+                   />
+                 </div>
+               </div>
              )}
 
              <button
@@ -373,7 +441,7 @@ export default function UnifiedOTPFastLogin() {
                {loading ? (
                  <Loader2 className="w-5 h-5 animate-spin mx-auto text-current" />
                ) : (
-                 step === 1 ? "Get Verification Code" : "Continue"
+                 step === 1 ? "Get Verification Code" : step === 2 ? "Continue" : "Complete Signup"
                )}
              </button>
            </form>
