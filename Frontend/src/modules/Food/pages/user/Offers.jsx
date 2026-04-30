@@ -11,7 +11,7 @@ import { useDelayedLoading } from "@food/hooks/useDelayedLoading"
 import BRAND_THEME from "@/config/brandTheme"
 
 // Import banner image
-import offerBanner from "@food/assets/offerpagebanner.png"
+import offerBanner from "@food/assets/offerpagebanner.webp"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}

@@ -57,7 +57,7 @@ import {
   getFoodVariants,
   hasFoodVariants,
 } from "@food/utils/foodVariants"
-import fssaiLogo from "@food/assets/fssai.png"
+import fssaiLogo from "@food/assets/fssai.webp"
 import { RestaurantDetailSkeleton } from "@food/components/ui/loading-skeletons"
 import RestaurantFoodCard from "@food/components/user/restaurants/RestaurantFoodCard"
 

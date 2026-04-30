@@ -53,7 +53,7 @@ import { adminSidebarMenu } from "@food/utils/adminSidebarMenu"
 import { quickAdminSidebarMenu } from "@food/utils/quickAdminSidebarMenu"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
 import { adminAPI } from "@food/api"
-import quickSpicyLogo from "@food/assets/quicky-spicy-logo.png"
+import quickSpicyLogo from "@food/assets/quicky-spicy-logo.webp"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}

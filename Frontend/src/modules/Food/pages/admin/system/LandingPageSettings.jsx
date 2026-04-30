@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Monitor, Info, X, ChevronRight, RotateCcw, Save } from "lucide-react";
-import mobileImage1 from "@food/assets/Transaction-report-icons/mobile_image1.png";
+import mobileImage1 from "@food/assets/Transaction-report-icons/mobile_image1.webp";
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -82,7 +82,7 @@ export default function LandingPageSettings({ type = "admin" }) {
     { id: "en", label: "English(EN)" },
     { id: "bn", label: "Bengali - বাংলা(BN)" },
     { id: "ar", label: "Arabic - العربية (AR)" },
-    { id: "es", label: "Spanish - espa�ol(ES)" },
+    { id: "es", label: "Spanish - espa�ol(ES)" },
   ];
 
   const handleImageUpload = (e, setter, field) => {

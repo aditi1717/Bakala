@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@food/components/ui/select"
-import loginBg from "@food/assets/loginbanner.png"
+import loginBg from "@food/assets/loginbanner.webp"
 import { useCompanyName } from "@food/hooks/useCompanyName"
 import BRAND_THEME from "@/config/brandTheme"
 

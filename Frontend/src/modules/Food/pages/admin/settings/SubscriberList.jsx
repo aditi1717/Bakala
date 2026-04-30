@@ -3,9 +3,9 @@ import { Search, Download, ChevronDown, Settings, ArrowUpDown, FileText, FileSpr
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@food/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@food/components/ui/dialog";
 
-import burgerIcon from "@food/assets/Dashboard-icons/image13.png";
-import leafIcon from "@food/assets/Dashboard-icons/image14.png";
-import chefIcon from "@food/assets/Dashboard-icons/image16.png";
+import burgerIcon from "@food/assets/Dashboard-icons/image13.webp";
+import leafIcon from "@food/assets/Dashboard-icons/image14.webp";
+import chefIcon from "@food/assets/Dashboard-icons/image16.webp";
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}

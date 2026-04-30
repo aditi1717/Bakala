@@ -23,7 +23,7 @@ import {
   PopoverTrigger,
 } from "@food/components/ui/popover";
 import { Badge } from "@food/components/ui/badge";
-import foodPattern from "@food/assets/food_pattern_background.png";
+import foodPattern from "@food/assets/food_pattern_background.webp";
 import useNotificationInbox from "@food/hooks/useNotificationInbox";
 import { useCart } from "@food/context/CartContext";
 import BRAND_THEME from "@/config/brandTheme";

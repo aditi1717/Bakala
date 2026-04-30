@@ -5,7 +5,7 @@ import AnimatedPage from "@food/components/user/AnimatedPage"
 import { Button } from "@food/components/ui/button"
 import { Input } from "@food/components/ui/input"
 import { authAPI } from "@food/api"
-import loginBanner from "@food/assets/loginbanner.png"
+import loginBanner from "@food/assets/loginbanner.webp"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
 import BRAND_THEME from "@/config/brandTheme"
 const debugLog = (...args) => {}

@@ -6,9 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { exportReportsToCSV, exportReportsToExcel, exportReportsToPDF, exportReportsToJSON } from "@food/components/admin/reports/reportsExportUtils"
 
 // Import icons from Transaction-report-icons
-import pendingIcon from "@food/assets/Transaction-report-icons/trx1.png"
-import completedIcon from "@food/assets/Transaction-report-icons/trx3.png"
-import canceledIcon from "@food/assets/Transaction-report-icons/trx5.png"
+import pendingIcon from "@food/assets/Transaction-report-icons/trx1.webp"
+import completedIcon from "@food/assets/Transaction-report-icons/trx3.webp"
+import canceledIcon from "@food/assets/Transaction-report-icons/trx5.webp"
 
 export default function DisbursementReportRestaurants() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -189,7 +189,7 @@ export default function DisbursementReportRestaurants() {
                   className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="All restaurants">All restaurants</option>
-                  <option value="Café Monarch">Café Monarch</option>
+                  <option value="Cafï¿½ Monarch">Cafï¿½ Monarch</option>
                   <option value="Hungry Puppets">Hungry Puppets</option>
                   <option value="Redcliff Cafe">Redcliff Cafe</option>
                 </select>

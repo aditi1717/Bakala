@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react"
 import { exportToCSV, exportToExcel, exportToPDF, exportToJSON } from "./ordersExportUtils"
-import quickSpicyLogo from "@food/assets/quicky-spicy-logo.png"
+import quickSpicyLogo from "@food/assets/quicky-spicy-logo.webp"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
 import { formatOrderAddressWithLabels } from "@food/utils/orderAddressFormatter"
 const debugError = () => {}

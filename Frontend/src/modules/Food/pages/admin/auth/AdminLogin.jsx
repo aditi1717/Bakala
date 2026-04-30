@@ -15,7 +15,7 @@ import {
 import { Input } from "@food/components/ui/input"
 import { Label } from "@food/components/ui/label"
 import { Eye, EyeOff } from "lucide-react"
-import quickSpicyLogo from "@food/assets/quicky-spicy-logo.png"
+import quickSpicyLogo from "@food/assets/quicky-spicy-logo.webp"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}

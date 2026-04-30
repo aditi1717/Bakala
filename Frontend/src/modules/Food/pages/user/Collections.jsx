@@ -7,7 +7,7 @@ import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
 import BRAND_THEME from "@/config/brandTheme"
 
 // Import banner
-import collectionsBanner from "@food/assets/collectionspagebanner.png"
+import collectionsBanner from "@food/assets/collectionspagebanner.webp"
 
 // Gradient colors for collection cards
 const gradientColors = [

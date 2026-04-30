@@ -14,7 +14,7 @@ export const uploadImageBuffer = async (buffer, folder = 'uploads') => {
 
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            { folder, resource_type: 'image' },
+            { folder, resource_type: 'image', format: 'webp' },
             (error, result) => {
                 if (error) {
                     return reject(error);
@@ -34,7 +34,7 @@ export const uploadImageBufferDetailed = async (buffer, folder = 'uploads') => {
 
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            { folder, resource_type: 'image' },
+            { folder, resource_type: 'image', format: 'webp' },
             (error, result) => {
                 if (error) {
                     return reject(error);
@@ -57,7 +57,11 @@ export const uploadBufferDetailed = async (
 
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-            { folder, resource_type: resourceType },
+            { 
+                folder, 
+                resource_type: resourceType,
+                ...(resourceType === 'image' ? { format: 'webp' } : {}) 
+            },
             (error, result) => {
                 if (error) {
                     return reject(error);

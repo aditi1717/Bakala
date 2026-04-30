@@ -32,7 +32,7 @@ import { useProfile } from "@food/context/ProfileContext"
 import { useCart } from "@food/context/CartContext"
 import { orderAPI } from "@food/api"
 import { useCompanyName } from "@food/hooks/useCompanyName"
-import circleIcon from "@food/assets/circleicon.png"
+import circleIcon from "@food/assets/circleicon.webp"
 import { RESTAURANT_PIN_SVG, CUSTOMER_PIN_SVG, RIDER_BIKE_SVG } from "@food/constants/mapIcons"
 import BRAND_THEME from "@/config/brandTheme"
 

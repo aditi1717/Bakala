@@ -10,7 +10,7 @@ import { useLocationSelector, useSearchOverlay } from "@food/components/user/Use
 import { useLocation } from "@food/hooks/useLocation"
 import { useZone } from "@food/hooks/useZone"
 import { useCart } from "@food/context/CartContext"
-import offerImage from "@food/assets/offerimage.png"
+import offerImage from "@food/assets/offerimage.webp"
 import AddToCartAnimation from "@food/components/user/AddToCartAnimation"
 import OptimizedImage from "@food/components/OptimizedImage"
 import FoodHeroHeaderShell from "@food/components/user/home/FoodHeroHeaderShell"

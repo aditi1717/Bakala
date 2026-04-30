@@ -1,8 +1,8 @@
 import React from 'react';
-import discountPromoIcon from "@food/assets/category-icons/discount_promo.png";
-import vegPromoIcon from "@food/assets/category-icons/veg_promo.png";
-import pricePromoIcon from "@food/assets/category-icons/price_promo.png";
-import comboPromoIcon from "@food/assets/category-icons/combo_promo.png";
+import discountPromoIcon from "@food/assets/category-icons/discount_promo.webp";
+import vegPromoIcon from "@food/assets/category-icons/veg_promo.webp";
+import pricePromoIcon from "@food/assets/category-icons/price_promo.webp";
+import comboPromoIcon from "@food/assets/category-icons/combo_promo.webp";
 import BRAND_THEME from "@/config/brandTheme";
 
 export default function PromoRow({ handleVegModeChange, navigate, isVegMode, toggleRef }) {

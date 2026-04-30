@@ -22,8 +22,8 @@ import {
   RestaurantGridSkeleton,
 } from "@food/components/ui/loading-skeletons";
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability";
-import foodPattern from "@food/assets/food_pattern_background.png";
-import discoveryBg from "@food/assets/food_discovery_bg.png";
+import foodPattern from "@food/assets/food_pattern_background.webp";
+import discoveryBg from "@food/assets/food_discovery_bg.webp";
 import BRAND_THEME from "@/config/brandTheme";
 
 const PRIMARY_FILTERS = [

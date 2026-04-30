@@ -10,7 +10,7 @@ import {
 } from '@react-google-maps/api';
 import io from 'socket.io-client';
 import { API_BASE_URL } from '@food/api/config';
-import bikeLogo from '@food/assets/bikelogo.png';
+import bikeLogo from '@food/assets/bikelogo.webp';
 import { subscribeOrderTracking } from '@food/realtimeTracking';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Navigation, Info, Circle } from 'lucide-react';
@@ -452,7 +452,7 @@ const DeliveryTrackingMap = ({
               className="relative w-16 h-16"
             >
               <img 
-                src="/MapRider.png" 
+                src="/MapRider.webp" 
                 alt="Rider" 
                 className="w-full h-full object-contain drop-shadow-2xl"
                 onError={(e) => {

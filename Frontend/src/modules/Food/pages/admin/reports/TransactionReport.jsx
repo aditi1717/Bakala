@@ -7,15 +7,15 @@ import { adminAPI } from "@food/api"
 import { toast } from "sonner"
 
 // Import icons from Transaction-report-icons
-import completedIcon from "@food/assets/Transaction-report-icons/trx1.png"
-import refundedIcon from "@food/assets/Transaction-report-icons/trx3.png"
-import adminEarningIcon from "@food/assets/Transaction-report-icons/admin-earning.png"
-import restaurantEarningIcon from "@food/assets/Transaction-report-icons/store-earning.png"
-import deliverymanEarningIcon from "@food/assets/Transaction-report-icons/deliveryman-earning.png"
+import completedIcon from "@food/assets/Transaction-report-icons/trx1.webp"
+import refundedIcon from "@food/assets/Transaction-report-icons/trx3.webp"
+import adminEarningIcon from "@food/assets/Transaction-report-icons/admin-earning.webp"
+import restaurantEarningIcon from "@food/assets/Transaction-report-icons/store-earning.webp"
+import deliverymanEarningIcon from "@food/assets/Transaction-report-icons/deliveryman-earning.webp"
 
 // Import search and export icons from Dashboard-icons
-import searchIcon from "@food/assets/Dashboard-icons/image8.png"
-import exportIcon from "@food/assets/Dashboard-icons/image9.png"
+import searchIcon from "@food/assets/Dashboard-icons/image8.webp"
+import exportIcon from "@food/assets/Dashboard-icons/image9.webp"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}

@@ -6,7 +6,7 @@ import { motion } from "framer-motion"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import { Button } from "@food/components/ui/button"
 import { Card, CardContent } from "@food/components/ui/card"
-import quickSpicyLogo from "@food/assets/quicky-spicy-logo.png"
+import quickSpicyLogo from "@food/assets/quicky-spicy-logo.webp"
 import api from "@food/api"
 import { API_ENDPOINTS } from "@food/api/config"
 import { useCompanyName } from "@food/hooks/useCompanyName"
@@ -82,7 +82,7 @@ export default function About() {
       <div className="min-h-screen bg-gradient-to-b from-brand-50 to-white dark:from-[#0a0a0a] dark:to-[#1a1a1a] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-10 w-10 animate-spin text-[#005128]" />
-          <p className="text-sm text-gray-500">Loading About…</p>
+          <p className="text-sm text-gray-500">Loading Aboutï¿½</p>
         </div>
       </div>
     )
@@ -331,7 +331,7 @@ export default function About() {
           className="text-center mt-8 mb-4"
         >
           <p className="text-sm text-gray-500 dark:text-gray-500">
-            © {new Date().getFullYear()} {companyName || "Iggymet"}. All rights reserved.
+            ï¿½ {new Date().getFullYear()} {companyName || "Iggymet"}. All rights reserved.
           </p>
         </motion.div>
       </div>

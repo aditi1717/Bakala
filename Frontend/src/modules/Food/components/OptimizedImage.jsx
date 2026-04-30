@@ -32,43 +32,61 @@ const OptimizedImage = React.memo(({
   const imgRef = useRef(null)
   const observerRef = useRef(null)
 
-  // Check if image URL supports optimization (external URLs)
+  // Check if image URL supports optimization
+  const isCloudinary = useMemo(() => {
+    return src && typeof src === 'string' && src.includes('res.cloudinary.com');
+  }, [src]);
+
   const supportsOptimization = (imageSrc) => {
-    if (!imageSrc || typeof imageSrc !== 'string' || imageSrc === '') return false
-    if (imageSrc.startsWith('data:') || imageSrc.startsWith('/')) return false
-    // Check if it's an external URL (http/https)
-    return /^https?:\/\//.test(imageSrc)
-  }
+    if (!imageSrc || typeof imageSrc !== 'string' || imageSrc === '') return false;
+    if (imageSrc.startsWith('data:')) return false;
+    // Local assets (starting with /) are now WebP, so no need for extra params
+    if (imageSrc.startsWith('/')) return false;
+    return /^https?:\/\//.test(imageSrc);
+  };
 
   const appendImageParams = (imageSrc, params) => {
     try {
-      const url = new URL(imageSrc)
+      if (isCloudinary) {
+        // Cloudinary handles transformations via path or search params
+        // For simplicity and compatibility, we'll use search params if possible, 
+        // but Cloudinary preferred way is path. However, adding params to URL is safer for many configurations.
+        const url = new URL(imageSrc);
+        url.searchParams.set('f', 'auto');
+        url.searchParams.set('q', 'auto');
+        if (params.w) url.searchParams.set('w', String(params.w));
+        return url.toString();
+      }
+      
+      const url = new URL(imageSrc);
       Object.entries(params).forEach(([key, value]) => {
-        url.searchParams.set(key, String(value))
-      })
-      return url.toString()
+        url.searchParams.set(key, String(value));
+      });
+      return url.toString();
     } catch {
-      return imageSrc
+      return imageSrc;
     }
-  }
+  };
 
   // Generate responsive srcset
   const srcSet = useMemo(() => {
-    if (!supportsOptimization(src)) return undefined
-    const sizesArr = [400, 600, 800, 1200, 1600]
+    if (!supportsOptimization(src)) return undefined;
+    const sizesArr = [400, 800, 1200];
     return sizesArr
-      .map(size => `${appendImageParams(src, { w: size, q: 80 })} ${size}w`)
-      .join(', ')
-  }, [src])
+      .map(size => `${appendImageParams(src, { w: size })} ${size}w`)
+      .join(', ');
+  }, [src, isCloudinary]);
 
-  // Generate WebP srcset
+  // WebP/Auto format is now handled by f=auto in appendImageParams for Cloudinary
   const webPSrcSet = useMemo(() => {
-    if (!supportsOptimization(src)) return undefined
-    const sizesArr = [400, 600, 800, 1200, 1600]
+    if (!supportsOptimization(src)) return undefined;
+    if (isCloudinary) return undefined; // Already handled in main srcSet via f_auto
+    
+    const sizesArr = [400, 800, 1200];
     return sizesArr
-      .map(size => `${appendImageParams(src, { w: size, q: 80, format: 'webp' })} ${size}w`)
-      .join(', ')
-  }, [src])
+      .map(size => `${appendImageParams(src, { w: size, format: 'webp' })} ${size}w`)
+      .join(', ');
+  }, [src, isCloudinary]);
 
   // Intersection Observer for lazy loading
   useEffect(() => {

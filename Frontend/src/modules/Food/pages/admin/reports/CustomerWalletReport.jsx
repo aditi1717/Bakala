@@ -7,9 +7,9 @@ import { adminAPI } from "@food/api"
 import { toast } from "sonner"
 
 // Import icons from Dashboard-icons
-import debitIcon from "@food/assets/Dashboard-icons/image2.png"
-import creditIcon from "@food/assets/Dashboard-icons/image1.png"
-import balanceIcon from "@food/assets/Dashboard-icons/image6.png"
+import debitIcon from "@food/assets/Dashboard-icons/image2.webp"
+import creditIcon from "@food/assets/Dashboard-icons/image1.webp"
+import balanceIcon from "@food/assets/Dashboard-icons/image6.webp"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}

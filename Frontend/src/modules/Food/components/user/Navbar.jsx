@@ -13,7 +13,7 @@ import { useLocation } from "@food/hooks/useLocation"
 import { useCart } from "@food/context/CartContext"
 import { useLocationSelector } from "./UserLayout"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
-import quickSpicyLogo from "@food/assets/quicky-spicy-logo.png"
+import quickSpicyLogo from "@food/assets/quicky-spicy-logo.webp"
 import BRAND_THEME from "@/config/brandTheme"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}

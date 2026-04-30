@@ -14,7 +14,7 @@ import { useLocation } from "@food/hooks/useLocation"
 import BRAND_THEME from "@/config/brandTheme"
 
 // Import banner
-import gourmetBanner from "@food/assets/groumetpagebanner.png"
+import gourmetBanner from "@food/assets/groumetpagebanner.webp"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}

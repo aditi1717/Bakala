@@ -8,9 +8,9 @@ import { exportRestaurantsToPDF } from "@food/components/admin/restaurants/resta
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
 
 // Import icons from Dashboard-icons
-import locationIcon from "@food/assets/Dashboard-icons/image1.png"
-import restaurantIcon from "@food/assets/Dashboard-icons/image2.png"
-import inactiveIcon from "@food/assets/Dashboard-icons/image3.png"
+import locationIcon from "@food/assets/Dashboard-icons/image1.webp"
+import restaurantIcon from "@food/assets/Dashboard-icons/image2.webp"
+import inactiveIcon from "@food/assets/Dashboard-icons/image3.webp"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}

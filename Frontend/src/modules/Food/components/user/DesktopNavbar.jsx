@@ -10,7 +10,7 @@ import { useLocationSelector, useSearchOverlay } from "./UserLayout"
 import { useProfile } from "@food/context/ProfileContext"
 import { FaLocationDot } from "react-icons/fa6"
 import { AnimatePresence, motion } from "framer-motion"
-import quickSpicyLogo from "@food/assets/quicky-spicy-logo.png"
+import quickSpicyLogo from "@food/assets/quicky-spicy-logo.webp"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
 import BRAND_THEME from "@/config/brandTheme"
 const debugLog = (...args) => {}
