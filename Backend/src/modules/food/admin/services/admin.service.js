@@ -3086,6 +3086,23 @@ export async function getCategories(query) {
         }
     }
 
+    // Filter by restaurant if requested
+    if (query.restaurantId && String(query.restaurantId).trim()) {
+        const rid = String(query.restaurantId).trim();
+        const normalizeId = (id) => (mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id);
+        const nid = normalizeId(rid);
+        
+        filter.$and = [...(filter.$and || []), {
+            $or: [
+                { restaurantId: nid },
+                { createdByRestaurantId: nid },
+                { isGlobal: true },
+                { restaurantId: { $exists: false } },
+                { restaurantId: null }
+            ]
+        }];
+    }
+
     const [list, total] = await Promise.all([
         FoodCategory.find(filter)
             .sort({ sortOrder: 1, createdAt: -1 })
