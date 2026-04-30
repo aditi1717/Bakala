@@ -36,7 +36,6 @@ const placeholders = [
   'Search "chinese"', 'Search "thali"', 'Search "momos"', 'Search "dosa"',
 ];
 
-const HERO_BANNER_AUTO_SLIDE_MS = 3500;
 const RESTAURANTS_BATCH_SIZE = 9;
 const getRestaurantRouteParam = (restaurant, fallbackIndex = 0) => {
   const slug = typeof restaurant?.slug === "string" ? restaurant.slug.trim() : "";
@@ -66,7 +65,6 @@ export default function Home() {
   
   const [showVegModePopup, setShowVegModePopup] = useState(false);
   const [showSwitchOffPopup, setShowSwitchOffPopup] = useState(false);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [hasScrolledPastBanner, setHasScrolledPastBanner] = useState(false);
   const [visibleRestaurantCount, setVisibleRestaurantCount] = useState(RESTAURANTS_BATCH_SIZE);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -76,10 +74,7 @@ export default function Home() {
   const stickyHeaderRef = useRef(null);
   const categoryScrollRef = useRef(null);
   const restaurantLoadMoreRef = useRef(null);
-  const autoSlideIntervalRef = useRef(null);
   const isHandlingSwitchOff = useRef(false);
-  const isSwiping = useRef(false);
-  const touchStartX = useRef(0);
 
   // High-performance data fetching hook
   const {
@@ -88,7 +83,6 @@ export default function Home() {
     heroBanners,
     exploreItems: landingExploreMore,
     exploreHeading,
-    headerVideoUrl,
     underPriceLimit,
     recommendedRestaurants,
     categories: landingCategories,
@@ -103,8 +97,6 @@ export default function Home() {
   }, [routerLocation.pathname]);
 
   // Derive UI data
-  const heroBannerImages = useMemo(() => heroBanners.map(b => b.imageUrl).filter(Boolean), [heroBanners]);
-  
   const displayCategories = useMemo(() => {
     if (vegMode) return landingCategories.filter(cat => cat.foodTypeScope === "Veg");
     return landingCategories;
@@ -149,15 +141,6 @@ export default function Home() {
     else setVegModeContext(newValue);
   };
 
-  // Hero Carousel Logic
-  useEffect(() => {
-    if (heroBannerImages.length <= 1) return;
-    autoSlideIntervalRef.current = setInterval(() => {
-      if (!isSwiping.current) setCurrentBannerIndex(p => (p + 1) % heroBannerImages.length);
-    }, HERO_BANNER_AUTO_SLIDE_MS);
-    return () => clearInterval(autoSlideIntervalRef.current);
-  }, [heroBannerImages.length]);
-
   // Scroll Tracking
   useEffect(() => {
     const onScroll = () => {
@@ -186,31 +169,6 @@ export default function Home() {
   }, []);
 
   // UI Sections
-  const HeroBannerSection = useMemo(() => {
-    if (showBannerSkeleton) return <div className="h-full w-full"><HeroBannerSkeleton className="h-full w-full" /></div>;
-    if (!heroBannerImages.length) return null;
-    return (
-      <div ref={heroShellRef} className="relative w-full h-full overflow-hidden bg-white">
-        {heroBannerImages.map((img, idx) => (
-          <motion.div key={idx} initial={false} animate={{ opacity: currentBannerIndex === idx ? 1 : 0 }} transition={{ duration: 0.7 }} className="absolute inset-0">
-            <img 
-              src={img} 
-              alt="" 
-              className="w-full h-full object-cover" 
-              fetchpriority={idx === 0 ? "high" : "low"}
-              loading={idx === 0 ? "eager" : "lazy"}
-            />
-          </motion.div>
-        ))}
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-1.5 z-30">
-          {heroBannerImages.map((_, idx) => (
-            <div key={idx} className={`h-1.5 rounded-full transition-all duration-300 ${currentBannerIndex === idx ? "bg-white w-5" : "bg-white/40 w-1.5"}`} />
-          ))}
-        </div>
-      </div>
-    );
-  }, [heroBannerImages, currentBannerIndex, showBannerSkeleton]);
-
   const CategoryRailSection = useMemo(() => (
     <section className="space-y-2 px-4 pt-4 content-auto">
       <p className="text-xl font-bold text-neutral-900">What's on your mind?</p>
@@ -267,20 +225,11 @@ export default function Home() {
         placeholders={placeholders}
         vegMode={vegMode}
         onVegModeChange={handleVegModeChange}
-        bannerContent={headerVideoUrl ? (
-          <video 
-            src={headerVideoUrl.replace('/upload/', '/upload/q_auto,vc_auto/')} 
-            poster={headerVideoUrl.replace(/\.[^/.]+$/, ".jpg").replace('/upload/', '/upload/q_auto,f_auto,so_0/')}
-            autoPlay 
-            loop 
-            muted 
-            playsInline 
-            className="h-full w-full object-cover" 
-          />
-        ) : HeroBannerSection}
       />
 
       <div className="bg-white dark:bg-[#0a0a0a] relative z-10">
+        {InlineHeroBannerSection}
+
         {CategoryRailSection}
         
         {recommendedRestaurants.length > 0 && (
@@ -307,9 +256,6 @@ export default function Home() {
             </div>
           </section>
         )}
-
-        {InlineHeroBannerSection}
-
         <section className="pt-8 px-4 content-auto">
           <h2 className="text-sm font-semibold text-gray-500 tracking-widest uppercase mb-4">{exploreHeading}</h2>
           <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-4">

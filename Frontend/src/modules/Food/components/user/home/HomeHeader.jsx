@@ -104,11 +104,14 @@ export default function HomeHeader({
 
   const theme = activeTab === "quick" ? quickTheme(quickThemeColor) : foodTheme;
   const isFood = activeTab === "food";
-  const isScrolledFoodHeader = isFood && Boolean(compact);
+  const useSolidFoodHeader = isFood && (compact || !bannerContent);
+  const isScrolledFoodHeader = useSolidFoodHeader;
   const stickyFoodBackground =
-    compact && isFood
-      ? scrolledHeaderColor || "transparent"
-      : "transparent";
+    isFood && compact
+      ? scrolledHeaderColor || "#ffffff"
+      : isFood && !compact
+        ? "#ffffff"
+        : "transparent";
   const locationTitle =
     savedAddressText || location?.area || location?.city || "Select Location";
   const locationSubtitle =
@@ -167,7 +170,7 @@ export default function HomeHeader({
   return (
     <motion.div
       className={`relative overflow-hidden transition-all duration-700 ${
-        isFood ? (compact ? "min-h-[96px]" : "min-h-[450px]") : "min-h-[90px]"
+        isFood ? (compact ? "min-h-[90px]" : "min-h-[122px]") : "min-h-[90px]"
       }`}
       style={{
         background: isFood ? stickyFoodBackground : theme.topBg,
@@ -184,7 +187,7 @@ export default function HomeHeader({
         </div>
       )}
 
-      {!compact && (
+      {!compact && Boolean(bannerContent) && (
         <div
           className="absolute inset-0 z-[1] opacity-[0.1] pointer-events-none"
           style={{
@@ -197,7 +200,7 @@ export default function HomeHeader({
         />
       )}
 
-      {isFood && !compact && (
+      {isFood && !compact && Boolean(bannerContent) && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <Pizza className="absolute top-10 right-[15%] opacity-[0.10]" size={64} style={{ color: brand.primary }} />
           <Beef className="absolute top-40 left-[10%] opacity-[0.08]" size={80} style={{ color: brand.primary }} />
@@ -208,7 +211,7 @@ export default function HomeHeader({
       )}
 
       <div className="relative z-10 pt-0 pb-3">
-        {isFood && !compact && <div className="absolute inset-0 bg-gradient-to-b from-black/25 to-transparent pointer-events-none" />}
+        {isFood && !compact && Boolean(bannerContent) && <div className="absolute inset-0 bg-gradient-to-b from-black/25 to-transparent pointer-events-none" />}
         <div
           className={`rounded-none border-none px-3 pt-2 pb-3 backdrop-blur-[4px] ${
             compact

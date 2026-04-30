@@ -945,35 +945,36 @@ export default function Under250() {
         vegMode={vegMode}
         onVegModeChange={handleVegModeChange}
         bannerShellProps={{ "data-banner-shell": "true" }}
-        bannerContent={
-          bannerImages.length > 0 ? (
-            <div
-              className="h-[450px] w-full"
-              onTouchStart={handleBannerTouchStart}
-              onTouchMove={handleBannerTouchMove}
-              onTouchEnd={handleBannerTouchEnd}
-            >
-              <div
-                className="flex h-full w-full transition-transform duration-500 ease-out"
-                style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
-              >
-                {bannerImages.map((bannerImage, index) => (
-                  <div key={`${bannerImage}-${index}`} className="relative h-full w-full shrink-0">
-                    <OptimizedImage
-                      src={bannerImage}
-                      alt={`Under ${maxPrice} Banner ${index + 1}`}
-                      className="h-full w-full"
-                      objectFit="cover"
-                      priority={index === 0}
-                      sizes="100vw"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null
-        }
       />
+
+      {bannerImages.length > 0 && (
+        <section className="bg-white px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 pt-2 sm:pt-3">
+          <div
+            className="relative h-40 sm:h-44 md:h-52 w-full overflow-hidden rounded-[22px] sm:rounded-[26px]"
+            onTouchStart={handleBannerTouchStart}
+            onTouchMove={handleBannerTouchMove}
+            onTouchEnd={handleBannerTouchEnd}
+          >
+            <div
+              className="flex h-full w-full transition-transform duration-500 ease-out"
+              style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
+            >
+              {bannerImages.map((bannerImage, index) => (
+                <div key={`${bannerImage}-${index}`} className="relative h-full w-full shrink-0">
+                  <OptimizedImage
+                    src={bannerImage}
+                    alt={`Under ${maxPrice} Banner ${index + 1}`}
+                    className="h-full w-full"
+                    objectFit="cover"
+                    priority={index === 0}
+                    sizes="100vw"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Content Section */}
       <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 space-y-0 pt-2 sm:pt-3 md:pt-4 lg:pt-6 pb-6 md:pb-8 lg:pb-10">

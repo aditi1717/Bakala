@@ -101,6 +101,10 @@ const normalizeOpenDays = (days = []) => {
   }).filter(Boolean))
   return DAY_NAMES.filter((day) => normalizedSet.has(day.toLowerCase()))
 }
+const getOpenDaysFromOutletTimings = (outletTimingsByDay) => {
+  if (!outletTimingsByDay || typeof outletTimingsByDay !== "object") return []
+  return DAY_NAMES.filter((day) => outletTimingsByDay?.[day]?.isOpen !== false)
+}
 
 const DEFAULT_OPENING_TIME = "09:00 AM"
 const DEFAULT_CLOSING_TIME = "10:00 PM"
@@ -1001,6 +1005,10 @@ export default function RestaurantsList() {
   const handleStartEditDetails = () => {
     const source = getDetailsEditSource()
     const nextForm = buildDetailsFormFromRestaurant(source)
+    const openDaysFromOutletTimings = getOpenDaysFromOutletTimings(outletTimingsByDay)
+    if (openDaysFromOutletTimings.length > 0) {
+      nextForm.openDays = openDaysFromOutletTimings
+    }
     const primarySlot = Array.isArray(outletSchedule?.slots) ? outletSchedule.slots[0] : null
     if (primarySlot) {
       nextForm.openingTime = primarySlot.openingTime || nextForm.openingTime
@@ -1048,6 +1056,7 @@ export default function RestaurantsList() {
         return
       }
       const outletTimingsPayload = buildAllDaysOutletPayload(outletSchedule)
+      const openDaysFromCurrentTimings = getOpenDaysFromOutletTimings(outletTimingsPayload)
       const primarySlot = outletSchedule?.isOpen !== false ? outletSchedule?.slots?.[0] : null
       const normalizedOpeningTime = normalizeTimeValue(primarySlot?.openingTime || detailsForm.openingTime.trim())
       const normalizedClosingTime = normalizeTimeValue(primarySlot?.closingTime || detailsForm.closingTime.trim())
@@ -1063,7 +1072,7 @@ export default function RestaurantsList() {
         estimatedDeliveryTime: detailsForm.estimatedDeliveryTime.trim(),
         openingTime: normalizedOpeningTime,
         closingTime: normalizedClosingTime,
-        openDays: Array.isArray(detailsForm.openDays) ? detailsForm.openDays : [],
+        openDays: openDaysFromCurrentTimings.length > 0 ? openDaysFromCurrentTimings : (Array.isArray(detailsForm.openDays) ? detailsForm.openDays : []),
         isActive: detailsForm.isActive,
       }
 
@@ -1078,6 +1087,7 @@ export default function RestaurantsList() {
       const updatedRestaurant = response?.data?.data?.restaurant
 
       if (updatedRestaurant) {
+        setOutletTimingsByDay(outletTimingsPayload)
         setRestaurantDetails(updatedRestaurant)
         setRestaurants((prev) =>
           prev.map((item) =>
@@ -1846,14 +1856,12 @@ export default function RestaurantsList() {
                 const openDaysFromOnboarding = normalizeOpenDays(
                   r?.openDays || r?.onboarding?.step2?.openDays || [],
                 )
-                const openDaysFromOutletTimings = outletTimingsByDay && typeof outletTimingsByDay === "object"
-                  ? DAY_NAMES.filter((day) => outletTimingsByDay?.[day]?.isOpen !== false)
-                  : []
+                const openDaysFromOutletTimings = getOpenDaysFromOutletTimings(outletTimingsByDay)
                 const openDaysVal =
-                  openDaysFromOnboarding.length > 0
-                    ? openDaysFromOnboarding
-                    : (openDaysFromOutletTimings.length > 0
-                      ? openDaysFromOutletTimings
+                  openDaysFromOutletTimings.length > 0
+                    ? openDaysFromOutletTimings
+                    : (openDaysFromOnboarding.length > 0
+                      ? openDaysFromOnboarding
                       : (outletSchedule?.isOpen === false ? [] : [...DAY_NAMES]))
                 const closedDaysVal = DAY_NAMES.filter((day) => !openDaysVal.includes(day))
                 const offerVal = r?.offer || r?.onboarding?.step4?.offer || ""
