@@ -254,6 +254,45 @@ function generateTicketId() {
     return `TKT-${n}${r}`;
 }
 
+function buildPhoneMatchQuery(phoneInput) {
+    const phoneRaw = String(phoneInput || '').trim();
+    const phoneDigits = phoneRaw.replace(/\D/g, '');
+    const last10 = phoneDigits.slice(-10);
+    if (!last10 || last10.length < 10) return null;
+
+    const escapedLast10 = last10.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return {
+        $or: [
+            { phone: last10 },
+            { phone: `91${last10}` },
+            { phone: `+91${last10}` },
+            { phone: { $regex: `${escapedLast10}$` } }
+        ]
+    };
+}
+
+async function findDeliveryPartnersByPhone(phoneInput) {
+    const query = buildPhoneMatchQuery(phoneInput);
+    if (!query) return [];
+
+    return FoodDeliveryPartner.find(query)
+        .select('_id status phone createdAt updatedAt')
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .lean();
+}
+
+async function findDeliveryPartnerByPhone(phoneInput) {
+    const partners = await findDeliveryPartnersByPhone(phoneInput);
+    if (!partners.length) return null;
+
+    const preferredPartner =
+        partners.find((partner) => String(partner?.status || '').toLowerCase() === 'pending') ||
+        partners.find((partner) => String(partner?.status || '').toLowerCase() === 'approved') ||
+        partners[0];
+
+    return preferredPartner || null;
+}
+
 export const listSupportTicketsByPartner = async (deliveryPartnerId) => {
     const list = await DeliverySupportTicket.find({ deliveryPartnerId })
         .sort({ createdAt: -1 })
@@ -261,8 +300,30 @@ export const listSupportTicketsByPartner = async (deliveryPartnerId) => {
     return list;
 };
 
+export const listSupportTicketsByPhone = async (phone) => {
+    const phoneDigits = String(phone || '').replace(/\D/g, '').slice(-10);
+    if (!phoneDigits || phoneDigits.length < 10) {
+        throw new ValidationError('Valid phone number is required');
+    }
+    const partners = await findDeliveryPartnersByPhone(phone);
+    const partnerIds = partners
+        .map((partner) => partner?._id)
+        .filter(Boolean);
+    if (!partnerIds.length) {
+        return [];
+    }
+    return DeliverySupportTicket.find({ deliveryPartnerId: { $in: partnerIds } })
+        .sort({ createdAt: -1 })
+        .lean();
+};
+
 export const createSupportTicket = async (deliveryPartnerId, payload) => {
     const { subject, description, category = 'other', priority = 'medium' } = payload;
+    const partner = await FoodDeliveryPartner.findById(deliveryPartnerId).select('status').lean();
+    const isApprovedPartner = String(partner?.status || '').toLowerCase() === 'approved';
+    const normalizedCategory = isApprovedPartner
+        ? (['payment', 'account', 'technical', 'order', 'other', 'verification_issue'].includes(category) ? category : 'other')
+        : 'verification_issue';
     if (!subject || !description || subject.trim().length < 3) {
         throw new ValidationError('Subject is required (min 3 characters)');
     }
@@ -280,10 +341,51 @@ export const createSupportTicket = async (deliveryPartnerId, payload) => {
         ticketId,
         subject: subject.trim(),
         description: description.trim(),
-        category: ['payment', 'account', 'technical', 'order', 'other'].includes(category) ? category : 'other',
+        category: normalizedCategory,
         priority: ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium',
         status: 'open'
     });
+    return ticket.toObject();
+};
+
+export const createSupportTicketForPendingPartner = async (payload) => {
+    const subject = String(payload?.subject || '').trim();
+    const description = String(payload?.description || '').trim();
+    const phoneRaw = String(payload?.phone || '').trim();
+    const priority = String(payload?.priority || 'medium').trim();
+    const phoneDigits = phoneRaw.replace(/\D/g, '').slice(-10);
+
+    if (!phoneDigits || phoneDigits.length < 10) {
+        throw new ValidationError('Valid phone number is required');
+    }
+    if (!subject || subject.length < 3) {
+        throw new ValidationError('Subject is required (min 3 characters)');
+    }
+    if (!description || description.length < 10) {
+        throw new ValidationError('Description must be at least 10 characters');
+    }
+
+    const partner = await findDeliveryPartnerByPhone(phoneRaw);
+    if (!partner?._id) {
+        throw new ValidationError('Delivery partner not found for this phone');
+    }
+    let ticketId = generateTicketId();
+    let exists = await DeliverySupportTicket.findOne({ ticketId }).lean();
+    while (exists) {
+        ticketId = generateTicketId();
+        exists = await DeliverySupportTicket.findOne({ ticketId }).lean();
+    }
+
+    const ticket = await DeliverySupportTicket.create({
+        deliveryPartnerId: partner._id,
+        ticketId,
+        subject,
+        description,
+        category: 'verification_issue',
+        priority: ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium',
+        status: 'open'
+    });
+
     return ticket.toObject();
 };
 
@@ -293,6 +395,24 @@ export const getSupportTicketByIdAndPartner = async (ticketId, deliveryPartnerId
         deliveryPartnerId
     }).lean();
     return ticket;
+};
+
+export const getSupportTicketByIdAndPhone = async (ticketId, phone) => {
+    const phoneDigits = String(phone || '').replace(/\D/g, '').slice(-10);
+    if (!phoneDigits || phoneDigits.length < 10) {
+        throw new ValidationError('Valid phone number is required');
+    }
+    const partners = await findDeliveryPartnersByPhone(phone);
+    const partnerIds = partners
+        .map((partner) => partner?._id)
+        .filter(Boolean);
+    if (!partnerIds.length) {
+        return null;
+    }
+    return DeliverySupportTicket.findOne({
+        _id: ticketId,
+        deliveryPartnerId: { $in: partnerIds }
+    }).lean();
 };
 
 export const getDeliveryPartnerReviews = async (deliveryPartnerId, query = {}) => {

@@ -17,7 +17,7 @@ const supportTicketSchema = new mongoose.Schema(
         description: { type: String, required: true },
         category: {
             type: String,
-            enum: ['payment', 'account', 'technical', 'order', 'other'],
+            enum: ['payment', 'account', 'technical', 'order', 'other', 'verification_issue'],
             default: 'other'
         },
         priority: {

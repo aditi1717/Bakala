@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, Send } from 'lucide-react';
 import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
@@ -9,12 +10,35 @@ import BRAND_THEME from '@/config/brandTheme';
  * CreateSupportTicketV2 - Restored Old UI for Ticket Creation.
  */
 export const CreateSupportTicketV2 = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const goBack = useDeliveryBackNavigation();
+  const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const storedSource = typeof window !== "undefined" ? sessionStorage.getItem("deliveryHelpSource") : "";
+  const storedPhone = typeof window !== "undefined" ? sessionStorage.getItem("deliveryHelpPhone") : "";
+  const deliveryUserRaw = typeof window !== "undefined" ? localStorage.getItem("delivery_user") : "";
+  const isPendingVerificationFlow = query.get("source") === "pending_verification" || storedSource === "pending_verification";
+  const deliveryUser = useMemo(() => {
+    if (!deliveryUserRaw) return null;
+    try {
+      return JSON.parse(deliveryUserRaw);
+    } catch {
+      return null;
+    }
+  }, [deliveryUserRaw]);
+  const isApprovedDeliveryUser = String(
+    deliveryUser?.status ||
+    deliveryUser?.verificationStatus ||
+    deliveryUser?.approvalStatus ||
+    ""
+  ).toLowerCase() === "approved";
+  const isVerificationOnlyFlow = isPendingVerificationFlow || !isApprovedDeliveryUser;
+  const pendingPhone = String(query.get("phone") || storedPhone || deliveryUser?.phone || "").trim();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     subject: "",
     description: "",
-    category: "other",
+    category: isVerificationOnlyFlow ? "verification_issue" : "other",
     priority: "medium"
   });
 
@@ -24,10 +48,25 @@ export const CreateSupportTicketV2 = () => {
 
     setLoading(true);
     try {
-      const response = await deliveryAPI.createSupportTicket(form);
+      const payload = {
+        ...form,
+        category: isVerificationOnlyFlow ? "verification_issue" : form.category,
+      };
+      const response = isVerificationOnlyFlow
+        ? await deliveryAPI.createPendingSupportTicket({ ...payload, phone: pendingPhone })
+        : await deliveryAPI.createSupportTicket(payload);
       if (response?.data?.success) {
+        const createdTicket = response?.data?.data || response?.data?.ticket || null;
+        if (createdTicket && typeof window !== "undefined") {
+          sessionStorage.setItem("deliveryLatestSupportTicket", JSON.stringify(createdTicket));
+        }
         toast.success("Ticket raised successfully");
-        goBack();
+        navigate(
+          isPendingVerificationFlow
+            ? `/food/delivery/help/tickets?source=pending_verification&phone=${encodeURIComponent(pendingPhone)}`
+            : "/food/delivery/help/tickets",
+          { replace: true, state: { refreshAt: Date.now() } }
+        );
       }
     } catch (e) {
       toast.error("Failed to create ticket");
@@ -76,17 +115,25 @@ export const CreateSupportTicketV2 = () => {
             <div className="grid grid-cols-2 gap-4">
                <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
-                  <select 
-                    value={form.category}
-                    onChange={(e) => setForm({...form, category: e.target.value})}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-xs font-black text-gray-800 uppercase tracking-widest outline-none"
-                  >
-                     <option value="payment">Payment</option>
-                     <option value="order">Order</option>
-                     <option value="account">Account</option>
-                     <option value="technical">Tech Issue</option>
-                     <option value="other">Other</option>
-                  </select>
+                  {isVerificationOnlyFlow ? (
+                    <input
+                      value="Verification Issue"
+                      readOnly
+                      className="w-full bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-xs font-black text-amber-800 uppercase tracking-widest outline-none"
+                    />
+                  ) : (
+                    <select 
+                      value={form.category}
+                      onChange={(e) => setForm({...form, category: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-xs font-black text-gray-800 uppercase tracking-widest outline-none"
+                    >
+                       <option value="payment">Payment</option>
+                       <option value="order">Order</option>
+                       <option value="account">Account</option>
+                       <option value="technical">Tech Issue</option>
+                       <option value="other">Other</option>
+                    </select>
+                  )}
                </div>
                <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Priority</label>

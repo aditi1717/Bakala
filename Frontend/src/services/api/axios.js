@@ -147,7 +147,7 @@ apiClient.interceptors.request.use(
       }
     }
 
-    const token = getAccessToken(config);
+    const token = config?.skipAuth ? null : getAccessToken(config);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

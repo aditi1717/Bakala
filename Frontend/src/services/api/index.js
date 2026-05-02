@@ -1764,17 +1764,31 @@ export const deliveryAPI = {
   /** GET /food/delivery/support-tickets - list tickets for logged-in delivery partner. */
   getSupportTickets: () =>
     apiClient.get("/food/delivery/support-tickets", {
+      params: { _ts: Date.now() },
       contextModule: "delivery",
+    }),
+  /** GET /food/delivery/support-tickets?phone=... - list tickets for pending verification flow (no auth). */
+  getSupportTicketsPending: (phone) =>
+    apiClient.get("/food/delivery/support-tickets", {
+      params: { phone, _ts: Date.now() },
+      skipAuth: true,
     }),
   /** POST /food/delivery/support-tickets - create ticket (body: subject, description, category?, priority?). */
   createSupportTicket: (body) =>
     apiClient.post("/food/delivery/support-tickets", body ?? {}, {
       contextModule: "delivery",
     }),
-  /** GET /food/delivery/support-tickets/:id - get one ticket (own only). */
-  getSupportTicketById: (id) =>
+  /** POST /food/delivery/support-tickets/pending - create ticket for pending verification users (no auth). */
+  createPendingSupportTicket: (body) =>
+    apiClient.post("/food/delivery/support-tickets/pending", body ?? {}, {
+      skipAuth: true,
+    }),
+  /** GET /food/delivery/support-tickets/:id - get one ticket (own only, or by phone in pending flow). */
+  getSupportTicketById: (id, params = {}, options = {}) =>
     apiClient.get(`/food/delivery/support-tickets/${id}`, {
-      contextModule: "delivery",
+      params: { ...(params || {}), _ts: Date.now() },
+      ...(options?.skipAuth ? { skipAuth: true } : {}),
+      ...(options?.contextModule ? { contextModule: options.contextModule } : {}),
     }),
   /** GET /food/delivery/reviews - list reviews for logged-in delivery partner. */
   getReviews: (params = {}) =>

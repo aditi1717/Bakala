@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Clock, CheckCircle, XCircle, 
   Loader2, MessageSquare, ShieldCheck, Mail 
@@ -8,6 +8,7 @@ import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import useDeliveryBackNavigation from '../../hooks/useDeliveryBackNavigation';
 import BRAND_THEME from '@/config/brandTheme';
+import { isModuleAuthenticated } from '@food/utils/auth';
 
 /**
  * ViewSupportTicketV2 - Restored Old UI for Ticket Details.
@@ -15,6 +16,33 @@ import BRAND_THEME from '@/config/brandTheme';
 export const ViewSupportTicketV2 = () => {
   const goBack = useDeliveryBackNavigation();
   const { ticketId } = useParams();
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const storedSource = typeof window !== "undefined" ? sessionStorage.getItem("deliveryHelpSource") : "";
+  const storedPhone = typeof window !== "undefined" ? sessionStorage.getItem("deliveryHelpPhone") : "";
+  const deliveryUserRaw = typeof window !== "undefined" ? localStorage.getItem("delivery_user") : "";
+  const deliveryAuthRaw = typeof window !== "undefined" ? sessionStorage.getItem("deliveryAuthData") : "";
+  const deliveryUserPhone = (() => {
+    if (!deliveryUserRaw) return "";
+    try {
+      const parsed = JSON.parse(deliveryUserRaw);
+      return String(parsed?.phone || "").trim();
+    } catch {
+      return "";
+    }
+  })();
+  const deliveryAuthPhone = (() => {
+    if (!deliveryAuthRaw) return "";
+    try {
+      const parsed = JSON.parse(deliveryAuthRaw);
+      return String(parsed?.phone || "").trim();
+    } catch {
+      return "";
+    }
+  })();
+  const isPendingVerificationFlow = query.get("source") === "pending_verification" || storedSource === "pending_verification";
+  const isLoggedInDelivery = typeof window !== "undefined" ? isModuleAuthenticated("delivery") : false;
+  const pendingPhone = String(query.get("phone") || storedPhone || deliveryUserPhone || deliveryAuthPhone || "").trim();
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -22,7 +50,13 @@ export const ViewSupportTicketV2 = () => {
     const fetchTicket = async () => {
       try {
         setLoading(true);
-        const response = await deliveryAPI.getSupportTicketById(ticketId);
+        const response = await deliveryAPI.getSupportTicketById(
+          ticketId,
+          pendingPhone ? { phone: pendingPhone } : {},
+          isPendingVerificationFlow || !isLoggedInDelivery
+            ? { skipAuth: true }
+            : { contextModule: "delivery" }
+        );
         if (response?.data?.success) {
           const found =
             response?.data?.data?.ticket ||
@@ -38,7 +72,7 @@ export const ViewSupportTicketV2 = () => {
       }
     };
     fetchTicket();
-  }, [ticketId]);
+  }, [ticketId, pendingPhone, isPendingVerificationFlow, isLoggedInDelivery]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><Loader2 className="w-8 h-8 animate-spin" style={{ color: BRAND_THEME.colors.brand.primary }} /></div>;
   if (!ticket) return <div className="p-20 text-center text-gray-400 font-bold uppercase tracking-widest h-screen">Ticket Not Found</div>;

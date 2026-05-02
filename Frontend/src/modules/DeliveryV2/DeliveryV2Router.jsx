@@ -59,9 +59,9 @@ const DeliveryV2Router = () => {
         <Route path="/profile/documents" element={<ProtectedRoute><ProfileDocsV2 /></ProtectedRoute>} />
         
         {/* Support Systems */}
-        <Route path="/help/tickets" element={<ProtectedRoute><SupportTicketsV2 /></ProtectedRoute>} />
-        <Route path="/help/tickets/create" element={<ProtectedRoute><CreateSupportTicketV2 /></ProtectedRoute>} />
-        <Route path="/help/tickets/:ticketId" element={<ProtectedRoute><ViewSupportTicketV2 /></ProtectedRoute>} />
+        <Route path="/help/tickets" element={<SupportTicketsV2 />} />
+        <Route path="/help/tickets/create" element={<CreateSupportTicketV2 />} />
+        <Route path="/help/tickets/:ticketId" element={<ViewSupportTicketV2 />} />
         <Route path="/help/id-card" element={<ProtectedRoute><ShowIdCardV2 /></ProtectedRoute>} />
         <Route path="/profile/terms" element={<ProtectedRoute><TermsAndConditionsV2 /></ProtectedRoute>} />
         <Route path="/profile/privacy" element={<ProtectedRoute><PrivacyPolicyV2 /></ProtectedRoute>} />

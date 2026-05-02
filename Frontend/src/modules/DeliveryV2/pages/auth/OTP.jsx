@@ -550,10 +550,22 @@ export default function DeliveryOTP() {
                 
                 <button
                   type="button"
-                  onClick={() => navigate("/food/delivery/login", { replace: true })}
+                  onClick={() => {
+                    if (isRejected) {
+                      navigate("/food/delivery/login", { replace: true })
+                      return
+                    }
+                    sessionStorage.setItem("deliveryHelpSource", "pending_verification")
+                    sessionStorage.setItem("deliveryHelpCategory", "verification_issue")
+                    sessionStorage.setItem("deliveryHelpPhone", String(authData?.phone || ""))
+                    navigate(
+                      `/food/delivery/help/tickets?source=pending_verification&category=verification_issue&phone=${encodeURIComponent(String(authData?.phone || ""))}`,
+                      { replace: true }
+                    )
+                  }}
                   className={`text-sm font-medium underline transition-colors ${isRejected ? "text-red-600 hover:text-red-800" : "text-amber-700 hover:text-amber-900"}`}
                 >
-                  Back to login
+                  {isRejected ? "Back to login" : "Need help?"}
                 </button>
               </div>
             </div>

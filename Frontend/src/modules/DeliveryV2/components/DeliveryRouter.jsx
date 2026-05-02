@@ -393,21 +393,17 @@ export default function DeliveryRouter() {
         />
         <Route
           element={
-            <ProtectedRoute>
-              <DeliveryLayout>
-                <SupportTickets />
-              </DeliveryLayout>
-            </ProtectedRoute>
+            <DeliveryLayout>
+              <SupportTickets />
+            </DeliveryLayout>
           }
           path="help/tickets"
         />
         <Route
           element={
-            <ProtectedRoute>
-              <DeliveryLayout>
-                <CreateSupportTicket />
-              </DeliveryLayout>
-            </ProtectedRoute>
+            <DeliveryLayout>
+              <CreateSupportTicket />
+            </DeliveryLayout>
           }
           path="help/create-ticket"
         />

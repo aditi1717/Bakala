@@ -172,8 +172,8 @@ export default function SignupStep1() {
 
     if (!formData.drivingLicenseNumber.trim()) {
       newErrors.drivingLicenseNumber = "Driving license number is required"
-    } else if (!/^[A-Z]{2}[0-9]{2}[0-9]{4}[0-9]{7}$/.test(formData.drivingLicenseNumber)) {
-      newErrors.drivingLicenseNumber = "Invalid DL format (e.g., MH1220110012345)"
+    } else if (!/^[A-Z]{2}[0-9]{2}[0-9]{4}[0-9]{7,8}$/.test(formData.drivingLicenseNumber)) {
+      newErrors.drivingLicenseNumber = "Invalid DL format (e.g., MH1220110012345 or MH12201100123456)"
     }
 
     if (!formData.panNumber.trim()) {

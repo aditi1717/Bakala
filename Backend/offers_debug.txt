@@ -1,0 +1,8 @@
+
+[2026-04-30T11:53:19.101Z] auth header: Present, req.user: {"userId":"69f199c539fd576453603518","role":"USER"}, userId: 69f199c539fd576453603518
+
+[2026-04-30T11:53:19.290Z] auth header: Present, req.user: {"userId":"69f199c539fd576453603518","role":"USER"}, userId: 69f199c539fd576453603518
+
+[2026-04-30T12:27:18.521Z] auth header: Present, req.user: {"userId":"69f34973dede7f75c83aa600","role":"USER"}, userId: 69f34973dede7f75c83aa600
+
+[2026-04-30T12:27:18.778Z] auth header: Present, req.user: {"userId":"69f34973dede7f75c83aa600","role":"USER"}, userId: 69f34973dede7f75c83aa600

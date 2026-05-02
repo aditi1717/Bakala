@@ -41,6 +41,25 @@ const sanitizeUploadedDocs = (docs) => ({
   drivingLicensePhoto: sanitizeUploadedDocValue(docs?.drivingLicensePhoto)
 })
 
+const buildCompactUploadedDocs = (docs) => {
+  const compactDoc = (value) => {
+    if (!value || typeof value !== "object") return value
+    return {
+      fileName: value.fileName || "",
+      mimeType: value.mimeType || "",
+      size: value.size || 0,
+      selected: true,
+    }
+  }
+
+  return {
+    profilePhoto: compactDoc(docs?.profilePhoto),
+    aadharPhoto: compactDoc(docs?.aadharPhoto),
+    panPhoto: compactDoc(docs?.panPhoto),
+    drivingLicensePhoto: compactDoc(docs?.drivingLicensePhoto),
+  }
+}
+
 const fileToDataUrl = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -126,6 +145,7 @@ export default function SignupStep2() {
   const [activePicker, setActivePicker] = useState(null) // { docType: string, title: string, ref: any }
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploading, setUploading] = useState({})
+  const hasShownQuotaWarning = useRef(false)
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" })
@@ -135,7 +155,21 @@ export default function SignupStep2() {
 
   // Save uploaded docs to session storage whenever they change
   useEffect(() => {
-    sessionStorage.setItem("deliverySignupDocs", JSON.stringify(uploadedDocs))
+    try {
+      sessionStorage.setItem("deliverySignupDocs", JSON.stringify(uploadedDocs))
+    } catch (error) {
+      const compactDocs = buildCompactUploadedDocs(uploadedDocs)
+      try {
+        sessionStorage.setItem("deliverySignupDocs", JSON.stringify(compactDocs))
+      } catch (fallbackError) {
+        debugWarn("Unable to save delivery signup docs in session storage:", fallbackError)
+      }
+      if (!hasShownQuotaWarning.current) {
+        hasShownQuotaWarning.current = true
+        toast.warning("Large images cannot be fully cached in browser storage.")
+      }
+      debugWarn("Storage quota exceeded for deliverySignupDocs:", error)
+    }
   }, [uploadedDocs])
 
   useEffect(() => {

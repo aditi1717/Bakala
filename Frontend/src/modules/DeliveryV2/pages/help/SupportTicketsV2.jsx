@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Clock, CheckCircle, 
   XCircle, Loader2, Eye, MessageSquare, ChevronRight 
@@ -8,24 +8,121 @@ import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import useDeliveryBackNavigation from '../../hooks/useDeliveryBackNavigation';
 import BRAND_THEME from '@/config/brandTheme';
+import { isModuleAuthenticated } from '@food/utils/auth';
 
 /**
  * SupportTicketsV2 - Restored Old UI for Support Ticket Hub.
  */
 export const SupportTicketsV2 = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const storedSource = typeof window !== "undefined" ? sessionStorage.getItem("deliveryHelpSource") : "";
+  const storedPhone = typeof window !== "undefined" ? sessionStorage.getItem("deliveryHelpPhone") : "";
+  const deliveryUserRaw = typeof window !== "undefined" ? localStorage.getItem("delivery_user") : "";
+  const deliveryAuthRaw = typeof window !== "undefined" ? sessionStorage.getItem("deliveryAuthData") : "";
+  const deliveryUserPhone = (() => {
+    if (!deliveryUserRaw) return "";
+    try {
+      const parsed = JSON.parse(deliveryUserRaw);
+      return String(parsed?.phone || "").trim();
+    } catch {
+      return "";
+    }
+  })();
+  const deliveryAuthPhone = (() => {
+    if (!deliveryAuthRaw) return "";
+    try {
+      const parsed = JSON.parse(deliveryAuthRaw);
+      return String(parsed?.phone || "").trim();
+    } catch {
+      return "";
+    }
+  })();
+  const isPendingVerificationFlow = query.get("source") === "pending_verification" || storedSource === "pending_verification";
+  const isLoggedInDelivery = typeof window !== "undefined" ? isModuleAuthenticated("delivery") : false;
+  const pendingPhone = String(query.get("phone") || storedPhone || deliveryUserPhone || deliveryAuthPhone || "").trim();
   const goBack = useDeliveryBackNavigation();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const canRaiseNewTicket = true;
+
+  const mergeTickets = (lists = []) => {
+    const merged = [];
+    const seen = new Set();
+    lists.forEach((list) => {
+      (list || []).forEach((ticket) => {
+        const key = String(ticket?._id || ticket?.ticketId || "");
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        merged.push(ticket);
+      });
+    });
+    merged.sort((a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime());
+    return merged;
+  };
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const latestTicketRaw = sessionStorage.getItem("deliveryLatestSupportTicket");
+    if (!latestTicketRaw) return;
+    try {
+      const latestTicket = JSON.parse(latestTicketRaw);
+      setTickets((prev) => mergeTickets([[latestTicket], prev]));
+    } catch {
+      // Ignore malformed session payload.
+    }
+  }, [location.key]);
+
+  useEffect(() => {
+    if (!isLoggedInDelivery && !pendingPhone) {
+      setLoading(false);
+      setTickets([]);
+      return;
+    }
+
     const fetchTickets = async () => {
       try {
         setLoading(true);
-        const response = await deliveryAPI.getSupportTickets();
-        if (response?.data?.success) {
-          setTickets(response.data.data.tickets || []);
+        const requests = [];
+        if (isLoggedInDelivery) {
+          requests.push(deliveryAPI.getSupportTickets());
         }
+        if (pendingPhone) {
+          requests.push(deliveryAPI.getSupportTicketsPending(pendingPhone));
+        }
+        const responses = await Promise.allSettled(requests);
+        const hasAnySuccess = responses.some((entry) => entry.status === "fulfilled");
+        const latestTicketRaw = typeof window !== "undefined"
+          ? sessionStorage.getItem("deliveryLatestSupportTicket")
+          : "";
+        let latestTicket = null;
+        if (latestTicketRaw) {
+          try {
+            latestTicket = JSON.parse(latestTicketRaw);
+          } catch {
+            latestTicket = null;
+          }
+        }
+        const fetchedLists = responses
+          .filter((entry) => entry.status === "fulfilled")
+          .map((entry) => entry.value?.data?.data?.tickets || []);
+        const merged = mergeTickets(latestTicket ? [[latestTicket], ...fetchedLists] : fetchedLists);
+        const latestTicketExistsInFetch = latestTicket
+          ? fetchedLists.some((list) =>
+              (list || []).some((ticket) =>
+                String(ticket?._id || ticket?.ticketId || "") === String(latestTicket?._id || latestTicket?.ticketId || "")
+              )
+            )
+          : false;
+        if (latestTicketExistsInFetch && typeof window !== "undefined") {
+          sessionStorage.removeItem("deliveryLatestSupportTicket");
+        }
+        if (!hasAnySuccess) {
+          toast.error("Failed to load tickets");
+          return;
+        }
+        setTickets((prev) => (merged.length > 0 ? merged : prev));
       } catch (error) {
         toast.error("Failed to load tickets");
       } finally {
@@ -33,7 +130,7 @@ export const SupportTicketsV2 = () => {
       }
     };
     fetchTickets();
-  }, []);
+  }, [isLoggedInDelivery, pendingPhone, isPendingVerificationFlow]);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -42,6 +139,12 @@ export const SupportTicketsV2 = () => {
       case "resolved": return "bg-green-50 text-green-600 border-green-100";
       default: return "bg-gray-50 text-gray-600 border-gray-100";
     }
+  };
+
+  const getStatusLabel = (status) => {
+    const s = String(status || "").toLowerCase();
+    if (s === "in_progress") return "pending";
+    return s.replace("_", " ");
   };
 
   return (
@@ -56,14 +159,22 @@ export const SupportTicketsV2 = () => {
 
       <div className="pt-24 px-4 space-y-6">
         {/* Create Action */}
-        <button 
-          onClick={() => navigate("/food/delivery/help/tickets/create")}
-          className="w-full text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all"
-          style={{ background: BRAND_THEME.colors.brand.primary, boxShadow: `0 14px 30px -18px ${BRAND_THEME.colors.brand.primaryDark}` }}
-        >
-          <Plus className="w-5 h-5" />
-          Raise New Ticket
-        </button>
+        {canRaiseNewTicket ? (
+          <button 
+            onClick={() =>
+              navigate(
+                isPendingVerificationFlow
+                  ? `/food/delivery/help/tickets/create?source=pending_verification&category=verification_issue&phone=${encodeURIComponent(pendingPhone)}`
+                  : "/food/delivery/help/tickets/create"
+              )
+            }
+            className="w-full text-white p-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all"
+            style={{ background: BRAND_THEME.colors.brand.primary, boxShadow: `0 14px 30px -18px ${BRAND_THEME.colors.brand.primaryDark}` }}
+          >
+            <Plus className="w-5 h-5" />
+            Raise New Ticket
+          </button>
+        ) : null}
 
         {/* List */}
         {loading ? (
@@ -84,7 +195,13 @@ export const SupportTicketsV2 = () => {
             {tickets.map((ticket, idx) => (
               <div 
                 key={ticket._id || idx}
-                onClick={() => navigate(`/food/delivery/help/tickets/${ticket._id}`)}
+                onClick={() =>
+                  navigate(
+                    isPendingVerificationFlow
+                      ? `/food/delivery/help/tickets/${ticket._id}?source=pending_verification&phone=${encodeURIComponent(pendingPhone)}`
+                      : `/food/delivery/help/tickets/${ticket._id}`
+                  )
+                }
                 className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm active:scale-[0.98] transition-all relative overflow-hidden group"
               >
                 <div className="flex justify-between items-start mb-3">
@@ -101,7 +218,7 @@ export const SupportTicketsV2 = () => {
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
                    <div className="flex items-center gap-2">
                       <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusColor(ticket.status)}`}>
-                        {ticket.status?.replace('_', ' ')}
+                        {getStatusLabel(ticket.status)}
                       </span>
                       <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{ticket.category}</span>
                    </div>

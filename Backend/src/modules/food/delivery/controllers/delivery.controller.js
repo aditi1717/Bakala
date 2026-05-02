@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { registerDeliveryPartner, updateDeliveryPartnerProfile, updateDeliveryPartnerBankDetails, listSupportTicketsByPartner, createSupportTicket, getSupportTicketByIdAndPartner, updateDeliveryPartnerDetails, updateDeliveryPartnerProfilePhotoBase64, updateDeliveryAvailability, getDeliveryPartnerWallet, getDeliveryPartnerEarnings, getDeliveryPartnerTripHistory, getDeliveryPocketDetails, getActiveEarningAddonsForPartner, getDeliveryPartnerOrderQueue, getDeliveryPartnerReviews } from '../services/delivery.service.js';
+import { registerDeliveryPartner, updateDeliveryPartnerProfile, updateDeliveryPartnerBankDetails, listSupportTicketsByPartner, listSupportTicketsByPhone, createSupportTicket, createSupportTicketForPendingPartner, getSupportTicketByIdAndPartner, getSupportTicketByIdAndPhone, updateDeliveryPartnerDetails, updateDeliveryPartnerProfilePhotoBase64, updateDeliveryAvailability, getDeliveryPartnerWallet, getDeliveryPartnerEarnings, getDeliveryPartnerTripHistory, getDeliveryPocketDetails, getActiveEarningAddonsForPartner, getDeliveryPartnerOrderQueue, getDeliveryPartnerReviews } from '../services/delivery.service.js';
 import { createDeliveryCashDepositOrder, getDeliveryPartnerWalletEnhanced, requestDeliveryWithdrawal, verifyDeliveryCashDepositPayment } from '../services/deliveryFinance.service.js';
 import { getDeliveryCashLimitSettings, getDeliveryEmergencyHelp } from '../../admin/services/admin.service.js';
 import { DeliveryBonusTransaction } from '../../admin/models/deliveryBonusTransaction.model.js';
@@ -73,7 +73,9 @@ export const updateDeliveryPartnerBankDetailsController = async (req, res, next)
 export const listSupportTicketsController = async (req, res, next) => {
     try {
         const deliveryPartnerId = req.user?.userId;
-        const tickets = await listSupportTicketsByPartner(deliveryPartnerId);
+        const tickets = deliveryPartnerId
+            ? await listSupportTicketsByPartner(deliveryPartnerId)
+            : await listSupportTicketsByPhone(req.query?.phone);
         return sendResponse(res, 200, 'Tickets fetched successfully', { tickets });
     } catch (error) {
         next(error);
@@ -83,7 +85,9 @@ export const listSupportTicketsController = async (req, res, next) => {
 export const createSupportTicketController = async (req, res, next) => {
     try {
         const deliveryPartnerId = req.user?.userId;
-        const ticket = await createSupportTicket(deliveryPartnerId, req.body);
+        const ticket = deliveryPartnerId
+            ? await createSupportTicket(deliveryPartnerId, req.body)
+            : await createSupportTicketForPendingPartner(req.body || {});
         return sendResponse(res, 201, 'Ticket created successfully', ticket);
     } catch (error) {
         next(error);
@@ -93,11 +97,22 @@ export const createSupportTicketController = async (req, res, next) => {
 export const getSupportTicketByIdController = async (req, res, next) => {
     try {
         const deliveryPartnerId = req.user?.userId;
-        const ticket = await getSupportTicketByIdAndPartner(req.params.id, deliveryPartnerId);
+        const ticket = deliveryPartnerId
+            ? await getSupportTicketByIdAndPartner(req.params.id, deliveryPartnerId)
+            : await getSupportTicketByIdAndPhone(req.params.id, req.query?.phone);
         if (!ticket) {
             return res.status(404).json({ success: false, message: 'Ticket not found' });
         }
         return sendResponse(res, 200, 'Ticket fetched successfully', ticket);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const createPendingSupportTicketController = async (req, res, next) => {
+    try {
+        const ticket = await createSupportTicketForPendingPartner(req.body || {});
+        return sendResponse(res, 201, 'Ticket created successfully', ticket);
     } catch (error) {
         next(error);
     }

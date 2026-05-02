@@ -4313,7 +4313,41 @@ export async function getDeliverySupportTickets(query = {}) {
         DeliverySupportTicket.countDocuments(filter)
     ]);
 
-    const tickets = list.map((t) => ({
+    const unresolvedPartnerIds = Array.from(
+        new Set(
+            (list || [])
+                .map((t) => {
+                    const partnerRef = t?.deliveryPartnerId;
+                    if (!partnerRef) return null;
+                    if (typeof partnerRef === 'object' && partnerRef.name) return null;
+                    const rawId = typeof partnerRef === 'object' ? partnerRef?._id : partnerRef;
+                    return rawId ? String(rawId) : null;
+                })
+                .filter(Boolean)
+        )
+    );
+
+    let partnerMap = new Map();
+    if (unresolvedPartnerIds.length > 0) {
+        const partners = await FoodDeliveryPartner.find({ _id: { $in: unresolvedPartnerIds } })
+            .select('_id name phone email')
+            .lean();
+        partnerMap = new Map((partners || []).map((p) => [String(p._id), p]));
+    }
+
+    const tickets = list.map((t) => {
+        const partnerRef = t?.deliveryPartnerId;
+        const partnerIdRaw = partnerRef
+            ? (typeof partnerRef === 'object' ? (partnerRef._id || null) : partnerRef)
+            : null;
+        const partnerId = partnerIdRaw ? String(partnerIdRaw) : null;
+        const fallbackPartner = partnerId ? partnerMap.get(partnerId) : null;
+        const resolvedPartner =
+            partnerRef && typeof partnerRef === 'object' && (partnerRef.name || partnerRef.phone || partnerRef.email)
+                ? partnerRef
+                : fallbackPartner;
+
+        return ({
         _id: t._id,
         ticketId: t.ticketId,
         subject: t.subject,
@@ -4325,15 +4359,15 @@ export async function getDeliverySupportTickets(query = {}) {
         respondedAt: t.respondedAt,
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
-        deliveryPartner: t.deliveryPartnerId
+        deliveryPartner: resolvedPartner
             ? {
-                _id: t.deliveryPartnerId._id,
-                name: t.deliveryPartnerId.name || '',
-                phone: t.deliveryPartnerId.phone || '',
-                email: t.deliveryPartnerId.email || ''
+                _id: resolvedPartner._id || partnerIdRaw || null,
+                name: resolvedPartner.name || '',
+                phone: resolvedPartner.phone || '',
+                email: resolvedPartner.email || ''
             }
             : null
-    }));
+    })});
 
     return {
         tickets,
@@ -7430,6 +7464,7 @@ export async function getSidebarBadges() {
         const [
             pendingRestaurants,
             pendingDeliveryPartners,
+            approvedDeliveryPartners,
             pendingFoods,
             pendingAddons,
             pendingOrders,
@@ -7445,6 +7480,7 @@ export async function getSidebarBadges() {
         ] = await Promise.all([
             FoodRestaurant.countDocuments({ status: 'pending' }),
             FoodDeliveryPartner.countDocuments({ status: 'pending' }),
+            FoodDeliveryPartner.countDocuments({ status: 'approved' }),
             FoodItem.countDocuments({ status: 'pending' }),
             FoodAddon.countDocuments({ status: 'pending' }),
             FoodOrder.countDocuments({ orderStatus: 'pending' }),
@@ -7462,6 +7498,8 @@ export async function getSidebarBadges() {
         return {
             restaurants: pendingRestaurants,
             deliveryPartners: pendingDeliveryPartners,
+            deliveryPartnersPending: pendingDeliveryPartners,
+            deliveryPartnersApproved: approvedDeliveryPartners,
             foods: pendingFoods + pendingAddons,
             foodApprovals: pendingFoods,
             orders: pendingOrders,

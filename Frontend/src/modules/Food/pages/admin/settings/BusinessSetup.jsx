@@ -25,6 +25,49 @@ const DEFAULT_MAINTENANCE_MODES = {
   },
 };
 
+function validateEmail(emailValue) {
+  const email = String(emailValue || "").trim().toLowerCase();
+  if (!email) return "Email is required";
+  if (email.length > 254) return "Email is too long";
+
+  const parts = email.split("@");
+  if (parts.length !== 2) return "Please enter a valid email address";
+
+  const [localPart, domainPart] = parts;
+  if (!localPart || !domainPart) return "Please enter a valid email address";
+  if (localPart.length > 64) return "Email username is too long";
+  if (localPart.startsWith(".") || localPart.endsWith(".")) return "Please enter a valid email address";
+  if (email.includes("..")) return "Please enter a valid email address";
+
+  const localRegex = /^[a-z0-9._%+-]+$/i;
+  if (!localRegex.test(localPart)) return "Please enter a valid email address";
+
+  if (domainPart.startsWith(".") || domainPart.endsWith(".")) return "Please enter a valid email address";
+  if (domainPart.startsWith("-") || domainPart.endsWith("-")) return "Please enter a valid email address";
+
+  const domainRegex = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+  if (!domainRegex.test(domainPart)) return "Please enter a valid email address";
+
+  // Guard against common spelling mistakes in popular email domains.
+  const commonTypoDomains = new Set([
+    "gnail.com",
+    "gamil.com",
+    "gmai.com",
+    "gmaiil.com",
+    "gmial.com",
+    "gnaiil.com",
+    "hotnail.com",
+    "outlok.com",
+    "yaho.com",
+  ]);
+  if (commonTypoDomains.has(domainPart)) return "Please check email spelling";
+
+  // Common TLD typo: ".comm" instead of ".com".
+  if (domainPart.endsWith(".comm")) return "Please check email spelling";
+
+  return "";
+}
+
 export default function BusinessSetup() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -139,9 +182,9 @@ export default function BusinessSetup() {
         toast.error("Email is required");
         return;
       }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email.trim())) {
-        toast.error("Please enter a valid email address");
+      const emailValidationError = validateEmail(formData.email);
+      if (emailValidationError) {
+        toast.error(emailValidationError);
         return;
       }
 
@@ -149,14 +192,14 @@ export default function BusinessSetup() {
         toast.error("Phone number is required");
         return;
       }
-      const phoneRegex = /^\d{7,15}$/;
+      const phoneRegex = /^\d{10}$/;
       if (!phoneRegex.test(formData.phoneNumber.trim())) {
-        toast.error("Please enter a valid phone number (7-15 digits)");
+        toast.error("Please enter a valid 10-digit phone number");
         return;
       }
 
-      if (formData.pincode.trim() && !/^\d{4,10}$/.test(formData.pincode.trim())) {
-        toast.error("Please enter a valid pincode (4-10 digits)");
+      if (formData.pincode.trim() && !/^\d{6}$/.test(formData.pincode.trim())) {
+        toast.error("Please enter a valid 6-digit pincode");
         return;
       }
 
@@ -362,7 +405,7 @@ export default function BusinessSetup() {
                     type="text"
                     placeholder="Enter Your Phone Number"
                     value={formData.phoneNumber}
-                    maxLength={15}
+                    maxLength={10}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, "");
                       handleInputChange("phoneNumber", val);
@@ -408,7 +451,7 @@ export default function BusinessSetup() {
                   type="text"
                   placeholder="Enter Your Pincode"
                   value={formData.pincode}
-                  maxLength={10}
+                  maxLength={6}
                   onChange={(e) => {
                     const val = e.target.value.replace(/\D/g, "");
                     handleInputChange("pincode", val);
