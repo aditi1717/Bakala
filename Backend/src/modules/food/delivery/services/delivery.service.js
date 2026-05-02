@@ -12,6 +12,13 @@ import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service
 
 const PAYABLE_DELIVERY_STATUSES = ['delivered'];
 
+const queueDeliveryPartnerForReview = (partner) => {
+    const currentStatus = String(partner?.status || '').toLowerCase();
+    if (currentStatus !== 'pending') {
+        partner.status = 'pending';
+    }
+};
+
 export const registerDeliveryPartner = async (payload, files) => {
     const { 
         name, phone, email, countryCode, address, city, state, 
@@ -144,16 +151,47 @@ export const updateDeliveryPartnerProfile = async (userId, payload, files) => {
         }
     }
 
-    let updatedDocsRequiringReapproval = false;
+    let updatedProfile = false;
 
     if (files?.profilePhoto?.[0]) {
         partner.profilePhoto = await uploadImageBuffer(files.profilePhoto[0].buffer, 'food/delivery/profile');
+        updatedProfile = true;
+    }
+    if (files?.aadharPhoto?.[0]) {
+        partner.aadharPhoto = await uploadImageBuffer(files.aadharPhoto[0].buffer, 'food/delivery/aadhar');
+        updatedProfile = true;
+    }
+    if (files?.panPhoto?.[0]) {
+        partner.panPhoto = await uploadImageBuffer(files.panPhoto[0].buffer, 'food/delivery/pan');
+        updatedProfile = true;
+    }
+    if (files?.drivingLicensePhoto?.[0]) {
+        partner.drivingLicensePhoto = await uploadImageBuffer(files.drivingLicensePhoto[0].buffer, 'food/delivery/license');
+        updatedProfile = true;
+    }
+
+    if (
+        name !== undefined ||
+        countryCode !== undefined ||
+        address !== undefined ||
+        city !== undefined ||
+        state !== undefined ||
+        vehicleType !== undefined ||
+        vehicleName !== undefined ||
+        vehicleNumber !== undefined ||
+        drivingLicenseNumber !== undefined
+    ) {
+        updatedProfile = true;
+    }
+
+    if (updatedProfile) {
+        queueDeliveryPartnerForReview(partner);
     }
 
     await partner.save();
     return {
         partner: partner.toObject(),
-        requiresReapproval: false
+        requiresReapproval: updatedProfile
     };
 };
 
@@ -163,16 +201,34 @@ export const updateDeliveryPartnerDetails = async (userId, payload) => {
         throw new ValidationError('Delivery partner not found');
     }
 
+    let updatedProfile = false;
     const vehicle = payload?.vehicle;
     if (vehicle && typeof vehicle === 'object') {
-        if (vehicle.number !== undefined) partner.vehicleNumber = String(vehicle.number || '').trim();
-        if (vehicle.type !== undefined) partner.vehicleType = String(vehicle.type || '').trim();
-        if (vehicle.brand !== undefined) partner.vehicleName = String(vehicle.brand || '').trim();
-        if (vehicle.model !== undefined) partner.vehicleName = String(vehicle.model || '').trim();
+        if (vehicle.number !== undefined) {
+            partner.vehicleNumber = String(vehicle.number || '').trim();
+            updatedProfile = true;
+        }
+        if (vehicle.type !== undefined) {
+            partner.vehicleType = String(vehicle.type || '').trim();
+            updatedProfile = true;
+        }
+        if (vehicle.brand !== undefined) {
+            partner.vehicleName = String(vehicle.brand || '').trim();
+            updatedProfile = true;
+        }
+        if (vehicle.model !== undefined) {
+            partner.vehicleName = String(vehicle.model || '').trim();
+            updatedProfile = true;
+        }
     }
 
     if (payload?.profilePhoto !== undefined) {
         partner.profilePhoto = payload.profilePhoto ? String(payload.profilePhoto).trim() : '';
+        updatedProfile = true;
+    }
+
+    if (updatedProfile) {
+        queueDeliveryPartnerForReview(partner);
     }
 
     await partner.save();
@@ -198,6 +254,7 @@ export const updateDeliveryPartnerProfilePhotoBase64 = async (userId, payload) =
     }
     // uploadImageBuffer expects raw bytes; mimeType is ignored by current implementation, but buffer is valid.
     partner.profilePhoto = await uploadImageBuffer(buffer, 'food/delivery/profile');
+    queueDeliveryPartnerForReview(partner);
     await partner.save();
     return partner.toObject();
 };
@@ -207,6 +264,7 @@ export const updateDeliveryPartnerBankDetails = async (userId, payload, files) =
     if (!partner) {
         throw new ValidationError('Delivery partner not found');
     }
+    let updatedBankDetails = false;
 
     // Handle both nested JSON and flat FormData from multer
     let bankDetails = payload?.documents?.bankDetails;
@@ -229,19 +287,40 @@ export const updateDeliveryPartnerBankDetails = async (userId, payload, files) =
 
     if (bankDetails) {
         const b = bankDetails;
-        if (b.accountHolderName !== undefined) partner.bankAccountHolderName = b.accountHolderName ? String(b.accountHolderName).trim() : '';
-        if (b.accountNumber !== undefined) partner.bankAccountNumber = b.accountNumber ? String(b.accountNumber).trim() : '';
-        if (b.ifscCode !== undefined) partner.bankIfscCode = b.ifscCode ? String(b.ifscCode).trim().toUpperCase() : '';
-        if (b.bankName !== undefined) partner.bankName = b.bankName ? String(b.bankName).trim() : '';
-        if (b.upiId !== undefined) partner.upiId = b.upiId ? String(b.upiId).trim() : '';
+        if (b.accountHolderName !== undefined) {
+            partner.bankAccountHolderName = b.accountHolderName ? String(b.accountHolderName).trim() : '';
+            updatedBankDetails = true;
+        }
+        if (b.accountNumber !== undefined) {
+            partner.bankAccountNumber = b.accountNumber ? String(b.accountNumber).trim() : '';
+            updatedBankDetails = true;
+        }
+        if (b.ifscCode !== undefined) {
+            partner.bankIfscCode = b.ifscCode ? String(b.ifscCode).trim().toUpperCase() : '';
+            updatedBankDetails = true;
+        }
+        if (b.bankName !== undefined) {
+            partner.bankName = b.bankName ? String(b.bankName).trim() : '';
+            updatedBankDetails = true;
+        }
+        if (b.upiId !== undefined) {
+            partner.upiId = b.upiId ? String(b.upiId).trim() : '';
+            updatedBankDetails = true;
+        }
     }
 
     if (panDetails?.number !== undefined) {
         partner.panNumber = panDetails.number ? String(panDetails.number).trim().toUpperCase() : '';
+        updatedBankDetails = true;
     }
 
     if (files?.upiQrCode?.[0]) {
         partner.upiQrCode = await uploadImageBuffer(files.upiQrCode[0].buffer, 'food/delivery/upi');
+        updatedBankDetails = true;
+    }
+
+    if (updatedBankDetails) {
+        queueDeliveryPartnerForReview(partner);
     }
 
     await partner.save();

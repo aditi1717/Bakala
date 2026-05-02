@@ -3,11 +3,14 @@ import { ArrowLeft, Edit2, Loader2, Save } from 'lucide-react';
 import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import useDeliveryBackNavigation from '../../hooks/useDeliveryBackNavigation';
+import { useNavigate } from 'react-router-dom';
+import { clearModuleAuth } from '@food/utils/auth';
 
 /**
  * ProfileBankV2 - Restored Old UI for Bank Details.
  */
 export const ProfileBankV2 = () => {
+  const navigate = useNavigate();
   const goBack = useDeliveryBackNavigation();
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -42,22 +45,24 @@ export const ProfileBankV2 = () => {
 
   const handleSave = async () => {
      if (!form.accountNumber || !form.ifscCode) return toast.error("Missing mandatory fields");
+     if (!/^\d{9,18}$/.test(String(form.accountNumber || "").trim())) {
+        return toast.error("Invalid Account Number (9-18 digits)");
+     }
      setIsSaving(true);
      try {
-        const payload = {
-           documents: {
-              bankDetails: {
-                 accountHolderName: form.accountHolderName,
-                 accountNumber: form.accountNumber,
-                 ifscCode: form.ifscCode,
-                 bankName: form.bankName
-              },
-              pan: { number: form.panNumber }
-           }
-        };
-        const response = await deliveryAPI.updateProfileDetails(payload);
+        const formData = new FormData();
+        formData.append("documents[bankDetails][accountHolderName]", String(form.accountHolderName || "").trim());
+        formData.append("documents[bankDetails][accountNumber]", String(form.accountNumber || "").trim());
+        formData.append("documents[bankDetails][ifscCode]", String(form.ifscCode || "").trim().toUpperCase());
+        formData.append("documents[bankDetails][bankName]", String(form.bankName || "").trim());
+        formData.append("documents[pan][number]", String(form.panNumber || "").trim().toUpperCase());
+
+        const response = await deliveryAPI.updateBankDetailsMultipart(formData);
         if (response?.data?.success) {
-           toast.success("Bank details updated");
+           toast.success("Bank details updated. Your approval request has been sent to admin. Redirecting to login...");
+           clearModuleAuth("delivery");
+           localStorage.removeItem("app:isOnline");
+           navigate("/food/delivery/login", { replace: true });
            setIsEditing(false);
         }
      } catch (e) { toast.error("Update failed"); }
@@ -88,10 +93,16 @@ export const ProfileBankV2 = () => {
                 <div key={key} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">{label}</label>
                    {isEditing ? (
-                      <input 
-                         type="text" 
+                      <input
+                         type="text"
                          value={form[key]}
-                         onChange={(e) => setForm({...form, [key]: e.target.value})}
+                         onChange={(e) => {
+                           let value = e.target.value;
+                           if (key === "accountNumber") {
+                             value = value.replace(/\D/g, "").slice(0, 18);
+                           }
+                           setForm({ ...form, [key]: value });
+                         }}
                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-950 focus:ring-2 focus:ring-orange-500/20"
                       />
                    ) : (

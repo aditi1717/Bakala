@@ -18,6 +18,7 @@ const requiredBooleanSchema = z.preprocess((value) => {
 }, z.boolean({ required_error: 'Please select whether the restaurant is pure veg' }));
 
 const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+const cityStateRegex = /^[A-Za-z\s]+$/;
 
 const normalizeTimeValue = (value) => {
     const raw = String(value || '').trim();
@@ -113,6 +114,14 @@ export const validateRestaurantRegisterDto = (body) => {
     }
 
     const data = result.data;
+
+    if (data.city && String(data.city).trim() && !cityStateRegex.test(String(data.city).trim())) {
+        throw new ValidationError('City must contain alphabets only');
+    }
+    if (data.state && String(data.state).trim() && !cityStateRegex.test(String(data.state).trim())) {
+        throw new ValidationError('State must contain alphabets only');
+    }
+
     const openingMinutes = timeToMinutes(data.openingTime);
     const closingMinutes = timeToMinutes(data.closingTime);
     if (openingMinutes !== null && closingMinutes !== null) {

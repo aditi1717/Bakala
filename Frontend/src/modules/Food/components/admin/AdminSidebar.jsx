@@ -159,8 +159,17 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
     if (l.includes("withdrawal")) return l.includes("delivery") ? badges.deliveryWithdrawals : badges.restaurantWithdrawals
     if (l.includes("emergency help")) return badges.emergencyHelp
     if (l.includes("safety emergency reports")) return badges.safetyReports
-    if (l === "deliveryman" && !p.includes("join-request")) return badges.deliveryPartners // expandable parent
-    if (l.includes("join-request")) return badges.deliveryPartners
+    if (l === "deliveryman") {
+      const pendingCount = badges.deliveryPartnersPending || badges.deliveryPartners || 0
+      const approvedCount = badges.deliveryPartnersApproved || 0
+      return pendingCount + approvedCount // expandable parent
+    }
+    if (p.includes("delivery-partners/join-request") || l.includes("join request")) {
+      return badges.deliveryPartnersPending || badges.deliveryPartners
+    }
+    if (p === "/admin/food/delivery-partners" || p.endsWith("/delivery-partners") || l.includes("deliveryman list")) {
+      return badges.deliveryPartnersApproved || 0
+    }
     return 0
   }
   const [logoUrl, setLogoUrl] = useState(() => getCachedSettings()?.logo?.url || null)

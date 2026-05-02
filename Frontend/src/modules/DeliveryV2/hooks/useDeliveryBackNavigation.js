@@ -69,6 +69,12 @@ export default function useDeliveryBackNavigation() {
   const location = useLocation()
 
   return useCallback(() => {
+    // Prefer true history back so user returns to the exact previous screen.
+    // For direct-entry pages (initial key), fall back to deterministic route mapping.
+    if (location?.key && location.key !== "default" && window.history.length > 1) {
+      navigate(-1)
+      return
+    }
     navigate(resolveDeliveryBackPath(location))
   }, [location, navigate])
 }

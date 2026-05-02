@@ -5,11 +5,14 @@ import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import { openCamera } from "@food/utils/imageUploadUtils";
 import useDeliveryBackNavigation from '../../hooks/useDeliveryBackNavigation';
+import { clearModuleAuth } from '@food/utils/auth';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * ProfileDocsV2 - Restored Old UI for Registration Documents & Vehicle Info.
  */
 export const ProfileDocsV2 = () => {
+  const navigate = useNavigate();
   const goBack = useDeliveryBackNavigation();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,6 +20,13 @@ export const ProfileDocsV2 = () => {
   const [showViewer, setShowViewer] = useState(null); // { title: string, url: string }
   const [uploadField, setUploadField] = useState(null)
   const fileInputRef = useRef(null);
+  const [redirectingAfterUpdate, setRedirectingAfterUpdate] = useState(false);
+
+  const redirectToLoginAfterDocumentUpdate = () => {
+    clearModuleAuth("delivery");
+    localStorage.removeItem("app:isOnline");
+    navigate("/food/delivery/login", { replace: true });
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -37,12 +47,15 @@ export const ProfileDocsV2 = () => {
      try {
         const res = await deliveryAPI.updateProfileMultipart(formData);
         if (res?.data?.success) {
-           toast.success("Document updated successfully");
-           const updated = await deliveryAPI.getProfile();
-           setProfile(updated.data.data.profile);
+           setRedirectingAfterUpdate(true);
+           toast.success("Document updated. Your approval request has been sent to admin. Redirecting to login...");
+           redirectToLoginAfterDocumentUpdate();
         }
      } catch (e) { toast.error("Upload failed"); }
-     finally { setIsUpdating(false); }
+     finally {
+      setIsUpdating(false);
+      setUploadField(null);
+     }
   };
 
   const handleTakeCameraPhoto = (field) => {
@@ -57,12 +70,26 @@ export const ProfileDocsV2 = () => {
     fileInputRef.current?.click()
   }
 
+  const isAdminApproved = ["approved", "active"].includes(String(profile?.status || "").toLowerCase());
+
   const getDocStatus = (doc) => {
     if (!doc?.document) return "Not Uploaded";
-    return doc.verified ? "Verified" : "Pending Verification";
+    if (doc.verified || isAdminApproved) return "Approved";
+    return "Pending Verification";
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="w-8 h-8 animate-spin text-orange-500" /></div>;
+  if (loading || isUpdating || redirectingAfterUpdate) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-[#005128]" />
+          <p className="text-xs font-semibold text-gray-500">
+            {redirectingAfterUpdate ? "Update complete, redirecting..." : "Updating document..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const docs = [
     { label: "Aadhar Card", field: "aadharPhoto", data: profile?.documents?.aadhar },
@@ -71,25 +98,25 @@ export const ProfileDocsV2 = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 font-poppins pb-20">
-       <div className="bg-white px-4 py-5 flex items-center gap-4 fixed top-0 w-full z-50 shadow-sm">
-          <button onClick={goBack}><ArrowLeft className="w-6 h-6 shadow-sm p-1 rounded-full bg-gray-50 bg-opacity-70" /></button>
-          <h1 className="text-xl font-black">Registration Docs</h1>
+    <div className="min-h-screen bg-gray-50 font-poppins pb-14">
+       <div className="bg-white px-4 py-3.5 flex items-center gap-3 fixed top-0 w-full z-50 shadow-sm border-b border-gray-100">
+          <button onClick={goBack}><ArrowLeft className="w-5 h-5 shadow-sm p-1 rounded-full bg-gray-50 bg-opacity-70" /></button>
+          <h1 className="text-lg font-black">Registration Docs</h1>
        </div>
 
-       <div className="pt-24 px-4 space-y-8">
+       <div className="pt-18 px-3 space-y-4">
           {/* 1. Vehicle Card */}
-          <div className="bg-[#ff8100] rounded-2xl p-6 text-white shadow-xl shadow-orange-500/20 flex flex-col gap-2 relative overflow-hidden">
-             <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full translate-x-20 -translate-y-20" />
-             <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 z-10">Vehicle Registered</p>
-             <h3 className="text-2xl font-black z-10">{profile?.vehicle?.number || "NO # REGISTERED"}</h3>
-             <p className="text-[10px] font-bold z-10 opacity-70 uppercase tracking-widest">{profile?.vehicle?.type || "Standard Bike"}</p>
+          <div className="bg-gradient-to-r from-[#005128] to-[#0b6b3a] rounded-xl p-4 text-white shadow-lg shadow-[#005128]/20 flex flex-col gap-1.5 relative overflow-hidden">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full translate-x-16 -translate-y-16" />
+             <p className="text-[9px] font-black uppercase tracking-[0.18em] opacity-80 z-10">Vehicle Registered</p>
+             <h3 className="text-xl font-black z-10">{profile?.vehicle?.number || "NO # REGISTERED"}</h3>
+             <p className="text-[9px] font-bold z-10 opacity-80 uppercase tracking-widest">{profile?.vehicle?.type || "Standard Bike"}</p>
           </div>
 
           {/* 2. Documents List */}
-          <div className="space-y-4">
+          <div className="space-y-3">
              {docs.map((doc, idx) => (
-                <div key={idx} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-4 relative">
+                <div key={idx} className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100 flex flex-col gap-3 relative">
                    <div className="flex justify-between items-start">
                       <div>
                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{doc.label}</p>
@@ -97,24 +124,24 @@ export const ProfileDocsV2 = () => {
                       </div>
                       <div className="flex gap-2">
                          {doc.data?.document && (
-                            <button onClick={() => setShowViewer({ title: doc.label, url: doc.data.document })} className="p-3 bg-gray-50 rounded-xl text-gray-600 hover:bg-gray-100 active:scale-95 transition-all"><Eye className="w-5 h-5" /></button>
+                            <button onClick={() => setShowViewer({ title: doc.label, url: doc.data.document })} className="p-2.5 bg-gray-50 rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95 transition-all"><Eye className="w-4 h-4" /></button>
                          )}
                          <button 
                             onClick={() => handleTakeCameraPhoto(doc.field)}
-                            className="p-3 bg-gray-900 rounded-xl text-white hover:bg-black active:scale-95 transition-all cursor-pointer relative"
+                            className="p-2.5 bg-[#0f172a] rounded-lg text-white hover:bg-black active:scale-95 transition-all cursor-pointer relative"
                          >
-                            <Camera className="w-5 h-5" />
+                            <Camera className="w-4 h-4" />
                          </button>
                          <button 
                             onClick={() => handlePickFromGallery(doc.field)}
-                            className="p-3 bg-orange-50 rounded-xl text-orange-600 hover:bg-orange-100 active:scale-95 transition-all cursor-pointer relative"
+                            className="p-2.5 bg-emerald-50 rounded-lg text-emerald-700 hover:bg-emerald-100 active:scale-95 transition-all cursor-pointer relative"
                          >
-                            <ImageIcon className="w-5 h-5" />
+                            <ImageIcon className="w-4 h-4" />
                          </button>
                       </div>
                    </div>
                    {doc.data?.document && (
-                      <div className="mt-2 w-24 h-16 rounded-xl border border-gray-100 overflow-hidden shadow-inner bg-gray-50 flex items-center justify-center">
+                      <div className="mt-1 w-20 h-14 rounded-lg border border-gray-100 overflow-hidden shadow-inner bg-gray-50 flex items-center justify-center">
                          <img src={doc.data.document} className="w-full h-full object-cover opacity-50 grayscale" alt="Preview" />
                       </div>
                    )}
@@ -122,9 +149,9 @@ export const ProfileDocsV2 = () => {
              ))}
           </div>
 
-          <div className="p-10 text-center opacity-30 mt-10">
-             <FileText className="w-16 h-16 mx-auto mb-4" />
-             <p className="text-[10px] font-black uppercase tracking-[0.4em]">Official Fleet Identity</p>
+          <div className="p-6 text-center opacity-35 mt-2">
+             <FileText className="w-10 h-10 mx-auto mb-2" />
+             <p className="text-[9px] font-black uppercase tracking-[0.28em]">Official Fleet Identity</p>
           </div>
        </div>
 
@@ -163,3 +190,4 @@ export const ProfileDocsV2 = () => {
 };
 
 export default ProfileDocsV2;
+

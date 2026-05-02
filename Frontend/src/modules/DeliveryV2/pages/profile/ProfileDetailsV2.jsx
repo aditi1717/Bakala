@@ -12,6 +12,7 @@ import { openCamera, isFlutterBridgeAvailable } from "@food/utils/imageUploadUti
 import { deliveryAPI } from "@food/api"
 import { motion, AnimatePresence } from "framer-motion"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
+import { clearModuleAuth } from "@food/utils/auth"
 
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
@@ -98,7 +99,7 @@ export const ProfileDetailsV2 = () => {
           setVehicleNumber(vNum)
           setVehicleBrand(vBrand)
           setVehicleType(vType)
-          setVehicleInput({ number: vNum, brand: vBrand, type: vType })
+          setVehicleInput({ number: formatVehicleNumberInput(vNum), brand: vBrand, type: vType })
           // Set bank details
           setBankDetails({
             accountHolderName: profileData?.documents?.bankDetails?.accountHolderName || "",
@@ -202,6 +203,21 @@ export const ProfileDetailsV2 = () => {
   const riderLevel = getRiderLevel()
 
   const profileImageUrl = profile?.profileImage?.url || profile?.documents?.photo || null
+  const formatVehicleNumberInput = (rawValue = "") => {
+    const compact = String(rawValue || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
+    const p1 = compact.slice(0, 2)
+    const p2 = compact.slice(2, 4)
+    const p3 = compact.slice(4, 6)
+    const p4 = compact.slice(6, 10)
+    return [p1, p2, p3, p4].filter(Boolean).join(" ")
+  }
+
+  const redirectToLoginAfterProfileUpdate = (message = "Update submitted. Your approval request has been sent to admin. Please log in again.") => {
+    clearModuleAuth("delivery")
+    localStorage.removeItem("app:isOnline")
+    toast.success(message)
+    navigate("/food/delivery/login", { replace: true })
+  }
 
   const refreshProfile = async () => {
     const response = await deliveryAPI.getProfile()
@@ -262,8 +278,7 @@ export const ProfileDetailsV2 = () => {
       formData.append("profilePhoto", file)
       const response = await deliveryAPI.updateProfileMultipart(formData)
       if (response?.data?.success) {
-        toast.success("Profile photo updated")
-        await refreshProfile()
+        redirectToLoginAfterProfileUpdate("Profile photo updated. Your approval request has been sent to admin. Please log in again.")
       } else {
         toast.error("Update failed")
       }
@@ -299,9 +314,8 @@ export const ProfileDetailsV2 = () => {
       const response = await deliveryAPI.updateProfileDetails({ profilePhoto: "" })
       // Backend might return different structures; check for success
       if (response?.status === 200) {
-        toast.success("Profile photo removed")
-        await refreshProfile()
         setShowDeletePopup(false)
+        redirectToLoginAfterProfileUpdate("Profile photo removed. Your approval request has been sent to admin. Please log in again.")
       } else {
         toast.error("Failed to remove photo")
       }
@@ -381,11 +395,10 @@ export const ProfileDetailsV2 = () => {
       }
 
       await deliveryAPI.updateBankDetailsMultipart(formData)
-      toast.success("Bank details updated")
       setShowBankDetailsPopup(false)
       setUpiQrFile(null)
       setUpiQrPreview(null)
-      await refreshProfile()
+      redirectToLoginAfterProfileUpdate("Bank details updated. Your approval request has been sent to admin. Please log in again.")
     } catch (error) {
       toast.error("Update failed")
     } finally {
@@ -400,9 +413,9 @@ export const ProfileDetailsV2 = () => {
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center font-poppins">
          <div className="flex flex-col items-center gap-4">
             <div className="relative">
-               <div className="w-16 h-16 border-4 border-orange-100 border-t-orange-500 rounded-full animate-spin" />
+               <div className="w-16 h-16 border-4 border-emerald-100 border-t-[#005128] rounded-full animate-spin" />
                <div className="absolute inset-0 flex items-center justify-center">
-                  <User className="w-6 h-6 text-orange-500" />
+                  <User className="w-5 h-5 text-[#005128]" />
                </div>
             </div>
             <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">Initializing Profile...</p>
@@ -412,13 +425,13 @@ export const ProfileDetailsV2 = () => {
   }
 
   const InfoCard = ({ icon: Icon, label, value, color = "blue", badge = null, onEdit = null }) => (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100/80 flex items-center justify-between group">
-      <div className="flex items-center gap-4">
-        <div className={`w-12 h-12 rounded-xl bg-${color}-50 flex items-center justify-center text-${color}-600 border border-${color}-100 transition-transform group-hover:scale-105`}>
-          <Icon className="w-6 h-6" />
+    <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100/80 flex items-center justify-between group">
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-lg bg-${color}-50 flex items-center justify-center text-${color}-600 border border-${color}-100 transition-transform group-hover:scale-105`}>
+          <Icon className="w-5 h-5" />
         </div>
         <div>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] mb-0.5">{label}</p>
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.14em] mb-0.5">{label}</p>
           <div className="flex items-center gap-2">
             <h4 className="text-sm font-bold text-gray-900">{value || "—"}</h4>
             {badge}
@@ -426,7 +439,7 @@ export const ProfileDetailsV2 = () => {
         </div>
       </div>
       {onEdit && (
-        <button onClick={onEdit} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400 hover:text-orange-500 transition-all active:scale-90">
+        <button onClick={onEdit} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400 hover:text-[#005128] transition-all active:scale-90">
           <Edit2 className="w-4 h-4" />
         </button>
       )}
@@ -434,24 +447,24 @@ export const ProfileDetailsV2 = () => {
   )
 
   return (
-    <div className="min-h-screen bg-[#FDFEFE] font-poppins pb-24">
+    <div className="min-h-screen bg-[#FDFEFE] font-poppins pb-16">
       {/* ─── HEADER ─── */}
-      <div className="fixed top-0 inset-x-0 h-16 bg-white/80 backdrop-blur-xl border-b border-gray-100 z-50 px-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="fixed top-0 inset-x-0 h-14 bg-white/90 backdrop-blur-xl border-b border-gray-100 z-50 px-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
           <button onClick={goBack} className="p-2 hover:bg-gray-100 rounded-xl transition-all active:scale-90">
             <ArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
-          <h1 className="text-lg font-black text-black uppercase tracking-tight leading-none">Profile</h1>
+          <h1 className="text-base font-black text-black uppercase tracking-tight leading-none">Profile</h1>
         </div>
-        <div className="bg-orange-500 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-orange-500/20">
+        <div className="bg-[#005128] text-white px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg shadow-[#005128]/20">
           ID: {profile?.deliveryId || "..."}
         </div>
       </div>
 
-      <div className="pt-20 px-4 space-y-6 max-w-lg mx-auto">
+      <div className="pt-16 px-3 space-y-3 max-w-lg mx-auto">
         {/* ─── PROFILE AVATAR BLOCK ─── */}
         <div className="relative group">
-           <div className="w-32 h-32 rounded-[2.5rem] bg-gray-100 border-2 border-white shadow-2xl mx-auto overflow-hidden relative">
+           <div className="w-24 h-24 rounded-[1.8rem] bg-gray-100 border-2 border-white shadow-xl mx-auto overflow-hidden relative">
               {profileImageUrl ? (
                 <img src={profileImageUrl} alt="Avatar" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
               ) : (
@@ -459,7 +472,7 @@ export const ProfileDetailsV2 = () => {
               )}
               {isUploadingImage && (
                 <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
                 </div>
               )}
            </div>
@@ -467,55 +480,55 @@ export const ProfileDetailsV2 = () => {
            <div className="flex items-center justify-center absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 gap-2">
               <button 
                 onClick={() => handleTakeCameraPhoto('profilePhoto')}
-                className="bg-black text-white p-3 rounded-2xl shadow-xl hover:bg-gray-900 transition-all active:scale-95 border-4 border-white flex items-center justify-center"
+                className="bg-black text-white p-2.5 rounded-xl shadow-xl hover:bg-gray-900 transition-all active:scale-95 border-2 border-white flex items-center justify-center"
                 title="Take Photo"
               >
-                <Camera className="w-5 h-5" />
+                <Camera className="w-4 h-4" />
               </button>
               
               <button 
                 onClick={() => handlePickFromGallery('profilePhoto', fileInputRef)}
-                className="bg-orange-500 text-white p-3 rounded-2xl shadow-xl hover:bg-orange-600 transition-all active:scale-95 border-4 border-white flex items-center justify-center"
+                className="bg-[#005128] text-white p-2.5 rounded-xl shadow-xl hover:bg-[#0b6b3a] transition-all active:scale-95 border-2 border-white flex items-center justify-center"
                 title="Gallery"
               >
-                <ImageIcon className="w-5 h-5" />
+                <ImageIcon className="w-4 h-4" />
               </button>
 
               {profileImageUrl && (
                 <button 
                   onClick={() => setShowDeletePopup(true)}
-                  className="bg-red-500 text-white p-3 rounded-2xl shadow-xl hover:bg-red-600 transition-all active:scale-95 border-4 border-white flex items-center justify-center"
+                  className="bg-red-500 text-white p-2.5 rounded-xl shadow-xl hover:bg-red-600 transition-all active:scale-95 border-2 border-white flex items-center justify-center"
                   title="Remove"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
            </div>
         </div>
 
-        <div className="text-center pt-6">
-           <h2 className="text-2xl font-black text-gray-900 leading-none">{profile?.name}</h2>
-           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-2 mb-4">Delivery Partner • {profile?.location?.city}</p>
+        <div className="text-center pt-3">
+           <h2 className="text-lg font-black text-gray-900 leading-none">{profile?.name}</h2>
+           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.16em] mt-1.5 mb-3">Delivery Partner • {profile?.location?.city}</p>
            
            <div className="flex items-center justify-center gap-2">
               <div className="bg-[#10B981]/10 text-[#10B981] px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-[#10B981]/20 flex items-center gap-2">
                  <CheckCircle className="w-4 h-4" /> {profile?.status}
               </div>
-              <div className="bg-orange-500/10 text-orange-500 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-orange-500/20 flex items-center gap-2">
+              <div className="bg-[#005128]/10 text-[#005128] px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-[#005128]/20 flex items-center gap-2">
                  <Smartphone className="w-4 h-4" /> {profile?.phone}
               </div>
            </div>
         </div>
 
         {/* ─── RIDER STATS ─── */}
-        <div className="grid grid-cols-2 gap-3">
-           <div className="bg-white border border-gray-100 p-4 rounded-3xl shadow-sm text-center">
+        <div className="grid grid-cols-2 gap-2.5">
+           <div className="bg-white border border-gray-100 p-3 rounded-2xl shadow-sm text-center">
               <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Rider Level</p>
-              <h4 className="text-xl font-black text-gray-900">{riderLevel}</h4>
+              <h4 className="text-lg font-black text-gray-900">{riderLevel}</h4>
            </div>
-           <div className="bg-white border border-gray-100 p-4 rounded-3xl shadow-sm text-center">
+           <div className="bg-white border border-gray-100 p-3 rounded-2xl shadow-sm text-center">
               <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Rating</p>
-              <h4 className="text-xl font-black text-gray-900">{ratingDisplay}</h4>
+              <h4 className="text-lg font-black text-gray-900">{ratingDisplay}</h4>
            </div>
         </div>
 
@@ -542,10 +555,10 @@ export const ProfileDetailsV2 = () => {
             })()} 
             label="Vehicle Details" 
             value={[profile?.vehicle?.type, profile?.vehicle?.brand, vehicleNumber].filter(Boolean).map(v => String(v).toUpperCase()).join(" • ") || "N/A"} 
-            color="orange"
+            color="emerald"
             badge={!vehicleNumber && <span className="text-[9px] bg-red-50 text-red-500 px-1.5 rounded uppercase font-bold">Missing</span>}
             onEdit={() => { 
-                setVehicleInput({ number: vehicleNumber, brand: vehicleBrand, type: vehicleType }); 
+                setVehicleInput({ number: formatVehicleNumberInput(vehicleNumber), brand: vehicleBrand, type: vehicleType }); 
                 setShowVehiclePopup(true); 
             }}
           />
@@ -573,7 +586,7 @@ export const ProfileDetailsV2 = () => {
                   setUpiQrPreview(null)
                   setShowBankDetailsPopup(true)
                 }} 
-                className="text-[10px] font-black text-orange-500 uppercase tracking-widest hover:underline"
+                className="text-[10px] font-black text-[#005128] uppercase tracking-widest hover:underline"
               >
                 Edit Details
               </button>
@@ -588,7 +601,7 @@ export const ProfileDetailsV2 = () => {
                           <p className="text-white/40 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Bank Account</p>
                           <h4 className="text-lg font-bold tracking-tight">{bankDetails.bankName || "Link Account"}</h4>
                        </div>
-                       <Banknote className="w-8 h-8 text-orange-500/50" />
+                       <Banknote className="w-8 h-8 text-[#005128]/50" />
                     </div>
                     <div className="flex justify-between items-end">
                        <div>
@@ -621,7 +634,7 @@ export const ProfileDetailsV2 = () => {
                       onClick={() => { setSelectedDocument({ name: "UPI Scanner", url: bankDetails.upiQrCode }); setShowDocumentModal(true); }}
                       className="w-14 h-14 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-center text-gray-400 hover:text-black hover:border-black/20 transition-all"
                     >
-                       <QrCode className="w-6 h-6" />
+                       <QrCode className="w-5 h-5" />
                     </button>
                  )}
               </div>
@@ -643,7 +656,7 @@ export const ProfileDetailsV2 = () => {
                { icon: Truck, label: "Driving License", doc: profile?.documents?.drivingLicense, number: getDrivingLicenseNumber() }
              ].map((item, i) => (
                <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                      <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400"><item.icon className="w-5 h-5" /></div>
                      <div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.label}</p>
@@ -701,7 +714,7 @@ export const ProfileDetailsV2 = () => {
             <h3 className="text-xl font-black text-gray-950 mb-2 uppercase tracking-tight">Are you sure?</h3>
             <p className="text-sm font-medium text-gray-500 mb-8 max-w-[200px] mx-auto">This will remove your current profile picture.</p>
             
-            <div className="grid grid-cols-2 gap-3 px-2">
+            <div className="grid grid-cols-2 gap-2.5 px-2">
                 <button 
                   onClick={() => setShowDeletePopup(false)}
                   className="bg-gray-100 text-gray-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] active:scale-95"
@@ -721,16 +734,16 @@ export const ProfileDetailsV2 = () => {
 
       {/* Vehicle Popup */}
       <BottomPopup isOpen={showVehiclePopup} onClose={() => setShowVehiclePopup(false)} title="Vehicle Info" closeOnHandleClick={true} showCloseButton={false}>
-         <div className="space-y-4 pb-10">
-            <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 flex flex-col gap-4">
+         <div className="space-y-3 pb-6">
+            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col gap-3">
                 {/* Type Selection */}
-                <div className="flex items-center gap-4 w-full">
+                <div className="flex items-center gap-3 w-full">
                     <div className="w-8 h-8 flex items-center justify-center">
                         {(() => {
                            const t = String(vehicleInput.type || "").toLowerCase();
-                           if (t.includes("car")) return <Car className="w-5 h-5 text-orange-500" />;
-                           if (t.includes("bicycle")) return <Bike className="w-5 h-5 text-orange-500" />;
-                           return <Truck className="w-5 h-5 text-orange-500" />;
+                           if (t.includes("car")) return <Car className="w-5 h-5 text-[#005128]" />;
+                           if (t.includes("bicycle")) return <Bike className="w-5 h-5 text-[#005128]" />;
+                           return <Truck className="w-5 h-5 text-[#005128]" />;
                         })()}
                     </div>
                     <div className="flex-1">
@@ -738,7 +751,7 @@ export const ProfileDetailsV2 = () => {
                         <select 
                             value={vehicleInput.type} 
                             onChange={(e) => setVehicleInput({...vehicleInput, type: e.target.value})} 
-                            className="w-full bg-transparent text-lg font-black text-black outline-none border-b-2 border-transparent focus:border-orange-500 cursor-pointer"
+                            className="w-full bg-transparent text-base font-black text-black outline-none border-b border-transparent focus:border-[#005128] cursor-pointer"
                         >
                             <option value="bike">Bike</option>
                             <option value="scooter">Scooter</option>
@@ -751,8 +764,8 @@ export const ProfileDetailsV2 = () => {
                 <div className="h-px bg-gray-200 w-full" />
 
                 {/* Name/Brand Input */}
-                <div className="flex items-center gap-4 w-full">
-                    <div className="w-8 h-8 flex items-center justify-center"><Plus className="w-4 h-4 text-orange-500/50" /></div>
+                <div className="flex items-center gap-3 w-full">
+                    <div className="w-8 h-8 flex items-center justify-center"><Plus className="w-4 h-4 text-[#005128]/50" /></div>
                     <div className="flex-1">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehicle Name/Brand</p>
                         <input 
@@ -760,7 +773,7 @@ export const ProfileDetailsV2 = () => {
                             value={vehicleInput.brand} 
                             onChange={(e) => setVehicleInput({...vehicleInput, brand: e.target.value})} 
                             placeholder="E.g. Honda Splendor"
-                            className="w-full bg-transparent text-lg font-black text-black outline-none border-b-2 border-transparent focus:border-orange-500 placeholder:text-gray-200"
+                            className="w-full bg-transparent text-base font-black text-black outline-none border-b border-transparent focus:border-[#005128] placeholder:text-gray-200"
                         />
                     </div>
                 </div>
@@ -768,16 +781,16 @@ export const ProfileDetailsV2 = () => {
                 <div className="h-px bg-gray-200 w-full" />
 
                 {/* Number Input */}
-                <div className="flex items-center gap-4 w-full">
-                    <div className="w-8 h-8 flex items-center justify-center"><QrCode className="w-4 h-4 text-orange-500/50" /></div>
+                <div className="flex items-center gap-3 w-full">
+                    <div className="w-8 h-8 flex items-center justify-center"><QrCode className="w-4 h-4 text-[#005128]/50" /></div>
                     <div className="flex-1">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehicle Number</p>
-                        <input 
-                            type="text" 
-                            value={vehicleInput.number} 
-                            onChange={(e) => setVehicleInput({...vehicleInput, number: e.target.value.toUpperCase()})} 
+                        <input
+                            type="text"
+                            value={vehicleInput.number}
+                            onChange={(e) => setVehicleInput({...vehicleInput, number: formatVehicleNumberInput(e.target.value)})}
                             placeholder="E.g. UP 80 AB 1234"
-                            className="w-full bg-transparent text-lg font-black text-black outline-none border-b-2 border-transparent focus:border-orange-500 placeholder:text-gray-200"
+                            className="w-full bg-transparent text-base font-black text-black outline-none border-b border-transparent focus:border-[#005128] placeholder:text-gray-200"
                         />
                     </div>
                 </div>
@@ -785,17 +798,17 @@ export const ProfileDetailsV2 = () => {
 
             <button 
                onClick={async () => {
-                 const num = vehicleInput.number.trim();
+                 const num = formatVehicleNumberInput(vehicleInput.number || "").trim();
                  const brand = vehicleInput.brand.trim();
                  const type = vehicleInput.type;
 
                  if (!num) return toast.error("Vehicle number is required");
                  if (!brand) return toast.error("Vehicle brand is required");
 
-                 // Improved validation for Indian vehicle numbers
-                 // Accept common formats like MH12AB1234 or MH12A1234
+                 // Validate compact Indian registration format.
+                 const compactNum = num.replace(/\s+/g, "");
                  const numRegex = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{4}$/i;
-                 if (!numRegex.test(num.replace(/\s+/g, ""))) {
+                 if (!numRegex.test(compactNum)) {
                     return toast.error("Please enter a valid vehicle number (e.g. MH12AB1234)");
                  }
 
@@ -807,15 +820,11 @@ export const ProfileDetailsV2 = () => {
                              type: type
                          } 
                      })
-                     setVehicleNumber(num)
-                     setVehicleBrand(brand)
-                     setVehicleType(type)
                      setShowVehiclePopup(false)
-                     toast.success("Flight details updated!")
-                     await refreshProfile()
+                     redirectToLoginAfterProfileUpdate("Vehicle details updated. Your approval request has been sent to admin. Please log in again.")
                    } catch (e) { toast.error("Cloud storage sync failed") }
                }}
-               className="w-full bg-black text-white py-5 rounded-[1.5rem] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-gray-900 transition-all active:scale-95"
+               className="w-full bg-black text-white py-3.5 rounded-2xl font-black uppercase tracking-[0.16em] shadow-lg hover:bg-gray-900 transition-all active:scale-95 text-sm"
             >
                Save Changes
             </button>
@@ -835,13 +844,13 @@ export const ProfileDetailsV2 = () => {
           <div className="grid gap-4">
              {[
                { label: "Account Holder", key: "accountHolderName", icon: User, maxLength: 60 },
-               { label: "Account Number", key: "accountNumber", icon: Banknote, maxLength: 20, isNumeric: true },
+               { label: "Account Number", key: "accountNumber", icon: Banknote, maxLength: 18, isNumeric: true },
                { label: "IFSC Code", key: "ifscCode", icon: Shield, format: (v) => v.toUpperCase(), maxLength: 11 },
                { label: "Bank Name", key: "bankName", icon: MapPin, maxLength: 60 },
                { label: "PAN Number", key: "panNumber", icon: FileText, format: (v) => v.toUpperCase(), maxLength: 10 },
                { label: "UPI ID", key: "upiId", icon: Smartphone, maxLength: 60 }
              ].map((field) => (
-               <div key={field.key} className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 group focus-within:border-orange-500/50 transition-all">
+               <div key={field.key} className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 group focus-within:border-[#005128]/50 transition-all">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-2">
                      <field.icon className="w-3.5 h-3.5" /> {field.label}
                   </label>
@@ -881,14 +890,14 @@ export const ProfileDetailsV2 = () => {
                       onClick={() => handleTakeCameraPhoto("upiQrCode")}
                       className="flex-1 aspect-square rounded-3xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 transition-all"
                     >
-                       <Camera className="w-6 h-6 text-purple-300" />
+                       <Camera className="w-5 h-5 text-purple-300" />
                        <span className="text-[8px] font-black text-purple-400 uppercase">Camera</span>
                     </div>
                     <div 
                       onClick={() => handlePickFromGallery("upiQrCode", upiQrInputRef)}
                       className="flex-1 aspect-square rounded-3xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 transition-all"
                     >
-                       <ImageIcon className="w-6 h-6 text-purple-300" />
+                       <ImageIcon className="w-5 h-5 text-purple-300" />
                        <span className="text-[8px] font-black text-purple-400 uppercase">Gallery</span>
                     </div>
                   </div>
@@ -923,7 +932,7 @@ export const ProfileDetailsV2 = () => {
              <div className="w-full flex justify-between items-center mb-10 pt-safe">
                 <h3 className="text-white text-lg font-black uppercase tracking-widest">{selectedDocument.name}</h3>
                 <button onClick={() => setShowDocumentModal(false)} className="bg-white/10 text-white p-3 rounded-2xl hover:bg-white/20 transition-all active:scale-90">
-                   <X className="w-6 h-6" />
+                   <X className="w-5 h-5" />
                 </button>
              </div>
              <div className="flex-1 w-full flex items-center justify-center">
@@ -937,3 +946,5 @@ export const ProfileDetailsV2 = () => {
 }
 
 export default ProfileDetailsV2
+
+

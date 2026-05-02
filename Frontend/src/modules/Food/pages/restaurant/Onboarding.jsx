@@ -50,6 +50,7 @@ const FSSAI_NUMBER_REGEX = /^\d{14}$/
 const OWNER_NAME_REGEX = /^[A-Za-z][A-Za-z\s.'-]*$/
 const INDIAN_MOBILE_REGEX = /^[6-9]\d{9}$/
 const PINCODE_REGEX = /^\d{6}$/
+const CITY_STATE_REGEX = /^[A-Za-z\s]+$/
 const BANK_ACCOUNT_NUMBER_REGEX = /^\d{9,18}$/
 const IFSC_CODE_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/
 const ACCOUNT_HOLDER_NAME_REGEX = /^[A-Za-z ]+$/
@@ -844,6 +845,11 @@ export default function RestaurantOnboarding() {
     }
     if (!step1.location?.city?.trim()) {
       errors.push("City is required")
+    } else if (!CITY_STATE_REGEX.test(step1.location.city.trim())) {
+      errors.push("City must contain alphabets only")
+    }
+    if (step1.location?.state?.trim() && !CITY_STATE_REGEX.test(step1.location.state.trim())) {
+      errors.push("State must contain alphabets only")
     }
     if (!step1.location?.pincode?.trim()) {
       errors.push("Pincode is required")
@@ -1405,24 +1411,42 @@ export default function RestaurantOnboarding() {
           />
           <Input
             value={step1.location?.city || ""}
-            onChange={(e) =>
+            onChange={(e) => {
+              const city = e.target.value.replace(/[^A-Za-z\s]/g, "")
               setStep1({
                 ...step1,
-                location: { ...step1.location, city: e.target.value },
+                location: { ...step1.location, city },
               })
-            }
+            }}
+            onPaste={(e) => {
+              e.preventDefault()
+              const pasted = e.clipboardData.getData("text").replace(/[^A-Za-z\s]/g, "")
+              setStep1({
+                ...step1,
+                location: { ...step1.location, city: pasted },
+              })
+            }}
             className="bg-white text-sm"
             placeholder="City"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               value={step1.location?.state || ""}
-              onChange={(e) =>
+              onChange={(e) => {
+                const state = e.target.value.replace(/[^A-Za-z\s]/g, "")
                 setStep1({
                   ...step1,
-                  location: { ...step1.location, state: e.target.value },
+                  location: { ...step1.location, state },
                 })
-              }
+              }}
+              onPaste={(e) => {
+                e.preventDefault()
+                const pasted = e.clipboardData.getData("text").replace(/[^A-Za-z\s]/g, "")
+                setStep1({
+                  ...step1,
+                  location: { ...step1.location, state: pasted },
+                })
+              }}
               className="bg-white text-sm"
               placeholder="State"
             />
