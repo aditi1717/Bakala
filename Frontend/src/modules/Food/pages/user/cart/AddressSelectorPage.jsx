@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react"
-import { useNavigate } from "react-router-dom"
-import { ChevronLeft, ChevronRight, Plus, MapPin, MoreHorizontal, Navigation, Home, Building2, Briefcase, Phone, X, Crosshair, Search } from "lucide-react"
+import { useNavigate, useLocation as useRouterLocation } from "react-router-dom"
+import { ChevronLeft, ChevronRight, Plus, MapPin, Navigation, Home, Building2, Briefcase, Phone, X, Crosshair, Search, Trash2 } from "lucide-react"
 import { Button } from "@food/components/ui/button"
 import { Input } from "@food/components/ui/input"
 import { Label } from "@food/components/ui/label"
@@ -168,11 +168,12 @@ const persistSelectedLocation = (locationData) => {
   }
 }
 
-export default function AddressSelectorPage() {
+export default function AddressSelectorPage({ formOnly = false }) {
   const navigate = useNavigate()
+  const routerLocation = useRouterLocation()
   const goBack = useAppBackNavigation()
   const { location, loading, requestLocation } = useGeoLocation()
-  const { addresses = [], addAddress, updateAddress, setDefaultAddress } = useProfile()
+  const { addresses = [], addAddress, updateAddress, deleteAddress, setDefaultAddress } = useProfile()
   const [showAddressForm, setShowAddressForm] = useState(false)
   const [editingAddressId, setEditingAddressId] = useState(null)
   const [mapPosition, setMapPosition] = useState([22.7196, 75.8577]) // Default Indore coordinates [lat, lng]
@@ -213,6 +214,37 @@ export default function AddressSelectorPage() {
   const ENABLE_LOCATION_REVERSE_GEOCODE = import.meta.env.VITE_ENABLE_LOCATION_REVERSE_GEOCODE !== "false"
   const ENABLE_NOMINATIM_SEARCH = import.meta.env.VITE_ENABLE_NOMINATIM_SEARCH !== "false"
   const getAddressId = (address) => address?.id || address?._id || null
+  const isFormRoute = formOnly || routerLocation.pathname.includes("/address-form")
+
+  const normalizeFoodPath = useCallback((value) => {
+    if (typeof value !== "string") return null
+    const text = value.trim()
+    if (!text) return null
+    if (text.startsWith("/food/")) return text
+    if (text === "/food") return "/food/user"
+    if (text.startsWith("/user/")) return `/food${text}`
+    if (text === "/user") return "/food/user"
+    return null
+  }, [])
+
+  const cartReturnPath = useMemo(() => {
+    const fromState =
+      normalizeFoodPath(routerLocation.state?.backTo) ||
+      normalizeFoodPath(routerLocation.state?.from)
+    if (fromState && fromState.startsWith("/food/user/cart")) return fromState
+    if (routerLocation.pathname.includes("/cart/address-selector")) return "/food/user/cart"
+    if (routerLocation.pathname.includes("/cart/address-form")) return "/food/user/cart"
+    return null
+  }, [normalizeFoodPath, routerLocation.pathname, routerLocation.state])
+
+  const formReturnPath = useMemo(() => {
+    const fromState =
+      normalizeFoodPath(routerLocation.state?.backTo) ||
+      normalizeFoodPath(routerLocation.state?.from)
+    if (!fromState) return null
+    if (fromState.includes("/address-form")) return null
+    return fromState
+  }, [normalizeFoodPath, routerLocation.state])
 
   const handleBack = () => {
     goBack()
@@ -326,7 +358,7 @@ export default function AddressSelectorPage() {
           const lat = center.lat()
           const lng = center.lng()
           setMapPosition([lat, lng])
-          queueReverseGeocode(lat, lng)
+          queueReverseGeocode(lat, lng, { allowFieldOverwrite: !editingAddressId })
         })
 
         setMapLoading(false)
@@ -337,7 +369,7 @@ export default function AddressSelectorPage() {
     }
     initializeGoogleMap()
     return () => { isMounted = false }
-  }, [showAddressForm, GOOGLE_MAPS_API_KEY])
+  }, [showAddressForm, GOOGLE_MAPS_API_KEY, editingAddressId])
 
   const applyResolvedLocationToMap = useCallback((loc) => {
     const latitude = Number(loc?.latitude)
@@ -396,6 +428,7 @@ export default function AddressSelectorPage() {
       lastReverseCenterRef.current = null
       return
     }
+    if (editingAddressId) return
     if (autoLocateAttemptedRef.current) return
     autoLocateAttemptedRef.current = true
 
@@ -416,7 +449,7 @@ export default function AddressSelectorPage() {
     return () => {
       cancelled = true
     }
-  }, [showAddressForm, requestLocation, applyResolvedLocationToMap])
+  }, [showAddressForm, requestLocation, applyResolvedLocationToMap, editingAddressId])
 
   const handleSelectSavedAddress = async (address) => {
     const id = getAddressId(address)
@@ -425,11 +458,31 @@ export default function AddressSelectorPage() {
       persistSelectedLocation(buildLocationPayloadFromAddress(address))
       try { localStorage.setItem("deliveryAddressMode", "saved") } catch {}
       toast.success("Address selected")
+      if (cartReturnPath) {
+        navigate(cartReturnPath, { replace: true })
+        return
+      }
       handleBack()
     }
   }
 
+  const openAddressFormPage = useCallback((extraState = {}) => {
+    const currentPath = `${routerLocation.pathname || ""}${routerLocation.search || ""}${routerLocation.hash || ""}` || "/food/user/address-selector"
+    navigate("/food/user/address-form", {
+      state: {
+        from: currentPath,
+        backTo: currentPath,
+        openAddressForm: true,
+        ...extraState,
+      },
+    })
+  }, [navigate, routerLocation.hash, routerLocation.pathname, routerLocation.search])
+
   const handleAddAddressClick = () => {
+    if (!isFormRoute) {
+      openAddressFormPage()
+      return
+    }
     setEditingAddressId(null)
     setAddressFormData({
       street: "",
@@ -447,6 +500,10 @@ export default function AddressSelectorPage() {
 
   const handleEditAddressClick = (address) => {
     if (!address || typeof address !== "object") return
+    if (!isFormRoute) {
+      openAddressFormPage({ editAddress: address })
+      return
+    }
 
     const id = getAddressId(address)
     const coordinates = Array.isArray(address.location?.coordinates)
@@ -475,8 +532,45 @@ export default function AddressSelectorPage() {
     setShowAddressForm(true)
   }
 
+  useEffect(() => {
+    if (isFormRoute && !showAddressForm) {
+      setShowAddressForm(true)
+    }
+  }, [isFormRoute, showAddressForm])
+
+  useEffect(() => {
+    if (!isFormRoute) return
+    const stateEditAddress = routerLocation.state?.editAddress
+    if (!stateEditAddress) return
+    handleEditAddressClick(stateEditAddress)
+  }, [isFormRoute, routerLocation.state])
+
+  useEffect(() => {
+    if (!routerLocation.state?.openCurrentLocationForm && !routerLocation.state?.openAddressForm) return
+    if (showAddressForm) return
+    handleAddAddressClick()
+  }, [routerLocation.state, showAddressForm])
+
+  const handleDeleteAddressClick = async (address) => {
+    const id = getAddressId(address)
+    if (!id) return
+    const ok = window.confirm("Delete this saved address?")
+    if (!ok) return
+    try {
+      await deleteAddress(id)
+      toast.success("Address deleted")
+    } catch {
+      toast.error("Failed to delete address")
+    } finally {
+    }
+  }
+
   const handleCancelAddressForm = () => {
     setEditingAddressId(null)
+    if (isFormRoute) {
+      handleBack()
+      return
+    }
     setShowAddressForm(false)
   }
 
@@ -522,7 +616,11 @@ export default function AddressSelectorPage() {
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
-  function queueReverseGeocode(lat, lng, { immediate = false, force = false } = {}) {
+  function queueReverseGeocode(
+    lat,
+    lng,
+    { immediate = false, force = false, allowFieldOverwrite = true } = {},
+  ) {
     const latNum = Number(lat)
     const lngNum = Number(lng)
     if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return
@@ -545,7 +643,7 @@ export default function AddressSelectorPage() {
 
     const run = async () => {
       lastReverseCenterRef.current = { lat: latNum, lng: lngNum }
-      await handleMapMoveEnd(latNum, lngNum)
+      await handleMapMoveEnd(latNum, lngNum, { allowFieldOverwrite })
     }
 
     if (immediate) {
@@ -601,7 +699,7 @@ export default function AddressSelectorPage() {
     })
   }
 
-  const handleMapMoveEnd = async (lat, lng) => {
+  const handleMapMoveEnd = async (lat, lng, { allowFieldOverwrite = true } = {}) => {
     if (!ENABLE_LOCATION_REVERSE_GEOCODE) return
 
     const requestSeq = ++reverseReqSeqRef.current
@@ -668,14 +766,16 @@ export default function AddressSelectorPage() {
         }
 
         setCurrentAddress(nextFormatted)
-        setAddressFormData(prev => ({
-          ...prev,
-          // Replace stale values instead of merging old + new
-          street: nextFormatted || nextStreet || "",
-          city: nextCity || "",
-          state: nextState || "",
-          zipCode: nextZip || "",
-        }))
+        if (allowFieldOverwrite) {
+          setAddressFormData(prev => ({
+            ...prev,
+            // Replace stale values instead of merging old + new
+            street: nextFormatted || nextStreet || "",
+            city: nextCity || "",
+            state: nextState || "",
+            zipCode: nextZip || "",
+          }))
+        }
       }
     } catch (e) {
       debugError("Reverse geocode error:", e)
@@ -725,6 +825,14 @@ export default function AddressSelectorPage() {
         try { localStorage.setItem("deliveryAddressMode", "saved") } catch {}
         toast.success(editingAddressId ? "Address updated" : "Address saved")
         setEditingAddressId(null)
+        if (formReturnPath) {
+          navigate(formReturnPath, { replace: true })
+          return
+        }
+        if (isFormRoute) {
+          navigate("/food/user/address-selector", { replace: true })
+          return
+        }
         setShowAddressForm(false)
       }
     } catch (error) {
@@ -767,7 +875,7 @@ export default function AddressSelectorPage() {
     }
   }, [showAddressForm])
 
-  if (showAddressForm) {
+  if (showAddressForm || isFormRoute) {
     const mapHeight = baseMapHeight 
     return (
       <AnimatedPage
@@ -1065,9 +1173,10 @@ export default function AddressSelectorPage() {
             ) : (
               addresses.map((addr, idx) => {
                 const Icon = getAddressIcon(addr)
+                const addressId = getAddressId(addr) || idx
                 return (
                   <div
-                    key={getAddressId(addr) || idx}
+                    key={addressId}
                     className="w-full flex items-start gap-4 p-4 bg-slate-50 dark:bg-[#1a1a1a] rounded-xl hover:bg-brand-50 dark:hover:bg-brand-900/10 transition-colors text-left group"
                   >
                     <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
@@ -1083,16 +1192,16 @@ export default function AddressSelectorPage() {
                         {composeAddressText(addr)}
                       </p>
                     </button>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="relative flex items-center gap-2 mt-1">
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleEditAddressClick(addr)}
-                        className="h-9 w-9 rounded-full border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700"
-                        aria-label={`Edit ${addr.label || "address"}`}
+                        onClick={() => handleDeleteAddressClick(addr)}
+                        className="h-9 w-9 rounded-full border border-red-200 bg-white text-red-600 hover:bg-red-50 dark:bg-gray-800 dark:border-red-900/40 dark:hover:bg-red-950/30"
+                        aria-label={`Delete ${addr.label || "address"}`}
                       >
-                        <MoreHorizontal className="h-4 w-4" style={{ color: BRAND_THEME.colors.brand.primary }} />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                       <button
                         type="button"

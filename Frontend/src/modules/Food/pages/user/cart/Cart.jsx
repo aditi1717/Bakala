@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, Fragment } from "react"
 import { createPortal } from "react-dom"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation as useRouterLocation } from "react-router-dom"
 import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Tag, Percent, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Wallet, Building2, Sparkles, Banknote, Zap, CheckCircle2, MessageCircle, Send, Mail, Copy } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import confetti from "canvas-confetti"
@@ -12,7 +12,6 @@ import { useProfile } from "@food/context/ProfileContext"
 import { useOrders } from "@food/context/OrdersContext"
 import QuickSharedCart from "@food/pages/user/cart/QuickSharedCart"
 import MixedSharedCart from "@food/pages/user/cart/MixedSharedCart"
-import { useLocation as useUserLocation } from "@food/hooks/useLocation"
 import { useZone } from "@food/hooks/useZone"
 import { useLocationSelector } from "@food/components/user/UserLayout"
 import { orderAPI, restaurantAPI, adminAPI, userAPI, API_ENDPOINTS } from "@food/api"
@@ -136,6 +135,7 @@ const isItemVeg = (item = {}) => {
 export default function Cart() {
   const companyName = useCompanyName()
   const navigate = useNavigate()
+  const routerLocation = useRouterLocation()
   const goBack = useAppBackNavigation()
   const orderSuccessAudioRef = useRef(null)
   const hasRestoredRecipientRef = useRef(false)
@@ -185,7 +185,6 @@ export default function Cart() {
   const { getDefaultAddress, getDefaultPaymentMethod, setDefaultAddress, addresses, paymentMethods, userProfile } = useProfile()
   const { createOrder } = useOrders()
   const { openLocationSelector } = useLocationSelector()
-  const { location: currentLocation, loading: currentLocationLoading } = useUserLocation() // Get live location address
 
   const [showCoupons, setShowCoupons] = useState(false)
   const [appliedCoupon, setAppliedCoupon] = useState(null)
@@ -237,14 +236,6 @@ export default function Cart() {
   const [showOrderSuccess, setShowOrderSuccess] = useState(false)
   const [placedOrderId, setPlacedOrderId] = useState(null)
   const [selectedAddressId, setSelectedAddressId] = useState(null)
-  const [deliveryAddressMode, setDeliveryAddressMode] = useState(() => {
-    try {
-      if (typeof window === "undefined") return "saved"
-      return localStorage.getItem("deliveryAddressMode") || "saved"
-    } catch {
-      return "saved"
-    }
-  })
 
   useEffect(() => {
     const audio = new Audio(zoopSound)
@@ -326,63 +317,9 @@ export default function Cart() {
   const savedAddress = getDefaultAddress()
   const selectedAddress = addresses.find((addr) => getAddressId(addr) && getAddressId(addr) === selectedAddressId)
 
-  const currentLocationAddress = useMemo(() => {
-    // `LocationSelectorOverlay` updates backend + localStorage, but Cart's live hook might lag.
-    // So we fall back to `localStorage.userLocation` when `currentLocation` doesn't have a usable payload yet.
-    let locFromStorage = null
-    try {
-      const storedRaw = localStorage.getItem("userLocation")
-      locFromStorage = storedRaw ? JSON.parse(storedRaw) : null
-    } catch {
-      locFromStorage = null
-    }
-
-    const loc = currentLocation?.latitude && currentLocation?.longitude ? currentLocation : locFromStorage
-    if (!loc?.latitude || !loc?.longitude) return null
-
-    const formattedAddress = loc?.formattedAddress || loc?.address || ""
-    if (!formattedAddress || formattedAddress === "Select location") return null
-
-    return {
-      // Backend deliveryAddressSchema expects label in ['Home','Office','Other'].
-      label: "Home",
-      formattedAddress,
-      address: formattedAddress,
-      street: loc?.street || loc?.address || loc?.area || "Current Location",
-      additionalDetails: loc?.area || "",
-      buildingName: "",
-      floor: "",
-      landmark: "",
-      city: loc?.city || loc?.area || "Current City",
-      state: loc?.state || loc?.city || "Current State",
-      zipCode: loc?.postalCode || loc?.zipCode || "",
-      phone: userProfile?.phone || "",
-      location: {
-        type: "Point",
-        coordinates: [loc.longitude, loc.latitude], // [lng, lat]
-      },
-    }
-  }, [
-    currentLocation?.latitude,
-    currentLocation?.longitude,
-    currentLocation?.formattedAddress,
-    currentLocation?.address,
-    currentLocation?.street,
-    currentLocation?.area,
-    currentLocation?.city,
-    currentLocation?.state,
-    currentLocation?.postalCode,
-    currentLocation?.zipCode,
-    userProfile?.phone,
-    // Re-evaluate derived address when mode changes (overlay closes -> Cart rerenders).
-    deliveryAddressMode,
-  ])
-
   const defaultAddress = useMemo(() => {
-    return deliveryAddressMode === "current"
-      ? currentLocationAddress || selectedAddress || savedAddress || null
-      : selectedAddress || savedAddress || currentLocationAddress || null
-  }, [deliveryAddressMode, currentLocationAddress, selectedAddress, savedAddress])
+    return selectedAddress || savedAddress || null
+  }, [selectedAddress, savedAddress])
 
   const hasSavedAddress = Boolean(defaultAddress && formatFullAddress(defaultAddress))
   const recipientName =
@@ -399,21 +336,18 @@ export default function Cart() {
       latitude: selectedAddressCoordinates[1],
       longitude: selectedAddressCoordinates[0]
     }
-    : currentLocation
+    : null
   const { zoneId } = useZone(zoneLocation) // Prefer selected/saved address zone
   const defaultPayment = getDefaultPaymentMethod()
 
   useEffect(() => {
-    // Sync delivery mode from overlay/localStorage changes.
-    // No dependency array: overlay open/close re-renders Cart via provider state update,
-    // even when GPS coords don't move enough to update `currentLocation`.
+    // Cart should always use saved addresses only.
     try {
-      const mode = localStorage.getItem("deliveryAddressMode") || "saved"
-      setDeliveryAddressMode((prev) => (prev === mode ? prev : mode))
+      localStorage.setItem("deliveryAddressMode", "saved")
     } catch {
       // ignore
     }
-  })
+  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -486,17 +420,11 @@ export default function Cart() {
   }, [restaurantNote, showNoteInput])
 
   useEffect(() => {
-    if (deliveryAddressMode === "current") {
-      setSelectedAddressId(null)
-    }
-  }, [deliveryAddressMode])
-
-  useEffect(() => {
     const defaultId = getAddressId(savedAddress)
-    if (deliveryAddressMode !== "current" && !selectedAddressId && defaultId) {
+    if (!selectedAddressId && defaultId) {
       setSelectedAddressId(defaultId)
     }
-  }, [savedAddress, selectedAddressId, deliveryAddressMode])
+  }, [savedAddress, selectedAddressId])
 
   // Get restaurant ID from cart or restaurant data
   // Priority: restaurantData > cart[0].restaurantId
@@ -1356,7 +1284,6 @@ export default function Cart() {
       // User selected a saved address from Cart; prefer saved mode.
       try {
         localStorage.setItem("deliveryAddressMode", "saved")
-        setDeliveryAddressMode("saved")
       } catch { }
 
       toast.success(`${address.label || "Saved"} address selected!`)
@@ -2047,6 +1974,17 @@ export default function Cart() {
     navigate(`/food/orders/${encodeURIComponent(String(placedOrderId))}?confirmed=true`)
   }
 
+  const handleOpenAddressSelector = () => {
+    const currentPath = `${routerLocation.pathname || ""}${routerLocation.search || ""}${routerLocation.hash || ""}` || "/food/user/cart"
+    navigate("/food/user/address-form", {
+      state: {
+        from: currentPath,
+        backTo: currentPath,
+        openAddressForm: true,
+      },
+    })
+  }
+
   // Empty cart state - but don't show if order success or placing order modal is active
   if (cart.length === 0 && !showOrderSuccess && !showPlacingOrder) {
     return (
@@ -2526,72 +2464,43 @@ export default function Cart() {
                     <div className="flex-1">
                         <div className="flex flex-col">
                           <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
-                            Delivery at{" "}
-                            <span className="font-semibold">
-                              {deliveryAddressMode === "current" ? "Current location" : "Location"}
-                            </span>
+                            Delivery Address
                           </p>
-                          {deliveryAddressMode === "current" ? (
-                            <div className="mt-1">
-                              {currentLocationLoading || !currentLocationAddress ? (
-                                <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 animate-pulse">
-                                  Finding your current address...
-                                </p>
-                              ) : (
-                                <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                                  {formatFullAddress(currentLocationAddress) ||
-                                    currentLocationAddress?.formattedAddress ||
-                                    currentLocationAddress?.address ||
-                                    "Add delivery address"}
-                                </p>
-                              )}
-                              <div className="mt-1 flex items-center gap-2">
-                                <span
-                                  className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] md:text-[11px] font-semibold"
-                                  style={{
-                                    backgroundColor: BRAND_THEME.colors.brand.primarySoft,
-                                    color: BRAND_THEME.colors.brand.primary,
-                                    borderColor: `${BRAND_THEME.colors.brand.primary}4D`
-                                  }}>
-                                  GPS enabled
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2 pr-4">
-                              {defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Add delivery address") : "Add delivery address"}
-                            </p>
-                          )}
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2 pr-4">
+                            {defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Add delivery address") : "Add delivery address"}
+                          </p>
                         </div>
                         {!hasSavedAddress && (
-                          <p className="text-sm mt-2 font-medium" style={{ color: BRAND_THEME.colors.brand.primary }}>
-                            Select a delivery location to continue
+                          <p className="text-xs mt-2 text-gray-500 dark:text-gray-400">
+                            No saved address yet. Please add one to continue.
                           </p>
                         )}
                         {/* Address Selection Buttons */}
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {["Home", "Work", "Other"].map((label) => {
-                            const normalizedLabel = normalizeAddressLabel(label)
-                            const addressExists = addresses.some(addr => normalizeAddressLabel(addr.label) === normalizedLabel)
-                            return (
-                              <button
-                                key={label}
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  handleSelectAddressByLabel(label)
-                                }}
-                                disabled={!addressExists}
-                                className={`text-xs px-4 py-1.5 rounded-full font-semibold transition-all ${addressExists
-                                  ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-300'
-                                  : 'bg-gray-50 text-gray-400 border border-gray-100 cursor-not-allowed dark:bg-gray-900'
-                                  }`}
-                              >
-                                {label}
-                              </button>
-                            )
-                          })}
-                        </div>
+                        {addresses.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {["Home", "Work", "Other"].map((label) => {
+                              const normalizedLabel = normalizeAddressLabel(label)
+                              const addressExists = addresses.some(addr => normalizeAddressLabel(addr.label) === normalizedLabel)
+                              return (
+                                <button
+                                  key={label}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleSelectAddressByLabel(label)
+                                  }}
+                                  disabled={!addressExists}
+                                  className={`text-xs px-4 py-1.5 rounded-full font-semibold transition-all ${addressExists
+                                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-300'
+                                    : 'bg-gray-50 text-gray-400 border border-gray-100 cursor-not-allowed dark:bg-gray-900'
+                                    }`}
+                                >
+                                  {label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
                         {addresses.length > 0 && (
                           <div className="mt-4 space-y-3">
                             {addresses.map((address) => {
@@ -2639,12 +2548,13 @@ export default function Cart() {
                   </div>
                   <button
                     type="button"
-                    onClick={openLocationSelector}
-                    className="p-2 bg-brand-50 rounded-full hover:bg-brand-100 transition-colors dark:bg-brand-900/20 dark:hover:bg-brand-900/40"
+                    onClick={handleOpenAddressSelector}
+                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold bg-brand-50 hover:bg-brand-100 transition-colors dark:bg-brand-900/20 dark:hover:bg-brand-900/40 whitespace-nowrap"
                     style={{ color: BRAND_THEME.colors.brand.primary }}
                     aria-label="Open location selector"
                   >
-                    <ChevronRight className="h-5 w-5" />
+                    {addresses.length > 0 ? "Change" : "Add New Address"}
+                    <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -2895,7 +2805,7 @@ export default function Cart() {
                 {isPlacingOrder
                   ? "Processing..."
                   : !hasSavedAddress
-                    ? "Select Address"
+                    ? "Add Address"
                     : "Place Order"}
                 <div className="flex align-center h-full">
                   <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
@@ -3421,5 +3331,4 @@ export default function Cart() {
         )}
     </div>
   )
-}      
-
+}

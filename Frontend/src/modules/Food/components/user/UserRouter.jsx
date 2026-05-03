@@ -105,6 +105,8 @@ export default function UserRouter() {
           <Route path="cart" element={<Cart />} />
           <Route path="address-selector" element={<AddressSelectorPage />} />
           <Route path="cart/address-selector" element={<AddressSelectorPage />} />
+          <Route path="address-form" element={<AddressSelectorPage formOnly />} />
+          <Route path="cart/address-form" element={<AddressSelectorPage formOnly />} />
 
           {/* Orders - Protected (require user auth) */}
           <Route

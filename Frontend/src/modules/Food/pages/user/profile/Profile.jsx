@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft,
   ChevronRight,
-  Wallet,
   Tag,
   User,
   Leaf,
@@ -83,7 +82,6 @@ export default function Profile() {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [walletBalance, setWalletBalance] = useState(0);
 
   // Trigger web push registration when profile mounts to ensure FCM token is saved
   useEffect(() => {
@@ -273,21 +271,6 @@ export default function Profile() {
 
   const profileCompletion = calculateProfileCompletion();
   const isComplete = profileCompletion === 100;
-  useEffect(() => {
-    let mounted = true;
-    userAPI
-      .getWallet()
-      .then((res) => {
-        const w = res?.data?.data?.wallet || res?.data?.wallet;
-        const bal = Number(w?.balance);
-        if (mounted) setWalletBalance(Number.isFinite(bal) ? bal : 0);
-      })
-      .catch(() => { });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
   const sectionHeadingClass =
     "text-[13px] font-normal text-slate-500 dark:text-slate-400";
   const optionCardClass =
@@ -493,7 +476,7 @@ export default function Profile() {
 
         {/* Account Options */}
         <div className="space-y-2 mb-3 mt-3">
-          <Link to="/food/user/wallet" className="block">
+          {/* <Link to="/food/user/wallet" className="block">
             <motion.div
               whileHover={{ x: 2 }}
               transition={{ duration: 0.2, type: "spring", stiffness: 300 }}>
@@ -523,7 +506,7 @@ export default function Profile() {
                 </CardContent>
               </Card>
             </motion.div>
-          </Link>
+          </Link> */}
 
           <Link to="/food/user/profile/coupons" className="block">
             <motion.div

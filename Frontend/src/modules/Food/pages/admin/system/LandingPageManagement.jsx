@@ -29,6 +29,8 @@ export default function LandingPageManagement() {
   const [bannersUploading, setBannersUploading] = useState(false)
   const [bannersUploadProgress, setBannersUploadProgress] = useState({ current: 0, total: 0 })
   const [bannersDeleting, setBannersDeleting] = useState(null)
+  const [bannerLinkEdits, setBannerLinkEdits] = useState({})
+  const [bannerLinkSavingId, setBannerLinkSavingId] = useState(null)
   const bannersFileInputRef = useRef(null)
 
   // Categories
@@ -163,7 +165,14 @@ export default function LandingPageManagement() {
       setError(null)
       const response = await api.get('/food/hero-banners', getAuthConfig())
       if (response.data.success) {
-        setBanners(response.data.data.banners || [])
+        const bannerList = response.data.data.banners || []
+        setBanners(bannerList)
+        setBannerLinkEdits(
+          bannerList.reduce((acc, banner) => {
+            acc[banner._id] = typeof banner?.ctaLink === 'string' ? banner.ctaLink : ''
+            return acc
+          }, {})
+        )
       }
     } catch (err) {
       // Handle 401/404 errors gracefully - don't show error messages
@@ -324,6 +333,35 @@ export default function LandingPageManagement() {
       await fetchBanners()
     } catch (err) {
       setErrorSafely('Failed to update banner order.')
+    }
+  }
+
+  const handleBannerLinkSave = async (id) => {
+    const rawLink = bannerLinkEdits[id] || ''
+    const trimmedLink = rawLink.trim()
+    if (trimmedLink) {
+      const hasProtocol = /^https?:\/\//i.test(trimmedLink)
+      const looksInternalPath = trimmedLink.startsWith('/')
+      if (!hasProtocol && !looksInternalPath) {
+        setErrorSafely('Please enter a valid URL starting with http://, https://, or /.')
+        return
+      }
+    }
+
+    try {
+      setBannerLinkSavingId(id)
+      setError(null)
+      setSuccess(null)
+      const response = await api.patch(`/food/hero-banners/${id}`, { ctaLink: trimmedLink }, getAuthConfig())
+      if (response.data.success) {
+        setSuccess('Banner URL saved successfully!')
+        await fetchBanners()
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (err) {
+      setErrorSafely(err.response?.data?.message || 'Failed to save banner URL.')
+    } finally {
+      setBannerLinkSavingId(null)
     }
   }
 
@@ -1261,6 +1299,27 @@ export default function LandingPageManagement() {
                         </div>
                       </div>
                       <div className="p-4 bg-white">
+                        <div className="mb-3">
+                          <Label htmlFor={`banner-link-${banner._id}`} className="text-xs text-slate-600">Redirect URL</Label>
+                          <div className="mt-1 flex gap-2">
+                            <Input
+                              id={`banner-link-${banner._id}`}
+                              type="text"
+                              value={bannerLinkEdits[banner._id] ?? (banner.ctaLink || '')}
+                              onChange={(e) => setBannerLinkEdits(prev => ({ ...prev, [banner._id]: e.target.value }))}
+                              placeholder="https://example.com or /food/user/offers"
+                              className="h-9 text-sm"
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => handleBannerLinkSave(banner._id)}
+                              disabled={bannerLinkSavingId === banner._id}
+                              className="h-9 px-3"
+                            >
+                              {bannerLinkSavingId === banner._id ? 'Saving...' : 'Save'}
+                            </Button>
+                          </div>
+                        </div>
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-1">
                             <button onClick={() => handleBannerOrderChange(banner._id, 'up')} disabled={index === 0} className="p-1.5 rounded hover:bg-slate-100 disabled:opacity-50">

@@ -2115,6 +2115,17 @@ export const deliveryAPI = {
     apiClient.get(`/food/delivery/store/orders/${String(id)}`, { contextModule: 'delivery' }),
 };
 
+let userAddressesInFlight = null;
+let userAddressesCached = null;
+let userAddressesCacheTime = 0;
+const USER_ADDRESSES_CACHE_MS = 3000;
+
+const invalidateUserAddressesCache = () => {
+  userAddressesInFlight = null;
+  userAddressesCached = null;
+  userAddressesCacheTime = 0;
+};
+
 export const userAPI = {
   /** Get current user profile (Bearer USER). */
   getProfile: () =>
@@ -2182,52 +2193,68 @@ export const userAPI = {
     apiClient.post("/food/user/wallet/topup/verify", body ?? {}, {
       contextModule: "user",
     }),
-  /** GET /food/user/addresses (Bearer USER). Deduped + short-cached. */
-  getAddresses: (() => {
-    let inFlight = null;
-    let cached = null;
-    let cacheTime = 0;
-    const CACHE_MS = 3000;
-    return () => {
-      const now = Date.now();
-      if (cached && now - cacheTime < CACHE_MS) return Promise.resolve(cached);
-      if (!inFlight) {
-        inFlight = apiClient
-          .get("/food/user/addresses", { contextModule: "user" })
-          .then((res) => {
-            cached = res;
-            cacheTime = Date.now();
-            return res;
-          })
-          .finally(() => {
-            inFlight = null;
-          });
-      }
-      return inFlight;
-    };
-  })(),
+  /** GET /food/user/addresses (Bearer USER). Short-cached for burst calls. */
+  getAddresses: () => {
+    const now = Date.now();
+    if (userAddressesCached && now - userAddressesCacheTime < USER_ADDRESSES_CACHE_MS) {
+      return Promise.resolve(userAddressesCached);
+    }
+    if (!userAddressesInFlight) {
+      userAddressesInFlight = apiClient
+        .get("/food/user/addresses", { contextModule: "user" })
+        .then((res) => {
+          userAddressesCached = res;
+          userAddressesCacheTime = Date.now();
+          return res;
+        })
+        .finally(() => {
+          userAddressesInFlight = null;
+        });
+    }
+    return userAddressesInFlight;
+  },
   /** POST /food/user/addresses (Bearer USER) */
   addAddress: (body) =>
-    apiClient.post("/food/user/addresses", body ?? {}, {
-      contextModule: "user",
-    }),
+    apiClient
+      .post("/food/user/addresses", body ?? {}, {
+        contextModule: "user",
+      })
+      .then((res) => {
+        invalidateUserAddressesCache();
+        return res;
+      }),
   /** PATCH /food/user/addresses/:id (Bearer USER) */
   updateAddress: (id, body) =>
-    apiClient.patch(`/food/user/addresses/${String(id)}`, body ?? {}, {
-      contextModule: "user",
-    }),
+    apiClient
+      .patch(`/food/user/addresses/${String(id)}`, body ?? {}, {
+        contextModule: "user",
+      })
+      .then((res) => {
+        invalidateUserAddressesCache();
+        return res;
+      }),
   /** DELETE /food/user/addresses/:id (Bearer USER) */
   deleteAddress: (id) =>
-    apiClient.delete(`/food/user/addresses/${String(id)}`, {
-      contextModule: "user",
-    }),
+    apiClient
+      .delete(`/food/user/addresses/${String(id)}`, {
+        contextModule: "user",
+      })
+      .then((res) => {
+        invalidateUserAddressesCache();
+        return res;
+      }),
   /** PATCH /food/user/addresses/:id/default (Bearer USER) */
   setDefaultAddress: (id) =>
-    apiClient.patch(
-      `/food/user/addresses/${String(id)}/default`,
-      {},
-      { contextModule: "user" },
-    ),
+    apiClient
+      .patch(
+        `/food/user/addresses/${String(id)}/default`,
+        {},
+        { contextModule: "user" },
+      )
+      .then((res) => {
+        invalidateUserAddressesCache();
+        return res;
+      }),
   /** POST /food/user/safety-emergency-reports (Bearer USER) */
   createSafetyEmergencyReport: (message) =>
     apiClient.post(

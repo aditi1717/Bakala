@@ -81,3 +81,12 @@ export const toggleHeroBannerStatus = async (id, isActive) => {
     return updated;
 };
 
+export const updateHeroBannerCtaLink = async (id, ctaLink) => {
+    const updated = await FoodHeroBanner.findByIdAndUpdate(
+        id,
+        { ctaLink },
+        { new: true }
+    ).lean();
+    return updated;
+};
+

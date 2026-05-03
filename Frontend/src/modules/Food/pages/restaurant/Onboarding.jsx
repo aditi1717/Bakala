@@ -153,6 +153,21 @@ const normalizeZoneIdValue = (value) => {
   return String(value?._id || value?.id || value || "")
 }
 
+const buildBoundsFromZone = (zone) => {
+  const coordinates = Array.isArray(zone?.coordinates) ? zone.coordinates : []
+  if (coordinates.length < 3 || !window.google?.maps?.LatLngBounds) return null
+  const bounds = new window.google.maps.LatLngBounds()
+  let hasPoint = false
+  coordinates.forEach((point) => {
+    const lat = Number(point?.latitude)
+    const lng = Number(point?.longitude)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+    bounds.extend({ lat, lng })
+    hasPoint = true
+  })
+  return hasPoint ? bounds : null
+}
+
 const getTodayLocalYMD = () => formatDateToLocalYMD(new Date())
 
 // Helper functions for localStorage
@@ -1568,6 +1583,7 @@ export default function RestaurantOnboarding() {
         {
           fields: ["formatted_address", "address_components", "geometry"],
           componentRestrictions: { country: "in" },
+          strictBounds: true,
         }
       )
 
@@ -1600,6 +1616,18 @@ export default function RestaurantOnboarding() {
       placesAutocompleteRef.current = null
     }
   }, [step])
+
+  // Keep location suggestions constrained to the currently selected service zone.
+  useEffect(() => {
+    if (step !== 1 || !placesAutocompleteRef.current) return
+    const selectedZone = zones.find((z) => normalizeZoneIdValue(z) === normalizeZoneIdValue(step1.zoneId))
+    const bounds = buildBoundsFromZone(selectedZone)
+    placesAutocompleteRef.current.setOptions({
+      componentRestrictions: { country: "in" },
+      strictBounds: Boolean(bounds),
+    })
+    if (bounds) placesAutocompleteRef.current.setBounds(bounds)
+  }, [step, step1.zoneId, zones])
 
   // Load zones for onboarding dropdown (public endpoint).
   useEffect(() => {

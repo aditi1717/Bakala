@@ -43,25 +43,6 @@ export const addAddress = async (userId, dto) => {
         isDefault: false
     };
 
-    // If same label exists, update-in-place (keeps "Home/Office/Other" single entry best UX)
-    const existingIdx = user.addresses.findIndex((a) => String(a?.label) === String(address.label));
-    if (existingIdx >= 0) {
-        const existing = user.addresses[existingIdx];
-        existing.label = address.label;
-        existing.street = address.street;
-        existing.additionalDetails = address.additionalDetails;
-        existing.buildingName = address.buildingName;
-        existing.floor = address.floor;
-        existing.landmark = address.landmark;
-        existing.city = address.city;
-        existing.state = address.state;
-        existing.zipCode = address.zipCode;
-        existing.phone = address.phone;
-        if (address.location) existing.location = address.location;
-        await user.save();
-        return { address: existing.toObject() };
-    }
-
     // First address becomes default automatically
     if (!user.addresses.some((a) => a.isDefault)) {
         address.isDefault = true;

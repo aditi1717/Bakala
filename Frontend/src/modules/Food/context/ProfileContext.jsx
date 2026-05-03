@@ -25,17 +25,10 @@ export function ProfileProvider({ children }) {
       ...(id ? { id: String(id) } : {}),
     }
   }
-  const dedupeAddressesByLabel = (addressList = []) => {
-    const addressMap = new Map()
-    addressList.forEach((addr, index) => {
-      const normalizedAddress = normalizeAddress(addr)
-      if (!normalizedAddress) return
-      const key = normalizedAddress.label || getAddressId(normalizedAddress) || index
-      // Keep latest address for each label so newly saved Home/Work/Other is visible immediately
-      addressMap.set(key, normalizedAddress)
-    })
-    return Array.from(addressMap.values())
-  }
+  const normalizeAddressList = (addressList = []) =>
+    addressList
+      .map((addr) => normalizeAddress(addr))
+      .filter(Boolean)
   const [userProfile, setUserProfile] = useState(() => {
     const userStr = localStorage.getItem("user_user")
     if (userStr) {
@@ -164,7 +157,7 @@ export function ProfileProvider({ children }) {
         try {
           const addressesResponse = await userAPI.getAddresses()
           const addressesData = addressesResponse?.data?.data?.addresses || addressesResponse?.data?.addresses || []
-          const normalizedAddresses = dedupeAddressesByLabel(addressesData)
+          const normalizedAddresses = normalizeAddressList(addressesData)
           setAddresses(normalizedAddresses)
           localStorage.setItem("userAddresses", JSON.stringify(normalizedAddresses))
         } catch (addressError) {
@@ -173,7 +166,7 @@ export function ProfileProvider({ children }) {
           const saved = localStorage.getItem("userAddresses")
           if (saved) {
             try {
-              setAddresses(dedupeAddressesByLabel(JSON.parse(saved)))
+              setAddresses(normalizeAddressList(JSON.parse(saved)))
             } catch (e) {
               debugError("Error parsing saved addresses:", e)
             }
@@ -186,7 +179,7 @@ export function ProfileProvider({ children }) {
         const saved = localStorage.getItem("userAddresses")
         if (saved) {
           try {
-            setAddresses(dedupeAddressesByLabel(JSON.parse(saved)))
+            setAddresses(normalizeAddressList(JSON.parse(saved)))
           } catch (e) {
             debugError("Error parsing saved addresses:", e)
           }
@@ -218,14 +211,20 @@ export function ProfileProvider({ children }) {
       
       if (newAddress) {
         const normalizedNewAddress = normalizeAddress(newAddress)
-        setAddresses((prev) => {
-          const filtered = prev.filter(
-            (addr) => normalizeAddressLabel(addr?.label) !== normalizeAddressLabel(normalizedNewAddress?.label)
+        try {
+          const refreshed = await userAPI.getAddresses()
+          const refreshedList = normalizeAddressList(
+            refreshed?.data?.data?.addresses || refreshed?.data?.addresses || []
           )
-          const updated = dedupeAddressesByLabel([...filtered, normalizedNewAddress])
-          localStorage.setItem("userAddresses", JSON.stringify(updated))
-          return updated
-        })
+          setAddresses(refreshedList)
+          localStorage.setItem("userAddresses", JSON.stringify(refreshedList))
+        } catch {
+          setAddresses((prev) => {
+            const updated = [...prev, normalizedNewAddress].filter(Boolean)
+            localStorage.setItem("userAddresses", JSON.stringify(updated))
+            return updated
+          })
+        }
         return normalizedNewAddress
       }
     } catch (error) {
@@ -242,9 +241,9 @@ export function ProfileProvider({ children }) {
       if (updatedAddr) {
         const normalizedUpdatedAddress = normalizeAddress(updatedAddr)
         setAddresses((prev) => {
-          const updated = dedupeAddressesByLabel(
-            prev.map((addr) => (String(getAddressId(addr)) === String(id) ? normalizedUpdatedAddress : normalizeAddress(addr)))
-          )
+          const updated = prev.map((addr) =>
+            String(getAddressId(addr)) === String(id) ? normalizedUpdatedAddress : normalizeAddress(addr)
+          ).filter(Boolean)
           localStorage.setItem("userAddresses", JSON.stringify(updated))
           return updated
         })

@@ -3,7 +3,8 @@ import {
     createHeroBannersFromFiles,
     deleteHeroBanner,
     updateHeroBannerOrder,
-    toggleHeroBannerStatus
+    toggleHeroBannerStatus,
+    updateHeroBannerCtaLink
 } from '../services/heroBanner.service.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
@@ -73,6 +74,20 @@ export const toggleHeroBannerStatusController = async (req, res, next) => {
         }
         const updated = await toggleHeroBannerStatus(id, isActive);
         return sendResponse(res, 200, 'Hero banner status updated', updated);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const updateHeroBannerCtaLinkController = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const ctaLink = typeof req.body?.ctaLink === 'string' ? req.body.ctaLink.trim() : '';
+        if (!id) {
+            throw new ValidationError('Banner id is required');
+        }
+        const updated = await updateHeroBannerCtaLink(id, ctaLink || null);
+        return sendResponse(res, 200, 'Hero banner URL updated', updated);
     } catch (error) {
         next(error);
     }

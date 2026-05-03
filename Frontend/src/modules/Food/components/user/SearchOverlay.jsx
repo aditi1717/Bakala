@@ -9,7 +9,23 @@ import BRAND_THEME from "@/config/brandTheme"
 const SEARCH_HISTORY_KEY = "user_recent_searches_v1"
 
 export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchChange }) {
-  const { searchOverlay } = BRAND_THEME.tokens
+  const searchOverlayTheme = BRAND_THEME.tokens?.searchOverlay || {}
+  const searchOverlay = {
+    surface: searchOverlayTheme.surface || "bg-white dark:bg-[#1a1a1a]",
+    headerSurface: searchOverlayTheme.headerSurface || "bg-white dark:bg-[#1a1a1a]",
+    headerBorder: searchOverlayTheme.headerBorder || "border-slate-200 dark:border-slate-800",
+    searchIcon: searchOverlayTheme.searchIcon || "#64748B",
+    inputSurface: searchOverlayTheme.inputSurface || "bg-white dark:bg-[#111111]",
+    inputBorder: searchOverlayTheme.inputBorder || "border border-slate-300 dark:border-slate-700",
+    inputFocusBorder: searchOverlayTheme.inputFocusBorder || "#005128",
+    closeHover: searchOverlayTheme.closeHover || "hover:bg-slate-100 dark:hover:bg-slate-800",
+    closeIcon: searchOverlayTheme.closeIcon || "text-slate-700 dark:text-slate-200",
+    recentChip: searchOverlayTheme.recentChip || "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700",
+    cardSurface: searchOverlayTheme.cardSurface || "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700",
+    placeholderSurface: searchOverlayTheme.placeholderSurface || "bg-slate-100 dark:bg-slate-800",
+    placeholderIcon: searchOverlayTheme.placeholderIcon || "text-slate-400 dark:text-slate-500",
+    itemHoverText: searchOverlayTheme.itemHoverText || "group-hover:text-[#005128] dark:group-hover:text-green-300",
+  }
   const { brand } = BRAND_THEME.colors
   const navigate = useNavigate()
   const inputRef = useRef(null)
