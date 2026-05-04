@@ -147,10 +147,6 @@ export default function FeedNavbar({ className = "" }) {
     e?.stopPropagation?.();
 
     const next = !isOnline;
-    
-    // Update state immediately for better UX
-    setIsOnline(next);
-    showSingleToast(next);
 
     // Update backend with location if available
     try {
@@ -228,11 +224,17 @@ export default function FeedNavbar({ className = "" }) {
         await deliveryAPI.updateOnlineStatus(next);
         debugLog('? Online status updated in backend (location not available):', next);
       }
+
+      // Update state only after backend confirms status change
+      setIsOnline(next);
+      showSingleToast(next);
     } catch (error) {
       debugError('? Error updating online status in backend:', error);
-      // Revert state if backend update fails
-      setIsOnline(!next);
-      toast.error('Failed to update status. Please try again.');
+      const msg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to update status. Please try again.';
+      toast.error(msg);
     }
   };
 

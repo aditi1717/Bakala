@@ -595,7 +595,7 @@ function OrdersTabV2({
  */
 export default function DeliveryHomeV2({ tab = 'feed' }) {
   const navigate = useNavigate();
-  const { isOnline, toggleOnline, activeOrder, tripStatus, setRiderLocation, setActiveOrder, updateTripStatus, clearActiveOrder } = useDeliveryStore();
+  const { isOnline, setOnline, activeOrder, tripStatus, setRiderLocation, setActiveOrder, updateTripStatus, clearActiveOrder } = useDeliveryStore();
   const { distanceToTarget } = useProximityCheck();
   const { acceptOrder, rejectOrder, resetTrip } = useOrderManager();
   const { newOrder, clearNewOrder, orderStatusUpdate, clearOrderStatusUpdate, isConnected: isSocketConnected, emitLocation, playNotificationSound } = useDeliveryNotifications();
@@ -990,11 +990,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       setEta(null);
     }
   }, [distanceToTarget]);
-
-  // 2. Online/Offline Status Sync (Low Frequency)
-  useEffect(() => {
-    deliveryAPI.updateOnlineStatus(isOnline).catch(() => { });
-  }, [isOnline]);
 
   // 3. Location logic (Smart Frequency Tracking)
   useEffect(() => {
@@ -1480,13 +1475,34 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                 <button
                   onClick={async () => {
                     const nextState = !isOnline;
-                    toggleOnline(); 
-                    if (nextState) {
-                      navigator.geolocation.getCurrentPosition((pos) => {
-                        deliveryAPI.updateLocation(pos.coords.latitude, pos.coords.longitude, true).catch(() => { });
-                      }, (err) => console.warn('Online sync pos failed', err), { enableHighAccuracy: true });
-                    } else {
-                      deliveryAPI.updateOnlineStatus(false).catch(() => { });
+                    try {
+                      if (nextState) {
+                        const wentOnline = await new Promise((resolve) => {
+                          navigator.geolocation.getCurrentPosition(async (pos) => {
+                            try {
+                              await deliveryAPI.updateLocation(pos.coords.latitude, pos.coords.longitude, true);
+                              resolve(true);
+                            } catch {
+                              resolve(false);
+                            }
+                          }, async () => {
+                            try {
+                              await deliveryAPI.updateOnlineStatus(true);
+                              resolve(true);
+                            } catch {
+                              resolve(false);
+                            }
+                          }, { enableHighAccuracy: true });
+                        });
+                        if (!wentOnline) {
+                          throw new Error('Failed to update availability status');
+                        }
+                      } else {
+                        await deliveryAPI.updateOnlineStatus(false);
+                      }
+                      setOnline(nextState);
+                    } catch (error) {
+                      toast.error(error?.response?.data?.message || 'Failed to update availability status');
                     }
                   }}
                   className={`relative w-[86px] h-8 rounded-full p-1 transition-all duration-300 flex items-center shadow-sm border ${isOnline ? 'border-green-500 bg-green-500' : 'border-gray-200 bg-gray-100'}`}

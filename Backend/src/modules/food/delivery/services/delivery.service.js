@@ -564,6 +564,13 @@ export const updateDeliveryAvailability = async (userId, payload) => {
     let validStatus = 'offline';
     if (status === 'online' || status === true) validStatus = 'online';
     else if (status === 'offline' || status === false) validStatus = 'offline';
+
+    const isApprovedPartner = String(partner?.status || '').toLowerCase() === 'approved';
+    if (validStatus === 'online' && !isApprovedPartner) {
+        partner.availabilityStatus = 'offline';
+        await partner.save();
+        throw new ValidationError('Your account is pending admin verification. You cannot go online yet.');
+    }
     
     partner.availabilityStatus = validStatus;
     if (typeof latitude === 'number' && typeof longitude === 'number') {

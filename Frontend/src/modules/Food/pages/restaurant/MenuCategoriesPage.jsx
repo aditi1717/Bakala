@@ -404,14 +404,14 @@ export default function MenuCategoriesPage() {
         {isModalOpen && (
           <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black/40" onClick={resetModal} />
-            <div className="absolute inset-0 flex items-end justify-center p-4 sm:items-center">
+            <div className="absolute inset-0 flex items-end justify-center overflow-y-auto p-2 sm:items-center sm:p-4">
               <motion.div
                 initial={{ opacity: 0, y: 16, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 16, scale: 0.98 }}
-                className="w-full max-w-lg rounded-3xl bg-white shadow-2xl"
+                className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col rounded-3xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
               >
-                <div className="flex items-center justify-between border-b px-5 py-4">
+                <div className="flex shrink-0 items-center justify-between border-b px-5 py-4">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">{editingCategory ? "Edit Category" : "Add Category"}</h2>
                     <p className="text-xs text-slate-500">Restaurant categories are sent for admin approval.</p>
@@ -421,7 +421,7 @@ export default function MenuCategoriesPage() {
                   </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4 p-5">
+                <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto p-5">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">Category Name</label>
                     <input

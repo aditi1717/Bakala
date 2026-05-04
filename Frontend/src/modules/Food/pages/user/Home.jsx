@@ -9,7 +9,6 @@ import OrderTrackingCard from "@food/components/user/OrderTrackingCard";
 import { CategoryChipRowSkeleton, ExploreGridSkeleton, HeroBannerSkeleton, LoadingSkeletonRegion, RestaurantGridSkeleton } from "@food/components/ui/loading-skeletons";
 import { useProfile } from "@food/context/ProfileContext";
 import { useCart } from "@food/context/CartContext";
-import { HorizontalCarousel } from "@food/components/ui/horizontal-carousel";
 import { DotPattern } from "@food/components/ui/dot-pattern";
 import { Card, CardHeader, CardTitle, CardContent } from "@food/components/ui/card";
 import { Button } from "@food/components/ui/button";
@@ -74,6 +73,7 @@ export default function Home() {
   const [hasScrolledPastBanner, setHasScrolledPastBanner] = useState(false);
   const [visibleRestaurantCount, setVisibleRestaurantCount] = useState(RESTAURANTS_BATCH_SIZE);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [currentHeroBanner, setCurrentHeroBanner] = useState(0);
   const [activeTab, setActiveTab] = useState(routerLocation.pathname.endsWith("/quick") ? "quick" : "food");
 
   const heroShellRef = useRef(null);
@@ -81,6 +81,7 @@ export default function Home() {
   const categoryScrollRef = useRef(null);
   const restaurantLoadMoreRef = useRef(null);
   const isHandlingSwitchOff = useRef(false);
+  const heroTouchStartX = useRef(0);
 
   // High-performance data fetching hook
   const {
@@ -191,6 +192,21 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (heroBanners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentHeroBanner((prev) => (prev + 1) % heroBanners.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [heroBanners.length]);
+
+  useEffect(() => {
+    setCurrentHeroBanner((prev) => {
+      if (!heroBanners.length) return 0;
+      return Math.min(prev, heroBanners.length - 1);
+    });
+  }, [heroBanners.length]);
+
+  useEffect(() => {
     const shouldLockScroll = showVegModePopup || showSwitchOffPopup;
     if (shouldLockScroll) {
       document.body.style.overflow = "hidden";
@@ -235,36 +251,74 @@ export default function Home() {
   const InlineHeroBannerSection = useMemo(() => {
     if (showBannerSkeleton) return <section className="px-4"><HeroBannerSkeleton className="h-40 w-full" /></section>;
     if (!heroBanners.length) return null;
+
+    const onBannerClick = (banner) => {
+      const targetUrl = typeof banner?.ctaLink === "string" ? banner.ctaLink.trim() : "";
+      if (targetUrl) {
+        if (targetUrl.startsWith("/")) {
+          navigate(targetUrl);
+          return;
+        }
+        if (/^https?:\/\//i.test(targetUrl)) {
+          window.location.assign(targetUrl);
+          return;
+        }
+      }
+      if (banner.linkedRestaurants?.[0]) {
+        navigate(`/food/restaurants/${banner.linkedRestaurants[0].slug || banner.linkedRestaurants[0].id || banner.linkedRestaurants[0]._id}`);
+      }
+    };
+
+    const goNext = () => setCurrentHeroBanner((prev) => (prev + 1) % heroBanners.length);
+    const goPrev = () => setCurrentHeroBanner((prev) => (prev - 1 + heroBanners.length) % heroBanners.length);
+
     return (
-      <section className="pt-4 px-4 space-y-3 content-auto">
-        {heroBanners.map((banner, i) => (
-          <motion.button
-            key={banner.id || i}
-            whileHover={{ scale: 0.98 }}
-            onClick={() => {
-              const targetUrl = typeof banner?.ctaLink === "string" ? banner.ctaLink.trim() : "";
-              if (targetUrl) {
-                if (targetUrl.startsWith("/")) {
-                  navigate(targetUrl);
-                  return;
-                }
-                if (/^https?:\/\//i.test(targetUrl)) {
-                  window.location.assign(targetUrl);
-                  return;
-                }
-              }
-              if (banner.linkedRestaurants?.[0]) {
-                navigate(`/food/restaurants/${banner.linkedRestaurants[0].slug || banner.linkedRestaurants[0].id || banner.linkedRestaurants[0]._id}`);
-              }
-            }}
-            className="relative block w-full h-40 sm:h-44 lg:h-52 overflow-hidden rounded-[28px] shadow-sm"
+      <section className="pt-4 px-4 content-auto">
+        <div
+          className="relative overflow-hidden rounded-[28px]"
+          onTouchStart={(e) => {
+            heroTouchStartX.current = e.touches[0]?.clientX || 0;
+          }}
+          onTouchEnd={(e) => {
+            if (heroBanners.length <= 1) return;
+            const touchEndX = e.changedTouches[0]?.clientX || 0;
+            const diffX = heroTouchStartX.current - touchEndX;
+            if (Math.abs(diffX) < 40) return;
+            if (diffX > 0) goNext();
+            else goPrev();
+          }}
+        >
+          <motion.div
+            className="flex"
+            animate={{ x: `-${currentHeroBanner * 100}%` }}
+            transition={{ type: "tween", ease: "easeInOut", duration: 0.45 }}
           >
-            <OptimizedImage src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
-          </motion.button>
-        ))}
+            {heroBanners.map((banner, i) => (
+              <button
+                key={banner.id || i}
+                onClick={() => onBannerClick(banner)}
+                className="relative block h-40 w-full shrink-0 overflow-hidden rounded-[28px] shadow-sm sm:h-44 lg:h-52"
+              >
+                <OptimizedImage src={banner.imageUrl} alt={banner.title} className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </motion.div>
+          {heroBanners.length > 1 && (
+            <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-1.5 rounded-full bg-black/30 px-2 py-1 backdrop-blur-sm">
+              {heroBanners.map((_, i) => (
+                <button
+                  key={`hero-dot-${i}`}
+                  onClick={() => setCurrentHeroBanner(i)}
+                  className={`h-1.5 rounded-full transition-all ${currentHeroBanner === i ? "w-4 bg-white" : "w-1.5 bg-white/60"}`}
+                  aria-label={`Go to banner ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     );
-  }, [heroBanners, showBannerSkeleton, navigate]);
+  }, [heroBanners, showBannerSkeleton, navigate, currentHeroBanner]);
 
   return (
     <div className={`relative min-h-screen ${BRAND_THEME.tokens.homepage.shared.pageBackground} pb-24 overflow-x-clip`}>
