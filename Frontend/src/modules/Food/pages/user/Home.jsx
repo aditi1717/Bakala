@@ -80,7 +80,6 @@ export default function Home() {
   const stickyHeaderRef = useRef(null);
   const categoryScrollRef = useRef(null);
   const restaurantLoadMoreRef = useRef(null);
-  const isHandlingSwitchOff = useRef(false);
 
   // High-performance data fetching hook
   const {
@@ -145,10 +144,7 @@ export default function Home() {
   }, [heroSearch, openSearch, setSearchValue]);
 
   const handleVegModeChange = (newValue) => {
-    if (isHandlingSwitchOff.current) return;
-    if (newValue && !vegMode) setShowVegModePopup(true);
-    else if (!newValue && vegMode) { isHandlingSwitchOff.current = true; setShowSwitchOffPopup(true); }
-    else setVegModeContext(newValue);
+    setVegModeContext(newValue);
   };
 
   useEffect(() => {

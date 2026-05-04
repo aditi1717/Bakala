@@ -14,6 +14,8 @@ const booleanQuerySchema = z.preprocess((value) => {
 const listSchema = z.object({
     search: z.string().optional(),
     zoneId: z.string().optional(),
+    restaurantId: z.string().optional(),
+    createdByRestaurantId: z.string().optional(),
     isApproved: booleanQuerySchema.optional(),
     approvalStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
     page: z.coerce.number().int().min(1).optional(),

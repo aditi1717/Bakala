@@ -1,35 +1,13 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { useSearchParams } from "react-router-dom"
-import { Search, Trash2, Loader2, Eye, Pencil, Plus, Save, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
-import { adminAPI, uploadAPI } from "@food/api"
+import { Search, Trash2, Loader2, Eye, Pencil, Plus, ChevronLeft, ChevronRight } from "lucide-react"
+import { adminAPI } from "@food/api"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@food/components/ui/dialog"
-import { Popover, PopoverContent, PopoverTrigger } from "@food/components/ui/popover"
 import { getFoodDisplayPrice, getFoodVariants } from "@food/utils/foodVariants"
-const debugLog = (...args) => {}
-const debugWarn = (...args) => {}
+import FoodFormDialog from "./FoodFormDialog"
+
 const debugError = (...args) => {}
-
-
-const createFoodForm = () => ({
-  restaurantId: "",
-  categoryId: "",
-  categoryName: "",
-  name: "",
-  price: "",
-  variants: [],
-  description: "",
-  image: "",
-  foodType: "Non-Veg",
-  isAvailable: true,
-  preparationTime: "",
-})
-
-const createVariantDraft = (variant = {}) => ({
-  id: String(variant?.id || variant?._id || `variant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
-  name: String(variant?.name || ""),
-  price: variant?.price != null ? String(variant.price) : "",
-})
 
 const normalizeEntityId = (value) => {
   if (!value) return ""
@@ -49,16 +27,12 @@ export default function FoodsList() {
   const [deleting, setDeleting] = useState(false)
   const [selectedFood, setSelectedFood] = useState(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  
+  // Modal state for the standalone FoodFormDialog
   const [showFoodFormModal, setShowFoodFormModal] = useState(false)
   const [foodFormMode, setFoodFormMode] = useState("add")
-  const [foodForm, setFoodForm] = useState(createFoodForm())
   const [editingFood, setEditingFood] = useState(null)
-  const [submittingFood, setSubmittingFood] = useState(false)
-  const [categoryOptions, setCategoryOptions] = useState([])
-  const [categorySearch, setCategorySearch] = useState("")
-  const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false)
-  const [selectedImageFile, setSelectedImageFile] = useState(null)
-  const [imagePreviewUrl, setImagePreviewUrl] = useState("")
+  
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [imageVersion, setImageVersion] = useState(Date.now())
@@ -78,7 +52,6 @@ export default function FoodsList() {
     return 0
   }
 
-  const toArray = (value) => (Array.isArray(value) ? value : [])
   const withImageVersion = (url) => {
     if (!url || typeof url !== "string") return "https://via.placeholder.com/40"
     return `${url}${url.includes("?") ? "&" : "?"}v=${imageVersion}`
@@ -180,42 +153,30 @@ export default function FoodsList() {
     }
   }, [productIdFromUrl, foods])
 
-  // Format ID to FOOD format (e.g., FOOD519399)
   const formatFoodId = (id) => {
     if (!id) return "FOOD000000"
-    
     const idString = String(id)
-    // Extract last 6 digits from the ID
-    // Handle formats like "1768285554154-0.703896654519399" or "item-1768285554154-0.703896654519399"
     const parts = idString.split(/[-.]/)
     let lastDigits = ""
-    
-    // Get the last part and extract digits
     if (parts.length > 0) {
       const lastPart = parts[parts.length - 1]
-      // Extract only digits from the last part
       const digits = lastPart.match(/\d+/g)
       if (digits && digits.length > 0) {
-        // Get last 6 digits from all digits found
         const allDigits = digits.join("")
         lastDigits = allDigits.slice(-6).padStart(6, "0")
       }
     }
-    
-    // If no digits found, use a hash of the ID
     if (!lastDigits) {
       const hash = idString.split("").reduce((acc, char) => {
         return ((acc << 5) - acc) + char.charCodeAt(0) | 0
       }, 0)
       lastDigits = Math.abs(hash).toString().slice(-6).padStart(6, "0")
     }
-    
     return `FOOD${lastDigits}`
   }
 
   const filteredFoods = useMemo(() => {
     let result = [...foods]
-    
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
       result = result.filter(food =>
@@ -225,11 +186,9 @@ export default function FoodsList() {
         food.categoryName?.toLowerCase().includes(query)
       )
     }
-
     if (selectedRestaurant !== "all") {
       result = result.filter((food) => String(food.restaurantId) === selectedRestaurant)
     }
-
     result.sort((a, b) => getItemCreatedMs(b) - getItemCreatedMs(a))
     return result
   }, [foods, searchQuery, selectedRestaurant])
@@ -254,257 +213,24 @@ export default function FoodsList() {
     }
   }, [currentPage, totalPages])
 
-  const restaurantOptions = useMemo(() => {
-    return restaurantsForFilter
-  }, [restaurantsForFilter])
-
-  const visibleCategoryOptions = useMemo(() => {
-    const selectedRestaurantId = String(foodForm.restaurantId || "").trim()
-    if (!selectedRestaurantId) return categoryOptions
-
-    const selectedCategoryId = String(foodForm.categoryId || "").trim()
-    const selectedCategoryName = String(foodForm.categoryName || "").trim().toLowerCase()
-
-    const filtered = categoryOptions.filter((category) => {
-      const categoryRestaurantId = String(
-        category?.restaurantId?._id ||
-        category?.restaurantId?.id ||
-        category?.restaurantId ||
-        category?.restaurant?._id ||
-        category?.restaurant?.id ||
-        category?.createdByRestaurantId?._id ||
-        category?.createdByRestaurantId?.id ||
-        category?.createdByRestaurantId ||
-        category?.createdByRestaurant?._id ||
-        category?.createdByRestaurant?.id ||
-        "",
-      ).trim()
-
-      const isGlobalCategory = category?.isGlobal === true || !categoryRestaurantId
-      return isGlobalCategory || categoryRestaurantId === selectedRestaurantId
-    })
-
-    const withSelected = filtered.slice()
-    const selectedInFiltered = withSelected.some((category) => {
-      const cid = String(category?.id || "").trim()
-      const cname = String(category?.name || "").trim().toLowerCase()
-      return (selectedCategoryId && cid === selectedCategoryId) || (selectedCategoryName && cname === selectedCategoryName)
-    })
-
-    if (!selectedInFiltered && (selectedCategoryId || selectedCategoryName)) {
-      const selectedCategory = categoryOptions.find((category) => {
-        const cid = String(category?.id || "").trim()
-        const cname = String(category?.name || "").trim().toLowerCase()
-        return (selectedCategoryId && cid === selectedCategoryId) || (selectedCategoryName && cname === selectedCategoryName)
-      })
-      if (selectedCategory) withSelected.unshift(selectedCategory)
-    }
-
-    return withSelected
-  }, [categoryOptions, foodForm.restaurantId, foodForm.categoryId, foodForm.categoryName])
-
   const openAddFoodModal = () => {
     setFoodFormMode("add")
     setEditingFood(null)
-    setFoodForm({
-      ...createFoodForm(),
-      restaurantId: selectedRestaurant !== "all" ? selectedRestaurant : "",
-    })
-    setSelectedImageFile(null)
-    setImagePreviewUrl("")
-    setCategorySearch("")
-    setCategoryPopoverOpen(false)
     setShowFoodFormModal(true)
   }
 
   const openEditFoodModal = (food) => {
     setFoodFormMode("edit")
     setEditingFood(food)
-    setFoodForm({
-      restaurantId: String(food.restaurantId || ""),
-      categoryId: String(food.categoryId || ""),
-      categoryName: String(food.categoryName || ""),
-      name: String(food.name || ""),
-      price: String(food.price || ""),
-      variants: getFoodVariants(food).map(createVariantDraft),
-      description: String(food.description || ""),
-      image: String(food.image || ""),
-      foodType: String(food.foodType || "Non-Veg"),
-      isAvailable: food.isAvailable !== false,
-      preparationTime: String(food.preparationTime || ""),
-    })
-    setSelectedImageFile(null)
-    setImagePreviewUrl(String(food.image || ""))
-    setCategorySearch("")
-    setCategoryPopoverOpen(false)
     setShowFoodFormModal(true)
-  }
-
-  useEffect(() => {
-    if (!showFoodFormModal) {
-      setCategoryOptions([])
-      return
-    }
-
-    let cancelled = false
-
-    const loadCategoryOptions = async () => {
-      try {
-        const res = await adminAPI.getCategories({ limit: 1000 })
-        const list =
-          res?.data?.data?.categories ||
-          res?.data?.categories ||
-          res?.data?.data?.data?.categories ||
-          []
-        const options = Array.isArray(list)
-          ? list
-              .map((c) => ({
-                id: String(c.id || c._id || c.name),
-                name: String(c.name || "").trim(),
-                isGlobal: c?.isGlobal === true || (!c?.restaurantId && !c?.createdByRestaurantId),
-                restaurantId: c?.restaurantId,
-                createdByRestaurantId: c?.createdByRestaurantId,
-              }))
-              .filter((c) => c.name)
-          : []
-        if (!cancelled) setCategoryOptions(options)
-      } catch (error) {
-        if (!cancelled) {
-          setCategoryOptions([])
-        }
-      }
-    }
-
-    loadCategoryOptions()
-
-    return () => {
-      cancelled = true
-    }
-  }, [showFoodFormModal])
-
-  const handleVariantChange = (variantId, field, value) => {
-    setFoodForm((prev) => ({
-      ...prev,
-      variants: (Array.isArray(prev.variants) ? prev.variants : []).map((variant) =>
-        variant.id === variantId ? { ...variant, [field]: value } : variant,
-      ),
-    }))
-  }
-
-  const handleAddVariant = () => {
-    setFoodForm((prev) => ({
-      ...prev,
-      variants: [...(Array.isArray(prev.variants) ? prev.variants : []), createVariantDraft()],
-    }))
-  }
-
-  const handleRemoveVariant = (variantId) => {
-    setFoodForm((prev) => ({
-      ...prev,
-      variants: (Array.isArray(prev.variants) ? prev.variants : []).filter((variant) => variant.id !== variantId),
-    }))
-  }
-
-  const handleFoodFormSubmit = async () => {
-    if (!foodForm.restaurantId) {
-      toast.error("Please select a restaurant")
-      return
-    }
-    if (!String(foodForm.categoryName || "").trim()) {
-      toast.error("Please select or enter a category")
-      return
-    }
-    if (!foodForm.name.trim()) {
-      toast.error("Food name is required")
-      return
-    }
-
-    const normalizedVariants = (Array.isArray(foodForm.variants) ? foodForm.variants : [])
-      .map((variant) => ({
-        id: String(variant?.id || variant?._id || "").trim(),
-        name: String(variant?.name || "").trim(),
-        price: Number(variant?.price),
-      }))
-      .filter((variant) => variant.id || variant.name || variant.price)
-
-    const hasVariants = normalizedVariants.length > 0
-    const parsedPrice = Number(foodForm.price)
-
-    if (normalizedVariants.some((variant) => !variant.name)) {
-      toast.error("Each variant must have a name")
-      return
-    }
-
-    if (normalizedVariants.some((variant) => !Number.isFinite(variant.price) || variant.price <= 0)) {
-      toast.error("Each variant price must be greater than 0")
-      return
-    }
-
-    if (!hasVariants && (!Number.isFinite(parsedPrice) || parsedPrice <= 0)) {
-      toast.error("Base price must be greater than 0")
-      return
-    }
-
-    try {
-      setSubmittingFood(true)
-      let imageUrl = foodForm.image.trim()
-
-      if (selectedImageFile) {
-        const uploadResponse = await uploadAPI.uploadMedia(selectedImageFile, {
-          folder: "foods",
-        })
-        imageUrl =
-          uploadResponse?.data?.data?.url ||
-          uploadResponse?.data?.url ||
-          imageUrl
-      }
-
-      const payload = {
-        restaurantId: foodForm.restaurantId,
-        categoryId: foodForm.categoryId || undefined,
-        categoryName: String(foodForm.categoryName || "").trim(),
-        name: foodForm.name.trim(),
-        price: hasVariants ? undefined : parsedPrice,
-        variants: normalizedVariants.map((variant) => ({
-          ...(variant.id && !variant.id.startsWith("variant-") ? { _id: variant.id } : {}),
-          name: variant.name,
-          price: variant.price,
-        })),
-        description: foodForm.description.trim(),
-        image: imageUrl,
-        foodType: foodForm.foodType === "Veg" ? "Veg" : "Non-Veg",
-        isAvailable: foodForm.isAvailable !== false,
-        preparationTime: String(foodForm.preparationTime || "").trim(),
-      }
-
-      if (foodFormMode === "edit") {
-        await adminAPI.updateFood(editingFood?._id || editingFood?.id, payload)
-      } else {
-        await adminAPI.createFood(payload)
-      }
-      toast.success(foodFormMode === "edit" ? "Food updated successfully" : "Food added successfully")
-      setShowFoodFormModal(false)
-      setEditingFood(null)
-      setFoodForm(createFoodForm())
-      setSelectedImageFile(null)
-      setImagePreviewUrl("")
-      await fetchAllFoods()
-    } catch (error) {
-      debugError("Error saving food:", error)
-      toast.error(error?.response?.data?.message || "Failed to save food")
-    } finally {
-      setSubmittingFood(false)
-    }
   }
 
   const handleDelete = async (id) => {
     const food = foods.find(f => f.id === id)
     if (!food) return
-
     if (!window.confirm(`Are you sure you want to delete "${food.name}"? This action cannot be undone.`)) {
       return
     }
-
     try {
       setDeleting(true)
       await adminAPI.deleteFood(food?._id || food?.id)
@@ -525,7 +251,7 @@ export default function FoodsList() {
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
-      {/* Header Section */}
+      {/* List Header */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
@@ -572,7 +298,7 @@ export default function FoodsList() {
               className="px-4 py-2.5 min-w-[220px] text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-slate-400"
             >
               <option value="all">All Restaurants</option>
-              {restaurantOptions.map((restaurant) => (
+              {restaurantsForFilter.map((restaurant) => (
                 <option key={restaurant.id} value={restaurant.id}>
                   {restaurant.name}
                 </option>
@@ -582,30 +308,18 @@ export default function FoodsList() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table Section */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  SL
-                </th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  Image
-                </th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  Title
-                </th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  Restaurant
-                </th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  Category
-                </th>
-                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                  Action
-                </th>
+                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">SL</th>
+                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Image</th>
+                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Title</th>
+                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Restaurant</th>
+                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Category</th>
+                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-100">
@@ -621,78 +335,33 @@ export default function FoodsList() {
               ) : filteredFoods.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
-                      <p className="text-sm text-slate-500">No food items match your search or restaurant filter</p>
-                    </div>
+                    <p className="text-sm text-slate-500">No food items found</p>
                   </td>
                 </tr>
               ) : (
                 paginatedFoods.map((food, index) => (
-                  <tr
-                    key={food.id}
-                    className="hover:bg-slate-50 transition-colors"
-                  >
+                  <tr key={food.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-medium text-slate-700">{(currentPage - 1) * pageSize + index + 1}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center border border-slate-200">
                         <img
                           src={withImageVersion(food.image)}
                           alt={food.name}
                           className="w-full h-full object-cover"
-                          key={`${food.id}-${imageVersion}`}
-                          loading="lazy"
-                          onError={(e) => {
-                            e.target.src = "https://via.placeholder.com/40"
-                          }}
+                          onError={(e) => { e.target.src = "https://via.placeholder.com/40" }}
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-slate-900">{food.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-slate-800">{food.restaurantName || "-"}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-slate-800">{food.categoryName || "-"}</span>
-                      </div>
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap"><span className="text-sm font-medium text-slate-900">{food.name}</span></td>
+                    <td className="px-6 py-4 whitespace-nowrap"><span className="text-sm font-medium text-slate-800">{food.restaurantName || "-"}</span></td>
+                    <td className="px-6 py-4 whitespace-nowrap"><span className="text-sm font-medium text-slate-800">{food.categoryName || "-"}</span></td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleViewDetails(food)}
-                          className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"
-                          title="View"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => openEditFoodModal(food)}
-                          className="p-1.5 rounded text-amber-600 hover:bg-amber-50 transition-colors"
-                          title="Edit"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(food.id)}
-                          disabled={deleting}
-                          className="p-1.5 rounded text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Delete"
-                        >
-                          {deleting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
+                        <button onClick={() => handleViewDetails(food)} className="p-1.5 rounded text-brand-600 hover:bg-brand-50" title="View Details"><Eye className="w-4 h-4" /></button>
+                        <button onClick={() => openEditFoodModal(food)} className="p-1.5 rounded text-amber-600 hover:bg-amber-50" title="Edit Food"><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(food.id)} disabled={deleting} className="p-1.5 rounded text-red-600 hover:bg-red-50" title="Delete Food"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </td>
                   </tr>
@@ -702,58 +371,27 @@ export default function FoodsList() {
           </table>
         </div>
 
+        {/* Pagination */}
         {!loading && filteredFoods.length > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
             <div className="text-sm text-slate-600">
-              Showing{" "}
-              <span className="font-semibold text-slate-800">{(currentPage - 1) * pageSize + 1}</span>
-              {" "}to{" "}
-              <span className="font-semibold text-slate-800">
-                {Math.min(currentPage * pageSize, filteredFoods.length)}
-              </span>
-              {" "}of{" "}
-              <span className="font-semibold text-slate-800">{filteredFoods.length}</span>
+              Showing <span className="font-semibold text-slate-800">{(currentPage - 1) * pageSize + 1}</span> to <span className="font-semibold text-slate-800">{Math.min(currentPage * pageSize, filteredFoods.length)}</span> of <span className="font-semibold text-slate-800">{filteredFoods.length}</span>
             </div>
-
             <div className="flex items-center gap-2">
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-                className="px-2.5 py-1.5 text-sm rounded-md border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
-              >
+              <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="px-2 py-1 text-sm rounded border border-slate-300 bg-white">
                 <option value={10}>10 / page</option>
                 <option value={20}>20 / page</option>
                 <option value={50}>50 / page</option>
               </select>
-
-              <button
-                type="button"
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Prev
-              </button>
-
-              <span className="px-3 py-1.5 text-sm font-medium text-slate-700">
-                {currentPage} / {totalPages}
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={currentPage >= totalPages}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded border border-slate-300 bg-white disabled:opacity-50"><ChevronLeft className="w-4 h-4" /></button>
+              <span className="text-sm font-medium">{currentPage} / {totalPages}</span>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="p-1.5 rounded border border-slate-300 bg-white disabled:opacity-50"><ChevronRight className="w-4 h-4" /></button>
             </div>
           </div>
         )}
       </div>
 
+      {/* Food Details Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
         <DialogContent className="max-w-xl p-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b border-slate-200 bg-slate-50">
@@ -762,14 +400,7 @@ export default function FoodsList() {
           {selectedFood && (
             <div className="p-6 space-y-5">
               <div className="flex items-center gap-4">
-                <img
-                          src={withImageVersion(selectedFood.image)}
-                          alt={selectedFood.name}
-                          className="w-20 h-20 rounded-xl object-cover border border-slate-200"
-                  onError={(e) => {
-                    e.target.src = "https://via.placeholder.com/64"
-                  }}
-                />
+                <img src={withImageVersion(selectedFood.image)} alt={selectedFood.name} className="w-20 h-20 rounded-xl object-cover border border-slate-200" onError={(e) => { e.target.src = "https://via.placeholder.com/64" }} />
                 <div>
                   <p className="text-lg font-semibold text-slate-900">{selectedFood.name}</p>
                   <p className="text-sm text-slate-500 mt-0.5">ID #{formatFoodId(selectedFood.id)}</p>
@@ -777,298 +408,26 @@ export default function FoodsList() {
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 border border-slate-200 rounded-lg p-4">
                 <p><span className="font-semibold text-slate-700">Restaurant:</span> <span className="text-slate-900">{selectedFood.restaurantName || "-"}</span></p>
-                <p><span className="font-semibold text-slate-700">Price:</span> <span className="text-slate-900">{selectedFood.variants?.length ? `Starting from \u20B9${selectedFood.price}` : `\u20B9${selectedFood.price}`}</span></p>
+                <p><span className="font-semibold text-slate-700">Price:</span> <span className="text-slate-900">{selectedFood.price}</span></p>
                 <p><span className="font-semibold text-slate-700">Category:</span> <span className="text-slate-900">{selectedFood.categoryName || "-"}</span></p>
                 <p><span className="font-semibold text-slate-700">Food Type:</span> <span className="text-slate-900">{selectedFood.foodType || "-"}</span></p>
-                <p><span className="font-semibold text-slate-700">Approval:</span> <span className="text-slate-900 capitalize">{selectedFood.approvalStatus || "-"}</span></p>
               </div>
-              {selectedFood.variants?.length ? (
-                <div className="rounded-lg border border-slate-200 bg-white p-4">
-                  <p className="text-sm font-semibold text-slate-800 mb-2">Variants</p>
-                  <div className="space-y-2">
-                    {selectedFood.variants.map((variant) => (
-                      <div key={variant.id || variant._id} className="flex items-center justify-between text-sm text-slate-700">
-                        <span>{variant.name}</span>
-                        <span className="font-semibold text-slate-900">{"\u20B9"}{variant.price}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {selectedFood.description && (
-                <p className="text-sm text-slate-700 leading-relaxed">
-                  <span className="font-semibold text-slate-800">Description:</span> {selectedFood.description}
-                </p>
-              )}
+              {selectedFood.description && <p className="text-sm text-slate-700 leading-relaxed"><span className="font-semibold text-slate-800">Description:</span> {selectedFood.description}</p>}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      {/* Standalone Food Form Component */}
+      <FoodFormDialog
         open={showFoodFormModal}
-        onOpenChange={(open) => {
-          setShowFoodFormModal(open)
-          if (!open) {
-            setEditingFood(null)
-            setFoodForm(createFoodForm())
-            setCategoryOptions([])
-            setCategorySearch("")
-            setCategoryPopoverOpen(false)
-            setSelectedImageFile(null)
-            setImagePreviewUrl("")
-          }
-        }}
-      >
-        <DialogContent className="max-w-2xl p-0 overflow-hidden">
-          <DialogHeader className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-            <DialogTitle className="text-lg font-semibold text-slate-900">
-              {foodFormMode === "edit" ? "Edit Food" : "Add Food"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Restaurant</label>
-                <select
-                  value={foodForm.restaurantId}
-                  onChange={(e) => setFoodForm((prev) => ({ ...prev, restaurantId: e.target.value, categoryId: "", categoryName: "" }))}
-                  disabled={foodFormMode === "edit"}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white disabled:bg-slate-100"
-                >
-                  <option value="">Select restaurant</option>
-                  {restaurantOptions.map((restaurant) => (
-                    <option key={restaurant.id} value={restaurant.id}>
-                      {restaurant.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-                <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white text-left flex items-center justify-between"
-                    >
-                      <span className={foodForm.categoryName ? "text-slate-900" : "text-slate-400"}>
-                        {foodForm.categoryName || "Select category"}
-                      </span>
-                      <ChevronDown className="w-4 h-4 text-slate-500" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
-                    <input
-                      type="text"
-                      value={categorySearch}
-                      onChange={(e) => setCategorySearch(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm bg-white mb-2"
-                      placeholder="Search category..."
-                      autoFocus
-                    />
-                    <div className="max-h-56 overflow-y-auto">
-                      {visibleCategoryOptions
-                        .filter((c) => {
-                          const q = String(categorySearch || "").trim().toLowerCase()
-                          if (!q) return true
-                          return String(c.name || "").toLowerCase().includes(q)
-                        })
-                        .map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => {
-                              setFoodForm((prev) => ({ ...prev, categoryId: c.id, categoryName: c.name }))
-                              setCategoryPopoverOpen(false)
-                            }}
-                            className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-slate-100 ${
-                              String(foodForm.categoryName || "") === String(c.name) ? "bg-slate-100 font-medium" : ""
-                            }`}
-                          >
-                            {c.name}
-                          </button>
-                        ))}
-                      {visibleCategoryOptions.length === 0 && (
-                        <div className="px-3 py-2 text-sm text-slate-500">No categories found</div>
-                      )}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Food Name</label>
-                <input
-                  type="text"
-                  value={foodForm.name}
-                  onChange={(e) => setFoodForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Base Price</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={foodForm.price}
-                  onChange={(e) => setFoodForm((prev) => ({ ...prev, price: e.target.value }))}
-                  disabled={(foodForm.variants || []).length > 0}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
-                />
-                {(foodForm.variants || []).length > 0 ? (
-                  <p className="mt-1 text-xs text-slate-500">Variants are active, so customers will see the lowest variant price as the starting price.</p>
-                ) : null}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Food Type</label>
-                <select
-                  value={foodForm.foodType}
-                  onChange={(e) => setFoodForm((prev) => ({ ...prev, foodType: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white"
-                >
-                  <option value="Veg">Veg</option>
-                  <option value="Non-Veg">Non-Veg</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Upload Image</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null
-                    setSelectedImageFile(file)
-                    if (file) {
-                      setImagePreviewUrl(URL.createObjectURL(file))
-                    } else {
-                      setImagePreviewUrl(foodForm.image.trim())
-                    }
-                  }}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Timing</label>
-                <div className="relative">
-                  <select
-                  value={foodForm.preparationTime}
-                  onChange={(e) => setFoodForm((prev) => ({ ...prev, preparationTime: e.target.value }))}
-                    className="w-full px-3 py-2.5 pr-10 border border-slate-300 rounded-lg text-sm bg-white appearance-none"
-                  >
-                    <option value="">Select timing</option>
-                    <option value="10-20 mins">10-20 mins</option>
-                    <option value="20-25 mins">20-25 mins</option>
-                    <option value="25-35 mins">25-35 mins</option>
-                    <option value="35-45 mins">35-45 mins</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                </div>
-              </div>
-              {imagePreviewUrl ? (
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Image Preview</label>
-                  <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                    <img
-                      src={imagePreviewUrl}
-                      alt="Food preview"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-              ) : null}
-              <div className="flex items-center gap-6 pt-7">
-                <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={foodForm.isAvailable}
-                    onChange={(e) => setFoodForm((prev) => ({ ...prev, isAvailable: e.target.checked }))}
-                  />
-                  Available
-                </label>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-              <textarea
-                rows={4}
-                value={foodForm.description}
-                onChange={(e) => setFoodForm((prev) => ({ ...prev, description: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white resize-none"
-              />
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Variants</p>
-                  <p className="text-xs text-slate-500">Optional. Add multiple names and prices such as Half, Full, Small, or Large.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddVariant}
-                  className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-50"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add variant
-                </button>
-              </div>
-              {(foodForm.variants || []).length ? (
-                <div className="space-y-3">
-                  {(foodForm.variants || []).map((variant, index) => (
-                    <div key={variant.id} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-slate-200 bg-white p-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-slate-600 mb-1">Variant name</label>
-                          <input
-                            type="text"
-                            value={variant.name}
-                            onChange={(e) => handleVariantChange(variant.id, "name", e.target.value)}
-                            placeholder={index === 0 ? "Full" : "Half"}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-slate-600 mb-1">Variant price</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={variant.price}
-                            onChange={(e) => handleVariantChange(variant.id, "price", e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
-                          />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveVariant(variant.id)}
-                        className="self-start rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-rose-500"
-                        aria-label="Remove variant"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">No variants added. This food will use the single base price.</p>
-              )}
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={handleFoodFormSubmit}
-                disabled={submittingFood}
-                className="px-4 py-2.5 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-60 inline-flex items-center gap-2"
-              >
-                {submittingFood ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                <span>{submittingFood ? "Saving..." : foodFormMode === "edit" ? "Update Food" : "Add Food"}</span>
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={setShowFoodFormModal}
+        mode={foodFormMode}
+        editingFood={editingFood}
+        restaurantOptions={restaurantsForFilter}
+        initialRestaurantId={selectedRestaurant !== "all" ? selectedRestaurant : ""}
+        onSuccess={fetchAllFoods}
+      />
     </div>
   )
 }
-
