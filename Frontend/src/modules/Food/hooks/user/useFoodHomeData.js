@@ -49,7 +49,7 @@ const calculateDistance = (lat1, lng1, lat2, lng2) => {
  * Super-fast unified hook for Food Homepage data.
  * Consolidates all layout, configuration, and restaurant fetching into a single parallel-execution flow.
  */
-export const useFoodHomeData = ({ location, zoneId, vegMode }) => {
+export const useFoodHomeData = ({ location, zoneId, zoneStatus, vegMode }) => {
   const [loading, setLoading] = useState(true);
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
   
@@ -148,13 +148,31 @@ export const useFoodHomeData = ({ location, zoneId, vegMode }) => {
   // 2. Restaurant Fetching - Zone & Location aware
   const fetchRestaurants = useCallback(async (filters = {}) => {
     const requestSeq = ++restaurantsRequestSeqRef.current;
+
+    // If user has a location but is confirmed out of all service zones,
+    // skip the fetch entirely and return empty — backend would return [] anyway.
+    const hasLocation = Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude);
+    if (hasLocation && zoneStatus === 'OUT_OF_SERVICE') {
+      startTransition(() => {
+        setRestaurants([]);
+        setLoadingRestaurants(false);
+      });
+      return;
+    }
+
     const params = { ...filters };
 
-    if (Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude)) {
+    if (hasLocation) {
       params.lat = location.latitude;
       params.lng = location.longitude;
     }
     if (zoneId) params.zoneId = zoneId;
+
+    // Clear ALL cached results when building a fresh fetch — location/zone already
+    // changed (the useCallback deps changed), so cached entries for old coords
+    // must not be served.
+    homeRestaurantsCache.clear();
+    homeRestaurantsInFlightCache.clear();
 
     const cacheKey = buildHomeRestaurantCacheKey(params);
     const now = Date.now();
@@ -254,7 +272,7 @@ export const useFoodHomeData = ({ location, zoneId, vegMode }) => {
         homeRestaurantsInFlightCache.delete(cacheKey);
       }
     }
-  }, [location?.latitude, location?.longitude, zoneId]);
+  }, [location?.latitude, location?.longitude, zoneId, zoneStatus]);
 
   // Refetch restaurants when location or zone changes
   useEffect(() => {

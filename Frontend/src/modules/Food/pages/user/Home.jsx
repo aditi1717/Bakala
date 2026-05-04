@@ -60,7 +60,7 @@ export default function Home() {
   const { vegMode, setVegMode: setVegModeContext, getDefaultAddress } = useProfile();
   const { addToCart, cart } = useCart();
   const { location } = useLocation();
-  const { zoneId } = useZone(location);
+  const { zoneId, zoneStatus } = useZone(location);
   const routerLocation = useRouterLocation();
   
   const [showVegModePopup, setShowVegModePopup] = useState(false);
@@ -95,7 +95,7 @@ export default function Home() {
     categories: landingCategories,
     restaurants: restaurantsData,
     refreshRestaurants: fetchRestaurants
-  } = useFoodHomeData({ location, zoneId, vegMode });
+  } = useFoodHomeData({ location, zoneId, zoneStatus, vegMode });
 
   // Sync activeTab with URL
   useEffect(() => {

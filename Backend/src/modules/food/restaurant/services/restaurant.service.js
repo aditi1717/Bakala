@@ -1194,17 +1194,71 @@ export const listApprovedRestaurants = async (query = {}) => {
         }
     }
 
-    // Optional zone polygon filter (when restaurant.zoneId is not set yet).
-    const zoneFilter = await buildZoneRestaurantFilter(query.zoneId);
-    if (zoneFilter) {
-        filter.$and = [...(filter.$and || []), zoneFilter];
-    }
-
     const lat = toFiniteNumber(query.lat);
     const lng = toFiniteNumber(query.lng);
     // Accept both radiusKm (preferred) and maxDistance (legacy frontend param).
     const radiusKm = toFiniteNumber(query.radiusKm) ?? toFiniteNumber(query.maxDistance);
     const sortBy = parseSortBy(query.sortBy);
+
+    // ---- ZONE-BASED FILTERING ----
+    // Strategy: restaurants belong to a zone. Users are only shown restaurants
+    // from their own service zone.
+    //
+    // Step 1: Determine the zone to filter by.
+    //   - If frontend already resolved and passed zoneId → use it directly.
+    //   - Else if lat/lng provided → auto-detect zone from coordinates on backend.
+    //   - If neither → no zone filter (admin/search contexts).
+    //
+    // Step 2: If a zone is found → apply strict zone filter (only restaurants in that zone).
+    // Step 3: If lat/lng given but NO zone found → user is outside all service areas
+    //         → return 0 restaurants immediately (correct "out of service" behavior).
+
+    let resolvedZoneId = String(query.zoneId || '').trim() || null;
+
+    if (!resolvedZoneId && lat !== null && lng !== null) {
+        // Auto-detect zone from lat/lng (same ray-casting logic as /zones/detect endpoint)
+        const allZones = await FoodZone.find({ isActive: true }).lean();
+        const zoneToPolygonCoords = (zoneDoc) => {
+            const coords = Array.isArray(zoneDoc?.coordinates) ? zoneDoc.coordinates : [];
+            return coords
+                .map((c) => [Number(c.longitude), Number(c.latitude)])
+                .filter((pair) => pair.every((n) => Number.isFinite(n)));
+        };
+        const isPointInZonePolygon = (pLat, pLng, ring) => {
+            if (ring.length < 3) return false;
+            let inside = false;
+            for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                const [xi, yi] = ring[i];
+                const [xj, yj] = ring[j];
+                // ring is [lng, lat] — swap for standard point-in-polygon
+                const intersect =
+                    yi > pLat !== yj > pLat &&
+                    pLng < ((xj - xi) * (pLat - yi)) / (yj - yi) + xi;
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        };
+        for (const zone of allZones) {
+            const ring = zoneToPolygonCoords(zone);
+            if (isPointInZonePolygon(lat, lng, ring)) {
+                resolvedZoneId = String(zone._id);
+                break;
+            }
+        }
+
+        // User sent lat/lng but is outside ALL service zones → return empty result.
+        if (!resolvedZoneId) {
+            return { restaurants: [], total: 0, page, limit };
+        }
+    }
+
+    // Apply zone filter if we have a resolved zone.
+    if (resolvedZoneId) {
+        const zoneFilter = await buildZoneRestaurantFilter(resolvedZoneId);
+        if (zoneFilter) {
+            filter.$and = [...(filter.$and || []), zoneFilter];
+        }
+    }
 
     const projection = {
         restaurantName: 1,
@@ -1231,20 +1285,18 @@ export const listApprovedRestaurants = async (query = {}) => {
         openDays: 1
     };
 
-    // Use $geoNear whenever lat+lng are provided — this ensures only nearby restaurants
-    // are returned when the user has a location set (fixes the bug where all restaurants
-    // were returned regardless of location because frontend doesn't send radiusKm).
-    // DEFAULT_RADIUS_KM is used when no explicit radius is requested.
-    const DEFAULT_RADIUS_KM = 20; // show restaurants within 20km of user by default
-    const effectiveRadiusKm = radiusKm !== null ? radiusKm : DEFAULT_RADIUS_KM;
-    if (lat !== null && lng !== null) {
+    // Use $geoNear only when geo sorting is explicitly needed (nearest / delivery time sort).
+    // Zone filter above already restricts to the correct restaurants — geoNear here is purely
+    // for ordering results by distance, not for restricting which restaurants are shown.
+    const wantsGeoSort = sortBy === 'nearest' || sortBy === 'deliveryTime' || radiusKm !== null;
+    if (lat !== null && lng !== null && wantsGeoSort) {
         const geoNear = {
             $geoNear: {
                 near: { type: 'Point', coordinates: [lng, lat] },
                 distanceField: 'distanceMeters',
                 spherical: true,
                 query: filter,
-                maxDistance: effectiveRadiusKm * 1000
+                ...(radiusKm !== null && { maxDistance: radiusKm * 1000 })
             }
         };
 
