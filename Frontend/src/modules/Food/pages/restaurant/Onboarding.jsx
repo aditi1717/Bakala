@@ -84,6 +84,9 @@ const isUploadableFile = (value) => {
 }
 
 const normalizePhoneDigits = (value) => String(value || "").replace(/\D/g, "").slice(-15)
+const sanitizeAlphabeticValue = (value) => String(value || "").replace(/[^A-Za-z\s]/g, "")
+const isAllowedTextEditKey = (key) =>
+  ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Tab", "Home", "End", "Enter"].includes(key)
 
 const isValidOwnerEmail = (value) => {
   const email = String(value || "").trim().toLowerCase()
@@ -676,7 +679,8 @@ export default function RestaurantOnboarding() {
 
     const updateInset = () => {
       const vv = window.visualViewport
-      const inset = Math.max(0, Math.round(window.innerHeight - vv.height))
+      const visibleBottom = vv.height + vv.offsetTop
+      const inset = Math.max(0, Math.round(window.innerHeight - visibleBottom))
       setKeyboardInset(inset > 120 ? inset : 0)
     }
 
@@ -1427,15 +1431,20 @@ export default function RestaurantOnboarding() {
           <Input
             value={step1.location?.city || ""}
             onChange={(e) => {
-              const city = e.target.value.replace(/[^A-Za-z\s]/g, "")
+              const city = sanitizeAlphabeticValue(e.target.value)
               setStep1({
                 ...step1,
                 location: { ...step1.location, city },
               })
             }}
+            onKeyDown={(e) => {
+              if (e.ctrlKey || e.metaKey || e.altKey) return
+              if (isAllowedTextEditKey(e.key)) return
+              if (!/^[A-Za-z\s]$/.test(e.key)) e.preventDefault()
+            }}
             onPaste={(e) => {
               e.preventDefault()
-              const pasted = e.clipboardData.getData("text").replace(/[^A-Za-z\s]/g, "")
+              const pasted = sanitizeAlphabeticValue(e.clipboardData.getData("text"))
               setStep1({
                 ...step1,
                 location: { ...step1.location, city: pasted },
@@ -1448,15 +1457,20 @@ export default function RestaurantOnboarding() {
             <Input
               value={step1.location?.state || ""}
               onChange={(e) => {
-                const state = e.target.value.replace(/[^A-Za-z\s]/g, "")
+                const state = sanitizeAlphabeticValue(e.target.value)
                 setStep1({
                   ...step1,
                   location: { ...step1.location, state },
                 })
               }}
+              onKeyDown={(e) => {
+                if (e.ctrlKey || e.metaKey || e.altKey) return
+                if (isAllowedTextEditKey(e.key)) return
+                if (!/^[A-Za-z\s]$/.test(e.key)) e.preventDefault()
+              }}
               onPaste={(e) => {
                 e.preventDefault()
-                const pasted = e.clipboardData.getData("text").replace(/[^A-Za-z\s]/g, "")
+                const pasted = sanitizeAlphabeticValue(e.clipboardData.getData("text"))
                 setStep1({
                   ...step1,
                   location: { ...step1.location, state: pasted },
@@ -2378,14 +2392,14 @@ export default function RestaurantOnboarding() {
         </header>
 
         <main
-          className="flex-1 px-4 sm:px-6 py-4 space-y-4"
+          className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4 sm:px-6"
           style={{ paddingBottom: keyboardInset ? `${keyboardInset + 20}px` : undefined }}
           onFocusCapture={(e) => {
             const target = e.target
             if (!(target instanceof HTMLElement)) return
             if (!target.matches("input, textarea, select")) return
             window.setTimeout(() => {
-              target.scrollIntoView({ behavior: "smooth", block: "center" })
+              target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" })
             }, 250)
           }}
         >

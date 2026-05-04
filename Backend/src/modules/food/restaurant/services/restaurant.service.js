@@ -476,48 +476,57 @@ export const updateRestaurantAcceptingOrders = async (restaurantId, isAcceptingO
         throw new ValidationError('Invalid restaurant id');
     }
     const value = Boolean(isAcceptingOrders);
-    const doc = await FoodRestaurant.findByIdAndUpdate(
-        restaurantId,
-        { $set: { isAcceptingOrders: value } },
-        {
-            new: true,
-            runValidators: true,
-            projection: [
-                'restaurantName',
-                'cuisines',
-                'location',
-                'addressLine1',
-                'addressLine2',
-                'area',
-                'city',
-                'state',
-                'pincode',
-                'landmark',
-                'ownerName',
-                'ownerEmail',
-                'ownerPhone',
-                'primaryContactNumber',
-                'accountNumber',
-                'ifscCode',
-                'accountHolderName',
-                'accountType',
-                'upiId',
-                'upiQrImage',
-                'pureVegRestaurant',
-                'profileImage',
-                'coverImages',
-                'menuImages',
-                'openingTime',
-                'closingTime',
-                'openDays',
-                'isAcceptingOrders',
-                'status',
-                'createdAt',
-                'updatedAt'
-            ].join(' ')
-        }
-    ).lean();
-    return toRestaurantProfile(doc);
+    const doc = await FoodRestaurant.findById(restaurantId);
+    if (!doc) {
+        throw new ValidationError('Restaurant not found');
+    }
+
+    const isApprovedRestaurant = String(doc?.status || '').toLowerCase() === 'approved';
+    if (value && !isApprovedRestaurant) {
+        doc.isAcceptingOrders = false;
+        await doc.save();
+        throw new ValidationError('Your account is pending admin verification. You cannot go online yet.');
+    }
+
+    doc.isAcceptingOrders = value;
+    await doc.save();
+
+    const profile = await FoodRestaurant.findById(restaurantId)
+        .select([
+            'restaurantName',
+            'cuisines',
+            'location',
+            'addressLine1',
+            'addressLine2',
+            'area',
+            'city',
+            'state',
+            'pincode',
+            'landmark',
+            'ownerName',
+            'ownerEmail',
+            'ownerPhone',
+            'primaryContactNumber',
+            'accountNumber',
+            'ifscCode',
+            'accountHolderName',
+            'accountType',
+            'upiId',
+            'upiQrImage',
+            'pureVegRestaurant',
+            'profileImage',
+            'coverImages',
+            'menuImages',
+            'openingTime',
+            'closingTime',
+            'openDays',
+            'isAcceptingOrders',
+            'status',
+            'createdAt',
+            'updatedAt'
+        ].join(' '))
+        .lean();
+    return toRestaurantProfile(profile);
 };
 
 

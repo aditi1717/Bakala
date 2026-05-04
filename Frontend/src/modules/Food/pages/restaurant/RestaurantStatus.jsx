@@ -282,18 +282,17 @@ export default function RestaurantStatus() {
       return
     }
     
-    setDeliveryStatus(checked)
     try {
       // Update backend
       try {
         await restaurantAPI.updateAcceptingOrders(checked)
         debugLog('? Delivery status updated in backend:', checked)
+        setDeliveryStatus(checked)
         persistRestaurantOnlineStatus(checked)
       } catch (apiError) {
         debugError('Error updating delivery status in backend:', apiError)
-        // Revert local toggle if backend fails.
-        setDeliveryStatus((prev) => !prev)
-        persistRestaurantOnlineStatus(!checked)
+        // Keep prior local toggle if backend fails.
+        persistRestaurantOnlineStatus(deliveryStatus)
         return
       }
       

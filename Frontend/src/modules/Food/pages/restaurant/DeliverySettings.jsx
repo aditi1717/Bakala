@@ -173,8 +173,8 @@ export default function DeliverySettings() {
 
     try {
       setSavingStatus(true)
-      saveDeliveryStatus(nextStatus)
       await restaurantAPI.updateAcceptingOrders(nextStatus)
+      saveDeliveryStatus(nextStatus)
     } catch (error) {
       setDeliveryStatus(previousStatus)
       syncStatusLocally(previousStatus)

@@ -120,11 +120,24 @@ window.addEventListener('unhandledrejection', (event) => {
   const error = event.reason || event
   const errorMsg = error?.message || String(error) || ''
   const errorName = error?.name || ''
+  const errorStack = String(error?.stack || '')
   if (
     errorMsg.includes('Timeout expired') ||
     errorMsg.includes('User denied Geolocation') ||
     errorMsg.includes('permission denied') ||
     errorName === 'GeolocationPositionError'
+  ) {
+    event.preventDefault()
+    return
+  }
+
+  // Guard known third-party core bundle crash:
+  // "Cannot read properties of undefined (reading 'payload')"
+  // Seen as unhandled promise rejection from minified core.js (outside app source).
+  if (
+    errorMsg.includes("Cannot read properties of undefined") &&
+    errorMsg.includes("payload") &&
+    (errorStack.includes("core.js") || errorStack.includes(" Tx "))
   ) {
     event.preventDefault()
     return
