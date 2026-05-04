@@ -240,9 +240,6 @@ export default function FoodApproval() {
                         Item Name
                       </th>
                       <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         Status
                       </th>
                       <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -259,7 +256,7 @@ export default function FoodApproval() {
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {filteredRequests.length === 0 ? (
                       <tr>
-                        <td colSpan="9" className="px-3 py-8 text-center text-sm text-gray-500">
+                        <td colSpan="8" className="px-3 py-8 text-center text-sm text-gray-500">
                           {loading ? "Loading..." : "No food or add-on records found."}
                         </td>
                       </tr>
@@ -280,11 +277,6 @@ export default function FoodApproval() {
                           </td>
                           <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-700 font-semibold">
                             {request.itemName || '-'}
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-700 capitalize text-center">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${request.entityType === 'addon' ? 'bg-purple-100 text-purple-700' : 'bg-brand-100 text-brand-700'}`}>
-                                {request.entityType || 'food'}
-                            </span>
                           </td>
                           <td className="px-3 py-3 whitespace-nowrap text-sm">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium capitalize ${
@@ -368,47 +360,64 @@ export default function FoodApproval() {
               </div>
 
               {/* Item Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Item Name</label>
-                        <p className="text-sm font-semibold text-gray-900">{selectedRequest.itemName || '-'}</p>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Category</label>
-                        <p className="text-sm text-gray-700">{selectedRequest.category || '-'}</p>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Price</label>
-                        <p className="text-sm font-bold text-green-600">{selectedRequest.price !== null && selectedRequest.price !== undefined ? `₹${selectedRequest.price}` : '-'}</p>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</label>
-                        <p className="text-sm text-gray-700 capitalize font-medium">{selectedRequest.approvalStatus || 'pending'}</p>
-                    </div>
+              <div className="space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Submitted Details</h3>
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="min-w-full text-sm">
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {[
+                        ['Item Name', selectedRequest.itemName || '-'],
+                        ['Category', selectedRequest.category || '-'],
+                        ['Entity', selectedRequest.entityType || '-'],
+                        ['Food Type', selectedRequest.foodType || '-'],
+                        ['Approval Status', selectedRequest.approvalStatus || 'pending'],
+                        ['Display Price', selectedRequest.price !== null && selectedRequest.price !== undefined ? `Rs ${selectedRequest.price}` : '-'],
+                        ['Base Price', selectedRequest.basePrice !== null && selectedRequest.basePrice !== undefined ? `Rs ${selectedRequest.basePrice}` : '-'],
+                        ['Preparation Time', selectedRequest.preparationTime || '-'],
+                        ['Availability Window', selectedRequest.availabilityTimeStart && selectedRequest.availabilityTimeEnd ? `${selectedRequest.availabilityTimeStart} - ${selectedRequest.availabilityTimeEnd}` : '-'],
+                        ['Is Available', selectedRequest.isAvailable === undefined ? '-' : (selectedRequest.isAvailable ? 'Yes' : 'No')],
+                        ['Requested On', selectedRequest.requestedAt ? new Date(selectedRequest.requestedAt).toLocaleString() : '-'],
+                        ['Last Updated', selectedRequest.updatedAt ? new Date(selectedRequest.updatedAt).toLocaleString() : '-'],
+                      ].map(([label, value]) => (
+                        <tr key={label}>
+                          <td className="w-44 bg-slate-50 px-3 py-2 font-semibold text-slate-700">{label}</td>
+                          <td className="px-3 py-2 text-slate-900">{value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
-                <div className="space-y-4">
-                    {selectedRequest.foodType && (
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Food Type</label>
-                            <p className="text-sm text-gray-700">{selectedRequest.foodType}</p>
-                        </div>
-                    )}
-                    {selectedRequest.requestedAt && (
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Requested On</label>
-                            <p className="text-sm text-gray-700">{new Date(selectedRequest.requestedAt).toLocaleString()}</p>
-                        </div>
-                    )}
-                </div>
-
-                {selectedRequest.description && (
-                  <div className="col-span-full">
+                {selectedRequest.description ? (
+                  <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Description</label>
                     <p className="text-sm text-gray-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">{selectedRequest.description}</p>
                   </div>
-                )}
+                ) : null}
+
+                {Array.isArray(selectedRequest.variants) && selectedRequest.variants.length > 0 ? (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Variants & Price</h4>
+                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Variant Name</th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Price</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                          {selectedRequest.variants.map((variant, index) => (
+                            <tr key={variant?.id || variant?._id || index}>
+                              <td className="px-3 py-2 text-slate-900">{variant?.name || '-'}</td>
+                              <td className="px-3 py-2 font-semibold text-slate-900">{variant?.price !== null && variant?.price !== undefined ? `Rs ${variant.price}` : '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
 
                 {/* Images */}
                 {(() => {

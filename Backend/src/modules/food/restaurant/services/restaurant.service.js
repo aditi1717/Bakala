@@ -461,6 +461,17 @@ export const getCurrentRestaurantProfile = async (restaurantId) => {
                 'offer',
                 'estimatedDeliveryTimeMinutes',
                 'isAcceptingOrders',
+                'panNumber',
+                'nameOnPan',
+                'panImage',
+                'gstRegistered',
+                'gstNumber',
+                'gstLegalName',
+                'gstAddress',
+                'gstImage',
+                'fssaiNumber',
+                'fssaiExpiry',
+                'fssaiImage',
                 'status',
                 'createdAt',
                 'updatedAt'
@@ -521,6 +532,8 @@ export const updateRestaurantAcceptingOrders = async (restaurantId, isAcceptingO
             'closingTime',
             'openDays',
             'isAcceptingOrders',
+            'featuredDish',
+            'featuredPrice',
             'status',
             'createdAt',
             'updatedAt'
@@ -530,7 +543,7 @@ export const updateRestaurantAcceptingOrders = async (restaurantId, isAcceptingO
 };
 
 
-export const updateRestaurantProfile = async (restaurantId, body = {}) => {
+export const updateRestaurantProfile = async (restaurantId, body = {}, files = {}) => {
     if (!restaurantId) {
         throw new ValidationError('Invalid restaurant id');
     }
@@ -544,6 +557,16 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
     }
 
     const update = {};
+
+    // Zone ID handling
+    if (body.zoneId !== undefined) {
+        const zoneIdRaw = String(body.zoneId || '').trim();
+        if (zoneIdRaw && mongoose.Types.ObjectId.isValid(zoneIdRaw)) {
+            update.zoneId = new mongoose.Types.ObjectId(zoneIdRaw);
+        } else if (!zoneIdRaw) {
+            update.zoneId = null;
+        }
+    }
 
     // Owner/contact fields (used by restaurant Contact Details screens)
     if (body.ownerName !== undefined) {
@@ -679,24 +702,35 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
         update.cuisines = cuisines;
     }
 
-    if (body.location !== undefined) {
-        const loc = body.location && typeof body.location === 'object' ? body.location : null;
-        if (!loc) {
-            throw new ValidationError('Location must be an object');
-        }
-        const toStr = (v) => (v != null ? String(v).trim() : '');
-        const formattedAddress = toStr(loc.formattedAddress || loc.address);
-        update.addressLine1 = toStr(loc.addressLine1);
-        update.addressLine2 = toStr(loc.addressLine2);
-        update.area = toStr(loc.area);
-        update.city = toStr(loc.city);
-        update.state = toStr(loc.state);
-        update.pincode = toStr(loc.pincode);
-        update.landmark = toStr(loc.landmark);
+    // Handle Location (Nested or Flat)
+    const loc = body.location && typeof body.location === 'object' ? body.location : null;
+    const hasFlatLocation = body.addressLine1 !== undefined || body.area !== undefined || body.latitude !== undefined || body.longitude !== undefined || body.city !== undefined || body.state !== undefined || body.pincode !== undefined || body.formattedAddress !== undefined;
 
-        // Optional geo coords for server-side distance filtering.
-        const lat = toFiniteNumber(loc.latitude);
-        const lng = toFiniteNumber(loc.longitude);
+    if (loc || hasFlatLocation) {
+        const toStr = (v) => (v != null ? String(v).trim() : '');
+        const data = loc || body; // Use nested object or fallback to flat body
+        
+        const formattedAddress = toStr(data.formattedAddress || data.address);
+        const addressLine1 = toStr(data.addressLine1);
+        const addressLine2 = toStr(data.addressLine2);
+        const area = toStr(data.area);
+        const city = toStr(data.city);
+        const state = toStr(data.state);
+        const pincode = toStr(data.pincode);
+        const landmark = toStr(data.landmark);
+        const lat = toFiniteNumber(data.latitude);
+        const lng = toFiniteNumber(data.longitude);
+
+        // Update top-level fields for convenience
+        if (addressLine1 !== undefined) update.addressLine1 = addressLine1;
+        if (addressLine2 !== undefined) update.addressLine2 = addressLine2;
+        if (area !== undefined) update.area = area;
+        if (city !== undefined) update.city = city;
+        if (state !== undefined) update.state = state;
+        if (pincode !== undefined) update.pincode = pincode;
+        if (landmark !== undefined) update.landmark = landmark;
+
+        // Update unified location object
         update.location = {
             type: 'Point',
             coordinates: lat !== null && lng !== null ? [lng, lat] : undefined,
@@ -704,13 +738,13 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
             longitude: lng ?? undefined,
             formattedAddress,
             address: formattedAddress,
-            addressLine1: toStr(loc.addressLine1),
-            addressLine2: toStr(loc.addressLine2),
-            area: toStr(loc.area),
-            city: toStr(loc.city),
-            state: toStr(loc.state),
-            pincode: toStr(loc.pincode),
-            landmark: toStr(loc.landmark)
+            addressLine1,
+            addressLine2,
+            area,
+            city,
+            state,
+            pincode,
+            landmark
         };
     }
 
@@ -794,6 +828,7 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
             throw new ValidationError('gstRegistered must be a boolean');
         }
     }
+
     if (body.gstNumber !== undefined) {
         update.gstNumber = String(body.gstNumber || '').trim().toUpperCase();
     }
@@ -825,23 +860,59 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
         update.fssaiImage = toUrl(body.fssaiImage) || '';
     }
 
+    // Handle File Uploads (Overrides body URLs if files are present)
+    if (files?.profileImage?.[0]) {
+        update.profileImage = await uploadImageBuffer(files.profileImage[0].buffer, 'food/restaurants/profile');
+    }
+    if (files?.panImage?.[0]) {
+        update.panImage = await uploadImageBuffer(files.panImage[0].buffer, 'food/restaurants/pan');
+    }
+    if (files?.gstImage?.[0]) {
+        update.gstImage = await uploadImageBuffer(files.gstImage[0].buffer, 'food/restaurants/gst');
+    }
+    if (files?.fssaiImage?.[0]) {
+        update.fssaiImage = await uploadImageBuffer(files.fssaiImage[0].buffer, 'food/restaurants/fssai');
+    }
+    if (files?.menuImages?.length) {
+        const newMenuUrls = await Promise.all(
+            files.menuImages.map((file) => uploadImageBuffer(file.buffer, 'food/restaurants/menu'))
+        );
+        const currentMenuImages = currentRestaurant.menuImages || [];
+        update.menuImages = [...currentMenuImages, ...newMenuUrls];
+    }
+
     if (!Object.keys(update).length) {
         return getCurrentRestaurantProfile(restaurantId);
     }
 
-    update.status = 'pending';
+    // Only reset status to 'pending' if critical fields are updated (FSSAI or Location)
+    const criticalFields = [
+        'fssaiNumber', 'fssaiExpiry', 'fssaiImage',
+        'location', 'addressLine1', 'addressLine2', 'area', 'city', 'state', 'pincode', 'landmark', 'zoneId'
+    ];
+    
+    const requiresApproval = Object.keys(update).some(key => criticalFields.includes(key));
+
+    if (requiresApproval) {
+        update.status = 'pending';
+    }
+
+    const updateOperation = {
+        $set: update
+    };
+
+    if (requiresApproval) {
+        updateOperation.$unset = {
+            approvedAt: 1,
+            rejectedAt: 1,
+            rejectionReason: 1
+        };
+    }
 
     try {
         const doc = await FoodRestaurant.findByIdAndUpdate(
             restaurantId,
-            {
-                $set: update,
-                $unset: {
-                    approvedAt: 1,
-                    rejectedAt: 1,
-                    rejectionReason: 1
-                }
-            },
+            updateOperation,
             {
                 new: true,
                 runValidators: true,
@@ -889,12 +960,14 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
                     'upiQrImage',
                     'estimatedDeliveryTime',
                     'estimatedDeliveryTimeMinutes',
+                    'featuredDish',
+                    'featuredPrice',
                     'zoneId'
                 ].join(' ')
             }
         ).lean();
 
-        if (currentRestaurant.status !== 'pending') {
+        if (requiresApproval && currentRestaurant.status !== 'pending') {
             const restaurantNameForNotification =
                 update.restaurantName || currentRestaurant.restaurantName || doc?.restaurantName;
             void notifyAdminsAboutRestaurantProfileReview(restaurantId, restaurantNameForNotification);
@@ -1158,21 +1231,22 @@ export const listApprovedRestaurants = async (query = {}) => {
         openDays: 1
     };
 
-    // Use $geoNear only when geo is explicitly needed (radius filter or nearest sorting).
-    // This avoids accidentally hiding restaurants that do not have coordinates yet.
-    const wantsGeo = (radiusKm !== null) || sortBy === 'nearest';
-    if (lat !== null && lng !== null && wantsGeo) {
+    // Use $geoNear whenever lat+lng are provided — this ensures only nearby restaurants
+    // are returned when the user has a location set (fixes the bug where all restaurants
+    // were returned regardless of location because frontend doesn't send radiusKm).
+    // DEFAULT_RADIUS_KM is used when no explicit radius is requested.
+    const DEFAULT_RADIUS_KM = 20; // show restaurants within 20km of user by default
+    const effectiveRadiusKm = radiusKm !== null ? radiusKm : DEFAULT_RADIUS_KM;
+    if (lat !== null && lng !== null) {
         const geoNear = {
             $geoNear: {
                 near: { type: 'Point', coordinates: [lng, lat] },
                 distanceField: 'distanceMeters',
                 spherical: true,
-                query: filter
+                query: filter,
+                maxDistance: effectiveRadiusKm * 1000
             }
         };
-        if (radiusKm !== null) {
-            geoNear.$geoNear.maxDistance = Math.max(0.1, radiusKm) * 1000;
-        }
 
         const sortStage = (() => {
             if (sortBy === 'rating' || sortBy === 'rating-high') return { $sort: { rating: -1, distanceMeters: 1 } };

@@ -937,11 +937,11 @@ export default function ExploreMore() {
               <Search className="w-5 h-5 text-gray-900" />
             </button>
             <button
-              onClick={() => navigate(`${restaurantBasePath}/onboarding?step=1`)}
+              onClick={() => navigate(`${restaurantBasePath}/profile`)}
               className="p-2 hover:bg-gray-100 bg-gray-200 rounded-full transition-colors"
               aria-label="Profile"
             >
-              <UserRound className="w-5 h-5 text-gray-900 " />
+              <UserRound className="w-5 h-5 text-gray-900" />
             </button>
           </div>
         </div>
@@ -982,7 +982,6 @@ export default function ExploreMore() {
           </Card>
         </motion.div>
 
-        {/* Sections */}
         {filteredSections.length > 0 ? (
           filteredSections.map((section, index) => (
             <div key={section.key}>

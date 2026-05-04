@@ -59,6 +59,7 @@ const HubFinance = lazy(() => import("@food/pages/restaurant/HubFinance"))
 const FinanceDetailsPage = lazy(() => import("@food/pages/restaurant/FinanceDetailsPage"))
 const PhoneNumbersPage = lazy(() => import("@food/pages/restaurant/PhoneNumbersPage"))
 const DownloadReport = lazy(() => import("@food/pages/restaurant/DownloadReport"))
+const RestaurantProfile = lazy(() => import("@food/pages/restaurant/RestaurantProfile"))
 
 const ManageOutlets = lazy(() => import("@food/pages/restaurant/ManageOutlets"))
 const UpdateBankDetails = lazy(() => import("@food/pages/restaurant/UpdateBankDetails"))
@@ -143,8 +144,8 @@ export default function RestaurantRouter() {
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><ManageOutlets /></ProtectedRoute>} path="manage-outlets" />
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><UpdateBankDetails /></ProtectedRoute>} path="update-bank-details" />
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><ZoneSetup /></ProtectedRoute>} path="zone-setup" />
+        <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><RestaurantProfile /></ProtectedRoute>} path="profile" />
       </Routes>
     </Suspense>
   )
 }
-

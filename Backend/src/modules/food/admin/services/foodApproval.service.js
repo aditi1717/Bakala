@@ -32,7 +32,7 @@ export async function listPendingFoodApprovals(query = {}) {
         .sort({ requestedAt: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select('restaurantId categoryName name price variants image foodType approvalStatus requestedAt createdAt')
+        .select('restaurantId categoryName name description price variants image foodType preparationTime availabilityTimeStart availabilityTimeEnd approvalStatus rejectionReason requestedAt createdAt updatedAt')
         .lean();
 
     const addonList = await FoodAddon.find({ approvalStatus: 'pending' })
@@ -65,10 +65,17 @@ export async function listPendingFoodApprovals(query = {}) {
         subsectionName: '',
         approvalStatus: f.approvalStatus || 'pending',
         price: getFoodDisplayPrice(f),
+        basePrice: Number.isFinite(Number(f.price)) ? Number(f.price) : 0,
         variants: serializeFoodVariants(f.variants),
         image: f.image || '',
         images: f.image ? [f.image] : [],
+        description: f.description || '',
+        preparationTime: f.preparationTime || '',
+        availabilityTimeStart: f.availabilityTimeStart || '',
+        availabilityTimeEnd: f.availabilityTimeEnd || '',
+        rejectionReason: f.rejectionReason || '',
         requestedAt: f.requestedAt || f.createdAt,
+        updatedAt: f.updatedAt || f.createdAt,
         isActionable: (f.approvalStatus || 'pending') === 'pending'
     }));
 
@@ -86,11 +93,15 @@ export async function listPendingFoodApprovals(query = {}) {
         subsectionName: '',
         approvalStatus: 'pending',
         price: a.draft?.price ?? 0,
+        basePrice: a.draft?.price ?? 0,
         image: a.draft?.image || (a.draft?.images && a.draft.images[0]) || '',
         images: a.draft?.images || (a.draft?.image ? [a.draft.image] : []),
         requestedAt: a.requestedAt || a.createdAt,
+        updatedAt: a.updatedAt || a.createdAt,
         isActionable: true,
-        description: a.draft?.description || ''
+        description: a.draft?.description || '',
+        isAvailable: Boolean(a.isAvailable),
+        draft: a.draft || null
     }));
 
     const allRequests = [...foodRequests, ...addonRequests].sort((a, b) => 
