@@ -792,7 +792,7 @@ const OrderDetailV2 = () => {
           <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
             <div className="rounded-xl bg-slate-50 p-2.5">
               <p className="text-slate-500">Earning</p>
-              <p className="mt-0.5 text-base font-extrabold text-slate-900">{formatMoney(order?.riderEarning || order?.deliveryEarning || 0)}</p>
+              <p className="mt-0.5 text-base font-extrabold text-slate-900">{formatMoney(order?.riderEarning || order?.earnings || order?.deliveryEarning || 0)}</p>
             </div>
             <div className="rounded-xl bg-slate-50 p-2.5">
               <p className="text-slate-500">Items</p>
