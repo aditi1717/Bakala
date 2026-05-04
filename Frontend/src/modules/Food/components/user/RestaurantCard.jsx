@@ -218,14 +218,10 @@ const RestaurantCard = ({
           {restaurant.cuisine || "North Indian, Chinese"}
         </p>
 
-        <div className={`flex items-center justify-between pt-2.5 border-t ${homepage.shared.border}`}>
+        <div className={`flex items-center pt-2.5 border-t ${homepage.shared.border}`}>
           <div className={`flex items-center gap-1.5 ${homepage.shared.mutedText} ${homepage.shared.surfaceAlt} px-2 py-1 rounded-md`}>
             <Clock className="w-3.5 h-3.5" style={{ color: BRAND_THEME.colors.brand.primary }} />
             <span className="text-[10px] sm:text-xs font-semibold">{restaurant.deliveryTime || "25-30 min"}</span>
-          </div>
-          <div className={`flex items-center gap-1 ${homepage.shared.mutedText} ${homepage.shared.surfaceAlt} px-2 py-1 rounded-md`}>
-            <IndianRupee className="w-3 h-3" style={{ color: BRAND_THEME.colors.brand.primary }} />
-            <span className="text-[10px] sm:text-xs font-semibold">{restaurant.avgPrice || "₹200 for one"}</span>
           </div>
         </div>
       </div>

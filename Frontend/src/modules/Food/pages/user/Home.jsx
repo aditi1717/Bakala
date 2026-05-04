@@ -411,9 +411,8 @@ export default function Home() {
                     <div className="flex items-center gap-1 text-gray-500 text-xs ml-2"><Clock className="w-3.5 h-3.5" />{r.deliveryTime || "25-30 min"}</div>
                   </div>
                   <p className="text-sm text-gray-500 mb-3 truncate">{r.cuisines?.join(", ") || "Multi-cuisine"}</p>
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                  <div className="flex items-center pt-3 border-t border-gray-50">
                     <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600"><MapPin className="w-3.5 h-3.5 text-brand-500" />{r.distance || "1.2 km"}</div>
-                    <div className="text-sm font-bold text-brand-600">{"\u20B9"}{r.featuredPrice || 249} for one</div>
                   </div>
                 </div>
               </Link>

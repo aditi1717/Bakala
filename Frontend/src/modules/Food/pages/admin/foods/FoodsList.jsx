@@ -393,26 +393,127 @@ export default function FoodsList() {
 
       {/* Food Details Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="max-w-xl p-0 overflow-hidden">
-          <DialogHeader className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+        <DialogContent className="max-w-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
+          <DialogHeader className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex-shrink-0">
             <DialogTitle className="text-lg font-semibold text-slate-900">Food Details</DialogTitle>
           </DialogHeader>
           {selectedFood && (
-            <div className="p-6 space-y-5">
+            <div className="p-6 space-y-5 overflow-y-auto">
+              {/* Image + Name */}
               <div className="flex items-center gap-4">
-                <img src={withImageVersion(selectedFood.image)} alt={selectedFood.name} className="w-20 h-20 rounded-xl object-cover border border-slate-200" onError={(e) => { e.target.src = "https://via.placeholder.com/64" }} />
+                <img
+                  src={withImageVersion(selectedFood.image)}
+                  alt={selectedFood.name}
+                  className="w-20 h-20 rounded-xl object-cover border border-slate-200 shadow-sm flex-shrink-0"
+                  onError={(e) => { e.target.src = "https://via.placeholder.com/64" }}
+                />
                 <div>
-                  <p className="text-lg font-semibold text-slate-900">{selectedFood.name}</p>
-                  <p className="text-sm text-slate-500 mt-0.5">ID #{formatFoodId(selectedFood.id)}</p>
+                  <p className="text-xl font-bold text-slate-900">{selectedFood.name}</p>
+                  <p className="text-xs text-slate-400 mt-0.5 font-mono">ID #{formatFoodId(selectedFood.id)}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${selectedFood.foodType === "Veg" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+                      <span className={`w-2 h-2 rounded-full ${selectedFood.foodType === "Veg" ? "bg-green-500" : "bg-red-500"}`} />
+                      {selectedFood.foodType || "Non-Veg"}
+                    </span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${selectedFood.isAvailable ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
+                      {selectedFood.isAvailable ? "Available" : "Unavailable"}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 border border-slate-200 rounded-lg p-4">
-                <p><span className="font-semibold text-slate-700">Restaurant:</span> <span className="text-slate-900">{selectedFood.restaurantName || "-"}</span></p>
-                <p><span className="font-semibold text-slate-700">Price:</span> <span className="text-slate-900">{selectedFood.price}</span></p>
-                <p><span className="font-semibold text-slate-700">Category:</span> <span className="text-slate-900">{selectedFood.categoryName || "-"}</span></p>
-                <p><span className="font-semibold text-slate-700">Food Type:</span> <span className="text-slate-900">{selectedFood.foodType || "-"}</span></p>
+
+              {/* Info Grid */}
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Restaurant</p>
+                  <p className="text-slate-900 font-medium">{selectedFood.restaurantName || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Category</p>
+                  <p className="text-slate-900 font-medium">{selectedFood.categoryName || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Base Price</p>
+                  <p className="text-slate-900 font-medium">₹{selectedFood.price ?? "—"}</p>
+                </div>
+                {selectedFood.preparationTime && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Prep Time</p>
+                    <p className="text-slate-900 font-medium">{selectedFood.preparationTime}</p>
+                  </div>
+                )}
               </div>
-              {selectedFood.description && <p className="text-sm text-slate-700 leading-relaxed"><span className="font-semibold text-slate-800">Description:</span> {selectedFood.description}</p>}
+
+              {/* Description */}
+              {selectedFood.description && (
+                <div className="text-sm text-slate-700 leading-relaxed bg-amber-50 border border-amber-100 rounded-lg p-3">
+                  <p className="font-semibold text-amber-800 mb-1">Description</p>
+                  <p>{selectedFood.description}</p>
+                </div>
+              )}
+
+              {/* Variants Table */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <span className="w-1.5 h-4 rounded-full bg-brand-500 inline-block" />
+                    Variants
+                    <span className="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-slate-100 text-slate-600">
+                      {(selectedFood.variants || []).length}
+                    </span>
+                  </h3>
+                </div>
+
+                {(selectedFood.variants || []).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-slate-400">
+                    <svg className="w-8 h-8 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <p className="text-sm font-medium">No variants added</p>
+                    <p className="text-xs mt-0.5">This food item has a single fixed price</p>
+                  </div>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-800 text-white">
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-10">#</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Variant Name</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Price (₹)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(selectedFood.variants || []).map((variant, idx) => (
+                          <tr
+                            key={variant.id || idx}
+                            className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}
+                          >
+                            <td className="px-4 py-3 text-slate-400 font-mono text-xs">{idx + 1}</td>
+                            <td className="px-4 py-3 font-medium text-slate-800">{variant.name}</td>
+                            <td className="px-4 py-3 text-right">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-green-50 text-green-800 font-bold text-sm border border-green-100">
+                                ₹{Number(variant.price).toFixed(2)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="border-t-2 border-slate-200 bg-slate-50">
+                        <tr>
+                          <td colSpan={2} className="px-4 py-2.5 text-xs font-semibold text-slate-500">
+                            Starting from
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <span className="font-bold text-brand-700">
+                              ₹{Math.min(...(selectedFood.variants || []).map(v => Number(v.price) || 0)).toFixed(2)}
+                            </span>
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
