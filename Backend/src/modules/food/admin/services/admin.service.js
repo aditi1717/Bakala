@@ -490,8 +490,10 @@ export async function getRestaurants(query, adminScope = {}) {
     return { restaurants, total, page, limit };
 }
 
-const CANCELLED_ORDER_STATUSES = ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin'];
-const PENDING_ORDER_STATUSES = ['created', 'confirmed', 'preparing', 'ready_for_pickup', 'picked_up'];
+const CANCELLED_ORDER_STATUSES = ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'cancelled_by_user_unavailable'];
+const PENDING_STATUSES = ['created', 'confirmed'];
+const PROCESSING_STATUSES = ['preparing', 'ready_for_pickup'];
+const ON_THE_WAY_STATUSES = ['picked_up', 'out_for_delivery', 'en_route_to_delivery', 'reached_drop', 'at_drop', 'at_delivery'];
 
 const getDateRangeByPeriod = (periodRaw) => {
     const period = String(periodRaw || 'overall').trim().toLowerCase();
@@ -602,7 +604,17 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
                     },
                     pending: {
                         $sum: {
-                            $cond: [{ $in: ['$orderStatus', PENDING_ORDER_STATUSES] }, 1, 0]
+                            $cond: [{ $in: ['$orderStatus', PENDING_STATUSES] }, 1, 0]
+                        }
+                    },
+                    processing: {
+                        $sum: {
+                            $cond: [{ $in: ['$orderStatus', PROCESSING_STATUSES] }, 1, 0]
+                        }
+                    },
+                    onTheWay: {
+                        $sum: {
+                            $cond: [{ $in: ['$orderStatus', ON_THE_WAY_STATUSES] }, 1, 0]
                         }
                     },
                     revenueTotal: { 
@@ -686,7 +698,7 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
         FoodDeliveryPartner.find({ status: 'pending' }).sort({ createdAt: -1 }).limit(5).select('name createdAt').lean(),
         FoodOrder.find({ 
             ...orderMatch,
-            orderStatus: { $in: PENDING_ORDER_STATUSES },
+            orderStatus: { $in: [...PENDING_STATUSES, ...PROCESSING_STATUSES, ...ON_THE_WAY_STATUSES] },
         }).sort({ createdAt: -1 }).limit(5).select('orderId createdAt').lean(),
         FoodOrder.find({ ...orderMatch, orderStatus: 'delivered' }).sort({ updatedAt: -1 }).limit(5).select('orderId updatedAt').lean(),
         FoodOrder.find({ 
@@ -822,7 +834,9 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
             byStatus: {
                 delivered: Number(totals.delivered || 0),
                 cancelled: Number(totals.cancelled || 0),
-                pending: Number(totals.pending || 0)
+                pending: Number(totals.pending || 0),
+                processing: Number(totals.processing || 0),
+                onTheWay: Number(totals.onTheWay || 0)
             }
         },
         revenue: { total: Number(totals.revenueTotal || 0) },
@@ -845,6 +859,8 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
         customers: { total: Number(customersTotal || 0) },
         orderStats: {
             pending: Number(totals.pending || 0),
+            processing: Number(totals.processing || 0),
+            onTheWay: Number(totals.onTheWay || 0),
             completed: Number(totals.delivered || 0)
         },
         monthlyData,

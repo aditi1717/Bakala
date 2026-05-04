@@ -104,7 +104,8 @@ export default function AdminHome() {
     return [
       { label: "Delivered", value: byStatus.delivered || 0, color: "#0ea5e9" },
       { label: "Cancelled", value: byStatus.cancelled || 0, color: "#ef4444" },
-      { label: "Refunded", value: 0, color: "#f59e0b" }, // Refunded not tracked separately
+      { label: "On the Way", value: byStatus.onTheWay || 0, color: "#f59e0b" },
+      { label: "Processing", value: byStatus.processing || 0, color: "#8b5cf6" },
       { label: "Pending", value: byStatus.pending || 0, color: "#10b981" },
     ]
   }
@@ -147,8 +148,10 @@ export default function AdminHome() {
   const totalAddons = dashboardData?.addons?.total || 0
   const totalCustomers = dashboardData?.customers?.total || 0
   const pendingOrders = dashboardData?.orderStats?.pending || 0
+  const processingOrders = dashboardData?.orderStats?.processing || 0
+  const onTheWayOrders = dashboardData?.orderStats?.onTheWay || 0
   const completedOrders = dashboardData?.orderStats?.completed || 0
-  const activeOrdersTotal = pendingOrders
+  const activeOrdersTotal = processingOrders + onTheWayOrders + pendingOrders
 
   const pieData = orderStats.map((item) => ({
     name: item.label,
@@ -237,9 +240,9 @@ export default function AdminHome() {
               path="/admin/food/restaurants/commission"
             />
             <MetricCard
-              title="Orders processed"
+              title="Active orders"
               value={activeOrdersTotal.toLocaleString("en-IN")}
-              helper="Orders currently being processed"
+              helper="Total live orders in system"
               icon={<Activity className="h-5 w-5 text-amber-600" />}
               accent="bg-amber-200/40"
               path="/admin/food/orders/processing"
@@ -456,7 +459,9 @@ export default function AdminHome() {
                           'Delivered': '/admin/food/orders/delivered',
                           'Cancelled': '/admin/food/orders/canceled',
                           'Refunded': '/admin/food/orders/refunded',
-                          'Pending': '/admin/food/orders/pending'
+                          'Pending': '/admin/food/orders/pending',
+                          'On the Way': '/admin/food/orders/food-on-the-way',
+                          'Processing': '/admin/food/orders/processing'
                         }
                         navigate(routes[item.label] || '/admin/food/orders/all')
                       }}
@@ -586,7 +591,9 @@ export default function AdminHome() {
                         'Delivered': '/admin/food/orders/delivered',
                         'Cancelled': '/admin/food/orders/canceled',
                         'Refunded': '/admin/food/orders/refunded',
-                        'Pending': '/admin/food/orders/pending'
+                        'Pending': '/admin/food/orders/pending',
+                        'On the Way': '/admin/food/orders/food-on-the-way',
+                        'Processing': '/admin/food/orders/processing'
                       }
                       navigate(routes[item.label] || '/admin/food/orders/all')
                     }}
