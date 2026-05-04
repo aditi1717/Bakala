@@ -24,6 +24,7 @@ import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
 import { clearModuleAuth, clearAuthData } from "@food/utils/auth"
 import { ImageSourcePicker } from "@food/components/ImageSourcePicker"
 import { isFlutterBridgeAvailable, openCamera } from "@food/utils/imageUploadUtils"
+import { saveFileToDB, saveFileListToDB, getFileFromDB, clearOnboardingFiles } from "@food/utils/onboardingStorage"
 import BRAND_THEME from "@/config/brandTheme"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
@@ -243,18 +244,24 @@ const clearOnboardingFromLocalStorage = () => {
   }
 }
 
-const syncOnboardingFileCache = (step2, step3) => {
+const syncOnboardingFileCache = async (step2, step3) => {
+  const menuImages = (step2?.menuImages || []).filter((img) => isUploadableFile(img))
+  const profileImage = isUploadableFile(step2?.profileImage) ? step2.profileImage : null
+  const panImage = isUploadableFile(step3?.panImage) ? step3.panImage : null
+  const gstImage = isUploadableFile(step3?.gstImage) ? step3.gstImage : null
+  const fssaiImage = isUploadableFile(step3?.fssaiImage) ? step3.fssaiImage : null
+
   onboardingFileCache = {
-    step2: {
-      menuImages: (step2?.menuImages || []).filter((img) => isUploadableFile(img)),
-      profileImage: isUploadableFile(step2?.profileImage) ? step2.profileImage : null,
-    },
-    step3: {
-      panImage: isUploadableFile(step3?.panImage) ? step3.panImage : null,
-      gstImage: isUploadableFile(step3?.gstImage) ? step3.gstImage : null,
-      fssaiImage: isUploadableFile(step3?.fssaiImage) ? step3.fssaiImage : null,
-    },
+    step2: { menuImages, profileImage },
+    step3: { panImage, gstImage, fssaiImage },
   }
+
+  // Persist to IndexedDB for refresh survival
+  void saveFileListToDB("menuImages", menuImages)
+  void saveFileToDB("profileImage", profileImage)
+  void saveFileToDB("panImage", panImage)
+  void saveFileToDB("gstImage", gstImage)
+  void saveFileToDB("fssaiImage", fssaiImage)
 }
 
 const clearOnboardingFileCache = () => {
@@ -269,6 +276,7 @@ const clearOnboardingFileCache = () => {
       fssaiImage: null,
     },
   }
+  void clearOnboardingFiles()
 }
 
 // Helper function to convert "HH:mm" string to Date object
@@ -500,6 +508,7 @@ export default function RestaurantOnboarding() {
     fileNamePrefix: "camera-image",
     fallbackInputRef: null,
   })
+  const isInitialized = useRef(false)
 
   const getPreviewImageUrl = (value) => {
     if (!value) return null
@@ -568,102 +577,139 @@ export default function RestaurantOnboarding() {
   }
 
 
-  // Load from localStorage on mount and check URL parameter
+  // Load from localStorage and IndexedDB on mount and check URL parameter
   useEffect(() => {
     setVerifiedPhoneNumber(getVerifiedPhoneFromStoredRestaurant())
 
-    // Check if step is specified in URL (from OTP login redirect)
-    const stepParam = searchParams.get("step")
-    if (stepParam) {
-      const stepNum = parseInt(stepParam, 10)
-      if (stepNum >= 1 && stepNum <= 3) {
-        setStep(stepNum)
+    const init = async () => {
+      // Check if step is specified in URL (from OTP login redirect)
+      const stepParam = searchParams.get("step")
+      if (stepParam) {
+        const stepNum = parseInt(stepParam, 10)
+        if (stepNum >= 1 && stepNum <= 3) {
+          setStep(stepNum)
+        }
       }
-    }
 
-    const localData = loadOnboardingFromLocalStorage()
-    if (localData) {
-      if (localData.step1) {
-        setStep1({
-          restaurantName: localData.step1.restaurantName || "",
-          pureVegRestaurant:
-            typeof localData.step1.pureVegRestaurant === "boolean"
-              ? localData.step1.pureVegRestaurant
-              : null,
-          ownerName: localData.step1.ownerName || "",
-          ownerEmail: localData.step1.ownerEmail || "",
-          ownerPhone: localData.step1.ownerPhone || "",
-          primaryContactNumber: localData.step1.primaryContactNumber || "",
-          zoneId: normalizeZoneIdValue(localData.step1.zoneId),
-          location: {
-            formattedAddress: localData.step1.location?.formattedAddress || "",
-            addressLine1: localData.step1.location?.addressLine1 || "",
-            addressLine2: localData.step1.location?.addressLine2 || "",
-            area: localData.step1.location?.area || "",
-            city: localData.step1.location?.city || "",
-            state: localData.step1.location?.state || "",
-            pincode: localData.step1.location?.pincode || "",
-            landmark: localData.step1.location?.landmark || "",
-            latitude: localData.step1.location?.latitude ?? "",
-            longitude: localData.step1.location?.longitude ?? "",
-          },
-        })
+      // Load files from IndexedDB if module cache is empty (refresh case)
+      const hasCachedFiles = 
+        onboardingFileCache.step2.menuImages.length > 0 || 
+        onboardingFileCache.step2.profileImage ||
+        onboardingFileCache.step3.panImage ||
+        onboardingFileCache.step3.gstImage ||
+        onboardingFileCache.step3.fssaiImage
+
+      if (!hasCachedFiles) {
+        const [menuImages, profileImage, panImage, gstImage, fssaiImage] = await Promise.all([
+          getFileFromDB("menuImages"),
+          getFileFromDB("profileImage"),
+          getFileFromDB("panImage"),
+          getFileFromDB("gstImage"),
+          getFileFromDB("fssaiImage"),
+        ])
+
+        if (menuImages || profileImage || panImage || gstImage || fssaiImage) {
+          onboardingFileCache = {
+            step2: {
+              menuImages: menuImages || [],
+              profileImage: profileImage || null,
+            },
+            step3: {
+              panImage: panImage || null,
+              gstImage: gstImage || null,
+              fssaiImage: fssaiImage || null,
+            },
+          }
+        }
       }
-      if (localData.step2) {
-        const restoredMenuImages = (localData.step2.menuImages || []).filter(
-          (img) => img?.url || (typeof img === "string" && img.startsWith("http"))
-        )
-        const cachedMenuImages = onboardingFileCache.step2.menuImages || []
-        const restoredProfileImage =
-          localData.step2.profileImage?.url ||
+
+      const localData = loadOnboardingFromLocalStorage()
+      if (localData) {
+        if (localData.step1) {
+          setStep1({
+            restaurantName: localData.step1.restaurantName || "",
+            pureVegRestaurant:
+              typeof localData.step1.pureVegRestaurant === "boolean"
+                ? localData.step1.pureVegRestaurant
+                : null,
+            ownerName: localData.step1.ownerName || "",
+            ownerEmail: localData.step1.ownerEmail || "",
+            ownerPhone: localData.step1.ownerPhone || "",
+            primaryContactNumber: localData.step1.primaryContactNumber || "",
+            zoneId: normalizeZoneIdValue(localData.step1.zoneId),
+            location: {
+              formattedAddress: localData.step1.location?.formattedAddress || "",
+              addressLine1: localData.step1.location?.addressLine1 || "",
+              addressLine2: localData.step1.location?.addressLine2 || "",
+              area: localData.step1.location?.area || "",
+              city: localData.step1.location?.city || "",
+              state: localData.step1.location?.state || "",
+              pincode: localData.step1.location?.pincode || "",
+              landmark: localData.step1.location?.landmark || "",
+              latitude: localData.step1.location?.latitude ?? "",
+              longitude: localData.step1.location?.longitude ?? "",
+            },
+          })
+        }
+        if (localData.step2) {
+          const restoredMenuImages = (localData.step2.menuImages || []).filter(
+            (img) => img?.url || (typeof img === "string" && img.startsWith("http"))
+          )
+          const cachedMenuImages = onboardingFileCache.step2.menuImages || []
+          const restoredProfileImage =
+            localData.step2.profileImage?.url ||
             (typeof localData.step2.profileImage === "string" &&
-            localData.step2.profileImage.startsWith("http"))
-            ? localData.step2.profileImage
-            : null
-        const cachedProfileImage = onboardingFileCache.step2.profileImage || null
+              localData.step2.profileImage.startsWith("http"))
+              ? localData.step2.profileImage
+              : null
+          const cachedProfileImage = onboardingFileCache.step2.profileImage || null
 
-        setStep2({
-          menuImages: [...restoredMenuImages, ...cachedMenuImages],
-          profileImage: cachedProfileImage || restoredProfileImage,
-          cuisines: localData.step2.cuisines || [],
-          openingTime: normalizeTimeValue(localData.step2.openingTime),
-          closingTime: normalizeTimeValue(localData.step2.closingTime),
-          openDays: localData.step2.openDays || [],
-        })
+          setStep2({
+            menuImages: [...restoredMenuImages, ...cachedMenuImages],
+            profileImage: cachedProfileImage || restoredProfileImage,
+            cuisines: localData.step2.cuisines || [],
+            openingTime: normalizeTimeValue(localData.step2.openingTime),
+            closingTime: normalizeTimeValue(localData.step2.closingTime),
+            openDays: localData.step2.openDays || [],
+          })
+        }
+        if (localData.step3) {
+          setStep3({
+            panNumber: localData.step3.panNumber || "",
+            nameOnPan: localData.step3.nameOnPan || "",
+            panImage: onboardingFileCache.step3.panImage || localData.step3.panImage || null,
+            gstRegistered: localData.step3.gstRegistered || false,
+            gstNumber: localData.step3.gstNumber || "",
+            gstLegalName: localData.step3.gstLegalName || "",
+            gstAddress: localData.step3.gstAddress || "",
+            gstImage: onboardingFileCache.step3.gstImage || localData.step3.gstImage || null,
+            fssaiNumber: localData.step3.fssaiNumber || "",
+            fssaiExpiry: localData.step3.fssaiExpiry || "",
+            fssaiImage: onboardingFileCache.step3.fssaiImage || localData.step3.fssaiImage || null,
+            accountNumber: localData.step3.accountNumber || "",
+            confirmAccountNumber: localData.step3.confirmAccountNumber || "",
+            ifscCode: (localData.step3.ifscCode || "").toUpperCase(),
+            accountHolderName: localData.step3.accountHolderName || "",
+            accountType: normalizeAccountTypeValue(localData.step3.accountType || ""),
+          })
+        }
+        if (localData.step4) {
+          setStep4({
+            estimatedDeliveryTime: localData.step4.estimatedDeliveryTime || "",
+            featuredDish: localData.step4.featuredDish || "",
+            featuredPrice: localData.step4.featuredPrice || "",
+            offer: localData.step4.offer || "",
+          })
+        }
+        // Only set step from localStorage if URL doesn't have a step parameter
+        if (localData.currentStep && !stepParam) {
+          setStep(localData.currentStep)
+        }
       }
-      if (localData.step3) {
-        setStep3({
-          panNumber: localData.step3.panNumber || "",
-          nameOnPan: localData.step3.nameOnPan || "",
-          panImage: onboardingFileCache.step3.panImage || localData.step3.panImage || null,
-          gstRegistered: localData.step3.gstRegistered || false,
-          gstNumber: localData.step3.gstNumber || "",
-          gstLegalName: localData.step3.gstLegalName || "",
-          gstAddress: localData.step3.gstAddress || "",
-          gstImage: onboardingFileCache.step3.gstImage || localData.step3.gstImage || null,
-          fssaiNumber: localData.step3.fssaiNumber || "",
-          fssaiExpiry: localData.step3.fssaiExpiry || "",
-          fssaiImage: onboardingFileCache.step3.fssaiImage || localData.step3.fssaiImage || null,
-          accountNumber: localData.step3.accountNumber || "",
-          confirmAccountNumber: localData.step3.confirmAccountNumber || "",
-          ifscCode: (localData.step3.ifscCode || "").toUpperCase(),
-          accountHolderName: localData.step3.accountHolderName || "",
-          accountType: normalizeAccountTypeValue(localData.step3.accountType || ""),
-        })
-      }
-      if (localData.step4) {
-        setStep4({
-          estimatedDeliveryTime: localData.step4.estimatedDeliveryTime || "",
-          featuredDish: localData.step4.featuredDish || "",
-          featuredPrice: localData.step4.featuredPrice || "",
-          offer: localData.step4.offer || "",
-        })
-      }
-      // Only set step from localStorage if URL doesn't have a step parameter
-      if (localData.currentStep && !stepParam) {
-        setStep(localData.currentStep)
-      }
+      isInitialized.current = true
     }
+
+    init()
   }, [searchParams])
 
   useEffect(() => {
@@ -695,11 +741,15 @@ export default function RestaurantOnboarding() {
 
   // Save to localStorage whenever step data changes
   useEffect(() => {
-    saveOnboardingToLocalStorage(step1, step2, step3, step4, step)
+    if (isInitialized.current) {
+      saveOnboardingToLocalStorage(step1, step2, step3, step4, step)
+    }
   }, [step1, step2, step3, step4, step])
 
   useEffect(() => {
-    syncOnboardingFileCache(step2, step3)
+    if (isInitialized.current) {
+      syncOnboardingFileCache(step2, step3)
+    }
   }, [step2, step3])
 
   useEffect(() => {
@@ -1132,41 +1182,59 @@ export default function RestaurantOnboarding() {
         formData.append("openDays", (step2.openDays || []).join(","))
 
         const menuFiles = (step2.menuImages || []).filter((f) => isUploadableFile(f))
-        if (menuFiles.length === 0) {
-          throw new Error("At least one menu image must be uploaded")
+        const existingMenuImages = (step2.menuImages || []).filter((f) => !isUploadableFile(f) && (f?.url || (typeof f === "string" && f.startsWith("http"))))
+        if (menuFiles.length === 0 && existingMenuImages.length === 0) {
+          throw new Error("At least one menu image is required")
         }
         menuFiles.forEach((file) => formData.append("menuImages", file))
 
-        if (!isUploadableFile(step2.profileImage)) {
+        const isProfileFile = isUploadableFile(step2.profileImage)
+        const hasExistingProfile = !isProfileFile && (step2.profileImage?.url || (typeof step2.profileImage === "string" && step2.profileImage.startsWith("http")))
+        
+        if (!isProfileFile && !hasExistingProfile) {
           throw new Error("Restaurant profile image is required")
         }
-        formData.append("profileImage", step2.profileImage)
+        if (isProfileFile) {
+          formData.append("profileImage", step2.profileImage)
+        }
 
         // Step 3
         formData.append("panNumber", step3.panNumber || "")
         formData.append("nameOnPan", step3.nameOnPan || "")
-        if (!isUploadableFile(step3.panImage)) {
+        const isPanFile = isUploadableFile(step3.panImage)
+        const hasExistingPan = !isPanFile && (step3.panImage?.url || (typeof step3.panImage === "string" && step3.panImage.startsWith("http")))
+        if (!isPanFile && !hasExistingPan) {
           throw new Error("PAN image is required")
         }
-        formData.append("panImage", step3.panImage)
+        if (isPanFile) {
+          formData.append("panImage", step3.panImage)
+        }
 
         formData.append("gstRegistered", step3.gstRegistered ? "true" : "false")
         if (step3.gstRegistered) {
           formData.append("gstNumber", step3.gstNumber || "")
           formData.append("gstLegalName", step3.gstLegalName || "")
           formData.append("gstAddress", step3.gstAddress || "")
-          if (!isUploadableFile(step3.gstImage)) {
+          const isGstFile = isUploadableFile(step3.gstImage)
+          const hasExistingGst = !isGstFile && (step3.gstImage?.url || (typeof step3.gstImage === "string" && step3.gstImage.startsWith("http")))
+          if (!isGstFile && !hasExistingGst) {
             throw new Error("GST image is required when GST registered")
           }
-          formData.append("gstImage", step3.gstImage)
+          if (isGstFile) {
+            formData.append("gstImage", step3.gstImage)
+          }
         }
 
         formData.append("fssaiNumber", step3.fssaiNumber || "")
         formData.append("fssaiExpiry", step3.fssaiExpiry || "")
-        if (!isUploadableFile(step3.fssaiImage)) {
+        const isFssaiFile = isUploadableFile(step3.fssaiImage)
+        const hasExistingFssai = !isFssaiFile && (step3.fssaiImage?.url || (typeof step3.fssaiImage === "string" && step3.fssaiImage.startsWith("http")))
+        if (!isFssaiFile && !hasExistingFssai) {
           throw new Error("FSSAI image is required")
         }
-        formData.append("fssaiImage", step3.fssaiImage)
+        if (isFssaiFile) {
+          formData.append("fssaiImage", step3.fssaiImage)
+        }
 
         formData.append("accountNumber", step3.accountNumber || "")
         formData.append("ifscCode", (step3.ifscCode || "").toUpperCase())
