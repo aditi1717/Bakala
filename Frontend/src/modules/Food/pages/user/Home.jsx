@@ -80,6 +80,7 @@ export default function Home() {
   const stickyHeaderRef = useRef(null);
   const categoryScrollRef = useRef(null);
   const restaurantLoadMoreRef = useRef(null);
+  const isHandlingSwitchOff = useRef(false);
 
   // High-performance data fetching hook
   const {
@@ -143,9 +144,19 @@ export default function Home() {
     openSearch();
   }, [heroSearch, openSearch, setSearchValue]);
 
-  const handleVegModeChange = (newValue) => {
-    setVegModeContext(newValue);
-  };
+  const handleVegModeChange = useCallback((newValue) => {
+    if (newValue) {
+      isHandlingSwitchOff.current = false;
+      setShowSwitchOffPopup(false);
+      setShowVegModePopup(true);
+      return;
+    }
+
+    if (!vegMode || isHandlingSwitchOff.current) return;
+    isHandlingSwitchOff.current = true;
+    setShowVegModePopup(false);
+    setShowSwitchOffPopup(true);
+  }, [vegMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
