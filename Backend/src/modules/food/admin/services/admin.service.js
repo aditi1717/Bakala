@@ -26,7 +26,6 @@ import { FoodSafetyEmergencyReport } from '../models/safetyEmergencyReport.model
 import { FoodAddon } from '../../restaurant/models/foodAddon.model.js';
 import { FoodSupportTicket } from '../../user/models/supportTicket.model.js';
 import { FoodRestaurantSupportTicket } from '../../restaurant/models/supportTicket.model.js';
-import { RestaurantOffer } from '../../restaurant/models/restaurantOffer.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
 import { FoodUserDebt } from '../../orders/models/userDebt.model.js';
@@ -973,11 +972,9 @@ export async function getTransactionReport(query = {}) {
             restaurant: tx.restaurantId?.restaurantName || 'N/A',
             customerName: tx.userId?.name || 'Guest',
             totalItemAmount: subtotal,
-            itemDiscount: pricing.offerByRestaurant || 0,
             couponDiscount: (pricing.couponByAdmin || 0) + (pricing.couponByRestaurant || 0),
             couponByAdmin: pricing.couponByAdmin || 0,
             couponByRestaurant: pricing.couponByRestaurant || 0,
-            offerByRestaurant: pricing.offerByRestaurant || 0,
             referralDiscount: 0, // Placeholder
             discountedAmount: Math.max(0, (pricing.subtotal || 0) - (pricing.discount || 0)),
             vatTax: tx.amounts?.taxAmount || pricing.tax || 0,
@@ -1262,15 +1259,6 @@ export async function getRestaurantReport(query = {}) {
                             $cond: [
                                 { $eq: ['$orderStatus', 'delivered'] },
                                 { $ifNull: ['$pricing.couponByRestaurant', 0] },
-                                0
-                            ]
-                        }
-                    },
-                    totalOfferByRestaurant: {
-                        $sum: {
-                            $cond: [
-                                { $eq: ['$orderStatus', 'delivered'] },
-                                { $ifNull: ['$pricing.offerByRestaurant', 0] },
                                 0
                             ]
                         }
@@ -2950,12 +2938,6 @@ export async function deleteRestaurantById(id, adminScope = {}) {
         .filter((offerId) => offerId && mongoose.Types.ObjectId.isValid(String(offerId)))
         .map((offerId) => new mongoose.Types.ObjectId(String(offerId)));
 
-    const foodItems = await FoodItem.find({ restaurantId }, { _id: 1 }).lean();
-    const foodItemIds = foodItems
-        .map((item) => item?._id)
-        .filter((itemId) => itemId && mongoose.Types.ObjectId.isValid(String(itemId)))
-        .map((itemId) => new mongoose.Types.ObjectId(String(itemId)));
-
     const [
         deletedRestaurant,
         deletedOrders,
@@ -2963,7 +2945,6 @@ export async function deleteRestaurantById(id, adminScope = {}) {
         deletedFoods,
         deletedCategories,
         deletedFoodOffers,
-        deletedRestaurantOffers,
         deletedOfferUsages,
         deletedAddons,
         deletedUserSupportTickets,
@@ -2992,7 +2973,6 @@ export async function deleteRestaurantById(id, adminScope = {}) {
                 { createdByRestaurantId: restaurantId },
             ],
         }),
-        RestaurantOffer.deleteMany({ restaurantId }),
         offerIds.length ? FoodOfferUsage.deleteMany({ offerId: { $in: offerIds } }) : Promise.resolve({ deletedCount: 0 }),
         FoodAddon.deleteMany({ restaurantId }),
         FoodSupportTicket.deleteMany({ restaurantId }),
@@ -3008,11 +2988,6 @@ export async function deleteRestaurantById(id, adminScope = {}) {
 
     if (!deletedRestaurant) return null;
 
-    let deletedRestaurantOffersByFood = { deletedCount: 0 };
-    if (foodItemIds.length) {
-        deletedRestaurantOffersByFood = await RestaurantOffer.deleteMany({ productId: { $in: foodItemIds } });
-    }
-
     return {
         deletedRestaurantId: String(restaurantId),
         cascade: {
@@ -3021,7 +2996,6 @@ export async function deleteRestaurantById(id, adminScope = {}) {
             foods: Number(deletedFoods?.deletedCount || 0),
             categories: Number(deletedCategories?.deletedCount || 0),
             offers: Number(deletedFoodOffers?.deletedCount || 0),
-            restaurantOffers: Number((deletedRestaurantOffers?.deletedCount || 0) + (deletedRestaurantOffersByFood?.deletedCount || 0)),
             offerUsages: Number(deletedOfferUsages?.deletedCount || 0),
             addons: Number(deletedAddons?.deletedCount || 0),
             userSupportTickets: Number(deletedUserSupportTickets?.deletedCount || 0),
@@ -4224,60 +4198,6 @@ export async function getPendingRestaurantOffers(query = {}) {
         offers,
         pagination: { page, limit, total, pages }
     };
-}
-
-export async function getPendingRestaurantProductOffers(query = {}) {
-    const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.min(200, Math.max(1, Number(query.limit) || 50));
-    const skip = (page - 1) * limit;
-    const filter = { approvalStatus: 'pending' };
-    const [list, total] = await Promise.all([
-        RestaurantOffer.find(filter)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .populate({ path: 'restaurantId', select: 'restaurantName' })
-            .lean(),
-        RestaurantOffer.countDocuments(filter)
-    ]);
-
-    const offers = list.map((o, idx) => ({
-        _id: o._id,
-        sl: skip + idx + 1,
-        title: o.title,
-        discountType: o.discountType,
-        discountValue: o.discountValue,
-        minOrderValue: o.minOrderValue ?? 0,
-        maxDiscount: o.maxDiscount ?? null,
-        usageLimit: o.usageLimit ?? null,
-        perUserLimit: o.perUserLimit ?? null,
-        startDate: o.startDate || null,
-        endDate: o.endDate || null,
-        restaurantId: o.restaurantId?._id ? String(o.restaurantId._id) : (o.restaurantId ? String(o.restaurantId) : null),
-        restaurantName: o.restaurantId?.restaurantName || 'Selected Restaurant',
-        createdAt: o.createdAt || null
-    }));
-
-    const pages = Math.ceil(total / limit) || 1;
-    return { offers, pagination: { page, limit, total, pages } };
-}
-
-export async function approveRestaurantProductOffer(id) {
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
-    return RestaurantOffer.findByIdAndUpdate(
-        id,
-        { $set: { approvalStatus: 'approved', status: 'active', rejectionReason: '' } },
-        { new: true }
-    ).lean();
-}
-
-export async function rejectRestaurantProductOffer(id, reason) {
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
-    return RestaurantOffer.findByIdAndUpdate(
-        id,
-        { $set: { approvalStatus: 'rejected', status: 'inactive', rejectionReason: String(reason || '').trim() } },
-        { new: true }
-    ).lean();
 }
 
 export async function approveRestaurantOffer(id) {
@@ -7812,3 +7732,4 @@ export async function updateStoreOrderStatus(orderId, body = {}) {
 
     return updated;
 }
+

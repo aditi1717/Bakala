@@ -12,8 +12,6 @@ import { ValidationError, ForbiddenError, NotFoundError } from '../../../../core
 import { buildPaginationOptions, buildPaginatedResult } from '../../../../utils/helpers.js';
 import { FoodOffer } from '../../admin/models/offer.model.js';
 import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
-import { RestaurantOffer } from '../../restaurant/models/restaurantOffer.model.js';
-import { RestaurantOfferUsage } from '../../restaurant/models/restaurantOfferUsage.model.js';
 import { FoodDeliveryCommissionRule } from '../../admin/models/deliveryCommissionRule.model.js';
 import { FoodRestaurantCommission } from '../../admin/models/restaurantCommission.model.js';
 import { FoodPayoutSettlement } from '../../admin/models/foodPayoutSettlement.model.js';
@@ -41,120 +39,23 @@ import * as foodTransactionService from './foodTransaction.service.js';
 
 const ORDER_ID_PREFIX = "FOD-";
 const ORDER_ID_LENGTH = 6;
-
-const getCartItemProductId = (item = {}) =>
-  String(item?.itemId || item?.productId || item?.id || '').trim();
-
-const calculateRestaurantOfferDiscount = (offer, eligibleSubtotal) => {
-  if (!Number.isFinite(eligibleSubtotal) || eligibleSubtotal <= 0) return 0;
-
-  if (offer?.discountType === 'flat-price') {
-    return Math.max(
-      0,
-      Math.min(eligibleSubtotal, Math.floor(Number(offer?.discountValue) || 0)),
-    );
-  }
-
-  const raw = eligibleSubtotal * ((Number(offer?.discountValue) || 0) / 100);
-  const capped = Number(offer?.maxDiscount)
-    ? Math.min(raw, Number(offer.maxDiscount))
-    : raw;
-
-  return Math.max(0, Math.min(eligibleSubtotal, Math.floor(capped)));
-};
-
-const findApplicableRestaurantAutoOffer = async (restaurantId, items = [], userId = null) => {
-  const normalizedRestaurantId = String(restaurantId || '').trim();
+const resolveOfferEndBoundary = (endDateValue) => {
+  if (!endDateValue) return null;
+  const raw = String(endDateValue).trim();
+  const end = new Date(endDateValue);
+  if (Number.isNaN(end.getTime())) return null;
+  // If date is provided without time, treat it as inclusive till end-of-day.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) end.setHours(23, 59, 59, 999);
+  // Legacy/backfilled safety: stored midnight timestamps should also be full-day inclusive.
   if (
-    !normalizedRestaurantId ||
-    !mongoose.Types.ObjectId.isValid(normalizedRestaurantId) ||
-    !Array.isArray(items) ||
-    items.length === 0
+    end.getHours() === 0 &&
+    end.getMinutes() === 0 &&
+    end.getSeconds() === 0 &&
+    end.getMilliseconds() === 0
   ) {
-    return null;
+    end.setHours(23, 59, 59, 999);
   }
-
-  const cartProductIds = items
-    .map((item) => getCartItemProductId(item))
-    .filter(Boolean);
-
-  if (cartProductIds.length === 0 || cartProductIds.length !== items.length) {
-    return null;
-  }
-
-  const uniqueCartProductIds = [...new Set(cartProductIds)];
-  const now = new Date();
-  const offers = await RestaurantOffer.find({
-    restaurantId: new mongoose.Types.ObjectId(normalizedRestaurantId),
-  }).lean();
-
-  let bestMatch = null;
-  let invalidMatch = null;
-
-  for (const offer of offers) {
-    const productIds = Array.isArray(offer?.productIds) && offer.productIds.length > 0
-      ? offer.productIds.map((id) => String(id))
-      : offer?.productId
-        ? [String(offer.productId)]
-        : [];
-
-    if (productIds.length === 0) continue;
-    if (offer?.status === 'paused') continue;
-    if (offer?.startDate && now < new Date(offer.startDate)) continue;
-    if (offer?.endDate && now >= new Date(offer.endDate)) continue;
-    if (
-      Number(offer?.usageLimit) > 0 &&
-      Number(offer?.usedCount || 0) >= Number(offer?.usageLimit)
-    ) continue;
-
-    if (userId && Number(offer?.perUserLimit) > 0) {
-      const usage = await RestaurantOfferUsage.findOne({
-        offerId: offer._id,
-        userId,
-      }).lean();
-      if (usage && Number(usage.count) >= Number(offer.perUserLimit)) continue;
-    }
-
-    const allowedProducts = new Set(productIds);
-    const allCartItemsBelongToOffer = uniqueCartProductIds.every((id) => allowedProducts.has(id));
-    if (!allCartItemsBelongToOffer) continue;
-
-    const eligibleItemCount = items.reduce((sum, item) => {
-      const itemId = getCartItemProductId(item);
-      if (!allowedProducts.has(itemId)) return sum;
-      return sum + Math.max(0, Number(item?.quantity) || 0);
-    }, 0);
-
-    if (
-      Number(offer?.maxOfferQuantityPerOrder) > 0 &&
-      eligibleItemCount > Number(offer.maxOfferQuantityPerOrder)
-    ) {
-      invalidMatch = {
-        offer,
-        reason: 'max_items_exceeded',
-        eligibleItemCount,
-        maxOfferQuantityPerOrder: Number(offer.maxOfferQuantityPerOrder),
-      };
-      continue;
-    }
-
-    const eligibleSubtotal = items.reduce((sum, item) => {
-      const itemId = getCartItemProductId(item);
-      if (!allowedProducts.has(itemId)) return sum;
-      return sum + (Number(item?.price) || 0) * (Number(item?.quantity) || 1);
-    }, 0);
-
-    if (eligibleSubtotal <= 0) continue;
-
-    const discount = calculateRestaurantOfferDiscount(offer, eligibleSubtotal);
-    if (discount <= 0) continue;
-
-    if (!bestMatch || discount > bestMatch.discount) {
-      bestMatch = { offer, eligibleSubtotal, discount };
-    }
-  }
-
-  return bestMatch || (invalidMatch ? { invalidReason: invalidMatch.reason, ...invalidMatch } : null);
+  return end;
 };
 
 /**
@@ -1022,9 +923,7 @@ export async function calculateOrder(userId, dto) {
 
   let discount = 0;
   let couponDiscount = 0;
-  let autoOfferDiscount = 0;
   let appliedCoupon = null;
-  let autoAppliedOffer = null;
   const codeRaw = dto.couponCode
     ? String(dto.couponCode).trim().toUpperCase()
     : "";
@@ -1037,7 +936,8 @@ export async function calculateOrder(userId, dto) {
       const approvalOk = (offer.approvalStatus || "approved") === "approved";
       const statusOk = offer.status === "active";
       const startOk = !offer.startDate || now >= new Date(offer.startDate);
-      const endOk = !offer.endDate || now < new Date(offer.endDate);
+      const couponEndBoundary = resolveOfferEndBoundary(offer.endDate);
+      const endOk = !couponEndBoundary || now <= couponEndBoundary;
       const scopeOk =
         offer.restaurantScope !== "selected" ||
         String(offer.restaurantId || "") === String(dto.restaurantId || "");
@@ -1093,44 +993,22 @@ export async function calculateOrder(userId, dto) {
             Math.min(subtotal, Math.floor(Number(offer.discountValue) || 0)),
           );
         }
-        appliedCoupon = { code: codeRaw, discount: couponDiscount, fundedBy: offer.fundedBy || 'platform' };
+        const isRestaurantFundedCoupon =
+          offer.fundedBy === 'restaurant' || Boolean(offer.createdByRestaurantId);
+        appliedCoupon = {
+          code: codeRaw,
+          discount: couponDiscount,
+          fundedBy: isRestaurantFundedCoupon ? 'restaurant' : 'platform'
+        };
       }
     }
   }
 
-  const autoOfferMatch = await findApplicableRestaurantAutoOffer(dto.restaurantId, dto.items || [], userId);
-  let autoOfferFeedback = null;
-  if (autoOfferMatch?.offer && !autoOfferMatch?.invalidReason) {
-    autoOfferDiscount = autoOfferMatch.discount;
-    autoAppliedOffer = {
-      code: null,
-      title: autoOfferMatch.offer.title || "Restaurant offer",
-      discount: autoOfferDiscount,
-      type: "restaurant-auto-offer",
-      autoApplied: true,
-      offerId: String(autoOfferMatch.offer._id),
-      eligibleSubtotal: autoOfferMatch.eligibleSubtotal,
-      maxOfferQuantityPerOrder: Number(autoOfferMatch.offer?.maxOfferQuantityPerOrder) || null,
-    };
-  } else if (autoOfferMatch?.invalidReason === 'max_items_exceeded') {
-    autoOfferFeedback = {
-      type: 'restaurant-auto-offer',
-      reason: autoOfferMatch.invalidReason,
-      title: autoOfferMatch.offer?.title || 'Restaurant offer',
-      offerId: String(autoOfferMatch.offer?._id || ''),
-      eligibleItemCount: Number(autoOfferMatch.eligibleItemCount) || 0,
-      maxOfferQuantityPerOrder: Number(autoOfferMatch.maxOfferQuantityPerOrder) || null,
-      message: Number(autoOfferMatch.maxOfferQuantityPerOrder) > 0
-        ? `Only ${Number(autoOfferMatch.maxOfferQuantityPerOrder)} item${Number(autoOfferMatch.maxOfferQuantityPerOrder) > 1 ? 's are' : ' is'} allowed for this offer in one order.`
-        : 'This restaurant offer is no longer applicable.',
-    };
-  }
-  discount = Math.max(0, Math.min(subtotal, couponDiscount + autoOfferDiscount));
+  discount = Math.max(0, Math.min(subtotal, couponDiscount));
   
   // Calculate discount breakdown for reporting
   let couponByAdmin = 0;
   let couponByRestaurant = 0;
-  let offerByRestaurant = autoOfferDiscount;
 
   if (appliedCoupon) {
     if (appliedCoupon.fundedBy === 'restaurant') {
@@ -1154,19 +1032,15 @@ export async function calculateOrder(userId, dto) {
       deliveryFee,
       platformFee,
       couponDiscount,
-      autoOfferDiscount,
       discount,
       couponByAdmin,
       couponByRestaurant,
-      offerByRestaurant,
       previousDue: debtSummary.totalDue,
       totalPayable,
       total,
       currency: "INR",
       couponCode: appliedCoupon?.code || codeRaw || null,
       appliedCoupon,
-      autoAppliedOffer,
-      autoOfferFeedback,
     },
     dues: {
       count: debtSummary.count,
@@ -1231,12 +1105,14 @@ export async function createOrder(userId, dto) {
     discount: Number(dto.pricing?.discount ?? 0),
     couponByAdmin: Number(dto.pricing?.couponByAdmin ?? 0),
     couponByRestaurant: Number(dto.pricing?.couponByRestaurant ?? 0),
-    offerByRestaurant: Number(dto.pricing?.offerByRestaurant ?? 0),
     previousDue: 0,
     totalPayable: 0,
     total: Number(dto.pricing?.total ?? 0),
     currency: String(dto.pricing?.currency || "INR"),
   };
+  normalizedPricing.discount =
+    (Number(normalizedPricing.couponByAdmin) || 0) +
+    (Number(normalizedPricing.couponByRestaurant) || 0);
   const computedTotal = Math.max(
     0,
     (Number.isFinite(normalizedPricing.subtotal)
@@ -1256,12 +1132,7 @@ export async function createOrder(userId, dto) {
         ? normalizedPricing.discount
         : 0),
   );
-  if (
-    !Number.isFinite(normalizedPricing.total) ||
-    normalizedPricing.total <= 0
-  ) {
-    normalizedPricing.total = computedTotal;
-  }
+  normalizedPricing.total = computedTotal;
 
   const debtSummary = await getUnpaidDebtSummary(userId);
   normalizedPricing.previousDue = debtSummary.totalDue;
@@ -1443,31 +1314,6 @@ export async function createOrder(userId, dto) {
     }
   }
 
-  const restaurantAutoOfferId = dto.pricing?.autoAppliedOffer?.offerId
-    ? String(dto.pricing.autoAppliedOffer.offerId).trim()
-    : "";
-  if (
-    orderType === "food" &&
-    restaurantAutoOfferId &&
-    mongoose.Types.ObjectId.isValid(restaurantAutoOfferId)
-  ) {
-    await RestaurantOffer.updateOne(
-      { _id: new mongoose.Types.ObjectId(restaurantAutoOfferId) },
-      { $inc: { usedCount: 1 } },
-    );
-    // Store restaurant offer ID on order for reversal on cancellation
-    await FoodOrder.updateOne({ _id: order._id }, { $set: { appliedRestaurantOfferId: new mongoose.Types.ObjectId(restaurantAutoOfferId) } });
-    if (userId) {
-      await RestaurantOfferUsage.updateOne(
-        {
-          offerId: new mongoose.Types.ObjectId(restaurantAutoOfferId),
-          userId: new mongoose.Types.ObjectId(userId),
-        },
-        { $inc: { count: 1 }, $set: { lastUsedAt: new Date() } },
-        { upsert: true },
-      );
-    }
-  }
 
   const saved = order.toObject();
   return { order: saved, razorpay: razorpayPayload };
@@ -1848,19 +1694,6 @@ export async function cancelOrder(orderId, userId, reason) {
     const cancelledOrder = order.toObject ? order.toObject() : order;
     const cancelUserId = cancelledOrder.userId ? String(cancelledOrder.userId) : null;
 
-    if (cancelledOrder.appliedRestaurantOfferId) {
-      await RestaurantOffer.updateOne(
-        { _id: cancelledOrder.appliedRestaurantOfferId },
-        { $inc: { usedCount: -1 } }
-      );
-      if (cancelUserId && mongoose.Types.ObjectId.isValid(cancelUserId)) {
-        await RestaurantOfferUsage.updateOne(
-          { offerId: cancelledOrder.appliedRestaurantOfferId, userId: new mongoose.Types.ObjectId(cancelUserId) },
-          { $inc: { count: -1 } }
-        );
-      }
-    }
-
     if (cancelledOrder.appliedCouponOfferId) {
       await FoodOffer.updateOne(
         { _id: cancelledOrder.appliedCouponOfferId },
@@ -2126,19 +1959,6 @@ export async function updateOrderStatusRestaurant(
     try {
       const cancelledOrder = order.toObject ? order.toObject() : order;
       const cancelUserId = cancelledOrder.userId ? String(cancelledOrder.userId) : null;
-
-      if (cancelledOrder.appliedRestaurantOfferId) {
-        await RestaurantOffer.updateOne(
-          { _id: cancelledOrder.appliedRestaurantOfferId },
-          { $inc: { usedCount: -1 } }
-        );
-        if (cancelUserId && mongoose.Types.ObjectId.isValid(cancelUserId)) {
-          await RestaurantOfferUsage.updateOne(
-            { offerId: cancelledOrder.appliedRestaurantOfferId, userId: new mongoose.Types.ObjectId(cancelUserId) },
-            { $inc: { count: -1 } }
-          );
-        }
-      }
 
       if (cancelledOrder.appliedCouponOfferId) {
         await FoodOffer.updateOne(
@@ -2428,19 +2248,6 @@ export async function updateOrderStatusAdmin(
     try {
       const cancelledOrder = order.toObject ? order.toObject() : order;
       const cancelUserId = cancelledOrder.userId ? String(cancelledOrder.userId) : null;
-
-      if (cancelledOrder.appliedRestaurantOfferId) {
-        await RestaurantOffer.updateOne(
-          { _id: cancelledOrder.appliedRestaurantOfferId },
-          { $inc: { usedCount: -1 } },
-        );
-        if (cancelUserId && mongoose.Types.ObjectId.isValid(cancelUserId)) {
-          await RestaurantOfferUsage.updateOne(
-            { offerId: cancelledOrder.appliedRestaurantOfferId, userId: new mongoose.Types.ObjectId(cancelUserId) },
-            { $inc: { count: -1 } },
-          );
-        }
-      }
 
       if (cancelledOrder.appliedCouponOfferId) {
         await FoodOffer.updateOne(
@@ -3857,6 +3664,7 @@ export async function deleteOrderAdmin(orderId, adminId, adminScope = {}) {
     orderMongoId: String(order._id),
   };
 }
+
 
 
 

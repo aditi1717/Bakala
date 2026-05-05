@@ -639,7 +639,7 @@ export const adminAPI = {
   getPendingRestaurantOffers: (params = {}) =>
     apiClient.get("/food/admin/offers/pending", { params, contextModule: "admin" }),
   getPendingRestaurantProductOffers: (params = {}) =>
-    apiClient.get("/food/admin/offers/restaurant/pending", { params, contextModule: "admin" }),
+    Promise.resolve({ data: { success: true, data: { offers: [], pagination: { page: 1, limit: 100, total: 0, pages: 1 } } } }),
   createAdminOffer: (body) =>
     apiClient.post("/food/admin/offers", body ?? {}, {
       contextModule: "admin",
@@ -663,9 +663,9 @@ export const adminAPI = {
   rejectRestaurantOffer: (offerId, reason = "") =>
     apiClient.patch(`/food/admin/offers/${String(offerId)}/reject`, { reason: String(reason || "") }, { contextModule: "admin" }),
   approveRestaurantProductOffer: (offerId) =>
-    apiClient.patch(`/food/admin/offers/restaurant/${String(offerId)}/approve`, {}, { contextModule: "admin" }),
+    Promise.reject(new Error("Restaurant product offers are disabled")),
   rejectRestaurantProductOffer: (offerId, reason = "") =>
-    apiClient.patch(`/food/admin/offers/restaurant/${String(offerId)}/reject`, { reason: String(reason || "") }, { contextModule: "admin" }),
+    Promise.reject(new Error("Restaurant product offers are disabled")),
 
   /** Delivery Partner Bonus (admin) */
   getDeliveryPartnerBonusTransactions: (params = {}) =>
@@ -1061,9 +1061,7 @@ export const adminAPI = {
   // Public restaurant offers; if restaurantId provided, hits public route
   getPublicOffers: (restaurantId) =>
     restaurantId
-      ? apiClient.get(`/food/restaurant/public/restaurants/${restaurantId}/offers`, {
-          contextModule: "user",
-        })
+      ? Promise.resolve({ data: { success: true, data: { offers: [] } } })
       : apiClient.get("/food/restaurant/offers", {
           contextModule: "user",
         }),
@@ -1078,13 +1076,13 @@ export const adminAPI = {
     apiClient.delete(`/food/restaurant/coupons/${String(id)}`, { contextModule: "restaurant" }),
   // Restaurant product offers (no coupon code)
   createRestaurantOffer: (body = {}) =>
-    apiClient.post("/food/restaurant/offers/restaurant", body ?? {}, { contextModule: "restaurant" }),
+    Promise.reject(new Error("Restaurant product offers are disabled")),
   getRestaurantOffers: () =>
-    apiClient.get("/food/restaurant/offers/restaurant", { contextModule: "restaurant" }),
+    Promise.resolve({ data: { success: true, data: { offers: [] } } }),
   deleteRestaurantOffer: (id) =>
-    apiClient.delete(`/food/restaurant/offers/restaurant/${String(id)}`, { contextModule: "restaurant" }),
+    Promise.reject(new Error("Restaurant product offers are disabled")),
   updateRestaurantOffer: (id, body = {}) =>
-    apiClient.patch(`/food/restaurant/offers/restaurant/${String(id)}`, body ?? {}, { contextModule: "restaurant" }),
+    Promise.reject(new Error("Restaurant product offers are disabled")),
   /** Backward-compat helper used by Cart: returns coupons array for an item by adapting public offers */
   getCouponsByItemIdPublic: (restaurantId, _itemId) =>
     apiClient.get("/food/restaurant/offers", { contextModule: "user" }).then((res) => {
@@ -1409,10 +1407,7 @@ export const adminAPI = {
     }),
   getPublicOffers: (restaurantIdOrParams = {}, config = {}) => {
     if (typeof restaurantIdOrParams === "string" && restaurantIdOrParams.trim()) {
-      return apiClient.get(
-        `/food/restaurant/public/restaurants/${String(restaurantIdOrParams).trim()}/offers`,
-        { contextModule: "user", ...config },
-      )
+      return Promise.resolve({ data: { success: true, data: { offers: [] } } })
     }
     return apiClient.get("/food/restaurant/offers", {
       params: restaurantIdOrParams || {},

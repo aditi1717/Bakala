@@ -50,17 +50,7 @@ const pricingSchema = z.object({
     currency: z.string().optional(),
     couponCode: z.string().nullable().optional(),
     couponByAdmin: z.number().min(0).optional(),
-    couponByRestaurant: z.number().min(0).optional(),
-    offerByRestaurant: z.number().min(0).optional(),
-    autoAppliedOffer: z.object({
-        offerId: z.string().optional(),
-        title: z.string().optional(),
-        discount: z.number().optional(),
-        type: z.string().optional(),
-        autoApplied: z.boolean().optional(),
-        eligibleSubtotal: z.number().optional(),
-        maxOfferQuantityPerOrder: z.number().nullable().optional()
-    }).nullable().optional()
+    couponByRestaurant: z.number().min(0).optional()
 });
 
 export function validateCalculateOrderDto(body) {
@@ -70,7 +60,7 @@ export function validateCalculateOrderDto(body) {
         restaurantId: z.string().optional(),
         deliveryAddressId: z.string().optional(),
         zoneId: z.string().optional(),
-        couponCode: z.string().optional(),
+        couponCode: z.string().nullable().optional(),
         deliveryFleet: z.string().optional()
     }).superRefine((data, ctx) => {
         if (data.orderType !== 'quick' && !data.restaurantId) {

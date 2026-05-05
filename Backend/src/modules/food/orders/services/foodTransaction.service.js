@@ -49,17 +49,7 @@ export function computeRestaurantCommissionAmount(baseAmount, rule) {
 
 export async function getRestaurantCommissionSnapshot(orderDoc) {
   const subtotal = Number(orderDoc?.pricing?.subtotal ?? 0) || 0;
-  
-  // For Scenario 3 (item-level offers), commission is on discounted amount
-  // For Scenario 1 & 2 (coupons), commission is on original amount
-  const offerByRestaurant = Number(orderDoc?.pricing?.offerByRestaurant ?? 0) || 0;
-  
-  // Base amount for commission calculation
-  // If item-level offer exists, use discounted amount
-  // Otherwise, use original subtotal
-  const baseAmount = offerByRestaurant > 0 
-    ? Math.max(0, subtotal - offerByRestaurant)
-    : subtotal;
+  const baseAmount = subtotal;
   
   const restaurantIdRaw =
     orderDoc?.restaurantId?._id ?? orderDoc?.restaurantId ?? null;
@@ -108,14 +98,12 @@ export async function createInitialTransaction(order) {
         Number.isFinite(restaurantCommissionFromOrder) && restaurantCommissionFromOrder > 0
             ? restaurantCommissionFromOrder
             : (commissionAmount || 0);
-    // Scenario 1 (restaurant coupon) & Scenario 3 (item offer): deduct restaurant-funded discounts
+    // Restaurant-funded coupons are deducted from the restaurant payout.
     // from restaurantNet so the stored restaurantShare reflects the restaurant's true payout.
     const couponByRestaurant = Number(order.pricing?.couponByRestaurant || 0);
-    const offerByRestaurant  = Number(order.pricing?.offerByRestaurant  || 0);
     const restaurantNet = (order.pricing?.subtotal || 0) + (order.pricing?.packagingFee || 0)
         - restaurantCommission
-        - couponByRestaurant   // Scenario 1: restaurant-funded coupon deducted from payout
-        - offerByRestaurant;   // Scenario 3: item-level offer deducted from payout
+        - couponByRestaurant;
 
     // Scenario 2 (platform coupon): deduct couponByAdmin so platform net profit reflects
     // the true cost of funding the discount.
@@ -165,7 +153,6 @@ export async function createInitialTransaction(order) {
             discount: Number(order.pricing?.discount || 0) || 0,
             couponByAdmin: Number(order.pricing?.couponByAdmin || 0) || 0,
             couponByRestaurant: Number(order.pricing?.couponByRestaurant || 0) || 0,
-            offerByRestaurant: Number(order.pricing?.offerByRestaurant || 0) || 0,
             total: Number(order.pricing?.total || 0) || 0,
             currency: String(order.pricing?.currency || order.currency || 'INR'),
         },

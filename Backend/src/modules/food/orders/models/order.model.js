@@ -54,7 +54,6 @@ const pricingSchema = new mongoose.Schema(
         // Discount breakdown for reporting
         couponByAdmin: { type: Number, default: 0, min: 0 },
         couponByRestaurant: { type: Number, default: 0, min: 0 },
-        offerByRestaurant: { type: Number, default: 0, min: 0 },
         total: { type: Number, required: true, min: 0 },
         currency: { type: String, default: 'INR' }
     },
@@ -299,8 +298,6 @@ const orderSchema = new mongoose.Schema(
         sendCutlery: { type: Boolean, default: true },
         deliveryFleet: { type: String, default: 'standard', trim: true },
         scheduledAt: { type: Date, default: null },
-        /** Stores the restaurant auto-offer ID applied at order creation so usage can be reversed on cancellation */
-        appliedRestaurantOfferId: { type: mongoose.Schema.Types.ObjectId, ref: 'RestaurantOffer', default: null },
         /** Stores the coupon (FoodOffer) ID applied at order creation so usage can be reversed on cancellation */
         appliedCouponOfferId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodOffer', default: null },
         riderEarning: { type: Number, default: 0, min: 0 },

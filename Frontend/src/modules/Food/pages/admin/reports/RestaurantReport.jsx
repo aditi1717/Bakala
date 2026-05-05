@@ -159,7 +159,6 @@ export default function RestaurantReport() {
       { key: "totalAdminCommission", label: "Admin Commission" },
       { key: "totalCouponByAdmin", label: "Coupon by Admin" },
       { key: "totalCouponByRestaurant", label: "Coupon by Restaurant" },
-      { key: "totalOfferByRestaurant", label: "Offer by Restaurant" },
       { key: "totalGST", label: "GST" },
       { key: "totalRestaurantEarning", label: "Total Restaurant Earning" },
       { key: "paidRestaurantEarning", label: "Paid To Restaurant" },
@@ -177,7 +176,6 @@ export default function RestaurantReport() {
           acc.totalAdminCommission += toAmountNumber(item.totalAdminCommission)
           acc.totalCouponByAdmin += toAmountNumber(item.totalCouponByAdmin)
           acc.totalCouponByRestaurant += toAmountNumber(item.totalCouponByRestaurant)
-          acc.totalOfferByRestaurant += toAmountNumber(item.totalOfferByRestaurant)
           acc.totalGST += toAmountNumber(item.totalGST)
           acc.totalRestaurantEarning += toAmountNumber(item.totalRestaurantEarning)
           acc.paidRestaurantEarning += toAmountNumber(item.paidRestaurantEarning)
@@ -197,7 +195,6 @@ export default function RestaurantReport() {
           totalAdminCommission: 0,
           totalCouponByAdmin: 0,
           totalCouponByRestaurant: 0,
-          totalOfferByRestaurant: 0,
           totalGST: 0,
           totalRestaurantEarning: 0,
           paidRestaurantEarning: 0,
@@ -221,7 +218,6 @@ export default function RestaurantReport() {
             <td class="num">${htmlEscape(item.totalAdminCommission ?? 0)}</td>
             <td class="num">${htmlEscape(item.totalCouponByAdmin ?? 0)}</td>
             <td class="num">${htmlEscape(item.totalCouponByRestaurant ?? 0)}</td>
-            <td class="num">${htmlEscape(item.totalOfferByRestaurant ?? 0)}</td>
             <td class="num">${htmlEscape(item.totalGST ?? 0)}</td>
             <td class="num">${htmlEscape(item.totalRestaurantEarning ?? 0)}</td>
             <td class="num">${htmlEscape(item.paidRestaurantEarning ?? 0)}</td>
@@ -259,7 +255,6 @@ export default function RestaurantReport() {
                   <th>Admin Commission</th>
                   <th>Coupon by Admin</th>
                   <th>Coupon by Restaurant</th>
-                  <th>Offer by Restaurant</th>
                   <th>GST</th>
                   <th>Total Restaurant Earning</th>
                   <th>Paid To Restaurant</th>
@@ -280,7 +275,6 @@ export default function RestaurantReport() {
                   <td class="num">${htmlEscape(metrics.totalAdminCommission.toFixed(2))}</td>
                   <td class="num">${htmlEscape(metrics.totalCouponByAdmin.toFixed(2))}</td>
                   <td class="num">${htmlEscape(metrics.totalCouponByRestaurant.toFixed(2))}</td>
-                  <td class="num">${htmlEscape(metrics.totalOfferByRestaurant.toFixed(2))}</td>
                   <td class="num">${htmlEscape(metrics.totalGST.toFixed(2))}</td>
                   <td class="num">${htmlEscape(metrics.totalRestaurantEarning.toFixed(2))}</td>
                   <td class="num">${htmlEscape(metrics.paidRestaurantEarning.toFixed(2))}</td>
@@ -586,12 +580,6 @@ export default function RestaurantReport() {
                   </th>
                   <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                     <div className="flex items-center justify-end gap-1">
-                      <span>Offer by Restaurant</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center justify-end gap-1">
                       <span>GST</span>
                       <ArrowUpDown className="w-3 h-3 text-slate-400" />
                     </div>
@@ -643,7 +631,7 @@ export default function RestaurantReport() {
               <tbody className="bg-white divide-y divide-slate-100">
                 {filteredRestaurants.length === 0 ? (
                   <tr>
-                    <td colSpan={16} className="px-6 py-20 text-center">
+                    <td colSpan={15} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                         <p className="text-sm text-slate-500">No restaurants match your search</p>
@@ -691,9 +679,6 @@ export default function RestaurantReport() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
                         <span className="text-sm font-medium text-orange-600">{restaurant.totalCouponByRestaurant}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
-                        <span className="text-sm font-medium text-purple-600">{restaurant.totalOfferByRestaurant}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right tabular-nums">
                         <span className="text-sm text-slate-700">{restaurant.totalGST}</span>

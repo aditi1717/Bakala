@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react"
-import { Routes, Route } from "react-router-dom"
+import { Routes, Route, Navigate } from "react-router-dom"
 import ProtectedRoute from "@food/components/ProtectedRoute"
 import Loader from "@food/components/Loader"
 
@@ -23,8 +23,6 @@ const EditAdvertisementPage = lazy(() => import("@food/pages/restaurant/EditAdve
 const CouponListPage = lazy(() => import("@food/pages/restaurant/CouponListPage"))
 const AddCouponPage = lazy(() => import("@food/pages/restaurant/AddCouponPage"))
 const EditCouponPage = lazy(() => import("@food/pages/restaurant/EditCouponPage"))
-const RestaurantOffersPage = lazy(() => import("@food/pages/restaurant/OffersPage"))
-const AddOfferPage = lazy(() => import("@food/pages/restaurant/AddOfferPage"))
 const ReviewsPage = lazy(() => import("@food/pages/restaurant/ReviewsPage"))
 const UpdateReplyPage = lazy(() => import("@food/pages/restaurant/UpdateReplyPage"))
 const SettingsPage = lazy(() => import("@food/pages/restaurant/SettingsPage"))
@@ -104,9 +102,9 @@ export default function RestaurantRouter() {
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><CouponListPage /></ProtectedRoute>} path="coupon" />
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><AddCouponPage /></ProtectedRoute>} path="coupon/new" />
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><EditCouponPage /></ProtectedRoute>} path="coupon/:id/edit" />
-        <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><RestaurantOffersPage /></ProtectedRoute>} path="offers" />
-        <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><AddOfferPage /></ProtectedRoute>} path="offers/new" />
-        <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><AddOfferPage /></ProtectedRoute>} path="offers/:id/edit" />
+        <Route element={<Navigate to="/restaurant/coupon" replace />} path="offers" />
+        <Route element={<Navigate to="/restaurant/coupon" replace />} path="offers/new" />
+        <Route element={<Navigate to="/restaurant/coupon" replace />} path="offers/:id/edit" />
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><ReviewsPage /></ProtectedRoute>} path="reviews" />
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><UpdateReplyPage /></ProtectedRoute>} path="reviews/:id/reply" />
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><SettingsPage /></ProtectedRoute>} path="settings" />

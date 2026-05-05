@@ -47,11 +47,11 @@ export const validateCreateOfferDto = (body) => {
         }
     }
 
-    const endDate = result.data.endDate ? new Date(`${result.data.endDate}T00:00:00.000Z`) : undefined;
+    const endDate = result.data.endDate ? new Date(`${result.data.endDate}T23:59:59.999`) : undefined;
     if (endDate && Number.isNaN(endDate.getTime())) {
         throw new ValidationError('Invalid endDate');
     }
-    const startDate = result.data.startDate ? new Date(`${result.data.startDate}T00:00:00.000Z`) : undefined;
+    const startDate = result.data.startDate ? new Date(`${result.data.startDate}T00:00:00.000`) : undefined;
     if (startDate && Number.isNaN(startDate.getTime())) {
         throw new ValidationError('Invalid startDate');
     }

@@ -256,15 +256,14 @@ export default function RegularOrderReport() {
             // Discount breakdown
             const couponByAdmin = Number(pricing.couponByAdmin || 0)
             const couponByRestaurant = Number(pricing.couponByRestaurant || 0)
-            const offerByRestaurant = Number(pricing.offerByRestaurant || 0)
-            const totalDiscount = couponByAdmin + couponByRestaurant + offerByRestaurant
+            const totalDiscount = couponByAdmin + couponByRestaurant
             
             // Admin commission
             const adminCommission = Number(pricing.restaurantCommission || 0)
             
             // Earnings
             const packagingFee = Number(pricing.packagingFee || 0)
-            const restaurantEarning = Math.max(0, subtotal + packagingFee - adminCommission - couponByRestaurant - offerByRestaurant)
+            const restaurantEarning = Math.max(0, subtotal + packagingFee - adminCommission - couponByRestaurant)
             const deliveryBoyEarning = Number(order.riderEarning || 0)
             
             const computedTotal =
@@ -298,7 +297,6 @@ export default function RegularOrderReport() {
               totalItemAmount: subtotal,
               couponByAdmin,
               couponByRestaurant,
-              offerByRestaurant,
               restaurantEarning,
               adminCommission,
               deliveryBoyEarning,
@@ -435,7 +433,6 @@ export default function RegularOrderReport() {
       { key: "totalItemAmount", label: "Total Item Amount" },
       { key: "couponByAdmin", label: "Coupon by Admin" },
       { key: "couponByRestaurant", label: "Coupon by Restaurant" },
-      { key: "offerByRestaurant", label: "Offer by Restaurant" },
       { key: "restaurantEarning", label: "Restaurant Earning" },
       { key: "adminCommission", label: "Admin Commission" },
       { key: "deliveryBoyEarning", label: "Delivery Boy Earning" },
@@ -451,7 +448,6 @@ export default function RegularOrderReport() {
           acc.totalItemAmount += toAmountNumber(order.totalItemAmount)
           acc.couponByAdmin += toAmountNumber(order.couponByAdmin)
           acc.couponByRestaurant += toAmountNumber(order.couponByRestaurant)
-          acc.offerByRestaurant += toAmountNumber(order.offerByRestaurant)
           acc.restaurantEarning += toAmountNumber(order.restaurantEarning)
           acc.adminCommission += toAmountNumber(order.adminCommission)
           acc.deliveryBoyEarning += toAmountNumber(order.deliveryBoyEarning)
@@ -465,7 +461,6 @@ export default function RegularOrderReport() {
           totalItemAmount: 0,
           couponByAdmin: 0,
           couponByRestaurant: 0,
-          offerByRestaurant: 0,
           restaurantEarning: 0,
           adminCommission: 0,
           deliveryBoyEarning: 0,
@@ -486,7 +481,6 @@ export default function RegularOrderReport() {
               <td class="num">${htmlEscape(toAmountNumber(order.totalItemAmount).toFixed(2))}</td>
               <td class="num">${htmlEscape(toAmountNumber(order.couponByAdmin).toFixed(2))}</td>
               <td class="num">${htmlEscape(toAmountNumber(order.couponByRestaurant).toFixed(2))}</td>
-              <td class="num">${htmlEscape(toAmountNumber(order.offerByRestaurant).toFixed(2))}</td>
               <td class="num">${htmlEscape(toAmountNumber(order.restaurantEarning).toFixed(2))}</td>
               <td class="num">${htmlEscape(toAmountNumber(order.adminCommission).toFixed(2))}</td>
               <td class="num">${htmlEscape(toAmountNumber(order.deliveryBoyEarning).toFixed(2))}</td>
@@ -522,7 +516,6 @@ export default function RegularOrderReport() {
                   <th>Total Item Amount</th>
                   <th>Coupon by Admin</th>
                   <th>Coupon by Restaurant</th>
-                  <th>Offer by Restaurant</th>
                   <th>Restaurant Earning</th>
                   <th>Admin Commission</th>
                   <th>Delivery Boy Earning</th>
@@ -542,7 +535,6 @@ export default function RegularOrderReport() {
                   <td class="num">${htmlEscape(totals.totalItemAmount.toFixed(2))}</td>
                   <td class="num">${htmlEscape(totals.couponByAdmin.toFixed(2))}</td>
                   <td class="num">${htmlEscape(totals.couponByRestaurant.toFixed(2))}</td>
-                  <td class="num">${htmlEscape(totals.offerByRestaurant.toFixed(2))}</td>
                   <td class="num">${htmlEscape(totals.restaurantEarning.toFixed(2))}</td>
                   <td class="num">${htmlEscape(totals.adminCommission.toFixed(2))}</td>
                   <td class="num">${htmlEscape(totals.deliveryBoyEarning.toFixed(2))}</td>
@@ -941,9 +933,6 @@ export default function RegularOrderReport() {
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider w-[6%]">
                     Coupon by Restaurant
                   </th>
-                  <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider w-[6%]">
-                    Offer by Restaurant
-                  </th>
                   <th className="px-1.5 py-1 text-left text-[8px] font-bold text-slate-700 uppercase tracking-wider w-[7%]">
                     Restaurant Earning
                   </th>
@@ -973,7 +962,7 @@ export default function RegularOrderReport() {
               <tbody className="bg-white divide-y divide-slate-100">
                 {paginatedOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="px-6 py-20 text-center">
+                    <td colSpan={15} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                         <p className="text-sm text-slate-500">No orders match your filters</p>
@@ -1005,9 +994,6 @@ export default function RegularOrderReport() {
                       </td>
                       <td className="px-1.5 py-1">
                         <span className="text-[10px] text-orange-600 font-medium">{formatAmount(order.couponByRestaurant)}</span>
-                      </td>
-                      <td className="px-1.5 py-1">
-                        <span className="text-[10px] text-purple-600 font-medium">{formatAmount(order.offerByRestaurant)}</span>
                       </td>
                       <td className="px-1.5 py-1">
                         <span className="text-[10px] text-emerald-600 font-semibold">{formatAmount(order.restaurantEarning)}</span>

@@ -33,18 +33,16 @@ export const useRestaurantDetailsData = ({ slug, zoneId, userLocation }) => {
 
       const rawRestaurant = res.data.data.restaurant || res.data.data;
       
-      // 2. Parallel Fetch: Menu, Offers, and Outlet Timings
+      // 2. Parallel Fetch: Menu and Outlet Timings
       const restaurantId = rawRestaurant._id || rawRestaurant.restaurantId;
       
-      const [menuRes, offersRes, timingsRes] = await Promise.all([
+      const [menuRes, timingsRes] = await Promise.all([
         restaurantAPI.getMenuByRestaurantId(restaurantId, { noCache: true }).catch(() => null),
-        restaurantAPI.getPublicOffers(restaurantId).catch(() => ({ data: { data: { offers: [] } } })),
         restaurantAPI.getOutletTimingsByRestaurantId(restaurantId).catch(() => null)
       ]);
 
       // 3. Process Data
       const menuData = menuRes?.data?.data?.menu || { sections: [] };
-      const publicOffers = offersRes?.data?.data?.offers || offersRes?.data?.offers || [];
       const timings = timingsRes?.data?.data?.outletTimings || timingsRes?.data?.outletTimings || null;
 
       const transformed = {
@@ -57,7 +55,7 @@ export const useRestaurantDetailsData = ({ slug, zoneId, userLocation }) => {
       };
 
       setRestaurant(transformed);
-      setRestaurantOffers(publicOffers);
+      setRestaurantOffers([]);
       fetchedRef.current = true;
       slugRef.current = slug;
 

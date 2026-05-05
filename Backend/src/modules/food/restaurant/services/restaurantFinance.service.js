@@ -104,7 +104,6 @@ function mapTransactionToFinanceOrder(tx, effectiveDateOverride = null) {
             packagingFee: order?.pricing?.packagingFee || 0,
             couponByAdmin: order?.pricing?.couponByAdmin || 0,
             couponByRestaurant: order?.pricing?.couponByRestaurant || 0,
-            offerByRestaurant: order?.pricing?.offerByRestaurant || 0,
             tax: order?.pricing?.tax || 0,
             deliveryFee: order?.pricing?.deliveryFee || 0,
             platformFee: order?.pricing?.platformFee || 0,

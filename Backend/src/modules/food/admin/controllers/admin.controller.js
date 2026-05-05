@@ -675,44 +675,6 @@ export async function rejectRestaurantOffer(req, res, next) {
     }
 }
 
-// Restaurant product offers (auto offers)
-export async function getPendingRestaurantProductOffers(req, res, next) {
-    try {
-        const data = await adminService.getPendingRestaurantProductOffers(req.query || {});
-        res.status(200).json({ success: true, message: 'Pending restaurant offers fetched successfully', data });
-    } catch (error) {
-        next(error);
-    }
-}
-
-export async function approveRestaurantProductOffer(req, res, next) {
-    try {
-        const { id } = req.params;
-        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, message: 'Invalid offer id' });
-        }
-        const updated = await adminService.approveRestaurantProductOffer(id);
-        if (!updated) return res.status(404).json({ success: false, message: 'Offer not found' });
-        res.status(200).json({ success: true, message: 'Offer approved successfully', data: { offer: updated } });
-    } catch (error) {
-        next(error);
-    }
-}
-
-export async function rejectRestaurantProductOffer(req, res, next) {
-    try {
-        const { id } = req.params;
-        const reason = req.body?.reason || '';
-        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, message: 'Invalid offer id' });
-        }
-        const updated = await adminService.rejectRestaurantProductOffer(id, reason);
-        if (!updated) return res.status(404).json({ success: false, message: 'Offer not found' });
-        res.status(200).json({ success: true, message: 'Offer rejected successfully', data: { offer: updated } });
-    } catch (error) {
-        next(error);
-    }
-}
 
 export async function getSupportTicketsController(req, res, next) {
     try {
@@ -1809,3 +1771,5 @@ export async function updateStoreOrderStatus(req, res, next) {
         next(error);
     }
 }
+
+

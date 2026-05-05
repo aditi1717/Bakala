@@ -38,7 +38,6 @@ const isExploreContextPath = (pathname = "", state) => {
     "/food/restaurant/outlet-info",
     "/food/restaurant/outlet-timings",
     "/food/restaurant/coupon",
-    "/food/restaurant/offers",
     "/food/restaurant/delivery-settings",
     "/food/restaurant/zone-setup",
     "/food/restaurant/help-centre/support",

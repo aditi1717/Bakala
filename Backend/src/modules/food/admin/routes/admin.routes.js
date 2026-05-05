@@ -184,9 +184,6 @@ router.patch('/offers/:id', adminController.updateAdminOffer);
 router.delete('/offers/:id', adminController.deleteAdminOffer);
 router.patch('/offers/:id/approve', adminController.approveRestaurantOffer);
 router.patch('/offers/:id/reject', adminController.rejectRestaurantOffer);
-router.get('/offers/restaurant/pending', adminController.getPendingRestaurantProductOffers);
-router.patch('/offers/restaurant/:id/approve', adminController.approveRestaurantProductOffer);
-router.patch('/offers/restaurant/:id/reject', adminController.rejectRestaurantProductOffer);
 
 // ----- Feedback Experience (Admin) -----
 router.get('/feedback-experiences', feedbackExperienceController.getFeedbackExperiences);

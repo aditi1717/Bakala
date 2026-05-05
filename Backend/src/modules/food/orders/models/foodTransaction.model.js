@@ -34,7 +34,6 @@ const foodTransactionSchema = new mongoose.Schema({
         // Discount breakdown for reporting
         couponByAdmin: { type: Number, default: 0, min: 0 },
         couponByRestaurant: { type: Number, default: 0, min: 0 },
-        offerByRestaurant: { type: Number, default: 0, min: 0 },
         total: { type: Number, default: 0, min: 0 },
         currency: { type: String, default: 'INR', trim: true },
     },

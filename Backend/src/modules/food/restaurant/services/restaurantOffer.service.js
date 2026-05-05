@@ -5,6 +5,24 @@ import { FoodRestaurant } from '../models/restaurant.model.js';
 
 const toStr = (v) => (v != null ? String(v).trim() : '');
 
+const normalizeCouponStartDate = (value) => {
+    if (!value) return null;
+    const raw = String(value).trim();
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return date;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) date.setHours(0, 0, 0, 0);
+    return date;
+};
+
+const normalizeCouponEndDate = (value) => {
+    if (!value) return null;
+    const raw = String(value).trim();
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return date;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) date.setHours(23, 59, 59, 999);
+    return date;
+};
+
 const normalizeCouponPayload = (body = {}) => {
     const couponCode = toStr(body.couponCode).toUpperCase();
     if (!couponCode) throw new ValidationError('Coupon code is required');
@@ -49,8 +67,8 @@ const normalizeCouponPayload = (body = {}) => {
         throw new ValidationError('Total usage limit must be greater than per-user limit');
     }
 
-    const startDate = body.startDate ? new Date(body.startDate) : null;
-    const endDate = body.endDate ? new Date(body.endDate) : null;
+    const startDate = body.startDate ? normalizeCouponStartDate(body.startDate) : null;
+    const endDate = body.endDate ? normalizeCouponEndDate(body.endDate) : null;
 
     if (startDate && Number.isNaN(startDate.getTime())) throw new ValidationError('Invalid start date');
     if (endDate && Number.isNaN(endDate.getTime())) throw new ValidationError('Invalid end date');
@@ -95,6 +113,7 @@ export async function createRestaurantOffer(restaurantId, body = {}) {
 
     const doc = await FoodOffer.create({
         ...payload,
+        fundedBy: 'restaurant',
         restaurantScope: 'selected',
         restaurantId: restaurant._id,
         createdByRestaurantId: restaurant._id,
@@ -193,6 +212,7 @@ export async function updateRestaurantOffer(restaurantId, offerId, body = {}) {
         {
             $set: {
                 ...payload,
+                fundedBy: 'restaurant',
                 restaurantScope: 'selected',
                 restaurantId: existing.restaurantId,
                 approvalStatus: 'pending',

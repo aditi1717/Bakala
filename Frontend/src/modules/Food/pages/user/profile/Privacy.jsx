@@ -17,6 +17,15 @@ export default function Privacy() {
     title: 'Privacy Policy',
     content: ''
   })
+  const legalTheme = BRAND_THEME?.tokens?.legal || {
+    pageBackground: "bg-gray-50 dark:bg-[#0a0a0a]",
+    loader: BRAND_THEME?.colors?.brand?.primary || "#16a34a",
+    headerSurface: "bg-white/95 dark:bg-[#0a0a0a]/95",
+    headerBorder: "border-gray-200 dark:border-gray-800",
+    brandLabel: "Bakalaa",
+    cardSurface: "bg-white dark:bg-[#111111]",
+    cardBorder: "border-gray-200 dark:border-gray-800",
+  }
 
   useEffect(() => {
     fetchPrivacyData()
@@ -42,9 +51,9 @@ export default function Privacy() {
 
   if (loading) {
     return (
-      <div className={`min-h-screen ${BRAND_THEME.tokens.legal.pageBackground} flex items-center justify-center p-6`}>
+      <div className={`min-h-screen ${legalTheme.pageBackground} flex items-center justify-center p-6`}>
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-10 w-10 animate-spin" style={{ color: BRAND_THEME.tokens.legal.loader }} />
+          <Loader2 className="h-10 w-10 animate-spin" style={{ color: legalTheme.loader }} />
           <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">Loading...</p>
         </div>
       </div>
@@ -52,8 +61,8 @@ export default function Privacy() {
   }
 
   return (
-    <AnimatedPage className={`min-h-screen ${BRAND_THEME.tokens.legal.pageBackground} pb-10`}>
-      <div className={`sticky top-0 z-50 ${BRAND_THEME.tokens.legal.headerSurface} backdrop-blur-xl border-b ${BRAND_THEME.tokens.legal.headerBorder}`}>
+    <AnimatedPage className={`min-h-screen ${legalTheme.pageBackground} pb-10`}>
+      <div className={`sticky top-0 z-50 ${legalTheme.headerSurface} backdrop-blur-xl border-b ${legalTheme.headerBorder}`}>
         <div className="max-w-4xl mx-auto px-4 h-16 md:h-20 flex items-center gap-4">
           <Button 
             variant="ghost" 
@@ -67,7 +76,7 @@ export default function Privacy() {
              <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white tracking-tight leading-none">
                {privacyData.title || "Privacy Policy"}
              </h1>
-             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{BRAND_THEME.tokens.legal.brandLabel}</p>
+             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{legalTheme.brandLabel}</p>
           </div>
         </div>
       </div>
@@ -76,7 +85,7 @@ export default function Privacy() {
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`${BRAND_THEME.tokens.legal.cardSurface} rounded-[2rem] p-6 md:p-10 shadow-sm border ${BRAND_THEME.tokens.legal.cardBorder}`}
+          className={`${legalTheme.cardSurface} rounded-[2rem] p-6 md:p-10 shadow-sm border ${legalTheme.cardBorder}`}
         >
           {privacyData.content ? (
             <div
