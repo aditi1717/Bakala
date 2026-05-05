@@ -236,7 +236,7 @@ export default function EditProfile() {
     if (!value) return ""
     const dob = dayjs(value)
     if (!dob.isValid()) return "Please select a valid date of birth"
-    return dob.isAfter(dayjs(), "day") ? "Date of birth cannot be in the future" : ""
+    return dob.isSame(dayjs(), "day") || dob.isAfter(dayjs(), "day") ? "Date of birth cannot be today or in the future" : ""
   }
 
   const handleChange = (field, value) => {
@@ -574,7 +574,7 @@ export default function EditProfile() {
                 <DatePicker
                   value={formData.dateOfBirth}
                   onChange={(newValue) => handleChange('dateOfBirth', newValue)}
-                  maxDate={dayjs()}
+                  maxDate={dayjs().subtract(1, 'day')}
                   slotProps={{
                     textField: {
                       className: "w-full",

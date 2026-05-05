@@ -57,7 +57,7 @@ export default function Home() {
   const [heroSearch, setHeroSearch] = useState("");
   const { openSearch, searchValue, setSearchValue } = useSearchOverlay();
   const { openLocationSelector } = useLocationSelector();
-  const { vegMode, setVegMode: setVegModeContext, getDefaultAddress } = useProfile();
+  const { vegMode, setVegMode: setVegModeContext, getDefaultAddress, addFavorite, removeFavorite, isFavorite } = useProfile();
   const { addToCart, cart } = useCart();
   const { location } = useLocation();
   const { zoneId, zoneStatus } = useZone(location);
@@ -158,6 +158,24 @@ export default function Home() {
     setShowVegModePopup(false);
     setShowSwitchOffPopup(true);
   }, [vegMode]);
+  
+  const handleToggleFavorite = useCallback((e, restaurant) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const slug = restaurant.slug || restaurant.id || restaurant._id;
+    if (isFavorite(slug)) {
+      removeFavorite(slug);
+    } else {
+      // Ensure we have a slug for the favorite key
+      const favData = {
+        ...restaurant,
+        slug: slug,
+        id: restaurant.id || restaurant._id
+      };
+      addFavorite(favData);
+    }
+  }, [isFavorite, addFavorite, removeFavorite]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -364,6 +382,14 @@ export default function Home() {
                       priority={i < 2}
                     />
                     <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/80 text-white text-[10px] font-medium">{r.rating || "NEW"}</div>
+                    <button
+                      onClick={(e) => handleToggleFavorite(e, r)}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 backdrop-blur-md shadow-sm z-10 hover:scale-110 transition-all duration-200"
+                    >
+                      <Heart 
+                        className={`w-3.5 h-3.5 ${isFavorite(r.slug || r.id || r._id) ? "fill-red-500 text-red-500" : "text-gray-400"}`} 
+                      />
+                    </button>
                   </div>
                   <div className="p-3">
                     <p className="text-sm font-semibold truncate">{r.name}</p>
@@ -410,6 +436,14 @@ export default function Home() {
                   />
                   <div className="absolute top-4 left-4 px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-xs font-bold shadow-sm">{r.offer || "Best Price"}</div>
                   <div className="absolute bottom-4 right-4 px-3 py-1 bg-black/70 backdrop-blur-md rounded-full text-white text-xs font-bold">{r.rating} <Star className="w-3 h-3 inline-block fill-yellow-400 text-yellow-400" /></div>
+                  <button
+                    onClick={(e) => handleToggleFavorite(e, r)}
+                    className="absolute top-4 right-4 p-2 rounded-full bg-white/90 backdrop-blur-md shadow-sm z-10 hover:scale-110 transition-all duration-200"
+                  >
+                    <Heart 
+                      className={`w-4 h-4 ${isFavorite(r.slug || r.id || r._id) ? "fill-red-500 text-red-500" : "text-gray-400"}`} 
+                    />
+                  </button>
                 </div>
                 <div className="p-5">
                   <div className="flex justify-between items-start mb-2">

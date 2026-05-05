@@ -160,6 +160,40 @@ function RestaurantDetailsContent() {
   const [highlightedDishId, setHighlightedDishId] = useState(null)
   const [loadingMenuItems, setLoadingMenuItems] = useState(true)
   const [selectedMenuCategory, setSelectedMenuCategory] = useState("all")
+
+  // Prevent background scrolling when any modal or sheet is open
+  useEffect(() => {
+    const isAnyModalOpen =
+      showItemDetail ||
+      showFilterSheet ||
+      showLocationSheet ||
+      showScheduleSheet ||
+      showOffersSheet ||
+      showMenuSheet ||
+      showMenuOptionsSheet ||
+      showShareModal ||
+      showManageCollections
+
+    if (isAnyModalOpen) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = ""
+    }
+
+    return () => {
+      document.body.style.overflow = ""
+    }
+  }, [
+    showItemDetail,
+    showFilterSheet,
+    showLocationSheet,
+    showScheduleSheet,
+    showOffersSheet,
+    showMenuSheet,
+    showMenuOptionsSheet,
+    showShareModal,
+    showManageCollections,
+  ])
   const dishCardRefs = useRef({})
   const [publicRestaurantOffers, setPublicRestaurantOffers] = useState([])
   const restaurantItemOffers = useMemo(
@@ -201,7 +235,6 @@ function RestaurantDetailsContent() {
         sortBy: null,
         vegNonVeg: null,
         highlyReordered: false,
-        spicy: false,
       }
     }
     try {
@@ -220,7 +253,6 @@ function RestaurantDetailsContent() {
                 ? savedFilters.vegNonVeg
                 : null,
             highlyReordered: savedFilters.highlyReordered === true,
-            spicy: savedFilters.spicy === true,
           }
         }
       }
@@ -231,7 +263,6 @@ function RestaurantDetailsContent() {
       sortBy: null,
       vegNonVeg: null,
       highlyReordered: false,
-      spicy: false,
     }
   })
 
@@ -1469,7 +1500,7 @@ function RestaurantDetailsContent() {
     if (filters.sortBy) count++
     if (filters.vegNonVeg) count++
     if (filters.highlyReordered) count++
-    if (filters.spicy) count++
+
     return count
   }
 
@@ -1798,7 +1829,7 @@ function RestaurantDetailsContent() {
       }
 
       if (filters.highlyReordered && !isRecommendedItem(item)) return false
-      if (filters.spicy && item.isSpicy !== true) return false
+
 
       return true
     })
@@ -1977,8 +2008,7 @@ function RestaurantDetailsContent() {
     vegMode === true ||
     filters.sortBy ||
     filters.vegNonVeg ||
-    filters.highlyReordered ||
-    filters.spicy
+    filters.highlyReordered
   )
 
   const filteredSections = useMemo(
@@ -2228,7 +2258,7 @@ function RestaurantDetailsContent() {
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{restaurant?.name || "Unknown Restaurant"}</h1>
-              <Info className="h-5 w-5 text-gray-400" />
+
             </div>
             <div className="flex flex-col items-end">
               <Badge className="bg-green-600 text-white mb-1 flex items-center gap-1 px-2 py-1">
@@ -3018,25 +3048,6 @@ function RestaurantDetailsContent() {
                       </button>
                     </div>
 
-                    {/* Dietary preference */}
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Dietary preference:</h3>
-                      <button
-                        onClick={() =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            spicy: !prev.spicy,
-                          }))
-                        }
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all w-full ${filters.spicy
-                          ? "border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400"
-                          : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
-                          }`}
-                      >
-                        <Flame className="h-4 w-4" />
-                        <span className="font-medium">Spicy</span>
-                      </button>
-                    </div>
                   </div>
 
                   {/* Bottom Action Bar */}
@@ -3047,7 +3058,7 @@ function RestaurantDetailsContent() {
                           sortBy: null,
                           vegNonVeg: null,
                           highlyReordered: false,
-                          spicy: false,
+
                         })
                       }}
                       className="text-red-600 dark:text-red-400 font-medium text-sm hover:text-red-700 dark:hover:text-red-500"
