@@ -3943,6 +3943,14 @@ export async function rejectRestaurant(id, reason) {
 }
 
 // ----- Offers & Coupons -----
+function getEndOfDayTimestamp(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
+}
+
 export async function getAllOffers(_query = {}) {
     const list = await FoodOffer.find({})
         .sort({ createdAt: -1 })
@@ -3951,7 +3959,7 @@ export async function getAllOffers(_query = {}) {
 
     const offers = list.map((o, index) => {
         const now = Date.now();
-        const endTs = o.endDate ? new Date(o.endDate).getTime() : null;
+        const endTs = getEndOfDayTimestamp(o.endDate);
         const isExpired = Boolean(endTs && now >= endTs);
         const restaurantName =
             o.restaurantScope === 'selected'
@@ -4020,7 +4028,7 @@ export async function createAdminOffer(body) {
         approvalStatus: 'approved',
         createdByRestaurantId: null,
         rejectionReason: '',
-        status: body.endDate && new Date(body.endDate).getTime() <= Date.now() ? 'inactive' : 'active',
+        status: body.endDate && getEndOfDayTimestamp(body.endDate) <= Date.now() ? 'inactive' : 'active',
         showInCart: true
     });
 
@@ -4076,7 +4084,7 @@ export async function updateAdminOffer(id, body) {
         startDate: body.startDate,
         isFirstOrderOnly: body.isFirstOrderOnly ?? false,
         endDate: body.endDate,
-        status: body.endDate && new Date(body.endDate).getTime() <= Date.now() ? 'inactive' : 'active',
+        status: body.endDate && getEndOfDayTimestamp(body.endDate) <= Date.now() ? 'inactive' : 'active',
         approvalStatus: 'approved',
         rejectionReason: ''
     };
@@ -4230,8 +4238,9 @@ export async function rejectRestaurantOffer(id, reason) {
 
 export async function expireExpiredOffers() {
     const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     await FoodOffer.updateMany(
-        { status: 'active', endDate: { $lte: now } },
+        { status: 'active', endDate: { $lt: startOfToday } },
         { $set: { status: 'inactive' } }
     );
 }

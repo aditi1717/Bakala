@@ -127,6 +127,22 @@ export default function Coupons() {
     return `${d.getFullYear()}-${m}-${day}`
   }
 
+  const toDateInputValue = (value) => {
+    if (!value) return ""
+    if (typeof value === "string") {
+      const trimmed = value.trim()
+      // Preserve backend date-only values as-is to avoid timezone shifts.
+      const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/)
+      if (match) return match[1]
+    }
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return ""
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, "0")
+    const dd = String(d.getDate()).padStart(2, "0")
+    return `${yyyy}-${mm}-${dd}`
+  }
+
   const validateForm = (draft) => {
     const e = {}
     const f = draft || formData
@@ -234,10 +250,8 @@ export default function Coupons() {
         : (offer.discountPercentage ?? offer.discountValue ?? 0)
       const discountValue = Number(discountValueRaw)
 
-      const startIso = offer.startDate ? new Date(offer.startDate) : null
-      const endIso = offer.endDate ? new Date(offer.endDate) : null
-      const safeStart = startIso && !Number.isNaN(startIso.getTime()) ? startIso.toISOString().split("T")[0] : ""
-      const safeEnd = endIso && !Number.isNaN(endIso.getTime()) ? endIso.toISOString().split("T")[0] : ""
+      const safeStart = toDateInputValue(offer.startDate)
+      const safeEnd = toDateInputValue(offer.endDate)
 
       setFormData({
         couponCode: offer.couponCode || "",
@@ -421,8 +435,8 @@ export default function Coupons() {
         customerScope: offer.customerScope || "all",
         restaurantScope: offer.restaurantScope || "selected",
         restaurantId: offer.restaurantId || "",
-        endDate: offer.endDate ? new Date(offer.endDate).toISOString().split("T")[0] : "",
-        startDate: offer.startDate ? new Date(offer.startDate).toISOString().split("T")[0] : "",
+        endDate: toDateInputValue(offer.endDate),
+        startDate: toDateInputValue(offer.startDate),
         minOrderValue: offer.minOrderValue ?? "",
         maxDiscount: offer.maxDiscount ?? "",
         usageLimit: offer.usageLimit ?? "",
@@ -472,7 +486,7 @@ export default function Coupons() {
   }, [offers, searchQuery])
 
   return (
-    <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
+    <div className="p-4 lg:p-6 bg-slate-50 min-h-screen text-slate-900" style={{ colorScheme: "light" }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
@@ -513,7 +527,7 @@ export default function Coupons() {
         <form
           ref={formTopRef}
           onSubmit={handleSubmit}
-          className="border border-slate-200 rounded-xl p-4 mb-5 bg-slate-50 relative"
+          className="border border-slate-200 rounded-xl p-4 mb-5 bg-slate-50 relative text-black [&_label]:text-black [&_input]:text-black [&_select]:text-black [&_input::placeholder]:text-black/70 [&_input:disabled]:text-black [&_select:disabled]:text-black [&_input:disabled]:opacity-100 [&_select:disabled]:opacity-100 [&_input:disabled]:[-webkit-text-fill-color:#000000] [&_select:disabled]:[-webkit-text-fill-color:#000000]"
         >
               <h3 className="text-base font-semibold text-slate-900 mb-3">
                 {editingOfferId ? "Edit Coupon" : "Create Coupon"}

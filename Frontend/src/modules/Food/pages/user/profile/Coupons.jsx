@@ -5,6 +5,7 @@ import AnimatedPage from "@food/components/user/AnimatedPage";
 import { Button } from "@food/components/ui/button";
 import { restaurantAPI } from "@food/api";
 import { toast } from "sonner";
+import BRAND_THEME from "@/config/brandTheme";
 
 export default function Coupons() {
   const [loading, setLoading] = useState(true);

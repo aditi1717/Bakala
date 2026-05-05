@@ -120,10 +120,14 @@ export async function createInitialTransaction(order) {
     // Scenario 2 (platform coupon): deduct couponByAdmin so platform net profit reflects
     // the true cost of funding the discount.
     const couponByAdmin = Number(order.pricing?.couponByAdmin || 0);
-    const platformNetProfit = (order.pricing?.platformFee || 0) + (order.pricing?.deliveryFee || 0)
+    // Order placement must not fail if initial split is temporarily loss-making.
+    // Keep ledger schema invariant (min: 0) by clamping here; detailed economics
+    // can still be handled in downstream finance reporting/reconciliation.
+    const computedPlatformNetProfit = (order.pricing?.platformFee || 0) + (order.pricing?.deliveryFee || 0)
         + restaurantCommission
         - riderShare
         - couponByAdmin;       // Scenario 2: platform bears the cost of platform-funded coupons
+    const platformNetProfit = Math.max(0, Number(computedPlatformNetProfit) || 0);
 
     const transaction = new FoodTransaction({
         orderId: order._id,

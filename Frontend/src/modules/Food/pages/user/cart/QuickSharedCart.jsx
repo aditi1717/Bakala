@@ -181,7 +181,7 @@ export default function QuickSharedCart() {
         toast.success("Quick order placed successfully");
         clearCart();
         const routeOrderId = order?._id || order?.id || order?.orderId;
-        navigate(`/food/orders/${encodeURIComponent(String(routeOrderId))}?confirmed=true`);
+        navigate(`/food/orders/${encodeURIComponent(String(routeOrderId))}?confirmed=true`, { replace: true });
         return;
       }
 
@@ -217,7 +217,7 @@ export default function QuickSharedCart() {
             toast.success("Quick order placed successfully");
             clearCart();
             const routeOrderId = order?._id || order?.id || order?.orderId;
-            navigate(`/food/orders/${encodeURIComponent(String(routeOrderId))}?confirmed=true`);
+            navigate(`/food/orders/${encodeURIComponent(String(routeOrderId))}?confirmed=true`, { replace: true });
           } else {
             throw new Error("Payment verification failed");
           }
