@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft, Upload, X, Check, Camera, Image as ImageIcon } from "lucide-react"
+import { ArrowLeft, Upload, X, Check, Camera } from "lucide-react"
 import { deliveryAPI } from "@food/api"
 import { toast } from "sonner"
 import { isFlutterBridgeAvailable, openCamera } from "@food/utils/imageUploadUtils"
@@ -402,6 +402,7 @@ export default function SignupStep2() {
   const DocumentUpload = ({ docType, label, required = true }) => {
     const uploaded = uploadedDocs[docType]
     const isUploading = uploading[docType]
+    const showCameraOption = isFlutterBridgeAvailable()
 
     return (
       <div className="bg-white rounded-lg p-4 border border-gray-200">
@@ -446,22 +447,24 @@ export default function SignupStep2() {
             </div>
 
             {!isUploading && (
-              <div className="w-full grid grid-cols-2 gap-2 pb-4">
-                <button
-                  type="button"
-                  onClick={() => handleTakeCameraPhoto(docType, label)}
-                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gray-900 text-white text-xs font-bold cursor-pointer hover:bg-black transition-all active:scale-95"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>Take Photo</span>
-                </button>
+              <div className={`w-full grid grid-cols-1 ${showCameraOption ? "sm:grid-cols-2" : ""} gap-2 pb-4`}>
+                {showCameraOption && (
+                  <button
+                    type="button"
+                    onClick={() => handleTakeCameraPhoto(docType, label)}
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gray-900 text-white text-xs font-bold cursor-pointer hover:bg-black transition-all active:scale-95"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Use Camera</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handlePickFromGallery(docType)}
                   className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[#00B761] text-white text-xs font-bold cursor-pointer hover:bg-[#00A055] transition-all active:scale-95"
                 >
-                  <ImageIcon className="w-4 h-4" />
-                  <span>Gallery</span>
+                  <Upload className="w-4 h-4" />
+                  <span>Upload from Device</span>
                 </button>
               </div>
             )}
