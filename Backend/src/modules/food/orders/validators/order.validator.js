@@ -168,7 +168,8 @@ export function validateOrderStatusDto(body) {
             'delivered',
             'cancelled_by_restaurant',
             'cancelled_by_admin'
-        ])
+        ]),
+        reason: z.string().optional()
     });
     const result = schema.safeParse(body);
     if (!result.success) {

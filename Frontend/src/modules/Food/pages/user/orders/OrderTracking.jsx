@@ -331,6 +331,21 @@ const transformOrderForTracking = (apiOrder, previousOrder = null, explicitResta
     dueAmount,
     paymentMethod: apiOrder?.paymentMethod || apiOrder?.payment?.method || previousOrder?.paymentMethod || null,
     payment: apiOrder?.payment || previousOrder?.payment || null,
+    cancellationReason:
+      typeof apiOrder?.cancellationReason === "string"
+        ? apiOrder.cancellationReason
+        : (typeof apiOrder?.cancelReason === "string"
+            ? apiOrder.cancelReason
+            : (previousOrder?.cancellationReason || previousOrder?.cancelReason || "")),
+    cancelReason:
+      typeof apiOrder?.cancelReason === "string"
+        ? apiOrder.cancelReason
+        : (previousOrder?.cancelReason || ""),
+    cancelledBy: apiOrder?.cancelledBy || previousOrder?.cancelledBy || null,
+    cancelledAt: apiOrder?.cancelledAt || previousOrder?.cancelledAt || null,
+    statusHistory: Array.isArray(apiOrder?.statusHistory)
+      ? apiOrder.statusHistory
+      : (previousOrder?.statusHistory || []),
     // Preserve delivery OTP code received via socket event.
     // API responses intentionally strip the secret code for security,
     // so without preserving it the UI would lose the OTP on each poll refresh.
@@ -818,6 +833,30 @@ export default function OrderTracking() {
     () => !isCancelledOrder && !isDeliveredLikeOrder,
     [isCancelledOrder, isDeliveredLikeOrder],
   )
+
+  const resolvedCancellationReason = useMemo(() => {
+    const directReason =
+      order?.cancellationReason ||
+      order?.cancelReason ||
+      order?.cancellation?.reason ||
+      ""
+    if (String(directReason).trim()) return String(directReason).trim()
+
+    const latestCancelHistory = Array.isArray(order?.statusHistory)
+      ? [...order.statusHistory]
+          .reverse()
+          .find((entry) =>
+            String(entry?.to || "")
+              .toLowerCase()
+              .includes("cancel"),
+          )
+      : null
+
+    const note = String(latestCancelHistory?.note || "").trim()
+    if (!note) return ""
+    const extracted = note.replace(/^.*reason:\s*/i, "").trim()
+    return extracted || note
+  }, [order])
 
   const handleCallRestaurant = (e) => {
     // Prevent event bubbling if necessary
@@ -1350,6 +1389,11 @@ export default function OrderTracking() {
             <div className="flex-1">
               <p className="font-semibold text-gray-900 leading-tight">{currentStatus.title}</p>
               <p className="text-sm text-gray-500 mt-1 leading-snug">{currentStatus.subtitle}</p>
+              {isCancelledOrder && resolvedCancellationReason && (
+                <p className="text-xs text-red-600 mt-1 leading-snug">
+                  Reason: {resolvedCancellationReason}
+                </p>
+              )}
             </div>
           </div>
         </motion.div>
@@ -1401,20 +1445,22 @@ export default function OrderTracking() {
         )}
 
         {/* Delivery Partner Safety */}
-        <motion.button
-          onClick={() => navigate("/food/profile/delivery-safety")}
-          className="w-full bg-white rounded-xl p-4 shadow-sm flex items-center gap-3"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          whileTap={{ scale: 0.99 }}
-        >
-          <Shield className="w-6 h-6 text-gray-600" />
-          <span className="flex-1 text-left font-medium text-gray-900">
-            Learn about delivery partner safety
-          </span>
-          <ChevronRight className="w-5 h-5 text-gray-400" />
-        </motion.button>
+        {!isCancelledOrder && !isDeliveredLikeOrder && (
+          <motion.button
+            onClick={() => navigate("/food/profile/delivery-safety")}
+            className="w-full bg-white rounded-xl p-4 shadow-sm flex items-center gap-3"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            whileTap={{ scale: 0.99 }}
+          >
+            <Shield className="w-6 h-6 text-gray-600" />
+            <span className="flex-1 text-left font-medium text-gray-900">
+              Learn about delivery partner safety
+            </span>
+            <ChevronRight className="w-5 h-5 text-gray-400" />
+          </motion.button>
+        )}
 
         {/* Delivery Details Banner */}
         <motion.div

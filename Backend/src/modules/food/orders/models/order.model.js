@@ -291,6 +291,9 @@ const orderSchema = new mongoose.Schema(
             type: orderRatingsSchema,
             default: () => ({})
         },
+        cancellationReason: { type: String, default: '', trim: true },
+        cancelledBy: { type: String, default: '', trim: true },
+        cancelledAt: { type: Date, default: null },
         note: { type: String, default: '', trim: true },
         restaurantNote: { type: String, default: '', trim: true },
         sendCutlery: { type: Boolean, default: true },

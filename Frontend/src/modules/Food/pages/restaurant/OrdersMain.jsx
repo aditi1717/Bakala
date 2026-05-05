@@ -394,7 +394,31 @@ function CancelledOrders({ onSelectOrder, refreshToken = 0 }) {
             (order) => order.status === "cancelled",
           );
 
-          const transformedOrders = cancelledOrders.map((order) => ({
+          const transformedOrders = cancelledOrders.map((order) => {
+            const latestCancelHistory = Array.isArray(order?.statusHistory)
+              ? [...order.statusHistory]
+                  .reverse()
+                  .find((entry) =>
+                    String(entry?.to || "")
+                      .toLowerCase()
+                      .includes("cancel"),
+                  )
+              : null;
+
+            const fallbackReasonFromNote =
+              typeof latestCancelHistory?.note === "string"
+                ? latestCancelHistory.note
+                    .replace(/^.*reason:\s*/i, "")
+                    .trim()
+                : "";
+
+            const resolvedCancellationReason =
+              order.cancellationReason ||
+              order.cancelReason ||
+              fallbackReasonFromNote ||
+              "No reason provided";
+
+            return {
             orderId: order.orderId || order._id,
             mongoId: order._id,
             status: order.status || "cancelled",
@@ -405,8 +429,7 @@ function CancelledOrders({ onSelectOrder, refreshToken = 0 }) {
             cancelledAt:
               order.cancelledAt || order.updatedAt || order.createdAt,
             cancelledBy: order.cancelledBy || "unknown",
-            cancellationReason:
-              order.cancellationReason || "No reason provided",
+            cancellationReason: resolvedCancellationReason,
             itemsSummary:
               order.items
                 ?.map((item) => `${item.quantity}x ${item.name}`)
@@ -416,7 +439,8 @@ function CancelledOrders({ onSelectOrder, refreshToken = 0 }) {
             photoAlt: order.items?.[0]?.name || "Order",
             amount: order.pricing?.total || order.total || 0,
             paymentMethod: order.paymentMethod || order.payment?.method || null,
-          }));
+          };
+        });
 
           transformedOrders.sort((a, b) => {
             const dateA = new Date(a.cancelledAt);

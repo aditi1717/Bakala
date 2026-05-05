@@ -2090,6 +2090,7 @@ export async function updateOrderStatusRestaurant(
   orderId,
   restaurantId,
   orderStatus,
+  reason = "",
 ) {
   let order = await FoodOrder.findOne({
     _id: new mongoose.Types.ObjectId(orderId),
@@ -2098,12 +2099,26 @@ export async function updateOrderStatusRestaurant(
   if (!order) throw new NotFoundError("Order not found");
   const from = order.orderStatus;
   order.orderStatus = orderStatus;
+  const trimmedReason =
+    typeof reason === "string" ? reason.trim() : "";
+  const cancellationNote =
+    String(orderStatus).includes("cancel") && trimmedReason
+      ? `Restaurant cancelled order. Reason: ${trimmedReason}`
+      : "";
+
   pushStatusHistory(order, {
     byRole: "RESTAURANT",
     byId: restaurantId,
     from,
     to: orderStatus,
+    note: cancellationNote,
   });
+
+  if (String(orderStatus).includes("cancel")) {
+    order.cancelledBy = "restaurant";
+    order.cancelledAt = new Date();
+    order.cancellationReason = trimmedReason || order.cancellationReason || "";
+  }
   await order.save();
 
   // Reverse offer usage counts when restaurant cancels

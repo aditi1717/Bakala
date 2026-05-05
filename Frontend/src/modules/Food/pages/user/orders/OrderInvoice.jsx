@@ -1,6 +1,6 @@
 import { useNavigate, useParams, Link } from "react-router-dom"
 
-import { Download, ArrowLeft, FileText, Printer } from "lucide-react"
+import { Download, ArrowLeft, FileText } from "lucide-react"
 import { useRef, useState, useEffect } from "react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import ScrollReveal from "@food/components/user/ScrollReveal"
@@ -11,6 +11,7 @@ import { orderAPI } from "@food/api"
 import { useOrders } from "@food/context/OrdersContext"
 import { useCompanyName } from "@food/hooks/useCompanyName"
 import BRAND_THEME from "@/config/brandTheme"
+import { toast } from "sonner"
 
 const toMoneyNumber = (value) => {
   const parsed = Number(value)
@@ -203,91 +204,51 @@ export default function OrderInvoice() {
     })
   }
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank')
-    const printContent = invoiceRef.current.innerHTML
-    const displayOrderId = getOrderDisplayId(order, orderId)
+  const handleDownloadPDF = async () => {
+    if (typeof window === "undefined") return
+    if (!invoiceRef.current) {
+      toast.error("Invoice is still loading. Please try again.")
+      return
+    }
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Invoice - ${displayOrderId}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 40px;
-              color: #333;
-            }
-            .invoice-header {
-              border-bottom: 2px solid #EB590E;
-              padding-bottom: 20px;
-              margin-bottom: 30px;
-            }
-            .invoice-title {
-              font-size: 32px;
-              font-weight: bold;
-              color: #EB590E;
-              margin-bottom: 10px;
-            }
-            .invoice-details {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 20px;
-              margin: 30px 0;
-            }
-            .invoice-items {
-              margin: 30px 0;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 20px 0;
-            }
-            th, td {
-              padding: 12px;
-              text-align: left;
-              border-bottom: 1px solid #ddd;
-            }
-            th {
-              background-color: #fed7aa;
-              font-weight: bold;
-            }
-            .total-section {
-              margin-top: 30px;
-              text-align: right;
-            }
-            .total-row {
-              padding: 10px 0;
-              font-size: 18px;
-            }
-            .grand-total {
-              font-size: 24px;
-              font-weight: bold;
-              color: #EB590E;
-              border-top: 2px solid #EB590E;
-              padding-top: 10px;
-            }
-            @media print {
-              body { margin: 0; padding: 20px; }
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          ${printContent}
-        </body>
-      </html>
-    `)
-    printWindow.document.close()
-    printWindow.focus()
-    setTimeout(() => {
-      printWindow.print()
-    }, 250)
-  }
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ])
 
-  const handleDownloadPDF = () => {
-    handlePrint()
+      const canvas = await html2canvas(invoiceRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        scrollY: -window.scrollY,
+      })
+
+      const imgData = canvas.toDataURL("image/png")
+      const pdf = new jsPDF("p", "mm", "a4")
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = pageWidth
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      let heightLeft = imgHeight
+      let position = 0
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      const pdfOrderId = getOrderDisplayId(order, orderId) || "order"
+      pdf.save(`invoice-${pdfOrderId}.pdf`)
+    } catch (err) {
+      toast.error("Failed to generate PDF. Please try again.")
+    }
   }
 
   const invoiceItems = getInvoiceItems(order)
@@ -345,14 +306,6 @@ export default function OrderInvoice() {
               </div>
             </div>
             <div className="flex gap-2 no-print">
-              <Button
-                variant="outline"
-                onClick={handlePrint}
-                className="flex items-center gap-2 text-xs sm:text-sm h-9 sm:h-10"
-              >
-                <Printer className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Print</span>
-              </Button>
               <Button
                 onClick={handleDownloadPDF}
                 className="flex items-center gap-2 text-xs sm:text-sm h-9 sm:h-10 text-white"
@@ -531,14 +484,6 @@ export default function OrderInvoice() {
 
         <ScrollReveal delay={0.2}>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 no-print">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate(`/food/orders/${encodeURIComponent(String(orderId))}`)}
-              className="flex-1 w-full text-sm sm:text-base h-10 sm:h-11"
-            >
-              Track Order
-            </Button>
             <Button
               type="button"
               variant="outline"

@@ -91,6 +91,32 @@ const isItemVeg = (item = {}) => {
   return false
 }
 
+const getFoodIndicatorStyle = (item = {}) => {
+  const normalizedFoodType = getNormalizedFoodType(item)
+
+  if (normalizedFoodType === "veg" || normalizedFoodType === "vegetarian" || item?.isVeg === true) {
+    return {
+      border: "border-green-600 dark:border-green-500",
+      bg: "bg-green-50 dark:bg-green-900/30",
+      dot: "bg-green-600 dark:bg-green-500",
+    }
+  }
+
+  if (normalizedFoodType === "egg") {
+    return {
+      border: "border-yellow-600 dark:border-yellow-500",
+      bg: "bg-yellow-50 dark:bg-yellow-900/30",
+      dot: "bg-yellow-600 dark:bg-yellow-500",
+    }
+  }
+
+  return {
+    border: "border-red-600 dark:border-red-500",
+    bg: "bg-red-50 dark:bg-red-900/30",
+    dot: "bg-red-600 dark:bg-red-500",
+  }
+}
+
 function RestaurantDetailsContent() {
   const { slug } = useParams()
   const navigate = useNavigate()
@@ -3340,9 +3366,14 @@ function RestaurantDetailsContent() {
                     {/* Item Name and Indicator */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2 flex-1">
-                        <div className="h-5 w-5 rounded border-2 border-red-600 dark:border-red-500 bg-red-50 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
-                          <div className="h-2.5 w-2.5 rounded-full bg-red-600 dark:bg-red-500" />
-                        </div>
+                        {(() => {
+                          const indicatorStyle = getFoodIndicatorStyle(selectedItem)
+                          return (
+                            <div className={`h-5 w-5 rounded border-2 ${indicatorStyle.border} ${indicatorStyle.bg} flex items-center justify-center flex-shrink-0`}>
+                              <div className={`h-2.5 w-2.5 rounded-full ${indicatorStyle.dot}`} />
+                            </div>
+                          )
+                        })()}
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                           {selectedItem.name}
                         </h2>
