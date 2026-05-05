@@ -24,16 +24,20 @@ const ROLES = {
   ADMIN: "ADMIN",
 };
 
+const getOtpRequestResponse = (otp) => {
+  if (config.exposeOtpInResponse) {
+    return { otp };
+  }
+  return {};
+};
+
 export const requestUserOtp = async (phone) => {
   if (!phone) {
     throw new ValidationError("Phone is required");
   }
 
   const otp = await createOrUpdateOtp(phone);
-  // TODO: integrate SMS provider here
-  const shouldExposeOtp =
-    config.nodeEnv !== "production" || config.useDefaultOtp;
-  return shouldExposeOtp ? { otp } : {};
+  return getOtpRequestResponse(otp);
 };
 
 export const verifyUserOtpAndLogin = async (
@@ -247,9 +251,7 @@ export const requestRestaurantOtp = async (phone) => {
     throw new ValidationError("Phone is required");
   }
   const otp = await createOrUpdateOtp(phone);
-  const shouldExposeOtp =
-    config.nodeEnv !== "production" || config.useDefaultOtp;
-  return shouldExposeOtp ? { otp } : {};
+  return getOtpRequestResponse(otp);
 };
 
 export const verifyRestaurantOtpAndLogin = async (phone, otp, fcmToken, platform) => {
@@ -339,9 +341,7 @@ export const requestDeliveryOtp = async (phone) => {
   }
   const otp = await createOrUpdateOtp(phone);
   // Only expose OTP in response when in default/dev mode — never in production with real SMS
-  const shouldExposeOtp =
-    config.nodeEnv !== "production" || config.useDefaultOtp;
-  return shouldExposeOtp ? { otp } : {};
+  return getOtpRequestResponse(otp);
 };
 
 const normalizePhoneForDelivery = (phone) => {
