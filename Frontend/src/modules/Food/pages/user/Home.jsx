@@ -249,7 +249,7 @@ export default function Home() {
   ), [displayCategories, showCategorySkeleton, navigate, underPriceLimit]);
 
   const InlineHeroBannerSection = useMemo(() => {
-    if (showBannerSkeleton) return <section className="px-4"><HeroBannerSkeleton className="h-40 w-full" /></section>;
+    if (showBannerSkeleton) return <section className="px-4"><HeroBannerSkeleton className="w-full aspect-[21/9] rounded-[20px] sm:rounded-[28px]" /></section>;
     if (!heroBanners.length) return null;
 
     const onBannerClick = (banner) => {
@@ -275,7 +275,7 @@ export default function Home() {
     return (
       <section className="pt-4 px-4 content-auto">
         <div
-          className="relative overflow-hidden rounded-[28px]"
+          className="relative overflow-hidden rounded-[20px] sm:rounded-[28px]"
           onTouchStart={(e) => {
             heroTouchStartX.current = e.touches[0]?.clientX || 0;
           }}
@@ -289,7 +289,7 @@ export default function Home() {
           }}
         >
           <motion.div
-            className="flex"
+            className="flex items-start"
             animate={{ x: `-${currentHeroBanner * 100}%` }}
             transition={{ type: "tween", ease: "easeInOut", duration: 0.45 }}
           >
@@ -297,9 +297,15 @@ export default function Home() {
               <button
                 key={banner.id || i}
                 onClick={() => onBannerClick(banner)}
-                className="relative block h-40 w-full shrink-0 overflow-hidden rounded-[28px] shadow-sm sm:h-44 lg:h-52"
+                className="relative block w-full shrink-0 rounded-[20px] sm:rounded-[28px] shadow-sm bg-transparent"
               >
-                <OptimizedImage src={banner.imageUrl} alt={banner.title} className="h-full w-full object-cover" />
+                <img 
+                  src={banner.imageUrl} 
+                  alt={banner.title || "Banner"} 
+                  className="w-full h-auto block rounded-[20px] sm:rounded-[28px]" 
+                  loading={i === 0 ? "eager" : "lazy"}
+                  decoding="async"
+                />
               </button>
             ))}
           </motion.div>

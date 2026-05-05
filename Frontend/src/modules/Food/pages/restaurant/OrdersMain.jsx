@@ -824,6 +824,7 @@ export default function OrdersMain() {
   const popupOrderRef = useRef(null);
   const popupHydrationRef = useRef("");
   const selectedOrderHydrationRef = useRef("");
+  const bodyScrollLockRef = useRef(null);
 
   const markOrderAsShown = (orderLike) => {
     const keys = [
@@ -1277,6 +1278,54 @@ export default function OrdersMain() {
   // Keep refs in sync to avoid stale state inside one-time event handlers.
   useEffect(() => {
     showNewOrderPopupRef.current = showNewOrderPopup;
+  }, [showNewOrderPopup]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return undefined;
+    }
+
+    if (!showNewOrderPopup) {
+      return undefined;
+    }
+
+    const body = document.body;
+    const root = document.documentElement;
+    const scrollY = window.scrollY || root.scrollTop || 0;
+
+    bodyScrollLockRef.current = {
+      scrollY,
+      bodyOverflow: body.style.overflow,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+      bodyWidth: body.style.width,
+      rootOverflow: root.style.overflow,
+    };
+
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    root.style.overflow = "hidden";
+
+    return () => {
+      const previous = bodyScrollLockRef.current;
+      bodyScrollLockRef.current = null;
+      if (!previous) return;
+
+      body.style.overflow = previous.bodyOverflow;
+      body.style.position = previous.bodyPosition;
+      body.style.top = previous.bodyTop;
+      body.style.left = previous.bodyLeft;
+      body.style.right = previous.bodyRight;
+      body.style.width = previous.bodyWidth;
+      root.style.overflow = previous.rootOverflow;
+      window.scrollTo(0, previous.scrollY);
+    };
   }, [showNewOrderPopup]);
 
   useEffect(() => {

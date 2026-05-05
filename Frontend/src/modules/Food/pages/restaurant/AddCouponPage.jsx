@@ -111,8 +111,8 @@ export default function AddCouponPage(props) {
     if (form.perUserLimit === "") return "Per user limit is required"
     if (Number(form.perUserLimit) <= 0) return "Per user limit must be greater than 0"
     if (Number(form.usageLimit) <= Number(form.perUserLimit)) return "Total usage limit must be greater than per-user limit"
-    if (form.startDate && form.endDate && new Date(form.endDate) <= new Date(form.startDate)) {
-      return "End date must be after start date"
+    if (form.startDate && form.endDate && new Date(form.endDate) < new Date(form.startDate)) {
+      return "End date must be equal to or after start date"
     }
     return ""
   }

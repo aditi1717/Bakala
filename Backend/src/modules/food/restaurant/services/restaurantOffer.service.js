@@ -54,7 +54,7 @@ const normalizeCouponPayload = (body = {}) => {
 
     if (startDate && Number.isNaN(startDate.getTime())) throw new ValidationError('Invalid start date');
     if (endDate && Number.isNaN(endDate.getTime())) throw new ValidationError('Invalid end date');
-    if (startDate && endDate && endDate.getTime() <= startDate.getTime()) {
+    if (startDate && endDate && endDate.getTime() < startDate.getTime()) {
         throw new ValidationError('End date must be after start date');
     }
 

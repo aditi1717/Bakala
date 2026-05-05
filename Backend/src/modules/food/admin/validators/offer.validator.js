@@ -55,8 +55,8 @@ export const validateCreateOfferDto = (body) => {
     if (startDate && Number.isNaN(startDate.getTime())) {
         throw new ValidationError('Invalid startDate');
     }
-    if (endDate && startDate && endDate.getTime() <= startDate.getTime()) {
-        throw new ValidationError('endDate must be after startDate');
+    if (endDate && startDate && endDate.getTime() < startDate.getTime()) {
+        throw new ValidationError('endDate must be equal to or after startDate');
     }
     if (endDate && endDate.getTime() <= Date.now()) {
         throw new ValidationError('endDate must be a future date');

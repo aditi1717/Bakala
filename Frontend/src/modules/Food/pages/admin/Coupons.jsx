@@ -183,14 +183,14 @@ export default function Coupons() {
       const s = next.startDate ? new Date(`${next.startDate}T00:00:00`) : null
       const e = new Date(`${next.endDate}T00:00:00`)
       if (s && s > e) {
-        // keep but will show error
+        next.endDate = next.startDate
       }
     }
     if (field === "endDate" && next.startDate) {
       const s = new Date(`${next.startDate}T00:00:00`)
       const e = next.endDate ? new Date(`${next.endDate}T00:00:00`) : null
       if (e && e < s) {
-        // keep but will show error
+        next.endDate = next.startDate
       }
     }
     setFormData(next)
