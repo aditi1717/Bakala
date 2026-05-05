@@ -25,12 +25,17 @@ export const config = {
     otpRateLimit: Number(process.env.OTP_RATE_LIMIT || 3),
     otpRateWindow: Number(process.env.OTP_RATE_WINDOW || 600),
     useDefaultOtp: process.env.USE_DEFAULT_OTP === 'true',
+    exposeOtpInResponse: process.env.EXPOSE_OTP_IN_RESPONSE === 'true',
 
-    // SMS India Hub
-    smsIndiaHubUsername: process.env.SMS_INDIA_HUB_USERNAME,
-    smsApiKey: process.env.SMS_INDIA_HUB_API_KEY,
-    smsSenderId: process.env.SMS_INDIA_HUB_SENDER_ID,
-    smsDltTemplateId: process.env.SMS_INDIA_HUB_DLT_TEMPLATE_ID,
+    // MSG91 (fallback to legacy SMS India Hub env names for compatibility)
+    smsApiKey: process.env.MSG91_Auth_Key || process.env.SMS_INDIA_HUB_API_KEY,
+    smsSenderId: process.env.MSG91_Sender_ID || process.env.SMS_INDIA_HUB_SENDER_ID,
+    smsDltTemplateId: process.env.MSG91_DL_Template_ID || process.env.SMS_INDIA_HUB_DLT_TEMPLATE_ID,
+    smsDltPeId: process.env.MSG91_PE_ID || process.env.SMS_INDIA_HUB_PE_ID,
+    smsOtpMessageTemplate:
+        process.env.MSG91_OTP_MESSAGE_TEMPLATE ||
+        process.env.SMS_OTP_MESSAGE_TEMPLATE ||
+        'Bakalaa: {{OTP}} is your login OTP. Use this OTP to login to your Bakalaa account. Thank you.',
 
     // Rate limiting
     rateLimitWindowMinutes: Number(process.env.RATE_LIMIT_WINDOW || 15),
