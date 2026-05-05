@@ -1408,12 +1408,14 @@ export const getApprovedRestaurantByIdOrSlug = async (idOrSlug) => {
 
 export const listPublicOffers = async (query = {}, userId = null) => {
     const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const filter = {
         status: 'active',
         approvalStatus: 'approved',
         $and: [
             { $or: [{ startDate: { $exists: false } }, { startDate: null }, { startDate: { $lte: now } }] },
-            { $or: [{ endDate: { $exists: false } }, { endDate: null }, { endDate: { $gt: now } }] }
+            // Keep offers valid for the full "Valid Until" day.
+            { $or: [{ endDate: { $exists: false } }, { endDate: null }, { endDate: { $gte: startOfToday } }] }
         ],
         showInCart: { $ne: false }
     };

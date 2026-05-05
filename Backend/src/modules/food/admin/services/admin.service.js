@@ -1965,6 +1965,84 @@ export async function updateSupportTicket(id, body = {}) {
     if (!Object.keys(set).length) return null;
     const model = source === 'restaurant' ? FoodRestaurantSupportTicket : FoodSupportTicket;
     const updated = await model.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
+    // Notify ticket owner when admin updates ticket (status/response),
+    // especially for resolved updates.
+    if (updated) {
+        try {
+            const { createInboxNotifications } = await import('../../../../core/notifications/notification.service.js');
+            const { notifyOwnerSafely } = await import('../../../../core/notifications/firebase.service.js');
+
+            const ownerType = source === 'restaurant' ? 'RESTAURANT' : 'USER';
+            const ownerIdRaw =
+                source === 'restaurant'
+                    ? updated?.restaurantId
+                    : updated?.userId;
+            const ownerId = ownerIdRaw ? String(ownerIdRaw) : '';
+
+            if (ownerId && mongoose.Types.ObjectId.isValid(ownerId)) {
+                const ticketStatus = String(updated?.status || '').toLowerCase();
+                const issueType = String(
+                    updated?.issueType ||
+                        updated?.subject ||
+                        updated?.category ||
+                        'support'
+                ).trim();
+                const shortTicketId = String(updated?._id || '').slice(-6).toUpperCase();
+                const responseText = String(updated?.adminResponse || '').trim();
+
+                const title =
+                    ticketStatus === 'resolved'
+                        ? 'Support Ticket Resolved'
+                        : 'Support Ticket Updated';
+                const message =
+                    ticketStatus === 'resolved'
+                        ? `Your support ticket (${issueType}) has been resolved.${responseText ? ` Response: ${responseText}` : ''}`
+                        : `Your support ticket (${issueType}) was updated by admin.${responseText ? ` Response: ${responseText}` : ''}`;
+
+                const link =
+                    ownerType === 'USER'
+                        ? '/food/user/notifications'
+                        : '/food/restaurant/notifications';
+
+                await createInboxNotifications({
+                    notifications: [
+                        {
+                            ownerType,
+                            ownerId,
+                            title,
+                            message,
+                            link,
+                            category: 'support_ticket',
+                            metadata: {
+                                source: 'support_ticket',
+                                ticketId: String(updated?._id || ''),
+                                ticketShortId: shortTicketId,
+                                status: ticketStatus || null,
+                                issueType,
+                            },
+                        },
+                    ],
+                });
+
+                await notifyOwnerSafely(
+                    { ownerType, ownerId },
+                    {
+                        title,
+                        body: message,
+                        dataOnly: true,
+                        data: {
+                            type: 'support_ticket_update',
+                            ticketId: String(updated?._id || ''),
+                            ticketStatus: ticketStatus || '',
+                            link,
+                        },
+                    },
+                );
+            }
+        } catch (e) {
+            console.error('Failed to notify support ticket owner:', e);
+        }
+    }
     return updated || null;
 }
 
