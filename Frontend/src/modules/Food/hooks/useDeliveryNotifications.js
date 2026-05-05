@@ -367,6 +367,11 @@ export const useDeliveryNotifications = () => {
     }
   }, [playNotificationSound, showBackgroundOrderNotification, startAlertLoop]);
 
+  const notifyIncomingOrder = useCallback((orderData = {}) => {
+    playNotificationSound(orderData);
+    showBackgroundOrderNotification(orderData);
+  }, [playNotificationSound, showBackgroundOrderNotification]);
+
   const recoverDeliveryState = useCallback(async () => {
     if (!deliveryPartnerId) return;
 
@@ -1039,6 +1044,7 @@ export const useDeliveryNotifications = () => {
     clearOrderStatusUpdate,
     isConnected,
     playNotificationSound,
+    notifyIncomingOrder,
     emitLocation
   };
 };
