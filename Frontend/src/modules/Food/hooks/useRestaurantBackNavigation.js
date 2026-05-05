@@ -26,7 +26,10 @@ const getNormalizedRestaurantPath = (pathname) => {
 
 const resolveRestaurantBackPath = ({ pathname, state }) => {
   const normalizedPath = getNormalizedRestaurantPath(pathname)
-  const explicitBackPath = toRestaurantPath(state?.backTo) || toRestaurantPath(state?.from)
+  const explicitBackPath =
+    toRestaurantPath(state?.returnTo) ||
+    toRestaurantPath(state?.backTo) ||
+    toRestaurantPath(state?.from)
 
   if (
     normalizedPath === "/orders/all" ||

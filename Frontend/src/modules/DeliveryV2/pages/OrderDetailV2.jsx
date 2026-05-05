@@ -27,6 +27,24 @@ const getOrderIdentity = (orderLike) =>
     '',
   ).trim();
 
+const isMongoObjectId = (value) => /^[a-f0-9]{24}$/i.test(String(value || '').trim());
+
+const getOrderDisplayId = (orderLike) => {
+  const candidates = [
+    orderLike?.displayOrderId,
+    orderLike?.orderCode,
+    orderLike?.orderNumber,
+    orderLike?.orderId,
+  ];
+
+  for (const value of candidates) {
+    const text = String(value ?? '').trim();
+    if (text && !isMongoObjectId(text)) return text;
+  }
+
+  return '';
+};
+
 const pickFirstText = (...values) => {
   for (const value of values) {
     const text = String(value ?? '').trim();
@@ -516,6 +534,7 @@ const OrderDetailV2 = () => {
   const customerMeta = useMemo(() => getCustomerMeta(order), [order]);
   const paymentMethodMeta = useMemo(() => getPaymentMethodMeta(order), [order]);
   const paymentStatusMeta = useMemo(() => getPaymentStatusMeta(order), [order]);
+  const orderDisplayId = useMemo(() => getOrderDisplayId(order), [order]);
   const restaurantLocation = order?.restaurantLocation;
   const customerLocation = order?.customerLocation;
   const restaurantAddress = pickFirstText(
@@ -765,7 +784,7 @@ const OrderDetailV2 = () => {
           </button>
           <div className="flex flex-col">
             <span className="text-base font-semibold tracking-tight text-slate-800">Order Detail</span>
-            <span className="text-xs font-bold text-[#005128]">{order?.displayOrderId ? `#${order.displayOrderId}` : '--'}</span>
+            <span className="text-xs font-bold text-[#005128]">{orderDisplayId ? `#${orderDisplayId}` : '--'}</span>
           </div>
         </div>
       </div>
@@ -783,7 +802,7 @@ const OrderDetailV2 = () => {
                 {getOrderEventDate(order) ? new Date(getOrderEventDate(order)).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '--'}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Order ID: {order?.displayOrderId ? `#${order.displayOrderId}` : String(orderId || '--')}
+                Order ID: {orderDisplayId ? `#${orderDisplayId}` : '--'}
               </p>
             </div>
             <StatusPill tone={currentStatus.tone}>{currentStatus.label}</StatusPill>

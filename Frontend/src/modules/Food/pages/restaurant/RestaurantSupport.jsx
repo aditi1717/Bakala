@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useSearchParams } from "react-router-dom"
 import useRestaurantBackNavigation from "@food/hooks/useRestaurantBackNavigation"
 import { ChevronLeft, Loader2, Send } from "lucide-react"
 import { restaurantAPI } from "@food/api"
@@ -44,7 +44,7 @@ const getIssueLabel = (value) =>
   String(value || "Issue").replace(/_/g, " ")
 
 export default function RestaurantSupport() {
-  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const goBack = useRestaurantBackNavigation()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -56,7 +56,7 @@ export default function RestaurantSupport() {
     category: "orders",
     issueType: "",
     description: "",
-    orderRef: "",
+    orderRef: searchParams.get("orderId") || "",
   })
 
   const stats = useMemo(() => {

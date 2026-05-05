@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   checkOnboardingStatus,
   isRestaurantOnboardingComplete,
@@ -776,6 +776,7 @@ function AllOrders({ onSelectOrder, onCancel, refreshToken = 0 }) {
 
 export default function OrdersMain() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeFilter, setActiveFilter] = useState("all");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -1879,7 +1880,15 @@ export default function OrdersMain() {
     const orderId =
       currentOrder?.orderMongoId || currentOrder?.orderId || currentOrder?._id || "";
     const qs = orderId ? `?orderId=${encodeURIComponent(String(orderId))}` : "";
-    navigate(`/food/restaurant/help-centre/support${qs}`);
+    const returnTo = `${location.pathname}${location.search || ""}`;
+    navigate(`/food/restaurant/help-centre/support${qs}`, {
+      state: {
+        from: returnTo,
+        backTo: returnTo,
+        returnTo,
+        source: "new-order-modal",
+      },
+    });
   };
 
   const handleRejectConfirm = async () => {

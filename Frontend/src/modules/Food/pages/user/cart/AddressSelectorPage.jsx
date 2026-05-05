@@ -1061,10 +1061,10 @@ export default function AddressSelectorPage({ formOnly = false }) {
                 <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">City</Label>
                 <Input 
                   value={addressFormData.city} 
-                  onChange={e => setAddressFormData({...addressFormData, city: e.target.value})} 
-                  onFocus={() => scrollFieldIntoView("city")}
+                  readOnly
+                  aria-readonly="true"
                   ref={(el) => { manualFieldRefs.current.city = el }}
-                  className="h-12 rounded-xl"
+                  className="h-12 rounded-xl bg-gray-100 text-gray-600 cursor-not-allowed dark:bg-gray-800/70 dark:text-gray-400"
                   required 
                 />
               </div>
@@ -1072,10 +1072,10 @@ export default function AddressSelectorPage({ formOnly = false }) {
                 <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">State</Label>
                 <Input 
                   value={addressFormData.state} 
-                  onChange={e => setAddressFormData({...addressFormData, state: e.target.value})} 
-                  onFocus={() => scrollFieldIntoView("state")}
+                  readOnly
+                  aria-readonly="true"
                   ref={(el) => { manualFieldRefs.current.state = el }}
-                  className="h-12 rounded-xl"
+                  className="h-12 rounded-xl bg-gray-100 text-gray-600 cursor-not-allowed dark:bg-gray-800/70 dark:text-gray-400"
                   required 
                 />
               </div>
@@ -1086,10 +1086,10 @@ export default function AddressSelectorPage({ formOnly = false }) {
               <Input 
                 placeholder="Pincode" 
                 value={addressFormData.zipCode || ""} 
-                onChange={e => setAddressFormData({...addressFormData, zipCode: e.target.value})} 
-                onFocus={() => scrollFieldIntoView("zipCode")}
+                readOnly
+                aria-readonly="true"
                 ref={(el) => { manualFieldRefs.current.zipCode = el }}
-                className="h-12 rounded-xl"
+                className="h-12 rounded-xl bg-gray-100 text-gray-600 cursor-not-allowed dark:bg-gray-800/70 dark:text-gray-400"
               />
             </div>
 

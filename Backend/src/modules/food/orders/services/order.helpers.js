@@ -48,8 +48,10 @@ export function sanitizeOrderForExternal(orderDoc) {
     };
   }
   o.orderMongoId = (o._id || orderDoc?._id || "").toString();
-  // Ensure orderId field for UI always contains the pretty ID
-  o.orderId = o.order_id || o.orderMongoId; 
+  // Keep the readable order id for display, while orderMongoId remains the action/detail identity.
+  const readableOrderId = o.orderId || o.order_id || o.displayOrderId || "";
+  o.orderId = readableOrderId || o.orderMongoId;
+  o.displayOrderId = o.displayOrderId || readableOrderId || o.orderMongoId;
   return o;
 }
 
