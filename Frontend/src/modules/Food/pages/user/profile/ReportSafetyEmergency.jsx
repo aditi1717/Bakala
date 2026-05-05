@@ -18,6 +18,7 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
+const MIN_REPORT_CHARACTERS = 10
 
 export default function ReportSafetyEmergency() {
   const [report, setReport] = useState("")
@@ -88,14 +89,19 @@ export default function ReportSafetyEmergency() {
   }
 
   const handleSubmit = async () => {
-    if (!report.trim()) {
+    const trimmedReport = report.trim()
+    if (!trimmedReport) {
       toast.error('Please describe the safety concern or emergency')
+      return
+    }
+    if (trimmedReport.length < MIN_REPORT_CHARACTERS) {
+      toast.error(`Please add at least ${MIN_REPORT_CHARACTERS} characters so our team can understand the issue.`)
       return
     }
 
     try {
       setIsSubmitting(true)
-      const response = await userAPI.createSafetyEmergencyReport(report.trim())
+      const response = await userAPI.createSafetyEmergencyReport(trimmedReport)
       
       if (response.data.success) {
         setIsSubmitted(true)
@@ -108,7 +114,13 @@ export default function ReportSafetyEmergency() {
       }
     } catch (error) {
       debugError('Error submitting safety emergency report:', error)
-      toast.error(error.response?.data?.message || 'Failed to submit safety emergency report. Please try again.')
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.response?.data?.errors?.[0]?.message ||
+        error.message ||
+        'Failed to submit safety emergency report. Please try again.'
+      toast.error(errorMessage)
     } finally {
       setIsSubmitting(false)
     }
@@ -199,7 +211,7 @@ export default function ReportSafetyEmergency() {
                   }}
                 />
                 <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-2">
-                  {report.length} characters
+                  {report.trim().length} / {MIN_REPORT_CHARACTERS} characters minimum
                 </p>
               </CardContent>
             </Card>

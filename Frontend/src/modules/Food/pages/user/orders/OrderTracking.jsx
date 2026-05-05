@@ -1224,7 +1224,9 @@ export default function OrderTracking() {
     },
     assigned: {
       title: "Rider is arriving",
-      subtitle: "A delivery partner is arriving at the restaurant",
+      subtitle: typeof estimatedTime === 'number'
+        ? `Rider is arriving in ${estimatedTime} mins`
+        : "A delivery partner is arriving at the restaurant",
       color: BRAND_THEME.colors.brand.primary,
       iconType: 'rider'
     },

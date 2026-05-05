@@ -1959,6 +1959,7 @@ export async function updateSupportTicket(id, body = {}) {
         try {
             const { createInboxNotifications } = await import('../../../../core/notifications/notification.service.js');
             const { notifyOwnerSafely } = await import('../../../../core/notifications/firebase.service.js');
+            const { getIO, rooms } = await import('../../../../config/socket.js');
 
             const ownerType = source === 'restaurant' ? 'RESTAURANT' : 'USER';
             const ownerIdRaw =
@@ -2026,6 +2027,27 @@ export async function updateSupportTicket(id, body = {}) {
                         },
                     },
                 );
+
+                try {
+                    const io = getIO();
+                    const socketPayload = {
+                        title,
+                        message,
+                        link,
+                        targetType: ownerType,
+                        type: 'support_ticket_update',
+                        ticketId: String(updated?._id || ''),
+                        ticketStatus: ticketStatus || '',
+                        createdAt: new Date().toISOString(),
+                    };
+                    if (ownerType === 'USER') {
+                        io.to(rooms.user(ownerId)).emit('admin_notification', socketPayload);
+                    } else if (ownerType === 'RESTAURANT') {
+                        io.to(rooms.restaurant(ownerId)).emit('admin_notification', socketPayload);
+                    }
+                } catch (socketError) {
+                    console.error('Failed to emit support ticket notification:', socketError);
+                }
             }
         } catch (e) {
             console.error('Failed to notify support ticket owner:', e);
@@ -2394,6 +2416,74 @@ export async function updateSafetyEmergencyStatus(id, status) {
         { $set: { status: next } },
         { new: true }
     ).lean();
+
+    if (updated && next === 'resolved' && updated.userId) {
+        try {
+            const { createInboxNotifications } = await import('../../../../core/notifications/notification.service.js');
+            const { notifyOwnerSafely } = await import('../../../../core/notifications/firebase.service.js');
+            const { getIO, rooms } = await import('../../../../config/socket.js');
+
+            const ownerId = String(updated.userId);
+            if (mongoose.Types.ObjectId.isValid(ownerId)) {
+                const title = 'Safety Emergency Report Resolved';
+                const message = 'Your safety emergency report has been resolved by our team.';
+                const link = '/food/user/notifications';
+                const reportId = String(updated._id || id);
+
+                await createInboxNotifications({
+                    notifications: [
+                        {
+                            ownerType: 'USER',
+                            ownerId,
+                            title,
+                            message,
+                            link,
+                            category: 'safety_emergency',
+                            metadata: {
+                                source: 'safety_emergency_report',
+                                reportId,
+                                status: next,
+                            },
+                        },
+                    ],
+                });
+
+                await notifyOwnerSafely(
+                    { ownerType: 'USER', ownerId },
+                    {
+                        title,
+                        body: message,
+                        dataOnly: true,
+                        data: {
+                            type: 'safety_emergency_resolved',
+                            reportId,
+                            reportStatus: next,
+                            link,
+                        },
+                    },
+                );
+
+                try {
+                    const io = getIO();
+                    io.to(rooms.user(ownerId)).emit('admin_notification', {
+                        title,
+                        message,
+                        link,
+                        targetType: 'USER',
+                        type: 'safety_emergency_resolved',
+                        reportId,
+                        reportStatus: next,
+                        createdAt: new Date().toISOString(),
+                    });
+                } catch (socketError) {
+                    console.error('Failed to emit safety emergency notification:', socketError);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to notify safety emergency owner:', error);
+        }
+    }
+
     return updated;
 }
 
