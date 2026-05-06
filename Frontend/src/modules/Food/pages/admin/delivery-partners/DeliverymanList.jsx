@@ -81,6 +81,7 @@ export default function DeliverymanList() {
     name: true,
     contact: true,
     zone: true,
+    vehicleType: false,
     totalOrders: true,
     availabilityStatus: true,
     actions: true,
@@ -378,12 +379,12 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
     setVisibleColumns(prev => ({ ...prev, [columnKey]: !prev[columnKey] }))
   }
 
-  const resetColumns = () => {
     setVisibleColumns({
       si: true,
       name: true,
       contact: true,
       zone: true,
+      vehicleType: false,
       totalOrders: true,
       availabilityStatus: true,
       actions: true,
@@ -395,6 +396,7 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
     name: "Name",
     contact: "Contact",
     zone: "Zone",
+    vehicleType: "Vehicle Type",
     totalOrders: "Total Orders",
     availabilityStatus: "Availability Status",
     actions: "Actions",
@@ -679,50 +681,32 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                   <tr>
                     {visibleColumns.si && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>SI</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        <span>SI</span>
                       </th>
                     )}
                     {visibleColumns.name && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Name</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        <span>Name</span>
                       </th>
                     )}
                     {visibleColumns.contact && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Contact</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        <span>Contact</span>
                       </th>
                     )}
                     {visibleColumns.zone && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Zone</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        <span>Zone</span>
                       </th>
                     )}
                     {visibleColumns.totalOrders && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Total Orders</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        <span>Total Orders</span>
                       </th>
                     )}
                     {visibleColumns.availabilityStatus && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Availability Status</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        <span>Availability Status</span>
                       </th>
                     )}
                     {visibleColumns.actions && (
