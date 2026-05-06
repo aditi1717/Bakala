@@ -63,6 +63,8 @@ const foodTheme = {
   inactiveBg: "rgba(255,255,255,0.14)",
   inactiveBorder: "rgba(255,255,255,0.12)",
 };
+const DEFAULT_HEADER_LOCATION_TITLE = "Mumbra, Thane";
+const DEFAULT_HEADER_LOCATION_SUBTITLE = "Mumbra, Thane, Maharashtra";
 
 export default function HomeHeader({
   activeTab,
@@ -112,10 +114,31 @@ export default function HomeHeader({
       : isFood && !compact
         ? "#ffffff"
         : "transparent";
+  const sanitizeLocationText = (value = "") => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const lower = text.toLowerCase();
+    if (
+      lower === "select location" ||
+      lower === "select location..." ||
+      lower === "current location" ||
+      lower === "unknown city"
+    ) {
+      return "";
+    }
+    return text;
+  };
+
   const locationTitle =
-    savedAddressText || location?.area || location?.city || "Select Location";
+    sanitizeLocationText(savedAddressText) ||
+    sanitizeLocationText(location?.area) ||
+    sanitizeLocationText(location?.city) ||
+    DEFAULT_HEADER_LOCATION_TITLE;
   const locationSubtitle =
-    location?.address || location?.city || "Tap to choose delivery location";
+    sanitizeLocationText(location?.formattedAddress) ||
+    sanitizeLocationText(location?.address) ||
+    sanitizeLocationText(location?.city) ||
+    DEFAULT_HEADER_LOCATION_SUBTITLE;
   const headerTextClass = isScrolledFoodHeader ? "text-slate-900 dark:text-white" : "text-white";
   const headerSubtleTextClass = isScrolledFoodHeader ? "text-slate-500 dark:text-slate-400" : "text-white/80";
   const floatingIconButtonClass = isScrolledFoodHeader

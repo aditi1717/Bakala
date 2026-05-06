@@ -2,6 +2,14 @@ import { useState, useEffect } from "react"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
+const DEFAULT_LOCATION = {
+  latitude: 19.173553,
+  longitude: 73.030342,
+  area: "Mumbra, Thane",
+  city: "Mumbra",
+  state: "Maharashtra",
+  formattedAddress: "Mumbra, Thane, Maharashtra",
+}
 
 
 /**
@@ -256,6 +264,8 @@ export function useLocationSimple() {
         } catch (parseErr) {
           debugError("Failed to parse cached location:", parseErr)
         }
+      } else {
+        setLocation(DEFAULT_LOCATION)
       }
       
       throw err
@@ -277,6 +287,7 @@ export function useLocationSimple() {
         debugError("Failed to parse cached location:", err)
       }
     } else {
+      setLocation(DEFAULT_LOCATION)
       setLoading(false)
     }
 
@@ -293,6 +304,7 @@ export function useLocationSimple() {
         .catch((err) => {
           setError(err.message)
           setPermissionGranted(false)
+          setLocation(DEFAULT_LOCATION)
         })
     }
   }, [])
