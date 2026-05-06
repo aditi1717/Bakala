@@ -48,28 +48,31 @@ export default function DeliveryEmergencyHelp() {
 
   const validateForm = () => {
     const errors = {}
-    const phoneRegex = /^\d{3,15}$/
+    // Pattern: 3-4 digits (Short codes) OR 10-12 digits (Mobile/Landline with country code)
+    const phoneRegex = /^(\d{3,4}|\d{10,12})$/
     const normalizeDigits = (value) => String(value || "").replace(/[^\d]/g, "")
 
-    if (formData.medicalEmergency && !phoneRegex.test(normalizeDigits(formData.medicalEmergency))) {
-      errors.medicalEmergency = "Phone number must be 3 to 15 digits"
-    }
-    if (formData.accidentHelpline && !phoneRegex.test(normalizeDigits(formData.accidentHelpline))) {
-      errors.accidentHelpline = "Phone number must be 3 to 15 digits"
-    }
-    if (formData.contactPolice && !phoneRegex.test(normalizeDigits(formData.contactPolice))) {
-      errors.contactPolice = "Phone number must be 3 to 15 digits"
-    }
-    if (formData.insurance && !phoneRegex.test(normalizeDigits(formData.insurance))) {
-      errors.insurance = "Phone number must be 3 to 15 digits"
-    }
+    const fields = [
+      { id: "medicalEmergency", label: "Medical Emergency no." },
+      { id: "accidentHelpline", label: "Accident Helpline no." },
+      { id: "contactPolice", label: "Contact Police no." },
+      { id: "insurance", label: "Insurance no." }
+    ]
+
+    fields.forEach(({ id, label }) => {
+      const cleanValue = normalizeDigits(formData[id])
+      if (cleanValue && !phoneRegex.test(cleanValue)) {
+        errors[id] = `${label} should be in a valid format (e.g., 108 or 10-digit mobile)`
+      }
+    })
 
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
 
   const handleInputChange = (field, value) => {
-    const sanitizedValue = String(value || "").replace(/[^\d]/g, "").slice(0, 15)
+    // Allow digits and '+' for the format
+    const sanitizedValue = String(value || "").replace(/[^\d+]/g, "").slice(0, 15)
     setFormData(prev => ({
       ...prev,
       [field]: sanitizedValue
@@ -88,7 +91,7 @@ export default function DeliveryEmergencyHelp() {
     e.preventDefault()
     
     if (!validateForm()) {
-      toast.error("Please fix the errors in the form")
+      toast.error("Invalid phone number format")
       return
     }
 

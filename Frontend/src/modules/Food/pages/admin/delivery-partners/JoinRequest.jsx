@@ -23,7 +23,6 @@ export default function JoinRequest() {
   const [processing, setProcessing] = useState(false)
   const [rejectionReason, setRejectionReason] = useState("")
   const [filters, setFilters] = useState({
-    zone: "",
     vehicleType: "",
   })
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -49,9 +48,6 @@ export default function JoinRequest() {
 
       if (debouncedSearch.trim()) {
         params.search = debouncedSearch.trim()
-      }
-      if (filters.zone) {
-        params.zone = filters.zone
       }
       if (filters.vehicleType) {
         params.vehicleType = filters.vehicleType.toLowerCase()
@@ -203,17 +199,16 @@ export default function JoinRequest() {
   }
 
   const handleResetFilters = () => {
-    setFilters({ zone: "", vehicleType: "" })
+    setFilters({ vehicleType: "" })
   }
 
   const handleTabChange = (tab) => {
     setActiveTab(tab)
     setSearchQuery("") // Reset search when changing tabs
-    setFilters({ zone: "", vehicleType: "" }) // Reset filters
+    setFilters({ vehicleType: "" }) // Reset filters
   }
 
   const activeFiltersCount = Object.values(filters).filter(v => v).length
-  const zones = [...new Set(requests.map(r => r.zone))].filter(Boolean)
   const vehicleTypes = [...new Set(requests.map(r => r.vehicle?.type || r.vehicleType))].filter(Boolean)
 
   return (
@@ -913,19 +908,6 @@ export default function JoinRequest() {
             </DialogTitle>
           </DialogHeader>
           <div className="px-6 pb-6 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Zone</label>
-              <select
-                value={filters.zone}
-                onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-              >
-                <option value="">All Zones</option>
-                {zones.map(zone => (
-                  <option key={zone} value={zone}>{zone}</option>
-                ))}
-              </select>
-            </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Vehicle Type</label>
               <select
