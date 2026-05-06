@@ -1374,6 +1374,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
   }, [activeOrder, activeOrderId, clearOrderStatusUpdate, clearPersistedIncomingOrder, currentTab, incomingOrder, orderStatusUpdate, persistFocusedOrder, promoteNextAcceptedOrder, removeAdvancedOrder, resetTrip, setActiveOrder, updateTripStatus]);
 
   const handleAdvancedOrderAccept = useCallback(async (order) => {
+    clearNewOrder();
     const acceptedOrder = await acceptOrder(order, { keepCurrentActive: Boolean(activeOrder) });
     const nextQueuedOrder = {
       ...acceptedOrder,
@@ -1388,13 +1389,14 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     toast.success('Added to queue', {
       description: activeOrder ? 'Finish the current trip first, then this one becomes active.' : 'Order accepted successfully.',
     });
-  }, [acceptOrder, activeOrder, upsertAdvancedOrder]);
+  }, [acceptOrder, activeOrder, clearNewOrder, upsertAdvancedOrder]);
 
   const handleOrdersTabDirectAccept = useCallback(async (order) => {
     const queuedOrderId = getOrderIdentity(order);
     if (!queuedOrderId) return;
 
     setOrderActionBusy({ orderId: queuedOrderId, type: 'accept' });
+    clearNewOrder();
     try {
       if (activeOrder) {
         await handleAdvancedOrderAccept(order);
@@ -1415,6 +1417,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     acceptOrder,
     activeOrder,
     clearPersistedIncomingOrder,
+    clearNewOrder,
     handleAdvancedOrderAccept,
     persistFocusedOrder,
     removeAdvancedOrder,
@@ -1425,6 +1428,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     if (!queuedOrderId) return;
 
     setOrderActionBusy({ orderId: queuedOrderId, type: 'pass' });
+    clearNewOrder();
     try {
       await rejectOrder(order, 'passed');
       removeAdvancedOrder(order);
@@ -1441,6 +1445,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     }
   }, [
     clearPersistedIncomingOrder,
+    clearNewOrder,
     focusedOrderId,
     incomingOrder,
     persistFocusedOrder,

@@ -236,6 +236,18 @@ export const useDeliveryNotifications = () => {
     alertLoopStartedAtRef.current = 0;
   }, []);
 
+  const stopActiveAlert = useCallback(() => {
+    stopAlertLoop();
+    activeOrderRef.current = null;
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(0);
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [stopAlertLoop]);
+
   const startAlertLoop = useCallback((playSoundFn) => {
     stopAlertLoop();
     alertLoopStartedAtRef.current = Date.now();
@@ -928,8 +940,7 @@ export const useDeliveryNotifications = () => {
       debugLog('?? Order reassigned to another partner:', data);
       if (data.orderId === activeOrderRef.current?._id || data.orderId === activeOrderRef.current?.orderId) {
         debugLog('?? Removing reassigned order from local state');
-        stopAlertLoop();
-        activeOrderRef.current = null;
+        stopActiveAlert();
         setNewOrder(null);
       }
     });
@@ -979,7 +990,7 @@ export const useDeliveryNotifications = () => {
 
     return () => {
       debugLog('? Cleaning up socket connection...');
-      stopAlertLoop();
+      stopActiveAlert();
       joinedDeliveryRoomRef.current = null;
       window.removeEventListener('deliveryAuthChanged', handleAuthChange);
       window.removeEventListener('authRefreshed', handleAuthRefreshed);
@@ -991,7 +1002,7 @@ export const useDeliveryNotifications = () => {
         socketRef.current = null;
       }
     };
-  }, [deliveryPartnerId, handleIncomingOrderAlert, joinDeliveryRoomIfPossible, playNotificationSound, recoverDeliveryState, showBackgroundOrderNotification, startAlertLoop, stopAlertLoop]);
+  }, [deliveryPartnerId, handleIncomingOrderAlert, joinDeliveryRoomIfPossible, playNotificationSound, recoverDeliveryState, showBackgroundOrderNotification, startAlertLoop, stopActiveAlert]);
 
   useEffect(() => {
     if (!deliveryPartnerId) {
@@ -1013,8 +1024,7 @@ export const useDeliveryNotifications = () => {
 
   // Helper functions
   const clearNewOrder = () => {
-    stopAlertLoop();
-    activeOrderRef.current = null;
+    stopActiveAlert();
     setNewOrder(null);
   };
 

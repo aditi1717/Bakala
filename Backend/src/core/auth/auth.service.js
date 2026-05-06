@@ -432,25 +432,20 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
 };
 
 export const logout = async (refreshToken, fcmToken, platform) => {
-  if (!refreshToken) {
-    throw new ValidationError("Refresh token is required");
-  }
-
   // 1. Remove specific FCM token from ALL collections if provided
   if (fcmToken) {
     console.log(`[FCM-Logout] Starting logout-driven token removal: platform=${platform}, tokenPreview=${fcmToken?.slice(0, 10)}...`);
     
     // We try to remove the token from all 4 possible models regardless of the user ID, 
     // ensuring no stale connections are left across any role or app the user was logged into.
-    const field = platform === "mobile" ? "fcmTokenMobile" : "fcmTokens";
     const models = [FoodUser, FoodRestaurant, FoodDeliveryPartner, FoodAdmin];
     
     try {
       await Promise.all(
         models.map((model) =>
           model.updateMany(
-            { [field]: fcmToken },
-            { $pull: { [field]: fcmToken } },
+            { $or: [{ fcmTokens: fcmToken }, { fcmTokenMobile: fcmToken }] },
+            { $pull: { fcmTokens: fcmToken, fcmTokenMobile: fcmToken } },
           ),
         ),
       );
@@ -461,8 +456,11 @@ export const logout = async (refreshToken, fcmToken, platform) => {
   }
 
   // 2. Invalidate the refresh token (standard logout procedure)
+  if (!refreshToken) {
+    return { invalidated: false, fcmTokenRemoved: Boolean(fcmToken) };
+  }
   const deleted = await FoodRefreshToken.deleteOne({ token: refreshToken });
-  return { invalidated: deleted.deletedCount > 0 };
+  return { invalidated: deleted.deletedCount > 0, fcmTokenRemoved: Boolean(fcmToken) };
 };
 
 export const getProfile = async (userId, role) => {

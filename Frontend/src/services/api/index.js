@@ -1670,7 +1670,7 @@ export const deliveryAPI = {
     apiClient.get("/food/delivery/referrals/stats", {
       contextModule: "delivery",
     }),
-  logout: (refreshToken) => {
+  logout: async (refreshToken) => {
     deliveryMeCached = null;
     deliveryMeCacheTime = 0;
     try {
@@ -1681,8 +1681,40 @@ export const deliveryAPI = {
       (typeof localStorage !== "undefined"
         ? localStorage.getItem("delivery_refreshToken")
         : null);
-    const fcmToken = typeof localStorage !== "undefined" ? localStorage.getItem("fcm_web_registered_token_delivery") : null;
-    return authService.logout(token, fcmToken, "web");
+    let fcmToken =
+      typeof localStorage !== "undefined"
+        ? localStorage.getItem("fcm_web_registered_token_delivery")
+        : null;
+    let platform = "web";
+
+    try {
+      if (
+        typeof window !== "undefined" &&
+        window.flutter_inappwebview?.callHandler
+      ) {
+        const handlerNames = [
+          "getFcmToken",
+          "getFCMToken",
+          "getPushToken",
+          "getFirebaseToken",
+        ];
+        for (const handlerName of handlerNames) {
+          try {
+            const value = await window.flutter_inappwebview.callHandler(handlerName, {
+              module: "delivery",
+            });
+            const nativeToken = String(value || "").trim();
+            if (nativeToken.length >= 20) {
+              fcmToken = nativeToken;
+              platform = "mobile";
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    return authService.logout(token, fcmToken, platform);
   },
   /** POST /food/delivery/register - multipart FormData (new partner, no token). */
   register: (formData) => {
