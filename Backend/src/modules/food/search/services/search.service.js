@@ -40,6 +40,47 @@ const buildZoneRestaurantConstraint = async (zoneIdRaw) => {
     return { $or: zoneClauses };
 };
 
+const APPROVED_FOOD_FILTER = {
+    $or: [
+        { approvalStatus: 'approved' },
+        { approvalStatus: { $exists: false }, isApproved: { $ne: false } }
+    ]
+};
+
+const buildFoodSearchFilter = (regex, { isVeg } = {}) => {
+    const filters = [APPROVED_FOOD_FILTER];
+    if (isVeg === 'true') {
+        filters.push({ foodType: 'Veg' });
+    }
+    if (regex) {
+        filters.push({
+            $or: [
+                { name: { $regex: regex } },
+                { description: { $regex: regex } },
+                { categoryName: { $regex: regex } },
+                { 'variants.name': { $regex: regex } }
+            ]
+        });
+    }
+    return { $and: filters };
+};
+
+const getMatchedFoodLabel = (food, regex, fallbackTerm = '') => {
+    if (!food) return fallbackTerm;
+    const fields = [food.name, food.description, food.categoryName];
+    const direct = fields.find((value) => value && regex?.test(String(value)));
+    if (direct) return food.name || direct;
+
+    const matchedVariant = Array.isArray(food.variants)
+        ? food.variants.find((variant) => variant?.name && regex?.test(String(variant.name)))
+        : null;
+    if (matchedVariant?.name) {
+        return food.name ? `${food.name} (${matchedVariant.name})` : matchedVariant.name;
+    }
+
+    return food.name || fallbackTerm;
+};
+
 /**
  * Unified Search Service
  * Searches for restaurants by name and also searches for food items, 
@@ -103,9 +144,11 @@ export const searchUnified = async (query = {}, options = {}) => {
             };
         }
 
-        const catFoodItems = await FoodItem.find({ 
-            categoryId: new mongoose.Types.ObjectId(categoryId),
-            approvalStatus: 'approved' 
+        const catFoodItems = await FoodItem.find({
+            $and: [
+                APPROVED_FOOD_FILTER,
+                { categoryId: new mongoose.Types.ObjectId(categoryId) }
+            ]
         }).select('restaurantId').lean();
         
         const catRestaurantIds = [...new Set(catFoodItems.map(f => f.restaurantId.toString()))];
@@ -137,13 +180,9 @@ export const searchUnified = async (query = {}, options = {}) => {
         });
 
         // B. Search by Food Item Name
-        const foodFilters = { approvalStatus: 'approved' };
-        if (isVeg === 'true') foodFilters.foodType = 'Veg';
-        
-        const matchedFoodsRaw = await FoodItem.find({
-            ...foodFilters,
-            name: { $regex: regex }
-        }).limit(limit * 2).lean();
+        const matchedFoodsRaw = await FoodItem.find(buildFoodSearchFilter(regex, { isVeg }))
+            .limit(limit * 2)
+            .lean();
 
         const matchedFoodCategoryIds = Array.from(
             new Set(
@@ -184,13 +223,14 @@ export const searchUnified = async (query = {}, options = {}) => {
                 }).lean();
 
                 rsForFoods.forEach(r => {
+                    const matchedFood = matchedFoods.find(f => f.restaurantId.toString() === r._id.toString());
                     restaurantIds.add(r._id.toString());
                     restaurantDetailsMap.set(r._id.toString(), { 
                         ...r, 
                         matchType: 'food',
-                        matchedDish: matchedFoods.find(f => f.restaurantId.toString() === r._id.toString())?.name,
-                        matchedDishImage: matchedFoods.find(f => f.restaurantId.toString() === r._id.toString())?.image,
-                        matchedDishId: matchedFoods.find(f => f.restaurantId.toString() === r._id.toString())?._id
+                        matchedDish: getMatchedFoodLabel(matchedFood, regex, term),
+                        matchedDishImage: matchedFood?.image,
+                        matchedDishId: matchedFood?._id
                     });
                 });
             }

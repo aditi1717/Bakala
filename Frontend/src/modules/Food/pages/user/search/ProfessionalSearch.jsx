@@ -68,6 +68,10 @@ export default function ProfessionalSearch() {
   }, [])
 
   useEffect(() => {
+    setQuery((prev) => (prev === initialQuery ? prev : initialQuery))
+  }, [initialQuery])
+
+  useEffect(() => {
     fetchCategories()
   }, [effectiveZoneId])
 
@@ -132,8 +136,8 @@ export default function ProfessionalSearch() {
   const handleClear = () => {
     setQuery("")
     setSelectedCategoryId(null)
-    setSearchParams({})
     setResults({ restaurants: [], dishes: [] })
+    navigate("/food", { replace: true })
   }
 
   const handleCategoryClick = (id) => {
