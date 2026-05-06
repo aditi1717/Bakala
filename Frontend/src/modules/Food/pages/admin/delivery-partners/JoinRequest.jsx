@@ -23,8 +23,6 @@ export default function JoinRequest() {
   const [processing, setProcessing] = useState(false)
   const [rejectionReason, setRejectionReason] = useState("")
   const [filters, setFilters] = useState({
-    zone: "",
-    jobType: "",
     vehicleType: "",
   })
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -50,9 +48,6 @@ export default function JoinRequest() {
 
       if (debouncedSearch.trim()) {
         params.search = debouncedSearch.trim()
-      }
-      if (filters.zone) {
-        params.zone = filters.zone
       }
       if (filters.vehicleType) {
         params.vehicleType = filters.vehicleType.toLowerCase()
@@ -101,12 +96,6 @@ export default function JoinRequest() {
 
   const filteredRequests = useMemo(() => {
     let result = [...requests]
-    
-    // Client-side filtering for additional filters not supported by backend
-    if (filters.jobType) {
-      result = result.filter(request => request.jobType === filters.jobType)
-    }
-
     return result
   }, [requests, filters])
 
@@ -210,19 +199,17 @@ export default function JoinRequest() {
   }
 
   const handleResetFilters = () => {
-    setFilters({ zone: "", jobType: "", vehicleType: "" })
+    setFilters({ vehicleType: "" })
   }
 
   const handleTabChange = (tab) => {
     setActiveTab(tab)
     setSearchQuery("") // Reset search when changing tabs
-    setFilters({ zone: "", jobType: "", vehicleType: "" }) // Reset filters
+    setFilters({ vehicleType: "" }) // Reset filters
   }
 
   const activeFiltersCount = Object.values(filters).filter(v => v).length
-  const zones = [...new Set(requests.map(r => r.zone))].filter(Boolean)
-  const jobTypes = [...new Set(requests.map(r => r.jobType))].filter(Boolean)
-  const vehicleTypes = [...new Set(requests.map(r => r.vehicleType))].filter(Boolean)
+  const vehicleTypes = [...new Set(requests.map(r => r.vehicle?.type || r.vehicleType))].filter(Boolean)
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
@@ -332,46 +319,22 @@ export default function JoinRequest() {
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                      <div className="flex items-center gap-2">
-                        <span>SI</span>
-                        <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                      </div>
+                      SI
                     </th>
                     <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                      <div className="flex items-center gap-2">
-                        <span>Name</span>
-                        <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                      </div>
+                      Name
                     </th>
                     <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                      <div className="flex items-center gap-2">
-                        <span>Contact</span>
-                        <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                      </div>
+                      Contact
                     </th>
                     <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                      <div className="flex items-center gap-2">
-                        <span>Zone</span>
-                        <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                      </div>
+                      Zone
                     </th>
                     <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                      <div className="flex items-center gap-2">
-                        <span>Job Type</span>
-                        <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                      </div>
+                      Vehicle Type
                     </th>
                     <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                      <div className="flex items-center gap-2">
-                        <span>Vehicle Type</span>
-                        <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                      <div className="flex items-center gap-2">
-                        <span>Availability Status</span>
-                        <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                      </div>
+                      Status
                     </th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
                   </tr>
@@ -379,7 +342,7 @@ export default function JoinRequest() {
                 <tbody className="bg-white divide-y divide-slate-100">
                   {filteredRequests.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-6 py-20 text-center">
+                      <td colSpan={7} className="px-6 py-20 text-center">
                         <p className="text-sm text-slate-500">
                           {error ? "Error loading requests" : "No requests found"}
                         </p>
@@ -427,10 +390,7 @@ export default function JoinRequest() {
                           <span className="text-sm text-slate-700">{request.zone}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-slate-700">{request.jobType}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-slate-700">{request.vehicleType}</span>
+                          <span className="text-sm text-slate-700 capitalize">{request.vehicle?.type || request.vehicleType}</span>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-col gap-1">
@@ -949,32 +909,6 @@ export default function JoinRequest() {
           </DialogHeader>
           <div className="px-6 pb-6 space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Zone</label>
-              <select
-                value={filters.zone}
-                onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-              >
-                <option value="">All Zones</option>
-                {zones.map(zone => (
-                  <option key={zone} value={zone}>{zone}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Job Type</label>
-              <select
-                value={filters.jobType}
-                onChange={(e) => setFilters({ ...filters, jobType: e.target.value })}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
-              >
-                <option value="">All Job Types</option>
-                {jobTypes.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-            </div>
-            <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">Vehicle Type</label>
               <select
                 value={filters.vehicleType}
@@ -1007,4 +941,3 @@ export default function JoinRequest() {
     </div>
   )
 }
-

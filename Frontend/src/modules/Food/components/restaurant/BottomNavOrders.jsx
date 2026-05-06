@@ -63,7 +63,8 @@ export default function BottomNavOrders() {
     const update = () => {
       const vv = window.visualViewport
       const inset = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)))
-      setIsKeyboardVisible(inset > 120)
+      // Detection based on inset or significant height reduction
+      setIsKeyboardVisible(inset > 80 || vv.height < window.innerHeight * 0.8)
     }
     window.visualViewport.addEventListener("resize", update)
     window.visualViewport.addEventListener("scroll", update)

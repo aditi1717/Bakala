@@ -336,52 +336,37 @@ export default function EarningAddon() {
                   <tr>
                     {visibleColumns.title && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Title</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        Title
                       </th>
                     )}
                     {visibleColumns.requiredOrders && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Required Orders</span>
-                        </div>
+                        Required Orders
                       </th>
                     )}
                     {visibleColumns.earningAmount && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Earning Amount</span>
-                        </div>
+                        Earning Amount
                       </th>
                     )}
                     {visibleColumns.startDate && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Start Date</span>
-                        </div>
+                        Start Date
                       </th>
                     )}
                     {visibleColumns.endDate && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>End Date</span>
-                        </div>
+                        End Date
                       </th>
                     )}
                     {visibleColumns.status && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Status</span>
-                        </div>
+                        Status
                       </th>
                     )}
                     {visibleColumns.redemptions && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Redemptions</span>
-                        </div>
+                        Redemptions
                       </th>
                     )}
                     {visibleColumns.actions && (

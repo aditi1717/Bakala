@@ -362,21 +362,6 @@ export default function Feedback() {
             </button>
           </div>
         </div>
-
-        <div className="flex gap-2 mt-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
-                activeTab === tab.id ? "text-white" : "bg-white text-gray-600 border border-gray-200"
-              }`}
-              style={activeTab === tab.id ? { background: BRAND_THEME.gradients.primary } : undefined}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="flex-1 p-3">

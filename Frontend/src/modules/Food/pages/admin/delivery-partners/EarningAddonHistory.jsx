@@ -335,54 +335,37 @@ export default function EarningAddonHistory() {
                   <tr>
                     {visibleColumns.si && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>SI</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        SI
                       </th>
                     )}
                     {visibleColumns.deliveryman && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Deliveryman</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        Deliveryman
                       </th>
                     )}
                     {visibleColumns.offerTitle && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Offer Title</span>
-                        </div>
+                        Offer Title
                       </th>
                     )}
                     {visibleColumns.ordersCompleted && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Orders</span>
-                        </div>
+                        Orders
                       </th>
                     )}
                     {visibleColumns.earningAmount && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Earning Amount</span>
-                        </div>
+                        Earning Amount
                       </th>
                     )}
                     {visibleColumns.date && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Date</span>
-                          <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
-                        </div>
+                        Date
                       </th>
                     )}
                     {visibleColumns.status && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <span>Status</span>
-                        </div>
+                        Status
                       </th>
                     )}
                     {visibleColumns.actions && (

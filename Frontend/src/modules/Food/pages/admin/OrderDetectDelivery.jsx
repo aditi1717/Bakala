@@ -682,10 +682,7 @@ export default function OrderDetectDelivery() {
         count={orders.length} 
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        onFilterClick={() => setIsFilterOpen(true)}
-        activeFiltersCount={activeFiltersCount}
         onExport={handleExport}
-        onSettingsClick={() => setIsSettingsOpen(true)}
       />
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">

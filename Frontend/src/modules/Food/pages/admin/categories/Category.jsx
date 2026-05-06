@@ -358,13 +358,12 @@ export default function Category() {
         category?.name || "N/A",
         category?.foodTypeScope || "Both",
         category?.isGlobal ? "Global" : "Private",
-        zoneLabel(category?.zoneId, zones),
         category?.approvalStatus || "pending",
       ])
 
       autoTable(doc, {
         startY: 35,
-        head: [["SL", "Category", "Diet Scope", "Visibility", "Zone", "Approval"]],
+        head: [["SL", "Category", "Diet Scope", "Visibility", "Approval"]],
         body: tableData,
         theme: "striped",
         headStyles: {
@@ -421,7 +420,7 @@ export default function Category() {
         type: String(formData.type || "").trim(),
         status: Boolean(formData.status),
         image: imageUrl || undefined,
-        zoneId: formData.zoneId || "global",
+        zoneId: "global",
         foodTypeScope: formData.foodTypeScope,
         visibilityStartTime: startTime24,
         visibilityEndTime: endTime24,
@@ -516,25 +515,23 @@ export default function Category() {
               <tr>
                 <th className="w-[25%] px-5 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Category</th>
                 <th className="w-[17%] px-4 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Owner</th>
-                <th className="w-[15%] px-4 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Zone</th>
                 <th className="w-[10%] px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-600">Diet</th>
                 <th className="w-[10%] px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-600">Status</th>
-                {/* COMMENTED OUT: Approval column removed - categories are auto-approved */}
-                {/* <th className="w-[13%] px-4 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Approval</th> */}
+                <th className="w-[13%] px-4 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Approval</th>
                 <th className="w-[20%] px-5 py-4 text-right text-[11px] font-bold uppercase tracking-wider text-slate-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-20 text-center">
+                  <td colSpan={6} className="px-6 py-20 text-center">
                     <Loader2 className="mx-auto h-8 w-8 animate-spin text-brand-600" />
                     <p className="mt-2 text-sm text-slate-500">Loading categories...</p>
                   </td>
                 </tr>
               ) : filteredCategories.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-20 text-center">
+                  <td colSpan={6} className="px-6 py-20 text-center">
                     <p className="text-lg font-semibold text-slate-700">No categories found</p>
                     <p className="mt-1 text-sm text-slate-500">Try a different search or create a new category.</p>
                   </td>
@@ -544,7 +541,6 @@ export default function Category() {
                   const creatorName = category?.createdByRestaurant?.name || category?.restaurant?.name || "Admin"
                   const approvalStatus = category?.approvalStatus || "pending"
                   const isRestaurantCategory = Boolean(category?.createdByRestaurantId || category?.restaurantId)
-                  const zoneText = zoneLabel(category?.zoneId, zones)
 
                   return (
                     <tr key={category.id} className="align-top hover:bg-slate-50/80">
@@ -581,13 +577,6 @@ export default function Category() {
                               Shared
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-5">
-                        <div className="max-w-[180px]">
-                          <p className="truncate text-sm font-medium text-slate-700" title={zoneText}>
-                            {zoneText}
-                          </p>
                         </div>
                       </td>
                       <td className="px-4 py-5 text-center">
@@ -697,27 +686,7 @@ export default function Category() {
 
                     <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
                       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-slate-700">Zone</label>
-                          <select
-                            value={formData.zoneId}
-                            onChange={(event) => setFormData((prev) => ({ ...prev, zoneId: event.target.value }))}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-slate-900"
-                          >
-                            <option value="global">Global (all zones)</option>
-                            {zonesLoading && <option value="" disabled>Loading zones...</option>}
-                            {zones.map((zone) => {
-                              const id = String(zone?._id || zone?.id || "")
-                              const label = zone?.name || zone?.zoneName || zone?.serviceLocation || id
-                              return (
-                                <option key={id} value={id}>
-                                  {label}
-                                </option>
-                              )
-                            })}
-                          </select>
-                        </div>
-
+                        
                         <div>
                           <label className="mb-2 block text-sm font-medium text-slate-700">Diet Scope</label>
                           <select

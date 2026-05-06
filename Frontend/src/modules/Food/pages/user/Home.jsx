@@ -75,6 +75,7 @@ export default function Home() {
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [currentHeroBanner, setCurrentHeroBanner] = useState(0);
   const [activeTab, setActiveTab] = useState(routerLocation.pathname.endsWith("/quick") ? "quick" : "food");
+  const [availabilityTick, setAvailabilityTick] = useState(() => Date.now());
 
   const heroShellRef = useRef(null);
   const stickyHeaderRef = useRef(null);
@@ -237,6 +238,11 @@ export default function Home() {
       document.body.style.overflow = "";
     };
   }, [showVegModePopup, showSwitchOffPopup]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setAvailabilityTick(Date.now()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // UI Sections
   const HeaderVideoBackground = useMemo(() => {
@@ -448,7 +454,20 @@ export default function Home() {
             {showRestaurantSkeleton && <div className="absolute inset-0 z-20 bg-white/80 backdrop-blur-sm flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-500" /></div>}
             
             {visibleRestaurants.map((r, i) => (
-              <Link key={r.id || i} to={`/food/restaurants/${r.slug || r.id || r._id}`} className="group block bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300">
+              (() => {
+                const availability = getRestaurantAvailabilityStatus(r, new Date(availabilityTick), {
+                  ignoreOperationalStatus: true,
+                });
+                const isUnavailableNow = !availability.isOpen;
+
+                return (
+                  <Link
+                    key={r.id || i}
+                    to={`/food/restaurants/${r.slug || r.id || r._id}`}
+                    className={`group block bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 ${
+                      isUnavailableNow ? "grayscale opacity-75" : ""
+                    }`}
+                  >
                 <div className="relative h-48 sm:h-56 overflow-hidden">
                   <OptimizedImage 
                     src={r.image} 
@@ -457,6 +476,11 @@ export default function Home() {
                     priority={i < 1}
                   />
                   <div className="absolute top-4 left-4 px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-xs font-bold shadow-sm">{r.offer || "Best Price"}</div>
+                  <div className={`absolute bottom-4 left-4 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm ${
+                    isUnavailableNow ? "bg-gray-500 text-white" : "bg-emerald-600 text-white"
+                  }`}>
+                    {isUnavailableNow ? "Offline" : "Open now"}
+                  </div>
                   <div className="absolute bottom-4 right-4 px-3 py-1 bg-black/70 backdrop-blur-md rounded-full text-white text-xs font-bold">{r.rating} <Star className="w-3 h-3 inline-block fill-yellow-400 text-yellow-400" /></div>
                   <button
                     onClick={(e) => handleToggleFavorite(e, r)}
@@ -477,7 +501,9 @@ export default function Home() {
                     <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600"><MapPin className="w-3.5 h-3.5 text-brand-500" />{r.distance || "1.2 km"}</div>
                   </div>
                 </div>
-              </Link>
+                  </Link>
+                );
+              })()
             ))}
           </div>
           
