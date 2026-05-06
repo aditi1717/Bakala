@@ -509,12 +509,11 @@ const RestaurantProfile = () => {
         })
       }
 
-      await restaurantAPI.updateProfile(requestPayload)
+      const response = await restaurantAPI.updateProfile(requestPayload)
+      const updatedData = response?.data?.data?.restaurant || response?.data?.restaurant
 
-      const isLocationSection = section === "location"
-      const isFssaiSection = section === "fssai"
-
-      if (isLocationSection || isFssaiSection) {
+      // Redirect if the update triggered a status change to 'pending' (requires approval)
+      if (updatedData?.status === 'pending') {
         clearModuleAuth("restaurant")
         window.dispatchEvent(new Event("restaurantAuthChanged"))
         toast.success("Update submitted for approval. Please log in again.")

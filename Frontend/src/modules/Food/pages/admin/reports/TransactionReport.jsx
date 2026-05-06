@@ -238,7 +238,7 @@ export default function TransactionReport() {
               >
                 <option value="All Zones">All Zones</option>
                 {zones.map(zone => (
-                  <option key={zone._id} value={zone.zoneName || zone.name}>{zone.zoneName || zone.name}</option>
+                  <option key={zone._id} value={zone._id}>{zone.zoneName || zone.name}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />

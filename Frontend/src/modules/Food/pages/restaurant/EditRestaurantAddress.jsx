@@ -5,6 +5,10 @@ import Lenis from "lenis"
 import { ArrowLeft, ChevronDown } from "lucide-react"
 import BottomPopup from "@delivery/components/BottomPopup"
 import { restaurantAPI } from "@food/api"
+import { clearModuleAuth } from "@food/utils/auth"
+import { toast } from "sonner"
+import BRAND_THEME from "@/config/brandTheme"
+
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -175,8 +179,18 @@ export default function EditRestaurantAddress() {
           }
           
           const response = await restaurantAPI.updateProfile({ location: updatedLocation })
+          const updatedRestaurant = response?.data?.data?.restaurant || response?.data?.restaurant
           
-          if (response?.data?.data?.restaurant) {
+          if (updatedRestaurant?.status === 'pending') {
+            // If update triggers approval, clear auth and redirect to login
+            clearModuleAuth("restaurant")
+            window.dispatchEvent(new Event("restaurantAuthChanged"))
+            toast.success("Update submitted for approval. Please log in again.")
+            navigate("/food/restaurant/login", { replace: true })
+            return
+          }
+
+          if (updatedRestaurant) {
             // Update local state
             setLocation(updatedLocation)
             // Dispatch event to notify other components

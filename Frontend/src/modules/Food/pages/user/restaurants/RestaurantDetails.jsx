@@ -2275,6 +2275,21 @@ function RestaurantDetailsContent() {
             <span>{restaurant?.topCategory || restaurant?.cuisine || "Multi-cuisine"}</span>
           </div>
 
+          {!!(
+            (typeof restaurant?.featuredDish === "string" && restaurant.featuredDish.trim()) ||
+            (typeof restaurant?.featuredDish?.name === "string" && restaurant.featuredDish.name.trim())
+          ) && (
+            <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <Flame className="h-4 w-4 text-orange-500" />
+              <span>
+                Featured Dish:{" "}
+                {typeof restaurant?.featuredDish === "string"
+                  ? restaurant.featuredDish.trim()
+                  : restaurant?.featuredDish?.name?.trim()}
+              </span>
+            </div>
+          )}
+
           {/* Location */}
           <div className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300">
             <MapPin className="h-4 w-4" />
