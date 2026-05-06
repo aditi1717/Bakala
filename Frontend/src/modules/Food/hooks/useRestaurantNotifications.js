@@ -153,6 +153,9 @@ export const useRestaurantNotifications = () => {
       .filter(Boolean);
 
   const shouldProcessOrderAlert = (orderData = {}) => {
+    const status = String(orderData?.orderStatus || orderData?.status || "").toLowerCase();
+    if (status && status !== "created") return false;
+
     const key = getOrderAlertKey(orderData);
     if (!key) return true;
     const now = Date.now();
@@ -291,11 +294,11 @@ export const useRestaurantNotifications = () => {
           response?.data?.data?.data?.orders ||
           [];
 
-        // Alert only for orders waiting for restaurant review.
+        // Alert only for orders that have not been accepted/rejected by the restaurant yet.
         const pendingReview = (rows || [])
           .filter((o) => {
-            const status = String(o?.status || "").toLowerCase();
-            return status === "created" || status === "confirmed";
+            const status = String(o?.orderStatus || o?.status || "").toLowerCase();
+            return status === "created";
           })
           .sort((a, b) => {
             const at = a?.updatedAt || a?.createdAt || 0;
@@ -698,7 +701,7 @@ export const useRestaurantNotifications = () => {
 
       // If order is no longer waiting for restaurant review, immediately clear
       // the active new-order notification for the same order.
-      const isPendingReviewStatus = status === 'created' || status === 'confirmed';
+      const isPendingReviewStatus = status === 'created';
       if (eventOrderKeys.length > 0 && status && !isPendingReviewStatus) {
         if (activeOrderRef.current) {
           const activeOrderKeys = getOrderKeys(activeOrderRef.current);

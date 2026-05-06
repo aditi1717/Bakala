@@ -1275,6 +1275,14 @@ export default function OrdersMain() {
     if (newOrder) {
       debugLog("?? New order received via Socket.IO:", newOrder);
 
+      const statusLower = String(
+        newOrder?.orderStatus || newOrder?.status || "",
+      ).toLowerCase();
+      if (statusLower && statusLower !== "created") {
+        clearNewOrder();
+        return;
+      }
+
       const scheduledAt = newOrder.scheduledAt
         ? new Date(newOrder.scheduledAt).getTime()
         : null;
@@ -1604,8 +1612,7 @@ export default function OrdersMain() {
       const statusLower = String(
         payload?.orderStatus || payload?.status || "",
       ).toLowerCase();
-      const isPendingReviewStatus =
-        statusLower === "created" || statusLower === "confirmed";
+      const isPendingReviewStatus = statusLower === "created";
       if (!statusLower || isPendingReviewStatus || !showNewOrderPopupRef.current) {
         return;
       }
@@ -1655,7 +1662,7 @@ export default function OrdersMain() {
     };
   }, []);
 
-  // Check for confirmed orders that haven't been shown in popup yet, or scheduled orders whose time has come
+  // Check for unreviewed orders that haven't been shown in popup yet, or scheduled orders whose time has come
   useEffect(() => {
     const checkOrdersToPopup = async () => {
       // Skip if popup is already showing or Socket.IO order exists
@@ -1671,14 +1678,13 @@ export default function OrdersMain() {
             if (hasOrderBeenShown(order)) return false;
 
             const statusLower = String(order.status || "").toLowerCase();
-            const isPendingReview =
-              statusLower === "created" || statusLower === "confirmed";
+            const isPendingReview = statusLower === "created";
 
             if (isPendingReview && !order.scheduledAt) return true; // ordinary new-order fallback
 
             if (
               order.scheduledAt &&
-              (order.status === "created" || order.status === "confirmed")
+              statusLower === "created"
             ) {
               const scheduledTime = new Date(order.scheduledAt).getTime();
               // Show popup if scheduled time is <= 30 mins from now

@@ -331,7 +331,12 @@ const getPickupContactMeta = (order) => {
   );
   const phone = pickFirstText(
     order?.restaurantPhone,
+    order?.restaurantContactNumber,
+    order?.restaurantMobile,
+    order?.restaurantOwnerPhone,
     restaurantObj?.phone,
+    restaurantObj?.ownerPhone,
+    restaurantObj?.primaryContactNumber,
     restaurantObj?.contactNumber,
     restaurantObj?.mobile,
   );

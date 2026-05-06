@@ -1565,7 +1565,7 @@ export async function getOrderById(
   const order = await FoodOrder.findOne(identity)
     .populate(
       "restaurantId",
-      "restaurantName profileImage area city location rating totalRatings",
+      "restaurantName name phone ownerPhone primaryContactNumber contactNumber mobile profileImage area city location addressLine1 address rating totalRatings",
     )
     .populate("dispatch.deliveryPartnerId", "name phone rating totalRatings")
     .populate("userId", "name phone email")
@@ -2378,7 +2378,7 @@ export async function getCurrentTripDelivery(deliveryPartnerId) {
       $in: ["confirmed", "preparing", "ready_for_pickup", "picked_up", "reached_pickup", "reached_drop"]
     }
   })
-    .populate({ path: "restaurantId", select: "restaurantName name phone location addressLine1 area city state profileImage" })
+    .populate({ path: "restaurantId", select: "restaurantName name phone ownerPhone primaryContactNumber contactNumber mobile location addressLine1 area city state profileImage" })
     .populate({ path: "userId", select: "name phone" })
     .sort({ updatedAt: -1 })
     .lean();
@@ -2415,7 +2415,7 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
       .skip(skip)
       .limit(limit)
       .populate("userId", "name phone email")
-      .populate("restaurantId", "restaurantName name address phone ownerPhone location profileImage")
+      .populate("restaurantId", "restaurantName name address phone ownerPhone primaryContactNumber contactNumber mobile location profileImage")
       .lean(),
     FoodOrder.countDocuments(filter),
   ]);
