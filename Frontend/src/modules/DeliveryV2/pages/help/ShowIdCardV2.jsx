@@ -135,7 +135,7 @@ export default function ShowIdCardV2() {
           </div>
 
           {/* Profile Content */}
-          <div className="px-5 pt-12 pb-6 relative text-center">
+          <div className="px-5 pt-14 pb-6 relative text-center">
              {/* Profile Picture Overlay */}
              <div className="absolute -top-10 left-1/2 -translate-x-1/2">
                 <div className="w-20 h-20 bg-white rounded-full p-1 shadow-md">
@@ -149,7 +149,7 @@ export default function ShowIdCardV2() {
                 <div className={`absolute bottom-1.5 right-1.5 w-3.5 h-3.5 rounded-full border-2 border-white ${isStatusActive ? 'bg-green-500' : 'bg-red-500'}`} />
              </div>
 
-             <div className="mt-2 space-y-1">
+             <div className="mt-4 space-y-1">
                 <h2 className="text-xl font-black text-gray-950 tracking-tight leading-none">{idCardData.name}</h2>
                 <div className="inline-block mt-2">
                    <span className={`px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${isStatusActive ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'} border`}>
