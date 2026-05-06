@@ -336,7 +336,7 @@ export default function OrdersTable({
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.orderStatus)}`}>
                           {order.orderStatus}
                         </span>
-                        <span className="text-xs text-slate-500">{order.deliveryType}</span>
+                        
                       </div>
                       {order.cancellationReason && (
                         <div className="text-xs text-red-600 mt-1">

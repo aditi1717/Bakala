@@ -155,9 +155,6 @@ export default function DispatchOrdersTable({ orders, visibleColumns, onViewOrde
                     }`}>
                       {order.orderStatus}
                     </span>
-                    {order.deliveryType && (
-                      <div className="text-xs text-slate-500 mt-1">{order.deliveryType}</div>
-                    )}
                   </td>
                 )}
                 {visibleColumns.actions && (

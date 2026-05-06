@@ -26,7 +26,7 @@ export const exportToCSV = (orders, filename = "orders") => {
       order.delivered
     ])
   } else {
-    headers = ["SI", "Order ID", "Order Date", "Customer Name", "Customer Phone", "Restaurant", "Total Amount", "Payment Status", "Order Status", "Delivery Type"]
+    headers = ["SI", "Order ID", "Order Date", "Customer Name", "Customer Phone", "Restaurant", "Total Amount", "Payment Status", "Order Status"]
     rows = orders.map((order, index) => [
       index + 1,
       order.orderId || order.id,
@@ -34,10 +34,9 @@ export const exportToCSV = (orders, filename = "orders") => {
       order.customerName,
       order.customerPhone,
       order.restaurant,
-      order.total || `?${(order.totalAmount || 0).toFixed(2)}`,
+      order.total || `₹${(order.totalAmount || 0).toFixed(2)}`,
       order.paymentStatus || "",
-      order.orderStatus || "",
-      order.deliveryType || ""
+      order.orderStatus || ""
     ])
   }
   
@@ -108,7 +107,7 @@ export const exportToExcel = (orders, filename = "orders") => {
       ]
     })
   } else {
-    headers = ["SI", "Order ID", "Order Date", "Customer Name", "Customer Phone", "Restaurant", "Total Amount", "Payment Status", "Order Status", "Delivery Type"]
+    headers = ["SI", "Order ID", "Order Date", "Customer Name", "Customer Phone", "Restaurant", "Total Amount", "Payment Status", "Order Status"]
     rows = orders.map((order, index) => [
       index + 1,
       order.orderId || order.id,
@@ -116,10 +115,9 @@ export const exportToExcel = (orders, filename = "orders") => {
       order.customerName || 'N/A',
       order.customerPhone || 'N/A',
       order.restaurant || 'N/A',
-      order.total || `?${(order.totalAmount || 0).toFixed(2)}`,
+      order.total || `₹${(order.totalAmount || 0).toFixed(2)}`,
       order.paymentStatus || 'N/A',
-      order.orderStatus || 'N/A',
-      order.deliveryType || 'N/A'
+      order.orderStatus || 'N/A'
     ])
   }
   
@@ -275,7 +273,7 @@ export const exportToPDF = async (orders, filename = "orders") => {
         ]
       })
     } else {
-      headers = ["SI", "Order ID", "Order Date", "Customer Name", "Customer Phone", "Restaurant", "Total Amount", "Payment Status", "Order Status", "Delivery Type"]
+      headers = [\"SI\", \"Order ID\", \"Order Date\", \"Customer Name\", \"Customer Phone\", \"Restaurant\", \"Total Amount\", \"Payment Status\", \"Order Status\"]
       tableData = orders.map((order, index) => {
         const amount =
           order.totalAmount ??
@@ -291,8 +289,7 @@ export const exportToPDF = async (orders, filename = "orders") => {
           order.restaurant || 'N/A',
           amount ? `₹${Number(amount).toFixed(2)}` : 'N/A',
           order.paymentStatus || 'N/A',
-          order.orderStatus || 'N/A',
-          order.deliveryType || 'N/A'
+          order.orderStatus || 'N/A'
         ]
       })
     }

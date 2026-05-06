@@ -58,7 +58,6 @@ export function useOrdersManagement(orders, statusKey, title) {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [filters, setFilters] = useState({
     paymentStatus: "",
-    deliveryType: "",
     minAmount: "",
     maxAmount: "",
     fromDate: "",
@@ -124,11 +123,6 @@ export function useOrdersManagement(orders, statusKey, title) {
       })
     }
 
-    if (filters.deliveryType) {
-      result = result.filter(
-        (order) => String(order.deliveryType || "").toLowerCase() === filters.deliveryType.toLowerCase(),
-      )
-    }
 
     if (filters.minAmount) {
       const min = parseFloat(filters.minAmount)
@@ -208,7 +202,6 @@ export function useOrdersManagement(orders, statusKey, title) {
   const handleResetFilters = () => {
     setFilters({
       paymentStatus: "",
-      deliveryType: "",
       minAmount: "",
       maxAmount: "",
       fromDate: "",
@@ -324,7 +317,6 @@ export function useOrdersManagement(orders, statusKey, title) {
       const customerName = formatDisplayText(order.customerName)
       const customerPhone = formatDisplayText(order.customerPhone)
       const restaurantName = formatDisplayText(order.restaurant)
-      const deliveryType = formatDisplayText(order.deliveryType)
       const deliveryAddress = formatOrderAddress(order.address || order.customerAddress || order.deliveryAddress)
       const itemCount = items.reduce((sum, item) => sum + toNumber(item?.quantity || 1), 0) || items.length
 
@@ -414,7 +406,6 @@ export function useOrdersManagement(orders, statusKey, title) {
       ])
       const restaurantCardHeight = drawInfoCard("Restaurant", 76, 53, 58, [
         { label: "Name", value: restaurantName },
-        { label: "Delivery", value: deliveryType },
         { label: "Items", value: `${itemCount} item${itemCount === 1 ? "" : "s"}` },
       ], [37, 99, 235])
       const deliveryCardHeight = drawInfoCard("Delivery Partner", 138, 53, 58, [
