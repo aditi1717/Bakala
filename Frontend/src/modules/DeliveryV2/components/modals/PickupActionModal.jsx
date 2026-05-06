@@ -29,7 +29,18 @@ export const PickupActionModal = ({
   const isAtPickup = status === 'REACHED_PICKUP';
   const restaurantName = order.restaurantName || order.restaurant_name || 'Restaurant';
   const restaurantAddress = order.restaurantAddress || order.restaurant_address || order.restaurantLocation?.address || 'Address not available';
-  const restaurantPhone = order.restaurantPhone || order.restaurant_phone || order.restaurantId?.phone || '';
+  const restaurantPhone =
+    order.restaurantPhone ||
+    order.restaurant_phone ||
+    order.restaurantContactNumber ||
+    order.restaurantMobile ||
+    order.restaurantOwnerPhone ||
+    order.restaurantId?.phone ||
+    order.restaurantId?.ownerPhone ||
+    order.restaurantId?.primaryContactNumber ||
+    order.restaurantId?.contactNumber ||
+    order.restaurantId?.mobile ||
+    '';
   const items = order.items || [];
   const restaurantLogo = order.restaurantImage || order.restaurant?.logo || order.restaurant?.profileImage || 'https://cdn-icons-png.flaticon.com/512/3170/3170733.png';
 

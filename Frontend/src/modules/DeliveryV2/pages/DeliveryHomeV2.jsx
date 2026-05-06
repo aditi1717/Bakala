@@ -1060,7 +1060,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           }).catch(() => { });
         }
       }
-    }, () => toast.error('GPS Needed!'), {
+    }, () => {
+      // Browser geolocation can fail repeatedly while online; keep tracking retrying silently.
+    }, {
       enableHighAccuracy: true,
       maximumAge: 0,
       timeout: 5000

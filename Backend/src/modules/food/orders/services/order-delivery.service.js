@@ -190,7 +190,7 @@ export async function getCurrentTripDelivery(deliveryPartnerId) {
   })
     .populate({
       path: 'restaurantId',
-      select: 'restaurantName name phone location addressLine1 area city state profileImage',
+      select: 'restaurantName name phone ownerPhone primaryContactNumber contactNumber mobile location addressLine1 area city state profileImage',
     })
     .populate({ path: 'userId', select: 'name phone' })
     .sort({ updatedAt: -1 })
@@ -240,7 +240,7 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
       .populate('userId', 'name phone email')
       .populate(
         'restaurantId',
-        'restaurantName name address phone ownerPhone location profileImage',
+        'restaurantName name address phone ownerPhone primaryContactNumber contactNumber mobile location profileImage',
       )
       .lean(),
     FoodOrder.countDocuments(filter),
