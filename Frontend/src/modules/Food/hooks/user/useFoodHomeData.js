@@ -52,6 +52,8 @@ const calculateDistance = (lat1, lng1, lat2, lng2) => {
 export const useFoodHomeData = ({ location, zoneId, zoneStatus, vegMode }) => {
   const [loading, setLoading] = useState(true);
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
+  const [loadingMoreRestaurants, setLoadingMoreRestaurants] = useState(false);
+  const [hasMoreRestaurants, setHasMoreRestaurants] = useState(true);
   
   // Layout & Config States
   const [heroBanners, setHeroBanners] = useState([]);
@@ -64,7 +66,9 @@ export const useFoodHomeData = ({ location, zoneId, zoneStatus, vegMode }) => {
   
   // Data States
   const [restaurants, setRestaurants] = useState([]);
+  const [restaurantsPage, setRestaurantsPage] = useState(1);
   const restaurantsRequestSeqRef = useRef(0);
+  const restaurantsBaseFiltersRef = useRef({});
 
   // Normalize data for UI
   const normalizedCategories = useMemo(() => {

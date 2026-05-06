@@ -26,6 +26,7 @@ import FoodHeroHeaderShell from "@food/components/user/home/FoodHeroHeaderShell"
 import PromoRow from "@food/components/user/home/PromoRow";
 import BRAND_THEME from "@/config/brandTheme";
 import { useFoodHomeData } from "@food/hooks/user/useFoodHomeData";
+import { restaurantAPI } from "@food/api";
 import exploreOffers from "@food/assets/explore more icons/offers.webp";
 import exploreGourmet from "@food/assets/explore more icons/gourmet.webp";
 import exploreCollection from "@food/assets/explore more icons/collection.webp";
@@ -35,7 +36,6 @@ const placeholders = [
   'Search "chinese"', 'Search "thali"', 'Search "momos"', 'Search "dosa"',
 ];
 
-const RESTAURANTS_BATCH_SIZE = 9;
 const HOME_VEG_MODE_OPTION_KEY = "food-home-veg-mode-option";
 const getRestaurantRouteParam = (restaurant, fallbackIndex = 0) => {
   const slug = typeof restaurant?.slug === "string" ? restaurant.slug.trim() : "";
@@ -71,11 +71,14 @@ export default function Home() {
     return saved === "pure-veg" ? "pure-veg" : "all";
   });
   const [hasScrolledPastBanner, setHasScrolledPastBanner] = useState(false);
-  const [visibleRestaurantCount, setVisibleRestaurantCount] = useState(RESTAURANTS_BATCH_SIZE);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [currentHeroBanner, setCurrentHeroBanner] = useState(0);
   const [activeTab, setActiveTab] = useState(routerLocation.pathname.endsWith("/quick") ? "quick" : "food");
   const [availabilityTick, setAvailabilityTick] = useState(() => Date.now());
+  const [pagedRestaurants, setPagedRestaurants] = useState([]);
+  const [restaurantPage, setRestaurantPage] = useState(1);
+  const [loadingMoreRestaurants, setLoadingMoreRestaurants] = useState(false);
+  const [hasMoreRestaurants, setHasMoreRestaurants] = useState(true);
 
   const heroShellRef = useRef(null);
   const stickyHeaderRef = useRef(null);
@@ -124,15 +127,93 @@ export default function Home() {
     });
   }, [landingExploreMore]);
 
-  const filteredRestaurants = useMemo(() => {
-    if (!vegMode) return restaurantsData;
-    if (vegModeOption === "pure-veg") {
-      return restaurantsData.filter((r) => r.pureVegRestaurant);
-    }
-    return restaurantsData;
-  }, [restaurantsData, vegMode, vegModeOption]);
+  useEffect(() => {
+    setPagedRestaurants(restaurantsData);
+    setRestaurantPage(1);
+    setHasMoreRestaurants((restaurantsData?.length || 0) >= 20);
+  }, [restaurantsData]);
 
-  const visibleRestaurants = useMemo(() => filteredRestaurants.slice(0, visibleRestaurantCount), [filteredRestaurants, visibleRestaurantCount]);
+  const fetchMoreRestaurants = useCallback(async () => {
+    if (loadingMoreRestaurants || loadingRestaurants || !hasMoreRestaurants) return;
+
+    const nextPage = restaurantPage + 1;
+    const params = { page: nextPage, limit: 20 };
+    if (Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude)) {
+      params.lat = location.latitude;
+      params.lng = location.longitude;
+    }
+    if (zoneId) params.zoneId = zoneId;
+
+    const normalize = (r) => {
+      let image = r.image;
+      if (!image || typeof image !== "string") {
+        if (r.profileImage?.url) image = r.profileImage.url;
+        else if (typeof r.profileImage === "string") image = r.profileImage;
+        else if (Array.isArray(r.coverImages) && r.coverImages.length > 0) image = r.coverImages[0]?.url || r.coverImages[0];
+        else if (Array.isArray(r.menuImages) && r.menuImages.length > 0) image = r.menuImages[0]?.url || r.menuImages[0];
+      }
+      if (image && typeof image === "object" && image.url) image = image.url;
+      if (typeof image !== "string") image = "";
+
+      return {
+        ...r,
+        id: r.restaurantId || r._id,
+        name: r.name || r.restaurantName || "Unknown Restaurant",
+        image,
+        deliveryTime: r.deliveryTime || r.estimatedDeliveryTime || "25-30 min",
+        featuredPrice: r.featuredPrice || 249,
+        cuisines: Array.isArray(r.cuisines) ? r.cuisines : [],
+        rating: r.rating || 0,
+      };
+    };
+
+    try {
+      setLoadingMoreRestaurants(true);
+      const res = await restaurantAPI.getRestaurants(params);
+      const nextBatch = Array.isArray(res?.data?.data?.restaurants)
+        ? res.data.data.restaurants.map(normalize)
+        : [];
+
+      setPagedRestaurants((prev) => {
+        const seen = new Set(prev.map((item) => String(item.id || item._id || item.restaurantId || "")));
+        const merged = [...prev];
+        nextBatch.forEach((item) => {
+          const key = String(item.id || item._id || item.restaurantId || "");
+          if (!seen.has(key)) {
+            seen.add(key);
+            merged.push(item);
+          }
+        });
+        return merged;
+      });
+
+      setRestaurantPage(nextPage);
+      setHasMoreRestaurants(nextBatch.length >= 20);
+    } catch (error) {
+      console.error("Failed to fetch more restaurants:", error);
+      setHasMoreRestaurants(false);
+    } finally {
+      setLoadingMoreRestaurants(false);
+    }
+  }, [
+    hasMoreRestaurants,
+    loadingMoreRestaurants,
+    loadingRestaurants,
+    location?.latitude,
+    location?.longitude,
+    restaurantPage,
+    zoneId,
+  ]);
+
+  const filteredRestaurants = useMemo(() => {
+    if (!vegMode) return pagedRestaurants;
+    if (vegModeOption === "pure-veg") {
+      return pagedRestaurants.filter((r) => r.pureVegRestaurant);
+    }
+    return pagedRestaurants;
+  }, [pagedRestaurants, vegMode, vegModeOption]);
+
+  const visibleRestaurants = useMemo(() => filteredRestaurants, [filteredRestaurants]);
 
   // Loading Skeletons State
   const showBannerSkeleton = loadingConfig;
@@ -197,13 +278,15 @@ export default function Home() {
 
   // Infinite Scroll
   useEffect(() => {
-    if (visibleRestaurantCount >= filteredRestaurants.length) return;
+    if (loadingRestaurants || loadingMoreRestaurants || !hasMoreRestaurants) return;
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) setVisibleRestaurantCount(prev => prev + RESTAURANTS_BATCH_SIZE);
+      if (entry.isIntersecting) {
+        void fetchMoreRestaurants();
+      }
     }, { rootMargin: "300px" });
     if (restaurantLoadMoreRef.current) observer.observe(restaurantLoadMoreRef.current);
     return () => observer.disconnect();
-  }, [filteredRestaurants.length, visibleRestaurantCount]);
+  }, [fetchMoreRestaurants, hasMoreRestaurants, loadingMoreRestaurants, loadingRestaurants]);
 
   // Placeholder Animation
   useEffect(() => {
@@ -508,7 +591,7 @@ export default function Home() {
           </div>
           
           <div ref={restaurantLoadMoreRef} className="h-20 flex items-center justify-center mt-8">
-            {visibleRestaurantCount < filteredRestaurants.length && <Loader2 className="w-6 h-6 animate-spin text-gray-400" />}
+            {(loadingMoreRestaurants || hasMoreRestaurants) && <Loader2 className="w-6 h-6 animate-spin text-gray-400" />}
           </div>
         </section>
       </div>
