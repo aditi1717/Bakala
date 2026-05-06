@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { useSearchParams, Link, useNavigate } from "react-router-dom"
 import { 
   ArrowLeft, Star, Clock, Search, SlidersHorizontal, 
-  ChevronDown, Bookmark, BadgePercent, Mic, Grid2x2,
+  ChevronDown, Bookmark, BadgePercent, Grid2x2,
   X, Utensils, Store, Loader2, History
 } from "lucide-react"
 import { Card, CardContent } from "@food/components/ui/card"
@@ -43,13 +43,20 @@ export default function ProfessionalSearch() {
   const navigate = useNavigate()
   const { location: userCoords } = useGeoLocation()
   const { zoneId } = useZone(userCoords)
+  const cachedZoneId = useMemo(() => {
+    try {
+      return localStorage.getItem("userZoneId") || ""
+    } catch {
+      return ""
+    }
+  }, [])
+  const effectiveZoneId = zoneId || cachedZoneId
   
   const [query, setQuery] = useState(initialQuery)
   const debouncedQuery = useDebounce(query, 500)
   
   const [results, setResults] = useState({ restaurants: [], dishes: [] })
   const [loading, setLoading] = useState(false)
-  const [isListening, setIsListening] = useState(false)
   const [categories, setCategories] = useState([])
   const [selectedCategoryId, setSelectedCategoryId] = useState(searchParams.get("cat") || null)
   const [history, setHistory] = useState([])
@@ -58,12 +65,15 @@ export default function ProfessionalSearch() {
   useEffect(() => {
     const savedHistory = localStorage.getItem(SEARCH_HISTORY_KEY)
     if (savedHistory) setHistory(JSON.parse(savedHistory))
-    fetchCategories()
   }, [])
+
+  useEffect(() => {
+    fetchCategories()
+  }, [effectiveZoneId])
 
   const fetchCategories = async () => {
     try {
-      const res = await searchAPI.getAdminCategories({ zoneId })
+      const res = await searchAPI.getAdminCategories(effectiveZoneId ? { zoneId: effectiveZoneId } : {})
       if (res.data?.success) setCategories(res.data.data.categories)
     } catch (err) {
       console.error("Failed to fetch categories", err)
@@ -81,6 +91,11 @@ export default function ProfessionalSearch() {
       setResults({ restaurants: [], dishes: [] })
       return
     }
+
+    if (!effectiveZoneId) {
+      setResults({ restaurants: [], dishes: [] })
+      return
+    }
     
     setLoading(true)
     try {
@@ -89,7 +104,7 @@ export default function ProfessionalSearch() {
         categoryId: catId,
         lat: userCoords?.latitude,
         lng: userCoords?.longitude,
-        zoneId
+        zoneId: effectiveZoneId
       })
       
       if (res.data?.success) {
@@ -105,7 +120,7 @@ export default function ProfessionalSearch() {
     } finally {
       setLoading(false)
     }
-  }, [userCoords, zoneId])
+  }, [userCoords, effectiveZoneId])
 
   useEffect(() => {
     performSearch(debouncedQuery, selectedCategoryId)
@@ -113,26 +128,6 @@ export default function ProfessionalSearch() {
         setSearchParams({ q: debouncedQuery, ...(selectedCategoryId ? { cat: selectedCategoryId } : {}) })
     }
   }, [debouncedQuery, selectedCategoryId, performSearch, setSearchParams])
-
-  // Speech Recognition Implementation
-  const handleVoiceSearch = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      alert("Voice search is not supported in this browser.")
-      return
-    }
-
-    const recognition = new SpeechRecognition()
-    recognition.lang = 'en-IN'
-    recognition.onstart = () => setIsListening(true)
-    recognition.onend = () => setIsListening(false)
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript
-      setQuery(transcript)
-      addToHistory(transcript)
-    }
-    recognition.start()
-  }
 
   const handleClear = () => {
     setQuery("")
@@ -172,16 +167,10 @@ export default function ProfessionalSearch() {
               className="pl-10 pr-10 h-11 bg-slate-100 dark:bg-zinc-800 border-none focus:ring-2 focus:ring-rose-500 rounded-xl"
             />
             {query && (
-              <button onClick={handleClear} className="absolute right-10 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600">
+              <button onClick={handleClear} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600">
                 <X className="w-4 h-4" />
               </button>
             )}
-            <button 
-              onClick={handleVoiceSearch}
-              className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-all ${isListening ? 'text-rose-500 scale-125 animate-pulse' : 'text-slate-400'}`}
-            >
-              <Mic className="w-5 h-5" />
-            </button>
           </div>
         </div>
       </div>
@@ -263,7 +252,7 @@ export default function ProfessionalSearch() {
                 </div>
                 <div className="grid gap-4">
                   {results.dishes.map((r) => (
-                    <Link to={`/user/restaurants/${r.slug || r._id}${r.matchedDishId ? `?dish=${r.matchedDishId}` : ''}`} key={r._id} className="flex gap-4 p-3 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-800 hover:shadow-md transition-shadow group">
+                    <Link to={`/food/restaurants/${r.slug || r._id}${r.matchedDishId ? `?dish=${r.matchedDishId}` : ''}`} key={r._id} className="flex gap-4 p-3 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-800 hover:shadow-md transition-shadow group">
                        <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 relative">
                            <img 
                             src={getMediaUrl(r.matchedDishImage || r.profileImage || r.image || (Array.isArray(r.images) && r.images[0]))} 
@@ -307,7 +296,7 @@ export default function ProfessionalSearch() {
                 </div>
                 <div className="grid gap-6">
                   {results.restaurants.map((r) => (
-                    <Link to={`/user/restaurants/${r._id}`} key={r._id} className="block group">
+                    <Link to={`/food/restaurants/${r.slug || r._id}`} key={r._id} className="block group">
                       <div className="relative rounded-3xl overflow-hidden aspect-[16/9] mb-3 bg-slate-200">
                          <img 
                           src={getMediaUrl(r.profileImage || r.image || (Array.isArray(r.images) && r.images[0]))} 

@@ -10,6 +10,7 @@ import { Badge } from "@food/components/ui/badge"
 import { orderAPI } from "@food/api"
 import { useOrders } from "@food/context/OrdersContext"
 import { useCompanyName } from "@food/hooks/useCompanyName"
+import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
 import BRAND_THEME from "@/config/brandTheme"
 import { toast } from "sonner"
 
@@ -143,6 +144,7 @@ export default function OrderInvoice() {
   const [order, setOrder] = useState(() => getOrderById(orderId))
   const [loading, setLoading] = useState(!order)
   const [error, setError] = useState(null)
+  const [businessLogoUrl, setBusinessLogoUrl] = useState(() => getCachedSettings()?.logo?.url || "")
   const invoiceRef = useRef(null)
 
   useEffect(() => {
@@ -167,6 +169,31 @@ export default function OrderInvoice() {
 
     fetchOrder()
   }, [orderId, order])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const applySettings = (settings) => {
+      if (!isMounted) return
+      setBusinessLogoUrl(settings?.logo?.url || "")
+    }
+
+    const cached = getCachedSettings()
+    if (cached?.logo?.url) applySettings(cached)
+
+    loadBusinessSettings().then(applySettings).catch(() => {})
+
+    const handleSettingsUpdate = () => {
+      applySettings(getCachedSettings())
+    }
+
+    window.addEventListener("businessSettingsUpdated", handleSettingsUpdate)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener("businessSettingsUpdated", handleSettingsUpdate)
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -212,20 +239,77 @@ export default function OrderInvoice() {
     }
 
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      const [{ default: html2canvas }, jsPdfModule] = await Promise.all([
         import("html2canvas"),
         import("jspdf"),
       ])
+      const JsPDF = jsPdfModule?.jsPDF || jsPdfModule?.default
 
-      const canvas = await html2canvas(invoiceRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        scrollY: -window.scrollY,
-      })
+      if (!JsPDF) {
+        throw new Error("PDF library could not be loaded")
+      }
 
-      const imgData = canvas.toDataURL("image/png")
-      const pdf = new jsPDF("p", "mm", "a4")
+      const hasUnsupportedPdfColor = (value) =>
+        typeof value === "string" && /(oklch|lch|lab|color-mix|var)\(/i.test(value)
+      const safePdfColor = (value, fallback) => (hasUnsupportedPdfColor(value) ? fallback : value)
+
+      const prepareCloneForPdf = (clonedDoc) => {
+        const clonedInvoice = clonedDoc.querySelector("[data-invoice-pdf='true']")
+        if (!clonedInvoice) return
+
+        clonedInvoice.style.backgroundColor = "#ffffff"
+        clonedInvoice.style.color = "#111827"
+        clonedInvoice.style.borderColor = "#dbe3ef"
+
+        const clonedWindow = clonedDoc.defaultView
+        const elements = [clonedInvoice, ...clonedInvoice.querySelectorAll("*")]
+        elements.forEach((element) => {
+          const computed = clonedWindow.getComputedStyle(element)
+          element.style.color = safePdfColor(computed.color, "#111827")
+          element.style.backgroundColor = safePdfColor(computed.backgroundColor, "transparent")
+          element.style.borderTopColor = safePdfColor(computed.borderTopColor, "#dbe3ef")
+          element.style.borderRightColor = safePdfColor(computed.borderRightColor, "#dbe3ef")
+          element.style.borderBottomColor = safePdfColor(computed.borderBottomColor, "#dbe3ef")
+          element.style.borderLeftColor = safePdfColor(computed.borderLeftColor, "#dbe3ef")
+          element.style.outlineColor = safePdfColor(computed.outlineColor, "#dbe3ef")
+          element.style.textDecorationColor = safePdfColor(computed.textDecorationColor, "currentColor")
+          element.style.boxShadow = "none"
+          element.style.textShadow = "none"
+
+          if (hasUnsupportedPdfColor(computed.backgroundImage)) {
+            element.style.backgroundImage = "none"
+          }
+        })
+      }
+
+      const captureInvoice = (ignoreImages = false) =>
+        html2canvas(invoiceRef.current, {
+          scale: Math.min(2, window.devicePixelRatio || 1.5),
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: "#ffffff",
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: invoiceRef.current.scrollWidth,
+          windowHeight: invoiceRef.current.scrollHeight,
+          ignoreElements: ignoreImages
+            ? (element) => element.tagName?.toLowerCase() === "img"
+            : undefined,
+          onclone: prepareCloneForPdf,
+        })
+
+      let canvas
+      let imgData
+
+      try {
+        canvas = await captureInvoice(false)
+        imgData = canvas.toDataURL("image/png")
+      } catch (captureError) {
+        canvas = await captureInvoice(true)
+        imgData = canvas.toDataURL("image/png")
+      }
+
+      const pdf = new JsPDF("p", "mm", "a4")
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
       const imgWidth = pageWidth
@@ -245,8 +329,10 @@ export default function OrderInvoice() {
       }
 
       const pdfOrderId = getOrderDisplayId(order, orderId) || "order"
-      pdf.save(`invoice-${pdfOrderId}.pdf`)
+      const safeOrderId = String(pdfOrderId).replace(/[^\w-]+/g, "_")
+      pdf.save(`invoice-${safeOrderId}.pdf`)
     } catch (err) {
+      console.error("Failed to generate invoice PDF:", err)
       toast.error("Failed to generate PDF. Please try again.")
     }
   }
@@ -261,6 +347,7 @@ export default function OrderInvoice() {
   const invoiceCouponByAdmin = toMoneyNumber(pricing.couponByAdmin ?? order?.couponByAdmin)
   const invoiceCouponByRestaurant = toMoneyNumber(pricing.couponByRestaurant ?? order?.couponByRestaurant)
   const invoiceOfferByRestaurant = toMoneyNumber(pricing.offerByRestaurant ?? order?.offerByRestaurant)
+  const invoiceCouponDiscount = invoiceCouponByAdmin + invoiceCouponByRestaurant
   const invoiceDiscount = toMoneyNumber(order?.discount ?? pricing.discount)
   const shownDiscountBreakdown = invoiceCouponByAdmin + invoiceCouponByRestaurant + invoiceOfferByRestaurant
   const invoiceOtherDiscount = Math.max(0, invoiceDiscount - shownDiscountBreakdown)
@@ -320,19 +407,42 @@ export default function OrderInvoice() {
         </ScrollReveal>
 
         <ScrollReveal delay={0.1}>
-          <Card ref={invoiceRef} className="dark:bg-[#1a1a1a] dark:border-gray-800">
+          <Card ref={invoiceRef} data-invoice-pdf="true" className="dark:bg-[#1a1a1a] dark:border-gray-800">
             <CardContent className="p-4 sm:p-6 md:p-8 lg:p-10">
               {/* Invoice Header */}
               <div className="invoice-header">
-                <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-                  <FileText className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: BRAND_THEME.colors.brand.primary }} />
-                  <h2 className="invoice-title text-xl sm:text-2xl md:text-3xl font-bold" style={{ color: BRAND_THEME.colors.brand.primary }}>INVOICE</h2>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    {businessLogoUrl ? (
+                      <img
+                        src={businessLogoUrl}
+                        alt={companyName}
+                        crossOrigin="anonymous"
+                        className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl object-contain bg-white"
+                        onError={() => setBusinessLogoUrl("")}
+                      />
+                    ) : (
+                      <div
+                        className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-lg font-black sm:h-12 sm:w-12"
+                        style={{ color: BRAND_THEME.colors.brand.primary }}
+                      >
+                        {String(companyName || BRAND_THEME.brandName).charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm sm:text-base font-bold" style={{ color: BRAND_THEME.colors.brand.primary }}>
+                        {companyName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Food Delivery Platform</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <FileText className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: BRAND_THEME.colors.brand.primary }} />
+                    <h2 className="invoice-title text-xl sm:text-2xl md:text-3xl font-bold" style={{ color: BRAND_THEME.colors.brand.primary }}>INVOICE</h2>
+                  </div>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
-                  <div>
-                    <p className="text-xs sm:text-sm text-muted-foreground">{companyName}</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Food Delivery Platform</p>
-                  </div>
+                  <div />
                   <Badge className="text-white text-sm sm:text-base md:text-lg px-3 sm:px-4 py-1.5 sm:py-2 w-fit" style={{ background: BRAND_THEME.gradients.primary }}>
                     {invoiceStatus}
                   </Badge>
@@ -437,16 +547,10 @@ export default function OrderInvoice() {
                   <span>Tax:</span>
                   <span>{formatCurrency(invoiceTax)}</span>
                 </div>
-                {invoiceCouponByAdmin > 0 ? (
+                {invoiceCouponDiscount > 0 ? (
                   <div className="total-row flex justify-between text-xs sm:text-sm sm:text-base py-1 sm:py-2 text-green-700">
-                    <span>Admin Coupon:</span>
-                    <span>-{formatCurrency(invoiceCouponByAdmin)}</span>
-                  </div>
-                ) : null}
-                {invoiceCouponByRestaurant > 0 ? (
-                  <div className="total-row flex justify-between text-xs sm:text-sm sm:text-base py-1 sm:py-2 text-green-700">
-                    <span>Restaurant Coupon:</span>
-                    <span>-{formatCurrency(invoiceCouponByRestaurant)}</span>
+                    <span>Coupon:</span>
+                    <span>-{formatCurrency(invoiceCouponDiscount)}</span>
                   </div>
                 ) : null}
                 {invoiceOfferByRestaurant > 0 ? (

@@ -9,6 +9,7 @@ const debugError = (...args) => {}
 
 
 const DISMISSED_KEY = "restaurant_dismissed_notifications"
+const ADMIN_NOTIFICATIONS_KEY = "restaurant_admin_notifications"
 
 const getStatusLabel = (status = "") => {
   const normalized = String(status).toLowerCase()
@@ -35,6 +36,14 @@ export default function Notifications() {
       return []
     }
   })
+  const [adminNotifications, setAdminNotifications] = useState(() => {
+    try {
+      const saved = localStorage.getItem(ADMIN_NOTIFICATIONS_KEY)
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
   const {
     items: broadcastNotifications,
     loading: broadcastLoading,
@@ -42,7 +51,7 @@ export default function Notifications() {
     dismiss: dismissBroadcastNotification,
     dismissAll: dismissAllBroadcastNotifications,
     refresh: refreshBroadcastNotifications,
-  } = useNotificationInbox("restaurant", { limit: 100, pollMs: 5 * 60 * 1000 })
+  } = useNotificationInbox("restaurant", { limit: 100, pollMs: 30 * 1000 })
 
   const fetchNotifications = async () => {
     try {
@@ -67,6 +76,24 @@ export default function Notifications() {
   useEffect(() => {
     localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissedIds))
   }, [dismissedIds])
+
+  useEffect(() => {
+    const syncAdminNotifications = () => {
+      try {
+        const saved = localStorage.getItem(ADMIN_NOTIFICATIONS_KEY)
+        const parsed = saved ? JSON.parse(saved) : []
+        const next = Array.isArray(parsed) ? parsed : []
+        setAdminNotifications((prev) =>
+          JSON.stringify(prev) === JSON.stringify(next) ? prev : next
+        )
+      } catch {
+        setAdminNotifications([])
+      }
+    }
+
+    window.addEventListener("restaurantNotificationsUpdated", syncAdminNotifications)
+    return () => window.removeEventListener("restaurantNotificationsUpdated", syncAdminNotifications)
+  }, [])
 
   const notifications = useMemo(() => {
     const orderNotifications = (orders || [])
@@ -107,13 +134,41 @@ export default function Notifications() {
           })
         : "N/A",
     }))
+    const adminRows = (adminNotifications || [])
+      .filter((item) => item?.id && !dismissedIds.includes(item.id))
+      .map((item) => {
+        const timestamp = item.createdAt || item.timestamp || Date.now()
+        return {
+          id: item.id,
+          message: item.title || "Notification",
+          detail: item.message || "",
+          source: "admin",
+          read: item.read,
+          timeValue: new Date(timestamp).getTime(),
+          time: timestamp
+            ? new Date(timestamp).toLocaleString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              })
+            : "N/A",
+        }
+      })
 
-    return [...broadcastRows, ...orderNotifications].sort((a, b) => b.timeValue - a.timeValue)
-  }, [broadcastNotifications, dismissedIds, orders])
+    return [...adminRows, ...broadcastRows, ...orderNotifications].sort((a, b) => b.timeValue - a.timeValue)
+  }, [adminNotifications, broadcastNotifications, dismissedIds, orders])
 
   const removeNotification = (id, source = "order") => {
     if (source === "broadcast") {
       dismissBroadcastNotification(id)
+      return
+    }
+    if (source === "admin") {
+      const next = adminNotifications.filter((item) => item.id !== id)
+      setAdminNotifications(next)
+      localStorage.setItem(ADMIN_NOTIFICATIONS_KEY, JSON.stringify(next))
       return
     }
     setDismissedIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
@@ -121,8 +176,10 @@ export default function Notifications() {
 
   const clearAll = () => {
     dismissAllBroadcastNotifications()
+    setAdminNotifications([])
+    localStorage.setItem(ADMIN_NOTIFICATIONS_KEY, JSON.stringify([]))
     const ids = notifications
-      .filter((item) => item.source !== "broadcast")
+      .filter((item) => item.source !== "broadcast" && item.source !== "admin")
       .map((n) => n.id)
       .filter(Boolean)
     setDismissedIds((prev) => [...new Set([...prev, ...ids])])

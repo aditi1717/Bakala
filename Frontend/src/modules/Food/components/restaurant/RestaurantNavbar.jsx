@@ -34,7 +34,7 @@ export default function RestaurantNavbar({
   const [loading, setLoading] = useState(true)
   const [companyName, setCompanyName] = useState("")
   const [logoUrl, setLogoUrl] = useState(null)
-  const { unreadCount } = useNotificationInbox("restaurant", { limit: 20, pollMs: 5 * 60 * 1000 })
+  const { unreadCount } = useNotificationInbox("restaurant", { limit: 20, pollMs: 30 * 1000 })
 
   // Load business settings for branding
   useEffect(() => {

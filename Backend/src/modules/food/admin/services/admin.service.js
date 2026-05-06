@@ -1891,7 +1891,8 @@ export async function getSupportTickets(query = {}) {
             t.restaurantId && typeof t.restaurantId === 'object'
                 ? {
                       _id: t.restaurantId._id,
-                      name: t.restaurantId.restaurantName || '',
+                      name: t.restaurantId.restaurantName || t.restaurantId.name || '',
+                      restaurantName: t.restaurantId.restaurantName || t.restaurantId.name || '',
                       city: t.restaurantId.city || '',
                       area: t.restaurantId.area || ''
                   }
@@ -1917,7 +1918,7 @@ export async function getSupportTickets(query = {}) {
             updatedAt: t.updatedAt,
             user: null,
             restaurant,
-            restaurantName: restaurant ? restaurant.name : ''
+            restaurantName: restaurant ? restaurant.name || restaurant.restaurantName || '' : ''
         };
     });
 
@@ -1961,14 +1962,25 @@ export async function updateSupportTicket(id, body = {}) {
             const { notifyOwnerSafely } = await import('../../../../core/notifications/firebase.service.js');
             const { getIO, rooms } = await import('../../../../config/socket.js');
 
-            const ownerType = source === 'restaurant' ? 'RESTAURANT' : 'USER';
-            const ownerIdRaw =
-                source === 'restaurant'
-                    ? updated?.restaurantId
-                    : updated?.userId;
-            const ownerId = ownerIdRaw ? String(ownerIdRaw) : '';
+            const notificationOwners = [];
+            const addNotificationOwner = (ownerType, ownerIdRaw) => {
+                const ownerId = ownerIdRaw ? String(ownerIdRaw) : '';
+                if (!ownerId || !mongoose.Types.ObjectId.isValid(ownerId)) return;
+                const exists = notificationOwners.some(
+                    (item) => item.ownerType === ownerType && item.ownerId === ownerId
+                );
+                if (!exists) {
+                    notificationOwners.push({ ownerType, ownerId });
+                }
+            };
 
-            if (ownerId && mongoose.Types.ObjectId.isValid(ownerId)) {
+            if (source === 'restaurant') {
+                addNotificationOwner('RESTAURANT', updated?.restaurantId);
+            } else {
+                addNotificationOwner('USER', updated?.userId);
+            }
+
+            if (notificationOwners.length > 0) {
                 const ticketStatus = String(updated?.status || '').toLowerCase();
                 const issueType = String(
                     updated?.issueType ||
@@ -1988,65 +2000,70 @@ export async function updateSupportTicket(id, body = {}) {
                         ? `Your support ticket (${issueType}) has been resolved.${responseText ? ` Response: ${responseText}` : ''}`
                         : `Your support ticket (${issueType}) was updated by admin.${responseText ? ` Response: ${responseText}` : ''}`;
 
-                const link =
+                const buildLink = (ownerType) =>
                     ownerType === 'USER'
                         ? '/food/user/notifications'
                         : '/food/restaurant/notifications';
 
                 await createInboxNotifications({
-                    notifications: [
-                        {
-                            ownerType,
-                            ownerId,
-                            title,
-                            message,
-                            link,
-                            category: 'support_ticket',
-                            metadata: {
-                                source: 'support_ticket',
-                                ticketId: String(updated?._id || ''),
-                                ticketShortId: shortTicketId,
-                                status: ticketStatus || null,
-                                issueType,
-                            },
+                    notifications: notificationOwners.map(({ ownerType, ownerId }) => ({
+                        ownerType,
+                        ownerId,
+                        title,
+                        message,
+                        link: buildLink(ownerType),
+                        category: 'support_ticket',
+                        source: 'SUPPORT_TICKET',
+                        metadata: {
+                            source: 'support_ticket',
+                            ticketId: String(updated?._id || ''),
+                            ticketShortId: shortTicketId,
+                            status: ticketStatus || null,
+                            issueType,
                         },
-                    ],
+                    })),
                 });
 
-                await notifyOwnerSafely(
-                    { ownerType, ownerId },
-                    {
-                        title,
-                        body: message,
-                        dataOnly: true,
-                        data: {
+                await Promise.all(
+                    notificationOwners.map(({ ownerType, ownerId }) =>
+                        notifyOwnerSafely(
+                            { ownerType, ownerId },
+                            {
+                                title,
+                                body: message,
+                                dataOnly: true,
+                                data: {
+                                    type: 'support_ticket_update',
+                                    ticketId: String(updated?._id || ''),
+                                    ticketStatus: ticketStatus || '',
+                                    link: buildLink(ownerType),
+                                },
+                            },
+                        )
+                    )
+                );
+
+                for (const { ownerType, ownerId } of notificationOwners) {
+                    try {
+                        const io = getIO();
+                        const socketPayload = {
+                            title,
+                            message,
+                            link: buildLink(ownerType),
+                            targetType: ownerType,
                             type: 'support_ticket_update',
                             ticketId: String(updated?._id || ''),
                             ticketStatus: ticketStatus || '',
-                            link,
-                        },
-                    },
-                );
-
-                try {
-                    const io = getIO();
-                    const socketPayload = {
-                        title,
-                        message,
-                        link,
-                        targetType: ownerType,
-                        type: 'support_ticket_update',
-                        ticketId: String(updated?._id || ''),
-                        ticketStatus: ticketStatus || '',
-                        createdAt: new Date().toISOString(),
-                    };
-                    if (ownerType === 'USER') {
-                        io.to(rooms.user(ownerId)).emit('admin_notification', socketPayload);
-                    } else if (ownerType === 'RESTAURANT') {
-                        io.to(rooms.restaurant(ownerId)).emit('admin_notification', socketPayload);
+                            createdAt: new Date().toISOString(),
+                        };
+                        if (ownerType === 'USER') {
+                            io.to(rooms.user(ownerId)).emit('admin_notification', socketPayload);
+                        } else if (ownerType === 'RESTAURANT') {
+                            io.to(rooms.restaurant(ownerId)).emit('admin_notification', socketPayload);
+                        }
+                    } catch (socketError) {
+                        console.error('Failed to emit support ticket notification:', socketError);
                     }
-                } catch (socketError) {
-                    console.error('Failed to emit support ticket notification:', socketError);
                 }
             }
         } catch (e) {

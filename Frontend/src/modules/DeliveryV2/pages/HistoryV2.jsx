@@ -476,8 +476,8 @@ export const HistoryV2 = () => {
           </div>
         ) : filteredTrips.length > 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-[780px] w-full text-sm">
+            <div className="overflow-x-scroll pb-2 [scrollbar-width:thin]">
+              <table className="min-w-[860px] w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                     <th className="text-left px-4 py-3 text-xs font-bold text-gray-600">Order ID</th>

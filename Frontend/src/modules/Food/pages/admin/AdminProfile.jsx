@@ -99,9 +99,21 @@ export default function AdminProfile() {
   };
 
   const handleInputChange = (field, value) => {
+    let sanitizedValue = value;
+
+    if (field === "name") {
+      // Strip numbers
+      sanitizedValue = value.replace(/[0-9]/g, "");
+    }
+    
+    if (field === "phone") {
+      // Only digits and max 10
+      sanitizedValue = value.replace(/\D/g, "").slice(0, 10);
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [field]: value,
+      [field]: sanitizedValue,
     }));
   };
 
@@ -156,6 +168,24 @@ export default function AdminProfile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Validations
+    const nameRegex = /^[A-Za-z\s]+$/;
+    if (!nameRegex.test(formData.name)) {
+      toast.error("Full Name should only contain alphabets");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    if (formData.phone && !/^\d{10}$/.test(formData.phone)) {
+      toast.error("Phone number should be 10 digits");
+      return;
+    }
+
     try {
       const currentPassword = String(passwordData.currentPassword || "").trim();
       const newPassword = String(passwordData.newPassword || "").trim();

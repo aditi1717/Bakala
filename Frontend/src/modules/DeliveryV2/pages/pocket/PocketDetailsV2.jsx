@@ -504,8 +504,8 @@ export const PocketDetailsV2 = () => {
               <p className="text-sm font-semibold text-gray-700">No delivered orders found for selected filter</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-xs">
+            <div className="-mx-4 overflow-x-scroll px-4 pb-2 [scrollbar-width:thin]">
+              <table className="min-w-[980px] w-full text-xs">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                     <th className="px-6 py-2.5 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Order</th>

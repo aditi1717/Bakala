@@ -8,6 +8,30 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
+const storeRestaurantAdminNotification = (payload = {}) => {
+  if (typeof window === 'undefined') return;
+  const id = `admin-${payload?.ticketId || Date.now()}`;
+  const item = {
+    id,
+    title: payload?.title || 'Notification',
+    message: payload?.message || 'New notification received.',
+    createdAt: payload?.createdAt || new Date().toISOString(),
+    read: false,
+    type: payload?.type || 'admin_notification',
+  };
+
+  try {
+    const saved = localStorage.getItem('restaurant_admin_notifications');
+    const current = saved ? JSON.parse(saved) : [];
+    const rows = Array.isArray(current) ? current : [];
+    const next = [item, ...rows.filter((row) => row?.id !== id)].slice(0, 100);
+    localStorage.setItem('restaurant_admin_notifications', JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent('restaurantNotificationsUpdated'));
+  } catch {
+    // Local notification cache is best-effort only.
+  }
+}
+
 const resolveAudioSource = (source, cacheKey = 'restaurant-alert') => {
   if (!source) return source;
   if (!import.meta.env.DEV) return source;
@@ -700,6 +724,7 @@ export const useRestaurantNotifications = () => {
 
     socketRef.current.on('admin_notification', (payload) => {
       debugLog('?? Admin broadcast received:', payload);
+      storeRestaurantAdminNotification(payload);
       dispatchNotificationInboxRefresh();
     });
 

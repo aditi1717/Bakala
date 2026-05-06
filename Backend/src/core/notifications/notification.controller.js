@@ -1,5 +1,6 @@
 import { sendResponse, sendError } from '../../utils/response.js';
 import {
+    createInboxNotifications,
     resolveNotificationOwnerFromRequest,
     getInboxNotifications,
     markNotificationAsRead,
@@ -7,9 +8,102 @@ import {
     dismissAllNotifications
 } from './notification.service.js';
 
+const buildSupportNotificationPayload = ({ ownerType, ownerId, ticket, link }) => {
+    const ticketStatus = String(ticket?.status || '').toLowerCase();
+    const issueType = String(
+        ticket?.issueType ||
+            ticket?.subject ||
+            ticket?.category ||
+            'support'
+    ).trim();
+    const responseText = String(ticket?.adminResponse || '').trim();
+    const title =
+        ticketStatus === 'resolved'
+            ? 'Support Ticket Resolved'
+            : 'Support Ticket Updated';
+    const message =
+        ticketStatus === 'resolved'
+            ? `Your support ticket (${issueType}) has been resolved.${responseText ? ` Response: ${responseText}` : ''}`
+            : `Your support ticket (${issueType}) was updated by admin.${responseText ? ` Response: ${responseText}` : ''}`;
+
+    return {
+        ownerType,
+        ownerId,
+        title,
+        message,
+        link,
+        category: 'support_ticket',
+        source: 'SUPPORT_TICKET',
+        metadata: {
+            source: 'support_ticket',
+            ticketId: String(ticket?._id || ''),
+            ticketShortId: String(ticket?._id || '').slice(-6).toUpperCase(),
+            status: ticketStatus || null,
+            issueType,
+        },
+    };
+};
+
+const ensureSupportTicketInboxNotifications = async ({ ownerType, ownerId } = {}) => {
+    try {
+        const ownerIdString = String(ownerId || '');
+        if (!ownerIdString) return;
+
+        if (ownerType === 'USER') {
+            const { FoodSupportTicket } = await import('../../modules/food/user/models/supportTicket.model.js');
+            const tickets = await FoodSupportTicket.find({
+                userId: ownerId,
+                adminResponse: { $exists: true, $ne: '' },
+            })
+                .sort({ updatedAt: -1 })
+                .limit(25)
+                .lean();
+
+            if (!tickets.length) return;
+            await createInboxNotifications({
+                notifications: tickets.map((ticket) =>
+                    buildSupportNotificationPayload({
+                        ownerType: 'USER',
+                        ownerId: ownerIdString,
+                        ticket,
+                        link: '/food/user/notifications',
+                    })
+                ),
+            });
+            return;
+        }
+
+        if (ownerType === 'RESTAURANT') {
+            const { FoodRestaurantSupportTicket } = await import('../../modules/food/restaurant/models/supportTicket.model.js');
+            const tickets = await FoodRestaurantSupportTicket.find({
+                restaurantId: ownerId,
+                adminResponse: { $exists: true, $ne: '' },
+            })
+                .sort({ updatedAt: -1 })
+                .limit(25)
+                .lean();
+
+            if (!tickets.length) return;
+            await createInboxNotifications({
+                notifications: tickets.map((ticket) =>
+                    buildSupportNotificationPayload({
+                        ownerType: 'RESTAURANT',
+                        ownerId: ownerIdString,
+                        ticket,
+                        link: '/food/restaurant/notifications',
+                    })
+                ),
+            });
+        }
+    } catch (error) {
+        console.error('Failed to ensure support ticket inbox notifications:', error);
+    }
+};
+
 export const getInboxController = async (req, res) => {
     try {
         const owner = resolveNotificationOwnerFromRequest(req.user);
+        await ensureSupportTicketInboxNotifications(owner);
         const data = await getInboxNotifications({
             ...owner,
             page: req.query?.page,

@@ -33,6 +33,21 @@ const getTicketOrderId = (ticket) => {
   return String(raw)
 }
 
+const getShortOrderId = (value = "") => {
+  const raw = String(value || "").trim()
+  if (!raw) return ""
+  const isMongoId = /^[a-f\d]{24}$/i.test(raw)
+  return isMongoId ? raw.slice(-8).toUpperCase() : raw
+}
+
+const getTicketDisplayOrderId = (ticket, fallback = "") => {
+  const raw = ticket?.orderId
+  if (raw && typeof raw === "object") {
+    return String(raw?.displayOrderId || raw?.orderId || raw?.id || raw?._id || "").trim()
+  }
+  return getShortOrderId(raw || fallback)
+}
+
 export default function SubmitComplaint() {
   const navigate = useNavigate()
   const { orderId = "" } = useParams()
@@ -89,6 +104,9 @@ export default function SubmitComplaint() {
   }, [routeOrderId])
 
   const isReadOnly = Boolean(existingTicket)
+  const displayOrderId = existingTicket
+    ? getTicketDisplayOrderId(existingTicket, routeOrderId)
+    : getShortOrderId(routeOrderId)
   const isValid = useMemo(() => {
     const hasValidType = COMPLAINT_TYPE_OPTIONS.some((option) => option.value === form.subject)
     return routeOrderId && hasValidType && form.description.trim().length >= 10
@@ -171,7 +189,7 @@ export default function SubmitComplaint() {
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Order ID</label>
-            <Input value={form.orderId} readOnly className="bg-slate-50" />
+            <Input value={displayOrderId} readOnly className="bg-slate-50" />
           </div>
 
           <div className="space-y-2">

@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { X, Search, Clock, Loader2 } from "lucide-react"
 import { Button } from "@food/components/ui/button"
 import { Input } from "@food/components/ui/input"
 import { searchAPI } from "@/services/api"
 import BRAND_THEME from "@/config/brandTheme"
+import { useLocation as useGeoLocation } from "@food/hooks/useLocation"
+import { useZone } from "@food/hooks/useZone"
 
 const SEARCH_HISTORY_KEY = "user_recent_searches_v1"
 
@@ -28,6 +30,16 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
   }
   const { brand } = BRAND_THEME.colors
   const navigate = useNavigate()
+  const { location: userCoords } = useGeoLocation()
+  const { zoneId } = useZone(userCoords)
+  const cachedZoneId = useMemo(() => {
+    try {
+      return localStorage.getItem("userZoneId") || ""
+    } catch {
+      return ""
+    }
+  }, [])
+  const effectiveZoneId = zoneId || cachedZoneId
   const inputRef = useRef(null)
   const [filteredFoods, setFilteredFoods] = useState([])
   const [recentSuggestions, setRecentSuggestions] = useState([])
@@ -90,9 +102,21 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
 
     const requestId = ++searchRequestIdRef.current
     const timer = setTimeout(async () => {
+      if (!effectiveZoneId) {
+        setFilteredFoods([])
+        setLoadingFoods(false)
+        return
+      }
+
       setLoadingFoods(true)
       try {
-        const res = await searchAPI.unifiedSearch({ q: term, limit: 60 })
+        const res = await searchAPI.unifiedSearch({
+          q: term,
+          limit: 60,
+          lat: userCoords?.latitude,
+          lng: userCoords?.longitude,
+          zoneId: effectiveZoneId,
+        })
         const restaurants = res?.data?.data?.restaurants || []
         const normalizedFoods = restaurants
           .map((item, index) => {
@@ -131,7 +155,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     }, 250)
 
     return () => clearTimeout(timer)
-  }, [isOpen, searchValue])
+  }, [effectiveZoneId, isOpen, searchValue, userCoords?.latitude, userCoords?.longitude])
 
   const saveRecentSearch = (term) => {
     const value = String(term || "").trim()
@@ -153,7 +177,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     e.preventDefault()
     if (searchValue.trim()) {
       saveRecentSearch(searchValue)
-      navigate(`/food/user/search?q=${encodeURIComponent(searchValue.trim())}`)
+      navigate(`/food/search?q=${encodeURIComponent(searchValue.trim())}`)
       onClose()
       onSearchChange("")
     }
@@ -161,7 +185,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
 
   const handleFoodClick = (food) => {
     saveRecentSearch(food.name)
-    navigate(`/food/user/search?q=${encodeURIComponent(food.name)}`)
+    navigate(`/food/search?q=${encodeURIComponent(food.name)}`)
     onClose()
     onSearchChange("")
   }

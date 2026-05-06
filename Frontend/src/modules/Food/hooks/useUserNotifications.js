@@ -40,6 +40,33 @@ const broadcastConnectionState = (connected) => {
   );
 };
 
+const storeUserAdminNotification = (payload = {}) => {
+  if (typeof window === 'undefined') return;
+  const id = `admin-${payload?.ticketId || Date.now()}`;
+  const item = {
+    id,
+    type: payload?.type || 'admin_notification',
+    title: payload?.title || 'Notification',
+    message: payload?.message || 'New notification received.',
+    time: 'Just now',
+    timestamp: payload?.createdAt || new Date().toISOString(),
+    read: false,
+    icon: 'Bell',
+    iconColor: 'text-emerald-600',
+  };
+
+  try {
+    const saved = localStorage.getItem('food_user_notifications');
+    const current = saved ? JSON.parse(saved) : [];
+    const rows = Array.isArray(current) ? current : [];
+    const next = [item, ...rows.filter((row) => row?.id !== id)].slice(0, 100);
+    localStorage.setItem('food_user_notifications', JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent('notificationsUpdated'));
+  } catch {
+    // Local notification cache is best-effort only.
+  }
+};
+
 /**
  * Hook for user to receive real-time order notifications.
  * Dispatches `orderStatusNotification` for order pages/cards.
@@ -179,6 +206,7 @@ export const useUserNotifications = () => {
         description: payload?.message || 'New broadcast notification received.',
         duration: 8000,
       });
+      storeUserAdminNotification(payload);
       dispatchNotificationInboxRefresh();
     });
 

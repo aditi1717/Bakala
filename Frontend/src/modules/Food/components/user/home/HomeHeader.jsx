@@ -90,7 +90,7 @@ export default function HomeHeader({
     items: broadcastNotifications,
     unreadCount: broadcastUnreadCount,
     dismiss: dismissBroadcastNotification,
-  } = useNotificationInbox("user", { limit: 20 });
+  } = useNotificationInbox("user", { limit: 20, pollMs: 30 * 1000 });
   const { getCartCount } = useCart();
 
   useEffect(() => {

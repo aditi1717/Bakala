@@ -62,7 +62,7 @@ export default function Notifications() {
     markAsRead: markBroadcastAsRead,
     dismiss: dismissBroadcastNotification,
     dismissAll: dismissAllBroadcastNotifications,
-  } = useNotificationInbox("user", { limit: 100 })
+  } = useNotificationInbox("user", { limit: 100, pollMs: 30 * 1000 })
 
   // Persistence: Save to localStorage whenever list updates
   useEffect(() => {
@@ -70,6 +70,24 @@ export default function Notifications() {
     // Also dispatch an event to update other components (like navbar badge)
     window.dispatchEvent(new CustomEvent('notificationsUpdated', { detail: { count: notificationsList.filter(n => !n.read).length } }))
   }, [notificationsList])
+
+  useEffect(() => {
+    const syncStoredNotifications = () => {
+      try {
+        const saved = localStorage.getItem('food_user_notifications')
+        const parsed = saved ? JSON.parse(saved) : []
+        const next = Array.isArray(parsed) ? parsed : []
+        setNotificationsList((prev) =>
+          JSON.stringify(prev) === JSON.stringify(next) ? prev : next
+        )
+      } catch {
+        setNotificationsList([])
+      }
+    }
+
+    window.addEventListener('notificationsUpdated', syncStoredNotifications)
+    return () => window.removeEventListener('notificationsUpdated', syncStoredNotifications)
+  }, [])
 
   // Real-time: Listen for status updates from useUserNotifications hook
   useEffect(() => {
