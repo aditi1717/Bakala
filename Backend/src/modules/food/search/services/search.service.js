@@ -58,7 +58,8 @@ const buildFoodSearchFilter = (regex, { isVeg } = {}) => {
                 { name: { $regex: regex } },
                 { description: { $regex: regex } },
                 { categoryName: { $regex: regex } },
-                { 'variants.name': { $regex: regex } }
+                { 'variants.name': { $regex: regex } },
+                { 'variations.name': { $regex: regex } }
             ]
         });
     }
@@ -71,8 +72,12 @@ const getMatchedFoodLabel = (food, regex, fallbackTerm = '') => {
     const direct = fields.find((value) => value && regex?.test(String(value)));
     if (direct) return food.name || direct;
 
-    const matchedVariant = Array.isArray(food.variants)
-        ? food.variants.find((variant) => variant?.name && regex?.test(String(variant.name)))
+    const variantList = Array.isArray(food?.variants)
+        ? food.variants
+        : (Array.isArray(food?.variations) ? food.variations : []);
+
+    const matchedVariant = Array.isArray(variantList)
+        ? variantList.find((variant) => variant?.name && regex?.test(String(variant.name)))
         : null;
     if (matchedVariant?.name) {
         return food.name ? `${food.name} (${matchedVariant.name})` : matchedVariant.name;
