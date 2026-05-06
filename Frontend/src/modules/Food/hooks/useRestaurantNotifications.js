@@ -55,7 +55,7 @@ const buildRestaurantOrderNotification = (orderData = {}) => {
     tag: `restaurant-order-${orderId}`,
     data: {
       orderId,
-      targetUrl: `/restaurant/orders/${orderData.orderMongoId || orderData.orderId || ''}`,
+      targetUrl: `/food/restaurant/orders/${orderData.orderMongoId || orderData._id || orderData.id || orderData.orderId || ''}`,
     },
   };
 }
@@ -68,7 +68,7 @@ const triggerWebViewNativeNotification = async (orderData = {}) => {
     body: `Order #${orderData?.orderId || orderData?.orderMongoId || orderData?.id || ''}`.trim(),
     orderId: orderData?.orderId || orderData?.order_id || '',
     orderMongoId: orderData?.orderMongoId || orderData?.order_mongo_id || '',
-    targetUrl: `/restaurant/orders/${orderData?.orderMongoId || orderData?.orderId || ''}`,
+    targetUrl: `/food/restaurant/orders/${orderData?.orderMongoId || orderData?._id || orderData?.id || orderData?.orderId || ''}`,
   };
 
   try {
@@ -281,7 +281,7 @@ export const useRestaurantNotifications = () => {
   useEffect(() => {
     if (!restaurantId) return;
 
-    const ALERT_POLL_MS = 8000;
+    const ALERT_POLL_MS = 3000;
     let isCancelled = false;
 
     const pollOrders = async () => {
@@ -533,11 +533,12 @@ export const useRestaurantNotifications = () => {
     debugLog('?? Is Production Build:', isProductionBuild);
     debugLog('?? Is Production Deployment:', isProductionDeployment);
 
-    // Initialize socket connection (default namespace)
-    // Use polling only to avoid repeated "WebSocket connection failed" when backend is down
+    // Initialize socket connection (default namespace).
+    // Prefer WebSocket for immediate alerts, with polling fallback for restricted networks.
     socketRef.current = io(socketUrl, {
       path: '/socket.io/',
-      transports: ['polling'],
+      transports: ['websocket', 'polling'],
+      upgrade: true,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
@@ -638,6 +639,13 @@ export const useRestaurantNotifications = () => {
     socketRef.current.on('new_order', (orderData) => {
       debugLog('?? New order received:', orderData);
       setNewOrder(orderData);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('restaurantNewOrderReceived', {
+            detail: orderData || {},
+          }),
+        );
+      }
 
       handleIncomingOrderAlert(orderData);
     });
@@ -650,6 +658,16 @@ export const useRestaurantNotifications = () => {
         orderMongoId: data?.orderMongoId || data?.order_mongo_id,
         ...data
       };
+      if (normalizedData?.orderId || normalizedData?.orderMongoId) {
+        setNewOrder((prev) => prev || normalizedData);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('restaurantNewOrderReceived', {
+              detail: normalizedData,
+            }),
+          );
+        }
+      }
       // Force immediate buzz for notification events, even if dedupe would skip.
       activeOrderRef.current = normalizedData || { id: Date.now() };
       playNotificationSound(normalizedData);

@@ -684,12 +684,14 @@ async function notifyRestaurantNewOrder(orderDoc) {
       io.to(rooms.restaurant(orderDoc.restaurantId)).emit(
         "play_notification_sound",
         {
+          ...payload,
           orderId: payload.orderId,
           orderMongoId: payload.orderMongoId,
         },
       );
       io.to(rooms.admin()).emit("admin_new_order", payload);
       io.to(rooms.admin()).emit("play_notification_sound", {
+        ...payload,
         orderId: payload.orderId,
         orderMongoId: payload.orderMongoId,
       });
@@ -1263,11 +1265,15 @@ export async function createOrder(userId, dto) {
 
   // Realtime + push notifications.
   try {
+    // Emit to the restaurant first so dashboard alerts are not delayed by push providers.
+    const restaurantNotificationPromise =
+      orderType === "food" ? notifyRestaurantNewOrder(order) : Promise.resolve();
+
     // Notify customer. For online payments, order is created but awaits payment confirmation.
     const isAwaitingOnlinePayment =
       String(order.payment?.method || "").toLowerCase() === "razorpay" &&
       String(order.payment?.status || "").toLowerCase() !== "paid";
-    await notifyOwnersSafely([{ ownerType: "USER", ownerId: userId }], {
+    const userNotificationPromise = notifyOwnersSafely([{ ownerType: "USER", ownerId: userId }], {
       title: isAwaitingOnlinePayment
         ? "Complete Payment to Confirm Order"
         : orderType === "quick"
@@ -1291,10 +1297,10 @@ export async function createOrder(userId, dto) {
       },
     });
 
-    // Restaurant gets new-order request only when payment flow is eligible.
-    if (orderType === "food") {
-      await notifyRestaurantNewOrder(order);
-    }
+    await Promise.allSettled([
+      restaurantNotificationPromise,
+      userNotificationPromise,
+    ]);
   } catch {
     // Don't block order placement on socket failures.
   }
