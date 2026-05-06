@@ -1452,7 +1452,15 @@ export function useLocation() {
       } catch (err) {
         debugError("Failed to parse stored location:", err)
         shouldForceRefresh = true
+        localStorage.setItem("userLocation", JSON.stringify(buildDefaultLocation()))
       }
+    } else {
+      const defaultLocation = buildDefaultLocation()
+      localStorage.setItem("userLocation", JSON.stringify(defaultLocation))
+      setLocation(defaultLocation)
+      setPermissionGranted(true)
+      setLoading(false)
+      hasInitialLocation = true
     }
 
     // If no cached location, try DB

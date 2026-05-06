@@ -285,8 +285,12 @@ export function useLocationSimple() {
         setLoading(false)
       } catch (err) {
         debugError("Failed to parse cached location:", err)
+        localStorage.setItem("userLocation", JSON.stringify(DEFAULT_LOCATION))
+        setLocation(DEFAULT_LOCATION)
+        setLoading(false)
       }
     } else {
+      localStorage.setItem("userLocation", JSON.stringify(DEFAULT_LOCATION))
       setLocation(DEFAULT_LOCATION)
       setLoading(false)
     }
