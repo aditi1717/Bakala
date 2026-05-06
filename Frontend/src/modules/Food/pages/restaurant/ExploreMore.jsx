@@ -805,7 +805,7 @@ export default function ExploreMore() {
       return allSections
     }
 
-    const query = searchQuery.toLowerCase()
+    const query = searchQuery.trim().toLowerCase()
     return allSections
       .map(section => ({
         ...section,
@@ -1136,7 +1136,12 @@ export default function ExploreMore() {
                     type="text"
                     placeholder="Search features..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (val.startsWith(" ")) return
+                      const sanitized = val.replace(/\s\s+/g, " ")
+                      setSearchQuery(sanitized)
+                    }}
                     autoFocus
                     className="w-full px-4 py-2 pr-10 bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-900 placeholder-gray-500"
                   />
@@ -1742,7 +1747,10 @@ export default function ExploreMore() {
           </>
         )}
       </AnimatePresence>
-      <BottomNavOrders />
+      {/* Bottom Navigation - Hidden when search or main popups are open */}
+      {!(searchOpen || profileOpen || scheduleOffOpen || dateTimePickerOpen || existingScheduleOpen || logoutConfirmOpen) && (
+        <BottomNavOrders />
+      )}
     </motion.div>
   )
 }

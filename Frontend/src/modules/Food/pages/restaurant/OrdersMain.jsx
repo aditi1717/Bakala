@@ -38,13 +38,11 @@ const debugError = (...args) => {};
 
 const STORAGE_KEY = "restaurant_online_status";
 
-// Top filter tabs
 const filterTabs = [
   { id: "all", label: "All" },
   { id: "preparing", label: "Preparing" },
   { id: "ready", label: "Ready" },
   { id: "out-for-delivery", label: "Picked Up" },
-  { id: "scheduled", label: "Scheduled" },
   { id: "completed", label: "Completed" },
   { id: "cancelled", label: "Cancelled" },
 ];
@@ -57,7 +55,6 @@ const allOrdersStatusPriority = {
   picked_up: 4,
   out_for_delivery: 4,
   reached_drop: 5,
-  scheduled: 5,
   // delivered, completed, cancelled — no fixed priority, sorted by date only
 };
 
@@ -1283,19 +1280,7 @@ export default function OrdersMain() {
         return;
       }
 
-      const scheduledAt = newOrder.scheduledAt
-        ? new Date(newOrder.scheduledAt).getTime()
-        : null;
-      const isFutureScheduled =
-        scheduledAt && scheduledAt > Date.now() + 30 * 60000;
 
-      if (isFutureScheduled) {
-        toast.info(
-          `New scheduled order received for ${new Date(scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
-        );
-        requestOrdersRefresh();
-        return; // Do not show the immediate popup
-      }
 
       if (!hasOrderBeenShown(newOrder)) {
         markOrderAsShown(newOrder);
@@ -1680,16 +1665,7 @@ export default function OrdersMain() {
             const statusLower = String(order.status || "").toLowerCase();
             const isPendingReview = statusLower === "created";
 
-            if (isPendingReview && !order.scheduledAt) return true; // ordinary new-order fallback
-
-            if (
-              order.scheduledAt &&
-              statusLower === "created"
-            ) {
-              const scheduledTime = new Date(order.scheduledAt).getTime();
-              // Show popup if scheduled time is <= 30 mins from now
-              if (scheduledTime <= now + 30 * 60000) return true;
-            }
+            if (isPendingReview) return true;
 
             return false;
           });
@@ -2398,8 +2374,7 @@ export default function OrdersMain() {
             refreshToken={ordersRefreshToken}
           />
         );
-      case "scheduled":
-        return <EmptyState message="Scheduled orders will appear here" />;
+
       case "completed":
         return (
           <CompletedOrders
@@ -2716,31 +2691,7 @@ export default function OrdersMain() {
 
                 {/* Content */}
                 <div className="px-3 pt-2.5 pb-3 sm:px-4 sm:pt-3 sm:pb-5 flex-1 overflow-y-auto min-h-0 overscroll-contain">
-                  {/* Scheduled Indicator */}
-                  {(popupOrder || newOrder)?.scheduledAt && (
-                    <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                        <Calendar className="w-4 h-4 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-green-800 uppercase tracking-wider">
-                          Scheduled Order
-                        </p>
-                        <p className="text-sm font-semibold text-green-900 mt-0.5">
-                          For{" "}
-                          {new Date(
-                            (popupOrder || newOrder).scheduledAt,
-                          ).toLocaleString("en-US", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: true,
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+
 
                   {/* Customer info */}
                   <div className="mb-4">
