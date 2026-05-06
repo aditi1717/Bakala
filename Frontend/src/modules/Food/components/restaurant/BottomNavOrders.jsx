@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom"
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
   FileText,
@@ -56,6 +56,24 @@ export default function BottomNavOrders() {
   const location = useLocation()
   const { pathname, state } = location
 
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return undefined
+    const update = () => {
+      const vv = window.visualViewport
+      const inset = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)))
+      setIsKeyboardVisible(inset > 120)
+    }
+    window.visualViewport.addEventListener("resize", update)
+    window.visualViewport.addEventListener("scroll", update)
+    update()
+    return () => {
+      window.visualViewport.removeEventListener("resize", update)
+      window.visualViewport.removeEventListener("scroll", update)
+    }
+  }, [])
+
   const basePath = pathname.startsWith("/food/restaurant")
     ? "/food/restaurant"
     : pathname.startsWith("/restaurant")
@@ -65,7 +83,7 @@ export default function BottomNavOrders() {
   const tabs = useMemo(() => getOrdersTabs(basePath), [basePath])
 
   const isInternalPage = pathname.includes("/create-offers")
-  if (isInternalPage) {
+  if (isInternalPage || isKeyboardVisible) {
     return null
   }
 
@@ -133,4 +151,3 @@ export default function BottomNavOrders() {
     </div>
   )
 }
-

@@ -91,6 +91,7 @@ export default function Home() {
     exploreItems: landingExploreMore,
     exploreHeading,
     underPriceLimit,
+    headerVideoUrl,
     recommendedRestaurants,
     categories: landingCategories,
     restaurants: restaurantsData,
@@ -238,6 +239,27 @@ export default function Home() {
   }, [showVegModePopup, showSwitchOffPopup]);
 
   // UI Sections
+  const HeaderVideoBackground = useMemo(() => {
+    if (loadingConfig || !headerVideoUrl) return null;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="relative h-full w-full overflow-hidden bg-neutral-900"
+      >
+        <video
+          src={headerVideoUrl}
+          className="h-full w-full object-cover object-center"
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+      </motion.div>
+    );
+  }, [headerVideoUrl, loadingConfig]);
+
   const CategoryRailSection = useMemo(() => (
     <section className="space-y-2 px-4 pt-4 content-auto">
       <p className="text-xl font-bold text-neutral-900">What's on your mind?</p>
@@ -358,12 +380,12 @@ export default function Home() {
         placeholders={placeholders}
         vegMode={vegMode}
         onVegModeChange={handleVegModeChange}
+        bannerContent={HeaderVideoBackground}
       />
 
       <div className="bg-white dark:bg-[#0a0a0a] relative z-10">
-        {InlineHeroBannerSection}
-
         {CategoryRailSection}
+        {InlineHeroBannerSection}
         
         {recommendedRestaurants.length > 0 && (
           <section className="pt-6 px-4 content-auto">

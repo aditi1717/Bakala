@@ -117,6 +117,15 @@ export default function UserLayout() {
 
   useUserNotifications()
 
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('appTheme') || 'light'
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [])
+
   // Note: Authentication checks and redirects are handled by ProtectedRoute components
   // UserLayout should not interfere with authentication redirects
 

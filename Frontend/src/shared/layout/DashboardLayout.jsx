@@ -178,6 +178,19 @@ const DashboardLayout = ({ children, navItems, title }) => {
         setIsSidebarOpen(false);
     }, [location.pathname]);
 
+    // Force light mode for dashboard and restore on unmount
+    useEffect(() => {
+        const root = document.documentElement;
+        const wasDark = root.classList.contains('dark');
+        root.classList.remove('dark');
+        
+        return () => {
+            if (wasDark) {
+                root.classList.add('dark');
+            }
+        };
+    }, []);
+
     // Timer: driven by server expiry (sellerPendingExpiresAt), not a local 60s from modal open
     useEffect(() => {
         if (!newOrderAlert) return undefined;

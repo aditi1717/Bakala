@@ -51,6 +51,19 @@ export default function DeliveryLayout({
     }
   }, [location.pathname])
 
+  // Force light mode for delivery panel and restore on unmount
+  useEffect(() => {
+    const root = document.documentElement;
+    const wasDark = root.classList.contains('dark');
+    root.classList.remove('dark');
+    
+    return () => {
+      if (wasDark) {
+        root.classList.add('dark');
+      }
+    };
+  }, []);
+
   const showBottomNav = [
     "/food/delivery",
     "/food/delivery/requests",
