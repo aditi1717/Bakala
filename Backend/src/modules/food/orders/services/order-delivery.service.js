@@ -18,7 +18,6 @@ import {
 } from '../helpers/razorpay.helper.js';
 import { fetchPolyline } from '../utils/googleMaps.js';
 import * as foodTransactionService from './foodTransaction.service.js';
-import * as dispatchService from './order-dispatch.service.js';
 import {
   buildOrderIdentityFilter,
   emitDeliveryDropOtpToUser,
@@ -211,25 +210,23 @@ export async function getCurrentTripDelivery(deliveryPartnerId) {
 
 export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
   const { page, limit, skip } = buildPaginationOptions(query);
+  const partnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
   const filter = {
+    'dispatch.deliveryPartnerId': partnerId,
+    'dispatch.status': 'assigned',
     $or: [
-      {
-        'dispatch.status': 'unassigned',
-        orderStatus: { $in: ['created', 'confirmed', 'preparing', 'ready_for_pickup'] },
-      },
-      {
-        'dispatch.deliveryPartnerId': new mongoose.Types.ObjectId(deliveryPartnerId),
-        orderStatus: {
-          $nin: [
-            'delivered',
-            'cancelled_by_user',
-            'cancelled_by_restaurant',
-            'cancelled_by_user_unavailable',
-            'cancelled_by_admin',
-          ],
-        },
-      },
+      { 'dispatch.acceptedAt': { $exists: false } },
+      { 'dispatch.acceptedAt': null },
     ],
+    orderStatus: {
+      $nin: [
+        'delivered',
+        'cancelled_by_user',
+        'cancelled_by_restaurant',
+        'cancelled_by_user_unavailable',
+        'cancelled_by_admin',
+      ],
+    },
   };
 
   const [docs, total] = await Promise.all([
@@ -295,13 +292,8 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
     {
       ...identity,
       orderStatus: { $in: acceptedStatuses },
-      $or: [
-        { 'dispatch.status': 'unassigned' },
-        {
-          'dispatch.status': 'assigned',
-          'dispatch.deliveryPartnerId': partnerId,
-        },
-      ],
+      'dispatch.status': 'assigned',
+      'dispatch.deliveryPartnerId': partnerId,
     },
     {
       $set: {
@@ -506,12 +498,6 @@ export async function rejectOrderDelivery(orderId, deliveryPartnerId) {
     orderId: order._id.toString(),
     deliveryPartnerId,
   });
-
-  void dispatchService
-    .tryAutoAssign(order._id)
-    .catch((error) =>
-      logger.error(`SmartDispatch: Auto-assign after reject failed: ${error.message}`),
-    );
 
   return order.toObject();
 }

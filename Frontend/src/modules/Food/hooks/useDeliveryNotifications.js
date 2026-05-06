@@ -366,6 +366,11 @@ export const useDeliveryNotifications = () => {
   }, []);
 
   const handleIncomingOrderAlert = useCallback((orderData = {}) => {
+    const dispatchStatus = String(orderData?.dispatch?.status || orderData?.queueStatus || "").toLowerCase();
+    if (dispatchStatus && dispatchStatus !== "assigned") {
+      return;
+    }
+
     if (!shouldProcessOrderAlert(orderData)) {
       return;
     }
@@ -426,7 +431,7 @@ export const useDeliveryNotifications = () => {
       const recoverableOrder = availableOrders.find((order) => {
         const dispatchStatus = order?.dispatch?.status;
         return (
-          ['unassigned', 'assigned'].includes(dispatchStatus) &&
+          dispatchStatus === 'assigned' &&
           ['preparing', 'ready_for_pickup'].includes(order?.orderStatus)
         );
       });

@@ -21,6 +21,16 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
+const getAdminSocketToken = () => {
+  if (typeof localStorage === "undefined") return ""
+  return (
+    localStorage.getItem("auth_admin") ||
+    localStorage.getItem("admin_accessToken") ||
+    localStorage.getItem("token") ||
+    ""
+  )
+}
+
 
 // Status configuration with titles, colors, and icons
 const statusConfig = {
@@ -637,6 +647,8 @@ export default function OrdersPage({ statusKey = "all" }) {
     if (!API_BASE_URL || !backendUrl || !backendUrl.startsWith("http")) {
       return undefined
     }
+    const token = getAdminSocketToken()
+    if (!token) return undefined
 
     const socket = io(backendUrl, {
       transports: ["websocket", "polling"],
@@ -645,6 +657,8 @@ export default function OrdersPage({ statusKey = "all" }) {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
+      auth: { token },
+      query: { token },
     })
     socketRef.current = socket
 

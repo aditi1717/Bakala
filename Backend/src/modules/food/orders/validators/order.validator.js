@@ -181,7 +181,7 @@ export function validateAssignDeliveryDto(body) {
 
 export function validateDispatchSettingsDto(body) {
     const schema = z.object({
-        dispatchMode: z.enum(['auto', 'manual'])
+        dispatchMode: z.literal('manual').default('manual')
     });
     const result = schema.safeParse(body);
     if (!result.success) {
