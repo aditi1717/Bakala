@@ -447,7 +447,7 @@ export default function AddToCartAnimation({
               bottom: dynamicBottom ? undefined : `${bottomOffset || 20}px`,
               pointerEvents: 'none',
             }}
-            className={`left-0 right-0 z-[9999] flex justify-center px-4 pb-4 md:pb-6 transition-all duration-300 ease-in-out bg-transparent`}
+            className={`left-0 right-0 z-[9999] flex justify-center px-4 pb-4 md:pb-6 transition-all duration-300 ease-in-out bg-transparent ${dynamicBottom || ""}`}
           >
             <button
               ref={linkRef}

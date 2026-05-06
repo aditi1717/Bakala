@@ -18,6 +18,14 @@ import api from "@food/api"
 import { restaurantAPI, adminAPI } from "@food/api"
 import { isModuleAuthenticated } from "@food/utils/auth"
 import { flattenMenuItems, getMenuFromResponse } from "@food/utils/menuItems"
+import {
+  buildCartLineId,
+  getDefaultFoodVariant,
+  getFoodDisplayPrice,
+  getFoodPriceLabel,
+  getFoodVariants,
+  hasFoodVariants,
+} from "@food/utils/foodVariants"
 import { calculateDistance, formatDistance } from "@food/utils/common"
 import BRAND_THEME from "@/config/brandTheme"
 const debugLog = (...args) => {}
@@ -96,11 +104,12 @@ export default function Under250() {
   const [under30MinsFilter, setUnder30MinsFilter] = useState(initialFiltersRef.current.under30MinsFilter)
   const [showItemDetail, setShowItemDetail] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
+  const [selectedVariantId, setSelectedVariantId] = useState("")
   const [itemDetailQuantity, setItemDetailQuantity] = useState(1)
   const [showShareOptions, setShowShareOptions] = useState(false)
   const [quantities, setQuantities] = useState({})
   const [bookmarkedItems, setBookmarkedItems] = useState(new Set())
-  const [viewCartButtonBottom, setViewCartButtonBottom] = useState("bottom-20")
+  const [viewCartButtonBottom, setViewCartButtonBottom] = useState("bottom-32")
   const lastScrollY = useRef(0)
   const scrollLockYRef = useRef(0)
   const itemDetailContentRef = useRef(null)
@@ -198,9 +207,9 @@ export default function Under250() {
     if (rangeMatch) {
       return (parseInt(rangeMatch[1]) + parseInt(rangeMatch[2])) / 2 // Average
     }
-    const match = value.match(/(\d+)/)
+    const match = value.match(/(\d+\.?\d*)/)
     if (match) {
-      return parseInt(match[1])
+      return parseFloat(match[1])
     }
     return 999
   }
@@ -240,11 +249,16 @@ export default function Under250() {
       if (selectedCat) {
         const catNameLower = selectedCat.name.toLowerCase()
         filtered = filtered.map(restaurant => {
-          const matches = restaurant.menuItems.filter(item => 
-            (item.category || "").toLowerCase() === catNameLower ||
-            (item.sectionName || "").toLowerCase() === catNameLower ||
-            (item.subsectionName || "").toLowerCase() === catNameLower
-          )
+          const matches = restaurant.menuItems.filter(item => {
+            const itemCat = (item.category || "").toLowerCase().trim();
+            const itemSec = (item.sectionName || "").toLowerCase().trim();
+            const itemSub = (item.subsectionName || "").toLowerCase().trim();
+            
+            return itemCat.includes(catNameLower) || 
+                   catNameLower.includes(itemCat) ||
+                   itemSec.includes(catNameLower) ||
+                   itemSub.includes(catNameLower);
+          })
           if (matches.length > 0) {
             return { ...restaurant, menuItems: matches }
           }
@@ -575,7 +589,9 @@ export default function Under250() {
   useEffect(() => {
     const cartQuantities = {}
     cart.forEach((item) => {
-      cartQuantities[item.id] = item.quantity || 0
+      // Use lineItemId if available, fallback to id (for backward compatibility)
+      const key = item.lineItemId || item.id
+      cartQuantities[key] = item.quantity || 0
     })
     setQuantities(cartQuantities)
   }, [cart])
@@ -583,11 +599,20 @@ export default function Under250() {
   useEffect(() => {
     if (!selectedItem || !showItemDetail) return
 
-    const existingQuantity = quantities[selectedItem.id] || 0
+    const defaultVariant = getDefaultFoodVariant(selectedItem)
+    if (!selectedVariantId && defaultVariant) {
+      setSelectedVariantId(defaultVariant.id)
+    }
+
+    const currentVariant = getFoodVariants(selectedItem).find(v => v.id === selectedVariantId) || defaultVariant
+    const lineItemId = buildCartLineId(selectedItem.id, currentVariant?.id, currentVariant?.name)
+    const existingQuantity = quantities[lineItemId] || 0
     if (existingQuantity > 0) {
       setItemDetailQuantity(existingQuantity)
+    } else {
+      setItemDetailQuantity(1)
     }
-  }, [quantities, selectedItem, showItemDetail])
+  }, [quantities, selectedItem, showItemDetail, selectedVariantId])
 
   useEffect(() => {
     if (!showSortPopup) return
@@ -656,11 +681,11 @@ export default function Under250() {
 
       // Scroll down -> bottom-0, Scroll up -> bottom-20
       if (currentScrollY > lastScrollY.current) {
-        // Scrolling down
-        setViewCartButtonBottom("bottom-0")
+        // Scrolling down - move closer to bottom as nav might hide
+        setViewCartButtonBottom("bottom-10")
       } else if (currentScrollY < lastScrollY.current) {
-        // Scrolling up
-        setViewCartButtonBottom("bottom-20")
+        // Scrolling up - move higher to clear the bottom nav
+        setViewCartButtonBottom("bottom-32")
       }
 
       lastScrollY.current = currentScrollY
@@ -703,8 +728,8 @@ export default function Under250() {
     }
   }, [])
 
-  // Helper function to update item quantity in bothlocal state and cart
-  const updateItemQuantity = (item, newQuantity, event = null, restaurantName = null) => {
+  // Helper function to update item quantity in both local state and cart
+  const updateItemQuantity = (item, newQuantity, event = null, variant = null, restaurantName = null) => {
     // Check authentication
     if (!isModuleAuthenticated('user')) {
       toast.error("Please login to add items to cart")
@@ -718,10 +743,14 @@ export default function Under250() {
       return
     }
 
+    // Find variant if not provided
+    const resolvedVariant = variant || (hasFoodVariants(item) ? getDefaultFoodVariant(item) : null)
+    const lineItemId = buildCartLineId(item.id, resolvedVariant?.id, resolvedVariant?.name)
+
     // Update local state
     setQuantities((prev) => ({
       ...prev,
-      [item.id]: newQuantity,
+      [lineItemId]: newQuantity,
     }))
 
     // Find restaurant name from the item or use provided parameter
@@ -729,13 +758,20 @@ export default function Under250() {
 
     // Prepare cart item with all required properties
     const cartItem = {
-      id: item.id,
+      id: lineItemId,
+      lineItemId,
+      itemId: item.id,
       name: item.name,
-      price: item.price,
+      price: resolvedVariant?.price ?? item.price,
+      variantId: resolvedVariant?.id || "",
+      variantName: resolvedVariant?.name || "",
+      variantPrice: resolvedVariant?.price ?? item.price,
       image: item.image,
       restaurant: restaurant,
       description: item.description || "",
       originalPrice: item.originalPrice || item.price,
+      isVeg: !!item.isVeg,
+      preparationTime: item.preparationTime
     }
 
     // Get source position for animation from event target
@@ -764,16 +800,16 @@ export default function Under250() {
     // Update cart context
     if (newQuantity <= 0) {
       const productInfo = {
-        id: item.id,
+        id: lineItemId,
         name: item.name,
         imageUrl: item.image,
       }
-      removeFromCart(item.id, sourcePosition, productInfo)
+      removeFromCart(lineItemId, sourcePosition, productInfo)
     } else {
-      const existingCartItem = getCartItem(item.id)
+      const existingCartItem = getCartItem(lineItemId)
       if (existingCartItem) {
         const productInfo = {
-          id: item.id,
+          id: lineItemId,
           name: item.name,
           imageUrl: item.image,
         }
@@ -785,12 +821,12 @@ export default function Under250() {
             return
           }
           if (newQuantity > existingCartItem.quantity + 1) {
-            updateQuantity(item.id, newQuantity)
+            updateQuantity(lineItemId, newQuantity)
           }
         } else if (newQuantity < existingCartItem.quantity && sourcePosition) {
-          updateQuantity(item.id, newQuantity, sourcePosition, productInfo)
+          updateQuantity(lineItemId, newQuantity, sourcePosition, productInfo)
         } else {
-          updateQuantity(item.id, newQuantity)
+          updateQuantity(lineItemId, newQuantity)
         }
       } else {
         const result = addToCart(cartItem, sourcePosition)
@@ -799,7 +835,7 @@ export default function Under250() {
           return
         }
         if (newQuantity > 1) {
-          updateQuantity(item.id, newQuantity)
+          updateQuantity(lineItemId, newQuantity)
         }
       }
     }
@@ -807,6 +843,8 @@ export default function Under250() {
 
   const closeItemDetail = useCallback(() => {
     setShowItemDetail(false)
+    setSelectedItem(null)
+    setSelectedVariantId("")
     setShowShareOptions(false)
   }, [])
 
@@ -817,13 +855,12 @@ export default function Under250() {
       restaurant: restaurant.name,
       restaurantSlug: restaurant.slug || restaurant.restaurantId || "",
       description: item.description || `${item.name} from ${restaurant.name}`,
-      customisable: item.customisable || false,
-      notEligibleForCoupons: item.notEligibleForCoupons || false,
     }
-    const existingQuantity = quantities[item.id] || 0
-    setItemDetailQuantity(existingQuantity > 0 ? existingQuantity : 1)
     setSelectedItem(itemWithRestaurant)
-    setShowShareOptions(false)
+    const variants = getFoodVariants(item)
+    if (variants.length > 0) {
+      setSelectedVariantId(variants[0].id)
+    }
     setShowItemDetail(true)
   }
 
@@ -930,7 +967,7 @@ export default function Under250() {
 
   return (
 
-    <div className={`relative min-h-screen bg-white dark:bg-[#0a0a0a] ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
+    <div className={`relative min-h-screen bg-white dark:bg-[#0a0a0a] pb-32 ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
       <FoodHeroHeaderShell
         stickyHeaderRef={stickyHeaderRef}
         bannerShellRef={bannerShellRef}
@@ -1172,25 +1209,32 @@ export default function Under250() {
                                 transition={{ duration: 0.3 }}
                               />
                               {/* Veg Indicator */}
-                              {item.isVeg && (
-                                <motion.div
-                                  className="absolute top-2 left-2 md:top-3 md:left-3 h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 rounded border-2 border-green-600 bg-white flex items-center justify-center z-10"
-                                  whileHover={{ scale: 1.2, rotate: 5 }}
-                                  transition={{ duration: 0.2 }}
-                                >
-                                  <div className="h-2 w-2 md:h-2.5 md:w-2.5 lg:h-3 lg:w-3 rounded-full bg-green-600" />
-                                </motion.div>
-                              )}
+                              {/* Veg/Non-Veg Indicator */}
+                              <motion.div
+                                className={`absolute top-2 left-2 md:top-3 md:left-3 h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6 rounded border-2 bg-white flex items-center justify-center z-10 ${
+                                  item.isVeg ? 'border-green-600' : 'border-red-600'
+                                }`}
+                                whileHover={{ scale: 1.2, rotate: 5 }}
+                                transition={{ duration: 0.2 }}
+                              >
+                                <div className={`h-2 w-2 md:h-2.5 md:w-2.5 lg:h-3 lg:w-3 rounded-full ${
+                                  item.isVeg ? 'bg-green-600' : 'bg-red-600'
+                                }`} />
+                              </motion.div>
                             </div>
 
                             {/* Item Details */}
                             <div className="p-3 md:p-4 lg:p-5">
                               <div className="flex items-center gap-1 md:gap-2 mb-1 md:mb-2 lg:mb-3">
-                                {item.isVeg && (
-                                  <div className="h-3 w-3 md:h-4 md:w-4 lg:h-5 lg:w-5 rounded border border-green-600 bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
-                                    <div className="h-1.5 w-1.5 md:h-2 md:w-2 lg:h-2.5 lg:w-2.5 rounded-full bg-green-600" />
-                                  </div>
-                                )}
+                                <div className={`h-3 w-3 md:h-4 md:w-4 lg:h-5 lg:w-5 rounded border flex items-center justify-center ${
+                                  item.isVeg
+                                    ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
+                                    : 'border-red-600 bg-red-50 dark:bg-red-900/20'
+                                }`}>
+                                  <div className={`h-1.5 w-1.5 md:h-2 md:w-2 lg:h-2.5 lg:w-2.5 rounded-full ${
+                                    item.isVeg ? 'bg-green-600' : 'bg-red-600'
+                                  }`} />
+                                </div>
                                 <span className="text-sm md:text-base lg:text-lg font-semibold text-gray-900 dark:text-white">
                                   1 x {item.name}
                                 </span>
@@ -1233,15 +1277,15 @@ export default function Under250() {
                                       color: BRAND_THEME.colors.brand.primary,
                                       border: `1px solid ${BRAND_THEME.colors.brand.primary}`,
                                     }}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      if (!shouldShowGrayscale) {
-                                        handleItemClick(item, restaurant)
-                                      }
-                                    }}
-                                  >
-                                    Add
-                                  </Button>
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (!shouldShowGrayscale) {
+                                          handleItemClick(item, restaurant)
+                                        }
+                                      }}
+                                    >
+                                      Add
+                                    </Button>
                                 )}
                               </div>
                             </div>
@@ -1412,12 +1456,12 @@ export default function Under250() {
                       handleBookmarkClick(selectedItem.id)
                     }}
                     className={`h-10 w-10 rounded-full border flex items-center justify-center transition-all duration-300 ${bookmarkedItems.has(selectedItem.id)
-                      ? "border-red-500 bg-red-50 text-red-500"
+                      ? "border-green-500 bg-green-50 text-green-500"
                       : "border-white bg-white/90 text-gray-600 hover:bg-white"
                       }`}
                   >
                     <Bookmark
-                      className={`h-5 w-5 transition-all duration-300 ${bookmarkedItems.has(selectedItem.id) ? "fill-red-500" : ""
+                      className={`h-5 w-5 transition-all duration-300 ${bookmarkedItems.has(selectedItem.id) ? "fill-green-500" : ""
                         }`}
                     />
                   </button>
@@ -1441,11 +1485,15 @@ export default function Under250() {
                 {/* Item Name and Indicator */}
                 <div className="flex items-start justify-between mb-3 md:mb-4 lg:mb-6">
                   <div className="flex items-center gap-2 md:gap-3 flex-1">
-                    {selectedItem.isVeg && (
-                      <div className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 rounded border-2 border-green-600 dark:border-green-500 bg-green-50 dark:bg-green-900/20 flex items-center justify-center flex-shrink-0">
-                        <div className="h-2.5 w-2.5 md:h-3 md:w-3 lg:h-3.5 lg:w-3.5 rounded-full bg-green-600 dark:bg-green-500" />
-                      </div>
-                    )}
+                    <div className={`h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                      selectedItem.isVeg
+                        ? 'border-green-600 dark:border-green-500 bg-green-50 dark:bg-green-900/20'
+                        : 'border-red-600 dark:border-red-500 bg-red-50 dark:bg-red-900/20'
+                    }`}>
+                      <div className={`h-2.5 w-2.5 md:h-3 md:w-3 lg:h-3.5 lg:w-3.5 rounded-full ${
+                        selectedItem.isVeg ? 'bg-green-600 dark:bg-green-500' : 'bg-red-600 dark:bg-red-500'
+                      }`} />
+                    </div>
                     <h2 className="text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white">
                       {selectedItem.name}
                     </h2>
@@ -1458,12 +1506,12 @@ export default function Under250() {
                         handleBookmarkClick(selectedItem.id)
                       }}
                       className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full border flex items-center justify-center transition-all duration-300 ${bookmarkedItems.has(selectedItem.id)
-                        ? "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400"
+                        ? "border-green-600 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400"
                         : "border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                         }`}
                     >
                       <Bookmark
-                        className={`h-4 w-4 lg:h-5 lg:w-5 transition-all duration-300 ${bookmarkedItems.has(selectedItem.id) ? "fill-red-500 dark:fill-red-400" : ""
+                        className={`h-4 w-4 lg:h-5 lg:w-5 transition-all duration-300 ${bookmarkedItems.has(selectedItem.id) ? "fill-green-600 dark:fill-green-400" : ""
                           }`}
                       />
                     </button>
@@ -1483,6 +1531,40 @@ export default function Under250() {
                 <p className="text-sm md:text-base lg:text-lg text-gray-600 dark:text-gray-400 mb-4 md:mb-6 lg:mb-8 leading-relaxed">
                   {selectedItem.description || `${selectedItem.name} from ${selectedItem.restaurant || underPriceDisplay}`}
                 </p>
+
+                {/* Variant Selection */}
+                {hasFoodVariants(selectedItem) && (
+                  <div className="mb-6 md:mb-8">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <span>Select Variant</span>
+                      <span className="h-1 w-1 rounded-full bg-gray-400"></span>
+                      <span className="text-[10px] text-gray-500 font-normal normal-case">Required</span>
+                    </h3>
+                    <div className="flex flex-wrap gap-2 md:gap-3">
+                      {getFoodVariants(selectedItem).map((variant) => {
+                        const isSelected = String(selectedVariantId || "") === String(variant.id)
+                        return (
+                          <button
+                            key={variant.id}
+                            type="button"
+                            onClick={() => setSelectedVariantId(variant.id)}
+                            className={`rounded-full border px-4 py-2 text-sm md:text-base font-medium transition-all duration-200 flex items-center gap-2 ${
+                              isSelected
+                                ? "border-green-600 bg-green-50 text-green-700 dark:border-green-400 dark:bg-green-900/30 dark:text-green-200 shadow-sm"
+                                : "border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-[#2a2a2a] dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
+                            }`}
+                          >
+                            <span>{variant.name}</span>
+                            <span className="opacity-40">•</span>
+                            <span className={isSelected ? "text-green-800 dark:text-green-200" : "text-gray-500"}>
+                              {RUPEE_SYMBOL}{Math.round(variant.price)}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Highly Reordered Progress Bar */}
                 {selectedItem.customisable && (
@@ -1549,16 +1631,19 @@ export default function Under250() {
                       <Plus className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7" />
                     </button>
                   </div>
-
                   {/* Add Item Button */}
                   <Button
                     className={`flex-1 h-[44px] md:h-[50px] lg:h-[56px] rounded-lg md:rounded-xl font-semibold flex items-center justify-center gap-2 text-sm md:text-base lg:text-lg ${shouldShowGrayscale
                       ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-600 cursor-not-allowed opacity-50'
-                      : 'bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white'
+                      : ''
                       }`}
+                    style={!shouldShowGrayscale ? { backgroundColor: BRAND_THEME.colors.brand.primary, color: '#fff' } : undefined}
                     onClick={(e) => {
                       if (!shouldShowGrayscale) {
-                        updateItemQuantity(selectedItem, itemDetailQuantity, e)
+                        const variant = hasFoodVariants(selectedItem)
+                          ? getFoodVariants(selectedItem).find(v => v.id === selectedVariantId)
+                          : null
+                        updateItemQuantity(selectedItem, itemDetailQuantity, e, variant)
                         closeItemDetail()
                       }
                     }}
@@ -1566,16 +1651,29 @@ export default function Under250() {
                   >
                     <span>Add item</span>
                     <div className="flex items-center gap-1 md:gap-2">
-                      {selectedItem.originalPrice && selectedItem.originalPrice > selectedItem.price && (
-                        <span className="text-sm md:text-base lg:text-lg line-through text-red-200">
-                          {RUPEE_SYMBOL}{Math.round(selectedItem.originalPrice)}
-                        </span>
-                      )}
-                      <span className="text-base md:text-lg lg:text-xl font-bold">
-                        {RUPEE_SYMBOL}{Math.round(selectedItem.price)}
-                      </span>
+                      {(() => {
+                        const variant = hasFoodVariants(selectedItem)
+                          ? getFoodVariants(selectedItem).find(v => v.id === selectedVariantId)
+                          : null
+                        const price = variant ? variant.price : selectedItem.price
+                        const originalPrice = selectedItem.originalPrice
+
+                        return (
+                          <>
+                            {originalPrice && originalPrice > price && (
+                              <span className="text-sm md:text-base lg:text-lg line-through opacity-70">
+                                {RUPEE_SYMBOL}{Math.round(originalPrice)}
+                              </span>
+                            )}
+                            <span className="text-base md:text-lg lg:text-xl font-bold">
+                              {RUPEE_SYMBOL}{Math.round(price)}
+                            </span>
+                          </>
+                        )
+                      })()}
                     </div>
                   </Button>
+
                 </div>
               </div>
             </motion.div>
