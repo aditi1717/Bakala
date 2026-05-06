@@ -31,6 +31,19 @@ export default function AdminLayout() {
     setIsSidebarCollapsed(collapsed)
   }
 
+  // Force light mode for admin panel and restore on unmount
+  useEffect(() => {
+    const root = document.documentElement;
+    const wasDark = root.classList.contains('dark');
+    root.classList.remove('dark');
+    
+    return () => {
+      if (wasDark) {
+        root.classList.add('dark');
+      }
+    };
+  }, []);
+
   return (
     <div className="h-screen bg-neutral-200 flex overflow-hidden">
       {/* Mobile Overlay */}
