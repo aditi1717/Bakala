@@ -81,7 +81,7 @@ export default function DeliverymanList() {
     name: true,
     contact: true,
     zone: true,
-    vehicleType: false,
+    vehicleType: true,
     totalOrders: true,
     availabilityStatus: true,
     actions: true,
@@ -378,13 +378,13 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
   const toggleColumn = (columnKey) => {
     setVisibleColumns(prev => ({ ...prev, [columnKey]: !prev[columnKey] }))
   }
-
+  const resetColumns = () => {
     setVisibleColumns({
       si: true,
       name: true,
       contact: true,
       zone: true,
-      vehicleType: false,
+      vehicleType: true,
       totalOrders: true,
       availabilityStatus: true,
       actions: true,
@@ -699,6 +699,11 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                         <span>Zone</span>
                       </th>
                     )}
+                    {visibleColumns.vehicleType && (
+                      <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                        <span>Vehicle Type</span>
+                      </th>
+                    )}
                     {visibleColumns.totalOrders && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                         <span>Total Orders</span>
@@ -776,6 +781,11 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                         {visibleColumns.zone && (
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-sm text-slate-700">{dm.zone}</span>
+                          </td>
+                        )}
+                        {visibleColumns.vehicleType && (
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-slate-700 capitalize">{dm.vehicle?.type || dm.vehicleType || "N/A"}</span>
                           </td>
                         )}
                         {visibleColumns.totalOrders && (
@@ -1310,7 +1320,7 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
               type="button"
               onClick={handleSaveZone}
               disabled={!selectedZoneId || savingZoneForDeliveryId === String(selectedDeliveryForZone?._id || "")}
-              className="px-4 py-2 rounded-lg bg-[#005128] text-sm font-medium text-white hover:bg-[#1565C0] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-lg bg-[#005128] text-sm font-medium text-white hover:bg-[#004020] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {savingZoneForDeliveryId === String(selectedDeliveryForZone?._id || "") ? "Saving..." : "Save Zone"}
             </button>
