@@ -14,6 +14,7 @@ import {
 import { restaurantAPI, uploadAPI } from "@food/api"
 import { toast } from "sonner"
 import BRAND_THEME from "@/config/brandTheme"
+import { openCamera } from "@food/utils/imageUploadUtils"
 
 const defaultFormData = {
   name: "",
@@ -171,8 +172,7 @@ export default function MenuCategoriesPage() {
     setIsModalOpen(true)
   }
 
-  const handleImageSelect = (event) => {
-    const file = event.target.files?.[0]
+  const handleImageFile = (file) => {
     if (!file) return
 
     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"]
@@ -189,6 +189,18 @@ export default function MenuCategoriesPage() {
     const reader = new FileReader()
     reader.onloadend = () => setImagePreview(reader.result)
     reader.readAsDataURL(file)
+  }
+
+  const handleImageSelect = (event) => {
+    const file = event.target.files?.[0]
+    handleImageFile(file)
+  }
+
+  const handleCameraImage = async () => {
+    await openCamera({
+      onSelectFile: handleImageFile,
+      fileNamePrefix: "category-photo",
+    })
   }
 
   const handleSubmit = async (event) => {
@@ -223,6 +235,12 @@ export default function MenuCategoriesPage() {
         const uploadRes = await uploadAPI.uploadMedia(selectedImageFile, { folder: "appzeto/categories" })
         const payload = uploadRes?.data?.data || uploadRes?.data
         imageUrl = payload?.url || imageUrl
+      }
+
+      if (!String(imageUrl || "").trim()) {
+        toast.error("Category image is required")
+        setSaving(false)
+        return
       }
 
       const payload = {
@@ -557,6 +575,14 @@ export default function MenuCategoriesPage() {
                           <Upload className="h-4 w-4" />
                           {imagePreview ? "Change Image" : "Upload Image"}
                         </label>
+                        <button
+                          type="button"
+                          onClick={handleCameraImage}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700"
+                        >
+                          <Upload className="h-4 w-4" />
+                          Use Camera
+                        </button>
                       </div>
                     </div>
                   </div>

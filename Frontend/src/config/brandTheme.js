@@ -32,7 +32,7 @@ const COLORS = {
 };
 
 export const BRAND_THEME = {
-  brandName: "Bakala",
+  brandName: "Bakalaa",
   logoReference: {
     fileName: "WhatsApp_Image_2026-04-04_at_11.41.58_AM-removebg-preview.png",
     sourcePath:

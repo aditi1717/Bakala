@@ -276,15 +276,6 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                   })()}
                 </div>
               )}
-              {order.deliveryType && (
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    <Truck className="w-4 h-4" />
-                    Delivery Type
-                  </p>
-                  <p className="text-sm font-medium text-slate-900">{order.deliveryType}</p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -579,5 +570,3 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
     </Dialog>
   )
 }
-
-

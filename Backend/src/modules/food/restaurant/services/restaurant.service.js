@@ -1026,23 +1026,13 @@ export const uploadRestaurantProfileImage = async (restaurantId, file) => {
         restaurantId,
         {
             $set: {
-                profileImage: url,
-                status: 'pending'
-            },
-            $unset: {
-                approvedAt: 1,
-                rejectedAt: 1,
-                rejectionReason: 1
+                profileImage: url
             }
         },
         { new: true, projection: 'profileImage coverImages restaurantName cuisines location menuImages addressLine1 addressLine2 area city state pincode landmark ownerName ownerEmail ownerPhone primaryContactNumber pureVegRestaurant openingTime closingTime openDays status createdAt updatedAt' }
     ).lean();
 
     if (!doc) throw new ValidationError('Restaurant not found');
-
-    if (currentRestaurant.status !== 'pending') {
-        void notifyAdminsAboutRestaurantProfileReview(restaurantId, currentRestaurant.restaurantName || doc.restaurantName);
-    }
 
     return { profileImage: { url } };
 };
@@ -1082,8 +1072,7 @@ export const uploadRestaurantCoverImages = async (restaurantId, files = []) => {
     });
 
     const update = {
-        coverImages: nextCoverImages.slice(0, 20),
-        status: 'pending'
+        coverImages: nextCoverImages.slice(0, 20)
     };
 
     if (!toUrl(currentRestaurant.profileImage) && uploadedUrls[0]) {
@@ -1093,19 +1082,10 @@ export const uploadRestaurantCoverImages = async (restaurantId, files = []) => {
     await FoodRestaurant.findByIdAndUpdate(
         restaurantId,
         {
-            $set: update,
-            $unset: {
-                approvedAt: 1,
-                rejectedAt: 1,
-                rejectionReason: 1
-            }
+            $set: update
         },
         { new: true }
     ).lean();
-
-    if (currentRestaurant.status !== 'pending') {
-        void notifyAdminsAboutRestaurantProfileReview(restaurantId, currentRestaurant.restaurantName || '');
-    }
 
     return {
         coverImages: uploadedUrls.map((url) => ({ url, publicId: null })),
@@ -1145,21 +1125,11 @@ export const uploadRestaurantMenuImages = async (restaurantId, files = []) => {
         restaurantId,
         {
             $set: {
-                menuImages: nextMenuImages.slice(0, 20),
-                status: 'pending'
-            },
-            $unset: {
-                approvedAt: 1,
-                rejectedAt: 1,
-                rejectionReason: 1
+                menuImages: nextMenuImages.slice(0, 20)
             }
         },
         { new: true }
     ).lean();
-
-    if (currentRestaurant.status !== 'pending') {
-        void notifyAdminsAboutRestaurantProfileReview(restaurantId, currentRestaurant.restaurantName || '');
-    }
 
     return {
         menuImages: uploadedUrls.map((url) => ({ url, publicId: null }))

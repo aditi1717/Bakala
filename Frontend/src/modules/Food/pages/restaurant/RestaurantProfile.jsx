@@ -40,6 +40,7 @@ import { toast } from "sonner"
 import BRAND_THEME from "@/config/brandTheme"
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
 import { zoneAPI } from "@food/api"
+import { clearModuleAuth } from "@food/utils/auth"
 
 const isPointInPolygon = (latitude, longitude, polygonCoordinates) => {
   if (!Array.isArray(polygonCoordinates) || polygonCoordinates.length < 3) return true
@@ -68,6 +69,21 @@ const buildBoundsFromZone = (zone) => {
     if (Number.isFinite(lat) && Number.isFinite(lng)) bounds.extend({ lat, lng })
   })
   return bounds
+}
+
+const getProfileUpdateErrorMessage = (error) => {
+  const backendMessage = String(
+    error?.response?.data?.error ||
+    error?.response?.data?.message ||
+    error?.message ||
+    "",
+  ).trim()
+
+  if (/cuisines must be an array of strings/i.test(backendMessage)) {
+    return "Please select cuisines in list format. Example: North Indian, Chinese, Fast Food."
+  }
+
+  return backendMessage || "Failed to save changes"
 }
 
 const RestaurantProfile = () => {
@@ -136,6 +152,7 @@ const RestaurantProfile = () => {
     location: false,
     operations: false,
     kyc: false,
+    fssai: false,
     bank: false,
     images: false,
   })
@@ -421,7 +438,7 @@ const RestaurantProfile = () => {
         if (!gstRegex.test(kycInfo.gstNumber)) return toast.error("Invalid GST number format")
         if (!/^[a-zA-Z\s]*$/.test(kycInfo.gstLegalName)) return toast.error("Legal entity name should only contain letters")
       }
-      
+    } else if (section === "fssai") {
       if (kycInfo.fssaiNumber && !/^\d{14}$/.test(kycInfo.fssaiNumber)) return toast.error("FSSAI license number must be 14 digits")
     } else if (section === 'bank') {
       if (!/^\d+$/.test(bankInfo.accountNumber)) return toast.error("Account number should only contain digits")
@@ -433,6 +450,7 @@ const RestaurantProfile = () => {
     setSavingSection(section)
     try {
       const formData = new FormData()
+      let requestPayload = formData
       
       if (section === 'basic') {
         formData.append("restaurantName", basicInfo.name)
@@ -454,10 +472,15 @@ const RestaurantProfile = () => {
         formData.append("longitude", String(location.longitude))
         formData.append("formattedAddress", location.formattedAddress || "")
       } else if (section === 'operations') {
-        formData.append("cuisines", opsInfo.cuisines.join(","))
-        formData.append("estimatedDeliveryTime", opsInfo.estimatedDeliveryTime)
-        formData.append("featuredDish", opsInfo.featuredDish)
-        formData.append("offer", opsInfo.offer)
+        const normalizedCuisines = opsInfo.cuisines
+          .map((c) => String(c || "").trim())
+          .filter(Boolean)
+        requestPayload = {
+          cuisines: normalizedCuisines,
+          estimatedDeliveryTime: opsInfo.estimatedDeliveryTime,
+          featuredDish: opsInfo.featuredDish,
+          offer: opsInfo.offer,
+        }
       } else if (section === 'kyc') {
         formData.append("panNumber", kycInfo.panNumber)
         formData.append("nameOnPan", kycInfo.nameOnPan)
@@ -470,7 +493,7 @@ const RestaurantProfile = () => {
           formData.append("gstAddress", kycInfo.gstAddress)
           if (isUploadableFile(kycInfo.gstImage)) formData.append("gstImage", kycInfo.gstImage)
         }
-        
+      } else if (section === "fssai") {
         formData.append("fssaiNumber", kycInfo.fssaiNumber)
         formData.append("fssaiExpiry", kycInfo.fssaiExpiry)
         if (isUploadableFile(kycInfo.fssaiImage)) formData.append("fssaiImage", kycInfo.fssaiImage)
@@ -486,13 +509,24 @@ const RestaurantProfile = () => {
         })
       }
 
-      await restaurantAPI.updateProfile(formData)
+      const response = await restaurantAPI.updateProfile(requestPayload)
+      const updatedData = response?.data?.data?.restaurant || response?.data?.restaurant
+
+      // Redirect if the update triggered a status change to 'pending' (requires approval)
+      if (updatedData?.status === 'pending') {
+        clearModuleAuth("restaurant")
+        window.dispatchEvent(new Event("restaurantAuthChanged"))
+        toast.success("Update submitted for approval. Please log in again.")
+        navigate("/food/restaurant/login", { replace: true })
+        return
+      }
+
       toast.success(`${section.charAt(0).toUpperCase() + section.slice(1)} info updated!`)
       setEditStates(prev => ({ ...prev, [section]: false }))
       fetchInitialData() // Refresh to get server values
     } catch (error) {
       console.error(`Failed to save ${section} section:`, error)
-      toast.error(error.message || "Failed to save changes")
+      toast.error(getProfileUpdateErrorMessage(error))
     } finally {
       setSavingSection(null)
     }
@@ -875,7 +909,7 @@ const RestaurantProfile = () => {
               <Label className="text-xs font-bold text-slate-500 ml-1">Cuisines (Comma Separated)</Label>
               <Input 
                 value={opsInfo.cuisines.join(", ")} 
-                onChange={e => setOpsInfo({...opsInfo, cuisines: e.target.value.split(",").map(c => c.trim())})}
+                onChange={e => setOpsInfo({...opsInfo, cuisines: e.target.value.split(",").map(c => c.trim()).filter(Boolean)})}
                 disabled={!editStates.operations}
                 className="rounded-xl bg-slate-50/50"
                 placeholder="North Indian, Chinese, Italian"
@@ -1073,54 +1107,65 @@ const RestaurantProfile = () => {
               </AnimatePresence>
             </div>
 
-            {/* FSSAI Details */}
-            <div className="pt-8 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-[#005128] flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-[#005128] rounded-full" /> FSSAI Details
-                </h3>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-500 ml-1">FSSAI License Number</Label>
-                    <Input 
-                      value={kycInfo.fssaiNumber} 
-                      onChange={e => setKycInfo({...kycInfo, fssaiNumber: e.target.value.replace(/\D/g, "").slice(0, 14)})}
-                      disabled={!editStates.kyc}
-                      className="rounded-xl bg-slate-50/50"
-                      placeholder="14-digit license number"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-500 ml-1">License Expiry Date</Label>
-                    <Input 
-                      type="date"
-                      value={kycInfo.fssaiExpiry} 
-                      onChange={e => setKycInfo({...kycInfo, fssaiExpiry: e.target.value})}
-                      disabled={!editStates.kyc}
-                      className="rounded-xl bg-slate-50/50"
-                    />
-                  </div>
-                </div>
+          </div>
+        </motion.section>
+
+        {/* FSSAI Section */}
+        <motion.section 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden"
+        >
+          <SectionHeader 
+            icon={ShieldCheck} 
+            title="FSSAI Details" 
+            section="fssai"
+            isEditing={editStates.fssai}
+            onToggle={() => toggleEdit('fssai')}
+            onSave={() => handleSaveSection('fssai')}
+            isSaving={savingSection === 'fssai'}
+          />
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-500 ml-1">FSSAI License Number</Label>
+                <Input 
+                  value={kycInfo.fssaiNumber} 
+                  onChange={e => setKycInfo({...kycInfo, fssaiNumber: e.target.value.replace(/\D/g, "").slice(0, 14)})}
+                  disabled={!editStates.fssai}
+                  className="rounded-xl bg-slate-50/50"
+                  placeholder="14-digit license number"
+                />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-500 ml-1">FSSAI License Document</Label>
-                <div className="relative group aspect-video rounded-2xl overflow-hidden border-2 border-dashed border-slate-200 bg-slate-50">
-                  {kycInfo.fssaiImage ? (
-                    <img src={getPreviewUrl(kycInfo.fssaiImage)} alt="FSSAI" className="w-full h-full object-contain p-2" />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-2">
-                      <ImageIcon className="w-8 h-8" />
-                      <span className="text-xs font-medium">Upload License</span>
-                    </div>
-                  )}
-                  {editStates.kyc && (
-                    <label className="absolute inset-0 bg-[#005128]/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer text-white">
-                      <Upload className="w-8 h-8 mb-2" />
-                      <span className="text-sm font-bold">Replace File</span>
-                      <input type="file" className="hidden" accept="image/*" onChange={e => setKycInfo({...kycInfo, fssaiImage: e.target.files[0]})} />
-                    </label>
-                  )}
-                </div>
+                <Label className="text-xs font-bold text-slate-500 ml-1">License Expiry Date</Label>
+                <Input 
+                  type="date"
+                  value={kycInfo.fssaiExpiry} 
+                  onChange={e => setKycInfo({...kycInfo, fssaiExpiry: e.target.value})}
+                  disabled={!editStates.fssai}
+                  className="rounded-xl bg-slate-50/50"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 ml-1">FSSAI License Document</Label>
+              <div className="relative group aspect-video rounded-2xl overflow-hidden border-2 border-dashed border-slate-200 bg-slate-50">
+                {kycInfo.fssaiImage ? (
+                  <img src={getPreviewUrl(kycInfo.fssaiImage)} alt="FSSAI" className="w-full h-full object-contain p-2" />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-2">
+                    <ImageIcon className="w-8 h-8" />
+                    <span className="text-xs font-medium">Upload License</span>
+                  </div>
+                )}
+                {editStates.fssai && (
+                  <label className="absolute inset-0 bg-[#005128]/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer text-white">
+                    <Upload className="w-8 h-8 mb-2" />
+                    <span className="text-sm font-bold">Replace File</span>
+                    <input type="file" className="hidden" accept="image/*" onChange={e => setKycInfo({...kycInfo, fssaiImage: e.target.files[0]})} />
+                  </label>
+                )}
               </div>
             </div>
           </div>

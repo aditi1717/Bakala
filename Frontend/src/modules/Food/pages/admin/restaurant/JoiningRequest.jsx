@@ -364,31 +364,31 @@ export default function JoiningRequest() {
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                     <div className="flex items-center gap-1">
                       <span>SL</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                      
                     </div>
                   </th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                     <div className="flex items-center gap-1">
                       <span>Restaurant Info</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                      
                     </div>
                   </th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                     <div className="flex items-center gap-1">
                       <span>Owner Info</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                      
                     </div>
                   </th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                     <div className="flex items-center gap-1">
                       <span>Zone</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                      
                     </div>
                   </th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                     <div className="flex items-center gap-1">
                       <span>Status</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                      
                     </div>
                   </th>
                   <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
@@ -564,7 +564,7 @@ export default function JoiningRequest() {
                       From Date
                     </label>
                     <input
-                      type="date"
+                      type="date" max={new Date().toISOString().split("T")[0]}
                       value={filters.dateFrom}
                       onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
@@ -575,7 +575,7 @@ export default function JoiningRequest() {
                       To Date
                     </label>
                     <input
-                      type="date"
+                      type="date" max={new Date().toISOString().split("T")[0]}
                       value={filters.dateTo}
                       onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
                       min={filters.dateFrom}

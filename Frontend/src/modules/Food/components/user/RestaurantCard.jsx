@@ -181,6 +181,13 @@ const RestaurantCard = ({
   backendOrigin 
 }) => {
   const { homepage } = BRAND_THEME.tokens;
+  const featuredDishName =
+    typeof restaurant?.featuredDish === "string"
+      ? restaurant.featuredDish.trim()
+      : typeof restaurant?.featuredDish?.name === "string"
+        ? restaurant.featuredDish.name.trim()
+        : "";
+
   return (
     <motion.div
       onClick={onClick}
@@ -217,6 +224,12 @@ const RestaurantCard = ({
         <p className="text-[11px] sm:text-[13px] text-slate-500 dark:text-slate-400 mb-2.5 line-clamp-1 font-medium">
           {restaurant.cuisine || "North Indian, Chinese"}
         </p>
+
+        {featuredDishName && (
+          <p className="text-[10px] sm:text-xs mb-2.5 font-semibold text-emerald-700 dark:text-emerald-400 line-clamp-1">
+            Featured Dish: {featuredDishName}
+          </p>
+        )}
 
         <div className={`flex items-center pt-2.5 border-t ${homepage.shared.border}`}>
           <div className={`flex items-center gap-1.5 ${homepage.shared.mutedText} ${homepage.shared.surfaceAlt} px-2 py-1 rounded-md`}>

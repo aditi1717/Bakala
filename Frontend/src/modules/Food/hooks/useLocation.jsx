@@ -31,6 +31,24 @@ let globalReverseGeocodeLastSuccess = null
 // Default behavior: only resolve an address once on initial app load,
 // then rely on localStorage/DB. Live watching is enabled only via explicit user action.
 const AUTO_START_LIVE_WATCH = false
+const DEFAULT_LOCATION_COORDS = {
+  latitude: 19.173553,
+  longitude: 73.030342,
+}
+const DEFAULT_LOCATION_TEXT = {
+  city: "Mumbra",
+  state: "Maharashtra",
+  country: "India",
+  area: "Mumbra, Thane",
+  address: "Mumbra, Thane, Maharashtra",
+  formattedAddress: "Mumbra, Thane, Maharashtra",
+}
+
+const buildDefaultLocation = (latitude = DEFAULT_LOCATION_COORDS.latitude, longitude = DEFAULT_LOCATION_COORDS.longitude) => ({
+  latitude,
+  longitude,
+  ...DEFAULT_LOCATION_TEXT,
+})
 
 const reverseGeocodeDirect = async (latitude, longitude) => {
   const now = Date.now()
@@ -99,11 +117,7 @@ const reverseGeocodeDirect = async (latitude, longitude) => {
       globalReverseGeocodeLastSuccess = value
       return value
     } catch {
-      const fallback = {
-        city: "Current Location",
-        address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-        formattedAddress: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-      }
+      const fallback = buildDefaultLocation(latitude, longitude)
       // Don't cache failures as "success" (keeps retries possible), but still return something usable.
       return fallback
     } finally {
@@ -1053,11 +1067,7 @@ export function useLocation() {
             } else {
               // No fallback available - set a default location so UI doesn't hang
               debugWarn("?? No fallback location available, setting default")
-              const defaultLocation = {
-                city: "Select location",
-                address: "Select location",
-                formattedAddress: "Select location"
-              }
+              const defaultLocation = buildDefaultLocation()
               setLocation(defaultLocation)
               setError(err.code === 3 ? "Location request timed out. Please try again." : err.message)
               setPermissionGranted(false)
@@ -1442,7 +1452,15 @@ export function useLocation() {
       } catch (err) {
         debugError("Failed to parse stored location:", err)
         shouldForceRefresh = true
+        localStorage.setItem("userLocation", JSON.stringify(buildDefaultLocation()))
       }
+    } else {
+      const defaultLocation = buildDefaultLocation()
+      localStorage.setItem("userLocation", JSON.stringify(defaultLocation))
+      setLocation(defaultLocation)
+      setPermissionGranted(true)
+      setLoading(false)
+      hasInitialLocation = true
     }
 
     // If no cached location, try DB
@@ -1478,11 +1496,7 @@ export function useLocation() {
             if (!currentLocation ||
               (currentLocation.formattedAddress === "Select location" &&
                 !currentLocation.latitude && !currentLocation.city)) {
-              return {
-                city: "Select location",
-                address: "Select location",
-                formattedAddress: "Select location"
-              }
+              return buildDefaultLocation()
             }
             return currentLocation
           })

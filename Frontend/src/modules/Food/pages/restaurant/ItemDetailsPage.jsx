@@ -21,8 +21,7 @@ import { Switch } from "@food/components/ui/switch"
 import api from "@food/api"
 import { restaurantAPI, uploadAPI } from "@food/api"
 import { toast } from "sonner"
-import { ImageSourcePicker } from "@food/components/ImageSourcePicker"
-import { isFlutterBridgeAvailable } from "@food/utils/imageUploadUtils"
+import { openCamera } from "@food/utils/imageUploadUtils"
 import { getFoodVariants } from "@food/utils/foodVariants"
 import BRAND_THEME from "@/config/brandTheme"
 const debugLog = (...args) => {}
@@ -88,7 +87,6 @@ export default function ItemDetailsPage() {
   const [images, setImages] = useState([])
   const [imageFiles, setImageFiles] = useState(new Map()) // Track File objects by preview URL
   const [uploadingImages, setUploadingImages] = useState(false)
-  const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [touchStart, setTouchStart] = useState(null)
   const [touchEnd, setTouchEnd] = useState(null)
@@ -386,11 +384,10 @@ export default function ItemDetailsPage() {
   }
 
   const handleCameraClick = () => {
-    if (isFlutterBridgeAvailable()) {
-      setIsPhotoPickerOpen(true)
-    } else {
-      fileInputRef.current?.click()
-    }
+    openCamera({
+      onSelectFile: handleImageAdd,
+      fileNamePrefix: "item-photo",
+    })
   }
 
   const handleImageDelete = (index) => {
@@ -580,6 +577,12 @@ export default function ItemDetailsPage() {
         url.trim() !== '' &&
         self.indexOf(url) === index
       ).slice(0, 1)
+
+      if (allImageUrls.length === 0) {
+        toast.error("Food image is required")
+        setUploadingImages(false)
+        return
+      }
 
       // Debug: Log image URLs
       debugLog('=== IMAGE UPLOAD SUMMARY ===')
@@ -898,6 +901,7 @@ export default function ItemDetailsPage() {
               className="hidden"
             />
             <button
+              type="button"
               onClick={handleCameraClick}
               className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 text-white rounded-xl text-sm font-semibold cursor-pointer transition-all shadow-md hover:shadow-lg active:scale-95"
               style={{
@@ -906,9 +910,19 @@ export default function ItemDetailsPage() {
               }}
             >
               <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
-                <Plus className="w-4 h-4" />
+                <Camera className="w-4 h-4" />
               </div>
-              <span>Add Image</span>
+              <span>Use Camera</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-3 w-full flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl text-sm font-semibold border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 transition-all"
+            >
+              <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center">
+                <Upload className="w-4 h-4" />
+              </div>
+              <span>Upload File</span>
             </button>
           </div>
         </div>
@@ -1374,16 +1388,6 @@ export default function ItemDetailsPage() {
           </button>
         </div>
       </div>
-      {/* Photo Picker */}
-      <ImageSourcePicker
-        isOpen={isPhotoPickerOpen}
-        onClose={() => setIsPhotoPickerOpen(false)}
-        onFileSelect={handleImageAdd}
-        title="Item Image"
-        description="Choose how to upload your item image"
-        fileNamePrefix="item-photo"
-        galleryInputRef={fileInputRef}
-      />
     </div>
   )
 }

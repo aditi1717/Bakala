@@ -1225,6 +1225,11 @@ export default function Inventory() {
         const uploadRes = await uploadAPI.uploadMedia(addonImageFile, { folder: "appzeto/restaurant/addons" })
         imageUrl = uploadRes?.data?.data?.url || uploadRes?.data?.url || ""
       }
+      if (!String(imageUrl || "").trim()) {
+        toast.error("Add-on image is required")
+        setSavingAddon(false)
+        return
+      }
       const payload = {
         name: addonName.trim(),
         description: addonDescription.trim(),

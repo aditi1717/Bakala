@@ -1375,63 +1375,40 @@ export default function RestaurantsList() {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th
-                      className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors"
-                      onClick={() => handleSort('sl')}
-                    >
+                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>SL</span>
-                        <ArrowUpDown className={`w-3 h-3 ${sortConfig.key === 'sl' ? 'text-brand-600' : 'text-slate-400'}`} />
                       </div>
                     </th>
-                    <th
-                      className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors"
-                      onClick={() => handleSort('name')}
-                    >
+                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>Restaurant Info</span>
-                        <ArrowUpDown className={`w-3 h-3 ${sortConfig.key === 'name' ? 'text-brand-600' : 'text-slate-400'}`} />
                       </div>
                     </th>
-                    <th
-                      className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors"
-                      onClick={() => handleSort('owner')}
-                    >
+                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>Owner Info</span>
-                        <ArrowUpDown className={`w-3 h-3 ${sortConfig.key === 'owner' ? 'text-brand-600' : 'text-slate-400'}`} />
                       </div>
                     </th>
-                    <th
-                      className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors"
-                      onClick={() => handleSort('zone')}
-                    >
+                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>Zone</span>
-                        <ArrowUpDown className={`w-3 h-3 ${sortConfig.key === 'zone' ? 'text-brand-600' : 'text-slate-400'}`} />
                       </div>
                     </th>
-                    <th
-                      className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors"
-                      onClick={() => handleSort('rating')}
-                    >
+                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>Rating</span>
-                        <ArrowUpDown className={`w-3 h-3 ${sortConfig.key === 'rating' ? 'text-brand-600' : 'text-slate-400'}`} />
                       </div>
                     </th>
-                    <th
-                      className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors"
-                      onClick={() => handleSort('status')}
-                    >
+                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       <div className="flex items-center gap-1">
                         <span>Status</span>
-                        <ArrowUpDown className={`w-3 h-3 ${sortConfig.key === 'status' ? 'text-brand-600' : 'text-slate-400'}`} />
                       </div>
                     </th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
+
                 <tbody className="bg-white divide-y divide-slate-100">
                   {filteredRestaurants.length === 0 ? (
                     <tr>

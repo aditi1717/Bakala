@@ -1031,10 +1031,34 @@ export async function getTransactionReport(query = {}) {
     }, 0);
 
     for (const tx of transactionRows) {
+        const pricing = tx?.pricing || tx?.orderId?.pricing || {};
+        const subtotal = Number(pricing?.subtotal || 0) || 0;
+        const packagingFee = Number(pricing?.packagingFee || 0) || 0;
+        const deliveryFee = Number(pricing?.deliveryFee || 0) || 0;
+        const tax = Number(pricing?.tax || 0) || 0;
+        const discount = Number(pricing?.discount || 0) || 0;
+        const total = Number(pricing?.total || 0) || 0;
+        const couponByAdmin = Number(pricing?.couponByAdmin || 0) || 0;
+        const platformFee =
+            pricing?.platformFee !== undefined && pricing?.platformFee !== null
+                ? Number(pricing.platformFee || 0) || 0
+                : Math.max(0, total - subtotal - packagingFee - deliveryFee - tax + discount);
+        const riderShare = Number(tx?.amounts?.riderShare || 0) || 0;
+        const restaurantCommission = Number(
+            tx?.amounts?.restaurantCommission ?? pricing?.restaurantCommission ?? 0
+        ) || 0;
+        const platformProfitFallback = Math.max(
+            0,
+            platformFee + deliveryFee + restaurantCommission - riderShare - couponByAdmin
+        );
+        const platformProfit = Number(
+            tx?.amounts?.platformNetProfit ?? platformProfitFallback
+        ) || 0;
+
         // Calculate Summary
         if (isCompletedLikeTx(tx)) {
             completedTransaction += tx.amounts?.totalCustomerPaid || 0;
-            adminEarning += tx.amounts?.platformNetProfit || 0;
+            adminEarning += platformProfit;
             restaurantEarning += tx.amounts?.restaurantShare || 0;
             deliverymanEarning += tx.amounts?.riderShare || 0;
         } else if (isPendingDueNoResponseTx(tx)) {

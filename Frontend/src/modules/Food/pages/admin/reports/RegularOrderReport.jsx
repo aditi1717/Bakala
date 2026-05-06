@@ -25,7 +25,7 @@ const debugError = (...args) => {}
 
 
 const statusMeta = {
-  Scheduled: { label: "Scheduled Orders", color: "text-amber-600", bg: "bg-amber-50", icon: scheduledIcon },
+  
   Pending: { label: "Pending Orders", color: "text-brand-600", bg: "bg-brand-50", icon: pendingIcon },
   Accepted: { label: "Accepted Orders", color: "text-sky-600", bg: "bg-sky-50", icon: acceptedIcon },
   Processing: { label: "Processing Orders", color: "text-indigo-600", bg: "bg-indigo-50", icon: processingIcon },
@@ -615,7 +615,7 @@ export default function RegularOrderReport() {
         },
         {
           total: 0,
-          Scheduled: 0,
+          
           Pending: 0,
           Accepted: 0,
           Processing: 0,

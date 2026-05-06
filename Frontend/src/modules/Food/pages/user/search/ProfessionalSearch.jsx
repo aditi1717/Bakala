@@ -1,11 +1,9 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useSearchParams, Link, useNavigate } from "react-router-dom"
 import { 
-  ArrowLeft, Star, Clock, Search, SlidersHorizontal, 
-  ChevronDown, Bookmark, BadgePercent, Grid2x2,
-  X, Utensils, Store, Loader2, History
+  ArrowLeft, Star, Clock, Search,
+  X, Loader2
 } from "lucide-react"
-import { Card, CardContent } from "@food/components/ui/card"
 import { Button } from "@food/components/ui/button"
 import { Input } from "@food/components/ui/input"
 import { useLocation as useGeoLocation } from "@food/hooks/useLocation"
@@ -17,11 +15,8 @@ import { motion, AnimatePresence } from "framer-motion"
 const getMediaUrl = (url) => {
   if (!url || typeof url !== 'string') return null;
   if (url.startsWith('http')) return url;
-  
-  // Use VITE_API_BASE_URL to derive the backend origin
   const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/v1";
   const origin = apiBase.split('/api/v1')[0];
-  
   return `${origin}${url.startsWith('/') ? url : '/' + url}`;
 };
 
@@ -34,8 +29,6 @@ function useDebounce(value, delay) {
   }, [value, delay])
   return debouncedValue
 }
-
-const SEARCH_HISTORY_KEY = "professional_search_history_v1"
 
 export default function ProfessionalSearch() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -51,44 +44,23 @@ export default function ProfessionalSearch() {
     }
   }, [])
   const effectiveZoneId = zoneId || cachedZoneId
+  const inputRef = useRef(null)
+  const skipUrlSyncRef = useRef(false)
   
   const [query, setQuery] = useState(initialQuery)
   const debouncedQuery = useDebounce(query, 500)
   
   const [results, setResults] = useState({ restaurants: [], dishes: [] })
   const [loading, setLoading] = useState(false)
-  const [categories, setCategories] = useState([])
   const [selectedCategoryId, setSelectedCategoryId] = useState(searchParams.get("cat") || null)
-  const [history, setHistory] = useState([])
-
-  // Load search history
-  useEffect(() => {
-    const savedHistory = localStorage.getItem(SEARCH_HISTORY_KEY)
-    if (savedHistory) setHistory(JSON.parse(savedHistory))
-  }, [])
 
   useEffect(() => {
+    if (skipUrlSyncRef.current) {
+      if (!initialQuery) skipUrlSyncRef.current = false
+      return
+    }
     setQuery((prev) => (prev === initialQuery ? prev : initialQuery))
   }, [initialQuery])
-
-  useEffect(() => {
-    fetchCategories()
-  }, [effectiveZoneId])
-
-  const fetchCategories = async () => {
-    try {
-      const res = await searchAPI.getAdminCategories(effectiveZoneId ? { zoneId: effectiveZoneId } : {})
-      if (res.data?.success) setCategories(res.data.data.categories)
-    } catch (err) {
-      console.error("Failed to fetch categories", err)
-    }
-  }
-
-  const addToHistory = (term) => {
-    const newHistory = [term, ...history.filter(h => h !== term)].slice(0, 5)
-    setHistory(newHistory)
-    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(newHistory))
-  }
 
   const performSearch = useCallback(async (searchTerm, catId) => {
     if (!searchTerm && !catId) {
@@ -128,28 +100,31 @@ export default function ProfessionalSearch() {
 
   useEffect(() => {
     performSearch(debouncedQuery, selectedCategoryId)
-    if (debouncedQuery) {
-        setSearchParams({ q: debouncedQuery, ...(selectedCategoryId ? { cat: selectedCategoryId } : {}) })
+  }, [debouncedQuery, selectedCategoryId, performSearch])
+
+  useEffect(() => {
+    const trimmedQuery = String(query || "").trim()
+    if (trimmedQuery || selectedCategoryId) {
+      setSearchParams(
+        { ...(trimmedQuery ? { q: trimmedQuery } : {}), ...(selectedCategoryId ? { cat: selectedCategoryId } : {}) },
+        { replace: true }
+      )
+    } else {
+      setSearchParams({}, { replace: true })
     }
-  }, [debouncedQuery, selectedCategoryId, performSearch, setSearchParams])
+  }, [query, selectedCategoryId, setSearchParams])
 
   const handleClear = () => {
+    skipUrlSyncRef.current = true
     setQuery("")
     setSelectedCategoryId(null)
     setResults({ restaurants: [], dishes: [] })
-    navigate("/food", { replace: true })
+    setSearchParams({}, { replace: true })
+    inputRef.current?.focus()
   }
 
-  const handleCategoryClick = (id) => {
-    const newCat = selectedCategoryId === id ? null : id
-    setSelectedCategoryId(newCat)
-    if (newCat) {
-        setSearchParams({ ...Object.fromEntries(searchParams), cat: newCat })
-    } else {
-        const p = Object.fromEntries(searchParams)
-        delete p.cat
-        setSearchParams(p)
-    }
+  const handleBack = () => {
+    navigate("/food")
   }
 
   return (
@@ -157,13 +132,14 @@ export default function ProfessionalSearch() {
       {/* Header */}
       <div className="sticky top-0 z-50 bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 px-4 py-3">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+          <button onClick={handleBack} className="p-2 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input 
+              ref={inputRef}
               autoFocus
               placeholder="Search for restaurants or dishes..." 
               value={query}
@@ -171,7 +147,7 @@ export default function ProfessionalSearch() {
               className="pl-10 pr-10 h-11 bg-slate-100 dark:bg-zinc-800 border-none focus:ring-2 focus:ring-rose-500 rounded-xl"
             />
             {query && (
-              <button onClick={handleClear} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600">
+              <button type="button" onClick={handleClear} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600">
                 <X className="w-4 h-4" />
               </button>
             )}
@@ -180,37 +156,6 @@ export default function ProfessionalSearch() {
       </div>
 
       <div className="max-w-3xl mx-auto p-4">
-        {/* Categories (Admin only) */}
-        {!query && !loading && (
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 px-1">Top Categories</h3>
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-4">
-              {categories.map((cat) => (
-                <button 
-                  key={cat._id} 
-                  onClick={() => handleCategoryClick(cat._id)}
-                  className={`flex flex-col items-center group transition-all ${selectedCategoryId === cat._id ? 'scale-110' : ''}`}
-                >
-                  <div className={`w-14 h-14 rounded-2xl mb-2 flex items-center justify-center overflow-hidden border-2 transition-all ${selectedCategoryId === cat._id ? 'border-rose-500 shadow-lg shadow-rose-100' : 'border-transparent bg-white dark:bg-zinc-900'}`}>
-                    {cat.image ? (
-                      <img 
-                        src={getMediaUrl(cat.image)} 
-                        alt={cat.name} 
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform" 
-                      />
-                    ) : (
-                      <Utensils className="w-6 h-6 text-slate-300" />
-                    )}
-                  </div>
-                  <span className={`text-[11px] font-medium text-center line-clamp-1 ${selectedCategoryId === cat._id ? 'text-rose-600' : 'text-slate-600 dark:text-slate-400'}`}>
-                    {cat.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Loading Spinner */}
         <AnimatePresence>
           {loading && (
@@ -223,25 +168,6 @@ export default function ProfessionalSearch() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Recent History */}
-        {!query && !loading && history.length > 0 && (
-          <div className="mb-8">
-             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">Recently Searched</h3>
-             <div className="flex flex-wrap gap-2">
-                {history.map((term, i) => (
-                  <button 
-                    key={i} 
-                    onClick={() => setQuery(term)}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-full text-sm text-slate-600 dark:text-zinc-400 hover:bg-slate-50 transition-colors"
-                  >
-                    <History className="w-3 h-3" />
-                    {term}
-                  </button>
-                ))}
-             </div>
-          </div>
-        )}
 
         {/* Search Results */}
         {!loading && (query || selectedCategoryId) && (

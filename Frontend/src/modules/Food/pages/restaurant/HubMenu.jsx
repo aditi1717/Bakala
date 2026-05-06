@@ -20,6 +20,7 @@ import {
   Loader2
 } from "lucide-react"
 import BottomNavOrders from "@food/components/restaurant/BottomNavOrders"
+import { openCamera } from "@food/utils/imageUploadUtils"
 // Removed foodManagement - now using backend API directly
 import { useNavigate } from "react-router-dom"
 import { restaurantAPI, uploadAPI } from "@food/api"
@@ -455,11 +456,11 @@ export default function HubMenu() {
   }, [activeTab])
 
   // Handle add-on image add
-  const handleAddonImageAdd = (e) => {
-    const files = Array.from(e.target.files)
-    
+  const handleAddonImageFiles = (files = []) => {
+    const normalizedFiles = Array.from(files).filter(Boolean)
+
     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/heic", "image/heif"]
-    const validFiles = files.filter(file => {
+    const validFiles = normalizedFiles.filter(file => {
       if (!allowedTypes.includes(file.type)) {
         toast.error(`${file.name}: Invalid file type. Please upload PNG, JPG, JPEG, WEBP, HEIC, or HEIF.`)
         return false
@@ -489,6 +490,24 @@ export default function HubMenu() {
     if (addonFileInputRef.current) {
       addonFileInputRef.current.value = ""
     }
+  }
+
+  // Handle add-on image add
+  const handleAddonImageAdd = (e) => {
+    const files = Array.from(e.target.files || [])
+    handleAddonImageFiles(files)
+  }
+
+  const handleAddonSingleImageFromPicker = (file) => {
+    if (!file) return
+    handleAddonImageFiles([file])
+  }
+
+  const handleAddonCameraImage = async () => {
+    await openCamera({
+      onSelectFile: handleAddonSingleImageFromPicker,
+      fileNamePrefix: "addon-photo",
+    })
   }
 
   // Handle add-on image delete
@@ -575,6 +594,12 @@ export default function HubMenu() {
         url.trim() !== '' && 
         self.indexOf(url) === index
       )
+
+      if (allImageUrls.length === 0) {
+        toast.error("Add-on image is required")
+        setUploadingAddonImages(false)
+        return
+      }
 
       const addonData = {
         name: addonName.trim(),
@@ -2386,6 +2411,14 @@ export default function HubMenu() {
                     <Camera className="h-5 w-5 text-gray-500" />
                     <span className="text-sm font-medium text-gray-700">Add Images</span>
                   </label>
+                  <button
+                    type="button"
+                    onClick={handleAddonCameraImage}
+                    className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors"
+                  >
+                    <Camera className="h-5 w-5 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">Use Camera</span>
+                  </button>
                   <p className="text-xs text-gray-500 mt-1">Add multiple images (PNG, JPG, WEBP - max 5MB each)</p>
                 </div>
               </div>
