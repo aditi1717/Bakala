@@ -745,9 +745,11 @@ export default function Inventory() {
       return "all-items"
     }
   })
-  const [searchQuery, setSearchQuery] = useState("")
+  const [foodSearchQuery, setFoodSearchQuery] = useState("")
+  const [addonSearchQuery, setAddonSearchQuery] = useState("")
+  const [foodSelectedFilter, setFoodSelectedFilter] = useState("all")
+  const [addonSelectedFilter, setAddonSelectedFilter] = useState("all")
   const [filterOpen, setFilterOpen] = useState(false)
-  const [selectedFilter, setSelectedFilter] = useState("all")
   const [isLoading, setIsLoading] = useState(false)
   const [loadingInventory, setLoadingInventory] = useState(false)
   const [categories, setCategories] = useState(() => {
@@ -1432,10 +1434,16 @@ export default function Inventory() {
   )
 
   useEffect(() => {
-    if (!activeFilterOptions.some((option) => option.value === selectedFilter)) {
-      setSelectedFilter("all")
+    if (!MENU_FILTER_OPTIONS.some((option) => option.value === foodSelectedFilter)) {
+      setFoodSelectedFilter("all")
     }
-  }, [activeFilterOptions, selectedFilter])
+  }, [foodSelectedFilter])
+
+  useEffect(() => {
+    if (!ADDON_FILTER_OPTIONS.some((option) => option.value === addonSelectedFilter)) {
+      setAddonSelectedFilter("all")
+    }
+  }, [addonSelectedFilter])
 
   const filterMenuItems = (items = [], filterValue = "all") => {
     if (filterValue === "all") return items
@@ -1482,7 +1490,7 @@ export default function Inventory() {
   const statusFilteredCategories = useMemo(() => {
     return categories
       .map((category) => {
-        const filteredItems = filterMenuItems(category.items || [], selectedFilter)
+        const filteredItems = filterMenuItems(category.items || [], foodSelectedFilter)
         if (filteredItems.length === 0) return null
 
         return {
@@ -1493,11 +1501,11 @@ export default function Inventory() {
         }
       })
       .filter(Boolean)
-  }, [categories, selectedFilter])
+  }, [categories, foodSelectedFilter])
 
   // Apply text search on categories & items
   const filteredCategories = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
+    const q = foodSearchQuery.trim().toLowerCase()
     if (!q) return statusFilteredCategories
 
     return statusFilteredCategories
@@ -1523,11 +1531,11 @@ export default function Inventory() {
         }
       })
       .filter(Boolean)
-  }, [statusFilteredCategories, searchQuery])
+  }, [statusFilteredCategories, foodSearchQuery])
 
   const filteredAddons = useMemo(() => {
-    const byFilter = filterAddonsList(addons, selectedFilter)
-    const q = searchQuery.trim().toLowerCase()
+    const byFilter = filterAddonsList(addons, addonSelectedFilter)
+    const q = addonSearchQuery.trim().toLowerCase()
     if (!q) return byFilter
 
     return byFilter.filter((addon) => {
@@ -1538,16 +1546,18 @@ export default function Inventory() {
         status.includes(q)
       )
     })
-  }, [addons, searchQuery, selectedFilter])
+  }, [addons, addonSearchQuery, addonSelectedFilter])
 
   // When on Add-ons tab, keep the list empty (no items shown)
   const listToRender = activeTab === "add-ons" ? [] : filteredCategories
 
   const activeFilterCount = activeTab === "add-ons"
-    ? (addonFilterCounts[selectedFilter] || 0)
-    : (menuFilterCounts[selectedFilter] || 0)
+    ? (addonFilterCounts[addonSelectedFilter] || 0)
+    : (menuFilterCounts[foodSelectedFilter] || 0)
 
-  const hasActiveTools = searchQuery.trim().length > 0 || selectedFilter !== "all"
+  const hasActiveTools = activeTab === "add-ons"
+    ? (addonSearchQuery.trim().length > 0 || addonSelectedFilter !== "all")
+    : (foodSearchQuery.trim().length > 0 || foodSelectedFilter !== "all")
 
   // Calculate out of stock count for a category
   const getOutOfStockCount = (category) => {
@@ -1567,7 +1577,11 @@ export default function Inventory() {
 
   // Handle filter clear
   const handleFilterClear = () => {
-    setSelectedFilter("all")
+    if (activeTab === "add-ons") {
+      setAddonSelectedFilter("all")
+    } else {
+      setFoodSelectedFilter("all")
+    }
     setFilterOpen(false)
   }
 
@@ -2035,8 +2049,13 @@ export default function Inventory() {
                 <button
                   type="button"
                   onClick={() => {
-                    setSearchQuery("")
-                    setSelectedFilter("all")
+                    if (activeTab === "add-ons") {
+                      setAddonSearchQuery("")
+                      setAddonSelectedFilter("all")
+                    } else {
+                      setFoodSearchQuery("")
+                      setFoodSelectedFilter("all")
+                    }
                   }}
                   className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
                 >
@@ -2050,15 +2069,15 @@ export default function Inventory() {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={activeTab === "add-ons" ? addonSearchQuery : foodSearchQuery}
+                  onChange={(e) => activeTab === "add-ons" ? setAddonSearchQuery(e.target.value) : setFoodSearchQuery(e.target.value)}
                   placeholder={activeTab === "add-ons" ? "Search add-ons by name or status" : "Search categories or menu items"}
                   className="h-12 w-full rounded-[20px] border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:outline-none"
                 />
-                {searchQuery ? (
+                {(activeTab === "add-ons" ? addonSearchQuery : foodSearchQuery) ? (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery("")}
+                    onClick={() => activeTab === "add-ons" ? setAddonSearchQuery("") : setFoodSearchQuery("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                     aria-label="Clear search"
                   >
@@ -2073,7 +2092,7 @@ export default function Inventory() {
               >
                 <SlidersHorizontal className="w-4 h-4 text-slate-700" />
                 <span>Filters</span>
-                {selectedFilter !== "all" && (
+                {((activeTab === "add-ons" ? addonSelectedFilter : foodSelectedFilter) !== "all") && (
                   <span
                     className="absolute top-2 right-2 w-2 h-2 rounded-full"
                     style={{ backgroundColor: BRAND_THEME.colors.brand.primary }}
@@ -2092,42 +2111,7 @@ export default function Inventory() {
               )}
             </div>
 
-            <div className="mt-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-              {activeFilterOptions.map((option) => {
-                const count = activeTab === "add-ons"
-                  ? (addonFilterCounts[option.value] || 0)
-                  : (menuFilterCounts[option.value] || 0)
-
-                const isActive = selectedFilter === option.value
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setSelectedFilter(option.value)}
-                    className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors ${
-                      isActive
-                        ? "text-white shadow-[0_14px_28px_-24px_rgba(41,121,251,0.4)]"
-                        : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
-                    }`}
-                    style={
-                      isActive
-                        ? {
-                            background: BRAND_THEME.gradients.primary,
-                            borderColor: BRAND_THEME.colors.brand.primary,
-                          }
-                        : undefined
-                    }
-                  >
-                    <span>{option.label}</span>
-                    <span className={`ml-2 inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] ${
-                      isActive ? "bg-white/15 text-white" : "bg-white text-slate-500"
-                    }`}>
-                      {count}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
+            {/* Filter chips removed - moved to Filter Modal */}
           </div>
         </div>
 
@@ -2570,41 +2554,71 @@ export default function Inventory() {
                         : "Refine your inventory by stock state, recommendation, or food type."}
                     </p>
                   </div>
-                  {selectedFilter !== "all" ? (
+                  {((activeTab === "add-ons" ? addonSelectedFilter : foodSelectedFilter) !== "all") ? (
                     <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
                       Active
                     </span>
                   ) : null}
                 </div>
 
-                <div className="space-y-4 mb-6">
-                  {activeFilterOptions.map((option) => {
-                    const count = activeTab === "add-ons"
-                      ? (addonFilterCounts[option.value] || 0)
-                      : (menuFilterCounts[option.value] || 0)
+                <div className="space-y-6">
+                  {/* Status Filter */}
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Status</h3>
+                    <div className="space-y-2">
+                      {activeFilterOptions.map((option) => {
+                        const count = activeTab === "add-ons"
+                          ? (addonFilterCounts[option.value] || 0)
+                          : (menuFilterCounts[option.value] || 0)
+                        const isActive = (activeTab === "add-ons" ? addonSelectedFilter : foodSelectedFilter) === option.value
 
-                    return (
-                      <label key={option.value} className="flex items-center justify-between gap-3 cursor-pointer rounded-xl border border-gray-200 px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="filter"
-                            checked={selectedFilter === option.value}
-                            onChange={() => setSelectedFilter(option.value)}
-                            className="w-5 h-5 text-brand-600 border-gray-300 focus:ring-brand-500"
-                          />
-                          <span className="text-base text-gray-900">{option.label}</span>
-                        </div>
-                        <span className="min-w-[28px] h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-700">
-                          {count}
-                        </span>
-                      </label>
-                    )
-                  })}
+                        return (
+                          <label 
+                            key={option.value} 
+                            className={`flex items-center justify-between gap-3 cursor-pointer rounded-xl border px-4 py-3.5 transition-all ${
+                              isActive ? "border-emerald-200 bg-emerald-50/50" : "border-gray-200 bg-white"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
+                                isActive ? "border-emerald-600 bg-emerald-600" : "border-gray-300 bg-white"
+                              }`}>
+                                {isActive && <div className="w-2 h-2 rounded-full bg-white" />}
+                              </div>
+                              <input
+                                type="radio"
+                                name="filter"
+                                checked={isActive}
+                                onChange={() => {
+                                  if (activeTab === "add-ons") {
+                                    setAddonSelectedFilter(option.value)
+                                  } else {
+                                    setFoodSelectedFilter(option.value)
+                                  }
+                                  handleFilterApply()
+                                }}
+                                className="hidden"
+                              />
+                              <span className={`text-sm font-medium transition-colors ${
+                                isActive ? "text-emerald-900" : "text-gray-700"
+                              }`}>
+                                {option.label}
+                              </span>
+                            </div>
+                            <span className={`min-w-[28px] h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors ${
+                              isActive ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+                            }`}>
+                              {count}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-3">
-                  {selectedFilter !== "all" && (
+                  {(activeTab === "add-ons" ? addonSelectedFilter : foodSelectedFilter) !== "all" && (
                     <button
                       onClick={handleFilterClear}
                       className="flex-1 border border-gray-300 text-gray-900 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
@@ -2614,7 +2628,7 @@ export default function Inventory() {
                   )}
                   <button
                     onClick={handleFilterApply}
-                    className={`${selectedFilter !== "all" ? 'flex-1' : 'w-full'} text-white py-3 rounded-lg font-medium transition-colors`}
+                    className={`${(activeTab === "add-ons" ? addonSelectedFilter : foodSelectedFilter) !== "all" ? 'flex-1' : 'w-full'} text-white py-3 rounded-lg font-medium transition-colors`}
                     style={{
                       background: BRAND_THEME.gradients.primary,
                       boxShadow: `0 12px 28px -18px ${BRAND_THEME.colors.brand.primaryDark}`,
