@@ -4,6 +4,7 @@ import { Search, Menu, ChevronRight, MapPin, X, Bell } from "lucide-react"
 import { restaurantAPI } from "@food/api"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
 import useNotificationInbox from "@food/hooks/useNotificationInbox"
+import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
 import BRAND_THEME from "@/config/brandTheme"
 
 const debugLog = (...args) => {}
@@ -31,6 +32,9 @@ export default function RestaurantNavbar({
   const [searchValue, setSearchValue] = useState("")
   const [status, setStatus] = useState("Offline")
   const [restaurantData, setRestaurantData] = useState(null)
+  const [outletTimings, setOutletTimings] = useState(null)
+  const [isAcceptingOrdersState, setIsAcceptingOrdersState] = useState(false)
+  const [availabilityTick, setAvailabilityTick] = useState(() => Date.now())
   const [loading, setLoading] = useState(true)
   const [companyName, setCompanyName] = useState("")
   const [logoUrl, setLogoUrl] = useState(null)
@@ -73,6 +77,7 @@ export default function RestaurantNavbar({
         const data = extractRestaurantPayload(response)
         if (data) {
           setRestaurantData(data)
+          setIsAcceptingOrdersState(Boolean(data?.isAcceptingOrders))
         }
       } catch (error) {
         // Only log error if it's not a network/timeout error (backend might be down/slow)
@@ -86,6 +91,29 @@ export default function RestaurantNavbar({
     }
 
     fetchRestaurantData()
+  }, [])
+
+  // Load outlet timings from backend and keep in sync with timings updates.
+  useEffect(() => {
+    let isMounted = true
+
+    const loadOutletTimings = async () => {
+      try {
+        const response = await restaurantAPI.getOutletTimings()
+        const data = response?.data?.data?.outletTimings || response?.data?.outletTimings || null
+        if (isMounted) setOutletTimings(data)
+      } catch (error) {
+        if (isMounted) setOutletTimings(null)
+      }
+    }
+
+    loadOutletTimings()
+    window.addEventListener("outletTimingsUpdated", loadOutletTimings)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener("outletTimingsUpdated", loadOutletTimings)
+    }
   }, [])
 
   // Format full address from location object - using stored data only, no live fetching
@@ -230,34 +258,29 @@ export default function RestaurantNavbar({
     }
   }, [restaurantData, propLocation])
 
-  // Load status from localStorage on mount and listen for changes
+  // Load manual online/offline toggle (accepting orders) and listen for changes.
   useEffect(() => {
-    const updateStatus = () => {
+    const updateAcceptingOrders = () => {
       try {
         const savedStatus = localStorage.getItem('restaurant_online_status')
         if (savedStatus !== null) {
           const isOnline = JSON.parse(savedStatus)
-          setStatus(isOnline ? "Online" : "Offline")
+          setIsAcceptingOrdersState(Boolean(isOnline))
         } else {
-          // If not stored yet, fallback to backend value (when available).
-          const isOnline = Boolean(restaurantData?.isAcceptingOrders)
-          setStatus(isOnline ? "Online" : "Offline")
+          setIsAcceptingOrdersState(Boolean(restaurantData?.isAcceptingOrders))
         }
       } catch (error) {
         debugError("Error loading restaurant status:", error)
-        const isOnline = Boolean(restaurantData?.isAcceptingOrders)
-        setStatus(isOnline ? "Online" : "Offline")
+        setIsAcceptingOrdersState(Boolean(restaurantData?.isAcceptingOrders))
       }
     }
 
-    // Load initial status
-    updateStatus()
+    updateAcceptingOrders()
 
-    // Listen for status changes from RestaurantStatus page
-  const handleStatusChange = (event) => {
+    const handleStatusChange = (event) => {
       const isOnline = event.detail?.isOnline || false
-      setStatus(isOnline ? "Online" : "Offline")
-  }
+      setIsAcceptingOrdersState(Boolean(isOnline))
+    }
 
     window.addEventListener('restaurantStatusChanged', handleStatusChange)
     
@@ -265,6 +288,29 @@ export default function RestaurantNavbar({
       window.removeEventListener('restaurantStatusChanged', handleStatusChange)
     }
   }, [restaurantData])
+
+  // Recompute badge status every minute using outlet timings.
+  useEffect(() => {
+    const timer = setInterval(() => setAvailabilityTick(Date.now()), 60 * 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const mergedRestaurant = {
+      ...(restaurantData || {}),
+      ...(outletTimings ? { outletTimings } : {}),
+      isAcceptingOrders: Boolean(isAcceptingOrdersState),
+    }
+
+    const availability = getRestaurantAvailabilityStatus(
+      mergedRestaurant,
+      new Date(availabilityTick),
+      { ignoreOperationalStatus: false }
+    )
+
+    // Must be within day/time window AND accepting orders to be online.
+    setStatus(availability.isOpen ? "Online" : "Offline")
+  }, [restaurantData, outletTimings, isAcceptingOrdersState, availabilityTick])
 
   const handleStatusClick = () => {
     navigate("/restaurant/status")

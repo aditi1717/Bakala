@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { FoodOffer } from '../../admin/models/offer.model.js';
 import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
+import { FoodRestaurantOutletTimings } from '../models/outletTimings.model.js';
 
 const normalizeName = (value) =>
     String(value || '')
@@ -34,6 +35,35 @@ const normalizeTotalRatingsValue = (value) => {
 };
 
 const toUrl = (v) => (v && (typeof v === 'string' ? v : v.url)) ? (typeof v === 'string' ? v : v.url) : '';
+
+const attachOutletTimingsToRestaurants = async (restaurants = []) => {
+    if (!Array.isArray(restaurants) || restaurants.length === 0) return restaurants;
+
+    const restaurantIds = restaurants
+        .map((r) => String(r?._id || r?.restaurantId || r?.id || ''))
+        .filter(Boolean);
+
+    if (restaurantIds.length === 0) return restaurants;
+
+    const timingDocs = await FoodRestaurantOutletTimings.find({
+        restaurantId: { $in: restaurantIds }
+    })
+        .select('restaurantId timings')
+        .lean();
+
+    const timingMap = new Map(
+        (timingDocs || []).map((doc) => [String(doc.restaurantId), { timings: Array.isArray(doc.timings) ? doc.timings : [] }])
+    );
+
+    return restaurants.map((r) => {
+        const rid = String(r?._id || r?.restaurantId || r?.id || '');
+        const outletTimings = timingMap.get(rid) || null;
+        return {
+            ...r,
+            outletTimings
+        };
+    });
+};
 
 const normalizeRestaurantTime = (value) => {
     const raw = String(value || '').trim();
@@ -1332,7 +1362,8 @@ export const listApprovedRestaurants = async (query = {}) => {
         ]);
 
         const total = totalDocs?.[0]?.count || 0;
-        return { restaurants: pageDocs, total, page, limit };
+        const restaurantsWithTimings = await attachOutletTimingsToRestaurants(pageDocs);
+        return { restaurants: restaurantsWithTimings, total, page, limit };
     }
 
     // Non-geo path: normal query + sort.
@@ -1372,7 +1403,8 @@ export const listApprovedRestaurants = async (query = {}) => {
         menuImages: Array.isArray(r.menuImages) ? r.menuImages : []
     }));
 
-    return { restaurants, total, page, limit };
+    const restaurantsWithTimings = await attachOutletTimingsToRestaurants(restaurants);
+    return { restaurants: restaurantsWithTimings, total, page, limit };
 };
 
 export const getApprovedRestaurantByIdOrSlug = async (idOrSlug) => {
