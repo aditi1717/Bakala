@@ -124,28 +124,24 @@ export default function DeliveryEmergencyHelp() {
       id: "medicalEmergency",
       label: "Medical Emergency",
       placeholder: "Enter medical emergency phone number",
-      icon: "??",
       description: "Phone number for medical emergencies (e.g., 108, +91-XXX-XXX-XXXX)"
     },
     {
       id: "accidentHelpline",
       label: "Accident Helpline",
       placeholder: "Enter accident helpline phone number",
-      icon: "??",
       description: "Phone number for accident helpline"
     },
     {
       id: "contactPolice",
       label: "Contact Police",
       placeholder: "Enter police emergency phone number",
-      icon: "??",
       description: "Phone number for police emergency (e.g., 100)"
     },
     {
       id: "insurance",
       label: "Insurance",
       placeholder: "Enter insurance helpline phone number",
-      icon: "???",
       description: "Phone number for insurance claims and policy help"
     }
   ]
@@ -198,7 +194,6 @@ export default function DeliveryEmergencyHelp() {
             {emergencyFields.map((field) => (
               <div key={field.id} className="space-y-2">
                 <label className="block text-sm font-semibold text-slate-900">
-                  <span className="mr-2">{field.icon}</span>
                   {field.label}
                 </label>
                 <p className="text-xs text-slate-600 mb-2">{field.description}</p>

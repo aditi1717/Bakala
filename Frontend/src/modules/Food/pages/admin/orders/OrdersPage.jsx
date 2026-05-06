@@ -35,7 +35,6 @@ const getAdminSocketToken = () => {
 // Status configuration with titles, colors, and icons
 const statusConfig = {
   "all": { title: "All Orders", color: "emerald", icon: FileText },
-  "scheduled": { title: "Scheduled Orders", color: "blue", icon: Calendar },
   "pending": { title: "Pending Orders", color: "amber", icon: Package },
   "accepted": { title: "Accepted Orders", color: "green", icon: Package },
   "processing": { title: "Processing Orders", color: "orange", icon: Package },
