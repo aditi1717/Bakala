@@ -985,7 +985,7 @@ export default function Under250() {
       />
 
       {bannerImages.length > 0 && (
-        <section className="bg-white px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 pt-2 sm:pt-3">
+        <section className="bg-white dark:bg-[#0a0a0a] px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 pt-0 sm:pt-0">
           <div
             className="relative h-40 sm:h-44 md:h-52 w-full overflow-hidden rounded-[22px] sm:rounded-[26px]"
             onTouchStart={handleBannerTouchStart}
@@ -1014,7 +1014,7 @@ export default function Under250() {
       )}
 
       {/* Content Section */}
-      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 space-y-0 pt-2 sm:pt-3 md:pt-4 lg:pt-6 pb-6 md:pb-8 lg:pb-10">
+      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 space-y-0 pt-1 sm:pt-2 md:pt-3 lg:pt-4 pb-6 md:pb-8 lg:pb-10">
 
         <section className="space-y-1 sm:space-y-1.5">
           <div
@@ -1255,9 +1255,9 @@ export default function Under250() {
                                       size="sm"
                                       className="h-7 md:h-8 lg:h-9 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-base"
                                       style={{
-                                        backgroundColor: `${BRAND_THEME.colors.brand.primary}14`,
-                                        color: BRAND_THEME.colors.brand.primary,
-                                        border: `1px solid ${BRAND_THEME.colors.brand.primary}`,
+                                        background: BRAND_THEME.gradients.primary,
+                                        color: "#ffffff",
+                                        border: "none",
                                       }}
                                     >
                                       View cart
@@ -1273,9 +1273,9 @@ export default function Under250() {
                                       : ''
                                       }`}
                                     style={shouldShowGrayscale ? undefined : {
-                                      backgroundColor: `${BRAND_THEME.colors.brand.primary}14`,
-                                      color: BRAND_THEME.colors.brand.primary,
-                                      border: `1px solid ${BRAND_THEME.colors.brand.primary}`,
+                                      background: BRAND_THEME.gradients.primary,
+                                      color: "#ffffff",
+                                      border: "none",
                                     }}
                                       onClick={(e) => {
                                         e.stopPropagation()

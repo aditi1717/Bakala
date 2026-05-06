@@ -170,7 +170,13 @@ export default function HomeHeader({
   return (
     <motion.div
       className={`relative overflow-hidden transition-all duration-700 ${
-        isFood ? (compact ? "min-h-[90px]" : "min-h-[122px]") : "min-h-[90px]"
+        isFood
+          ? compact
+            ? "min-h-[90px]"
+            : bannerContent
+              ? "min-h-[420px] sm:min-h-[520px]"
+              : "min-h-[122px]"
+          : "min-h-[90px]"
       }`}
       style={{
         background: isFood ? stickyFoodBackground : theme.topBg,
@@ -210,7 +216,7 @@ export default function HomeHeader({
         </div>
       )}
 
-      <div className="relative z-10 pt-0 pb-3">
+      <div className="relative z-10 pt-2 pb-4">
         {isFood && !compact && Boolean(bannerContent) && <div className="absolute inset-0 bg-gradient-to-b from-black/25 to-transparent pointer-events-none" />}
         <div
           className={`rounded-none border-none px-3 pt-2 pb-3 backdrop-blur-[4px] ${

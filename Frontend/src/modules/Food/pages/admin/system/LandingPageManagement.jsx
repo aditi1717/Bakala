@@ -32,6 +32,7 @@ export default function LandingPageManagement() {
   const [bannerLinkEdits, setBannerLinkEdits] = useState({})
   const [bannerLinkSavingId, setBannerLinkSavingId] = useState(null)
   const bannersFileInputRef = useRef(null)
+  const videoInputRef = useRef(null)
 
   // Categories
   const [categories, setCategories] = useState([])
@@ -60,9 +61,11 @@ export default function LandingPageManagement() {
   const under250BannersFileInputRef = useRef(null)
 
   // Settings
-  const [settings, setSettings] = useState({ exploreMoreHeading: "Explore More", recommendedRestaurantIds: [], defaultUnderPriceLimit: DEFAULT_PRICE_LIMIT })
+  const [settings, setSettings] = useState({ exploreMoreHeading: "Explore More", recommendedRestaurantIds: [], defaultUnderPriceLimit: DEFAULT_PRICE_LIMIT, headerVideoUrl: "" })
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [settingsSaving, setSettingsSaving] = useState(false)
+  const [headerVideoUploading, setHeaderVideoUploading] = useState(false)
+  const [headerVideoDeleting, setHeaderVideoDeleting] = useState(false)
   const [recommendedSearchQuery, setRecommendedSearchQuery] = useState("")
 
   const [allRestaurants, setAllRestaurants] = useState([])
@@ -948,12 +951,13 @@ export default function LandingPageManagement() {
           exploreMoreHeading: nextSettings.exploreMoreHeading || "Explore More",
           recommendedRestaurantIds: Array.isArray(nextSettings.recommendedRestaurantIds) ? nextSettings.recommendedRestaurantIds : [],
           defaultUnderPriceLimit: normalizePriceLimit(nextSettings.defaultUnderPriceLimit, DEFAULT_PRICE_LIMIT),
+          headerVideoUrl: nextSettings.headerVideoUrl || "",
         })
       }
     } catch (err) {
       // Silently handle 401/404 errors - endpoints may not exist yet, use default settings
       if (err.response?.status === 401 || err.response?.status === 404) {
-        setSettings({ exploreMoreHeading: "Explore More", recommendedRestaurantIds: [], defaultUnderPriceLimit: DEFAULT_PRICE_LIMIT }) // Use default settings
+        setSettings({ exploreMoreHeading: "Explore More", recommendedRestaurantIds: [], defaultUnderPriceLimit: DEFAULT_PRICE_LIMIT, headerVideoUrl: "" }) // Use default settings
         setError(null) // Clear any previous error
       } else {
         // Filter out token-related errors
@@ -984,6 +988,7 @@ export default function LandingPageManagement() {
             ? savedSettings.recommendedRestaurantIds
             : prev.recommendedRestaurantIds,
           defaultUnderPriceLimit: normalizePriceLimit(savedSettings.defaultUnderPriceLimit, prev.defaultUnderPriceLimit),
+          headerVideoUrl: savedSettings.headerVideoUrl || prev.headerVideoUrl,
         }))
         setSuccess('Settings saved successfully!')
         setTimeout(() => setSuccess(null), 3000)
@@ -992,6 +997,62 @@ export default function LandingPageManagement() {
       setErrorSafely(err.response?.data?.message || 'Failed to save settings.')
     } finally {
       setSettingsSaving(false)
+    }
+  }
+
+  const handleHeaderVideoUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setHeaderVideoUploading(true)
+      setError(null)
+      setSuccess(null)
+
+      const formData = new FormData()
+      formData.append('video', file)
+
+      const response = await api.post('/food/hero-banners/landing/settings/header-video', formData, getAuthConfig())
+
+      if (response.data.success) {
+        const savedSettings = response.data.data?.settings || response.data.data || {}
+        setSettings((prev) => ({
+          ...prev,
+          headerVideoUrl: savedSettings.headerVideoUrl,
+        }))
+        setSuccess('Header video uploaded successfully!')
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (err) {
+      setErrorSafely(err.response?.data?.message || 'Failed to upload header video.')
+    } finally {
+      setHeaderVideoUploading(false)
+      if (videoInputRef.current) videoInputRef.current.value = ''
+    }
+  }
+
+  const handleHeaderVideoDelete = async () => {
+    if (!window.confirm('Are you sure you want to remove the header video?')) return
+
+    try {
+      setHeaderVideoDeleting(true)
+      setError(null)
+      setSuccess(null)
+
+      const response = await api.delete('/food/hero-banners/landing/settings/header-video', getAuthConfig())
+
+      if (response.data.success) {
+        setSettings((prev) => ({
+          ...prev,
+          headerVideoUrl: '',
+        }))
+        setSuccess('Header video removed successfully!')
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (err) {
+      setErrorSafely(err.response?.data?.message || 'Failed to remove header video.')
+    } finally {
+      setHeaderVideoDeleting(false)
     }
   }
 
@@ -1244,6 +1305,61 @@ export default function LandingPageManagement() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Header Video Section */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+              <Label className="text-base font-semibold text-slate-900">Homepage Header Video</Label>
+              <p className="text-xs text-slate-500 mt-1 mb-4">
+                Separate video for homepage header. Upload here and it saves immediately.
+              </p>
+
+              {settings.headerVideoUrl ? (
+                <div className="relative rounded-xl overflow-hidden bg-slate-900 aspect-video max-w-md border border-slate-200 shadow-sm group">
+                  <video
+                    src={settings.headerVideoUrl}
+                    className="w-full h-full object-cover"
+                    controls
+                  />
+                  <button
+                    onClick={handleHeaderVideoDelete}
+                    disabled={headerVideoDeleting}
+                    className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                    title="Remove Video"
+                  >
+                    {headerVideoDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => videoInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center bg-slate-50/50 cursor-pointer transition-all hover:border-brand-400 hover:bg-brand-50/30 group"
+                >
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleHeaderVideoUpload}
+                    className="hidden"
+                  />
+                  {headerVideoUploading ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
+                      <p className="text-sm font-medium text-brand-600">Uploading video...</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 group-hover:scale-110 transition-transform">
+                        <Upload className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Click to upload video</p>
+                        <p className="text-xs text-slate-500 mt-1">MP4, WebM up to 50MB</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Banners List */}
@@ -1564,6 +1680,7 @@ export default function LandingPageManagement() {
                       )}
                     </div>
                   </div>
+
                 </div>
               )}
             </div>
