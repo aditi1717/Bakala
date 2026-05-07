@@ -163,6 +163,12 @@ export const useRestaurantNotifications = () => {
       .map((value) => String(value).trim())
       .filter(Boolean);
 
+  const hasMatchingOrderKey = (keys = [], payload = null) => {
+    if (!payload || !Array.isArray(keys) || keys.length === 0) return false;
+    const payloadKeys = getOrderKeys(payload);
+    return payloadKeys.some((key) => keys.includes(key));
+  };
+
   const shouldProcessOrderAlert = (orderData = {}) => {
     const status = String(orderData?.orderStatus || orderData?.status || "").toLowerCase();
     if (status && status !== "created") return false;
@@ -289,12 +295,31 @@ export const useRestaurantNotifications = () => {
           return new Date(bt).getTime() - new Date(at).getTime();
         });
 
+      const pendingOrderKeys = Array.from(
+        new Set(
+          pendingReview
+            .flatMap((order) => getOrderKeys(order))
+            .filter(Boolean),
+        ),
+      );
+
+      if (activeOrderRef.current && !hasMatchingOrderKey(pendingOrderKeys, activeOrderRef.current)) {
+        stopAlertLoop();
+        activeOrderRef.current = null;
+      }
+
       if (pendingReview.length === 0) {
+        setNewOrder((prev) => (prev ? null : prev));
         return;
       }
 
       const latestPendingOrder = pendingReview[0];
-      setNewOrder((prev) => prev || latestPendingOrder);
+      setNewOrder((prev) => {
+        if (prev && hasMatchingOrderKey(pendingOrderKeys, prev)) {
+          return prev;
+        }
+        return latestPendingOrder;
+      });
       pendingReview.slice(0, 5).forEach((order) => handleIncomingOrderAlert(order));
     } catch (error) {
       debugWarn('Restaurant recovery sync failed:', error?.message || error);

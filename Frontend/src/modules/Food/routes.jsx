@@ -36,7 +36,7 @@ function ScrollToTop() {
 
 function RestaurantGlobalNotificationListenerInner() {
   const navigate = useNavigate()
-  const { newOrder, clearNewOrder } = useRestaurantNotifications()
+  const { newOrder, clearNewOrder, cancelledOrderId, cancelledOrderInfo, clearCancelledOrderId } = useRestaurantNotifications()
   const notificationOrder = newOrder
     ? {
         ...newOrder,
@@ -45,6 +45,86 @@ function RestaurantGlobalNotificationListenerInner() {
         customerAddress: newOrder.customerAddress || newOrder.deliveryAddress || newOrder.address,
       }
     : null
+
+  useEffect(() => {
+    if (!cancelledOrderId || !newOrder) return
+
+    const eventKeys = Array.from(
+      new Set(
+        [
+          cancelledOrderId,
+          ...(Array.isArray(cancelledOrderInfo?.orderKeys) ? cancelledOrderInfo.orderKeys : []),
+        ]
+          .filter(Boolean)
+          .map((value) => String(value).trim())
+          .filter(Boolean),
+      ),
+    )
+
+    const shownKeys = [
+      newOrder.orderMongoId,
+      newOrder.orderId,
+      newOrder._id,
+      newOrder.id,
+    ]
+      .filter(Boolean)
+      .map((value) => String(value).trim())
+      .filter(Boolean)
+
+    if (shownKeys.some((key) => eventKeys.includes(key))) {
+      clearNewOrder()
+      clearCancelledOrderId()
+    }
+  }, [cancelledOrderId, cancelledOrderInfo, newOrder, clearNewOrder, clearCancelledOrderId])
+
+  useEffect(() => {
+    if (!newOrder) return
+
+    const handleRestaurantOrderStatusUpdated = (event) => {
+      const payload = event?.detail || {}
+      const status = String(payload?.orderStatus || payload?.status || "").toLowerCase()
+      if (!status || status === "created") return
+
+      const eventKeys = Array.from(
+        new Set(
+          [
+            payload?.orderId,
+            payload?.order_id,
+            payload?.orderMongoId,
+            payload?.order_mongo_id,
+            payload?._id,
+            payload?.id,
+            payload?.mongoId,
+          ]
+            .filter(Boolean)
+            .map((value) => String(value).trim())
+            .filter(Boolean),
+        ),
+      )
+
+      if (eventKeys.length === 0) return
+
+      const shownKeys = [
+        newOrder.orderMongoId,
+        newOrder.orderId,
+        newOrder._id,
+        newOrder.id,
+      ]
+        .filter(Boolean)
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+
+      if (shownKeys.some((key) => eventKeys.includes(key))) {
+        clearNewOrder()
+        clearCancelledOrderId()
+      }
+    }
+
+    window.addEventListener("restaurantOrderStatusUpdated", handleRestaurantOrderStatusUpdated)
+    return () => {
+      window.removeEventListener("restaurantOrderStatusUpdated", handleRestaurantOrderStatusUpdated)
+    }
+  }, [newOrder, clearNewOrder, clearCancelledOrderId])
 
   return (
     <NewOrderNotification
