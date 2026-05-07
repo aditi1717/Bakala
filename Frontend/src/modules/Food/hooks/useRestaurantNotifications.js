@@ -607,13 +607,14 @@ export const useRestaurantNotifications = () => {
     socketRef.current = io(socketUrl, {
       path: '/socket.io/',
       transports: ['websocket', 'polling'],
+      withCredentials: true,
       upgrade: true,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: Infinity,
+      reconnectionAttempts: 20,
       timeout: 20000,
-      forceNew: false,
+      forceNew: true,
       autoConnect: true,
       auth: {
         token: localStorage.getItem('restaurant_accessToken') || localStorage.getItem('accessToken')

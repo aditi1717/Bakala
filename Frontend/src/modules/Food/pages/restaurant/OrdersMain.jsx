@@ -1550,6 +1550,32 @@ export default function OrdersMain() {
       // Always refresh the background list for any status change
       if (hasDispatchUpdate || hasOrderStatusUpdate) {
         console.log("?? [DEBUG] OrdersMain: Refreshing order list...");
+        
+        // Optimistic Removal: If cancelled, remove from local list immediately
+        const statusLower = String(payload?.orderStatus || payload?.status || "").toLowerCase();
+        if (statusLower.includes("cancel")) {
+          const eventKeys = Array.from(
+            new Set(
+              [
+                payload?.orderId,
+                payload?.order_id,
+                payload?.orderMongoId,
+                payload?.order_mongo_id,
+                payload?._id,
+                payload?.id,
+              ].filter(Boolean).map(v => String(v).trim())
+            )
+          );
+          
+          if (eventKeys.length > 0) {
+            console.log("?? [DEBUG] OrdersMain: Optimistically removing order from list:", eventKeys);
+            setOrders(prev => prev.filter(o => {
+              const oKeys = [o.id, o._id, o.orderId, o.orderMongoId].filter(Boolean).map(v => String(v).trim());
+              return !eventKeys.some(ek => oKeys.includes(ek));
+            }));
+          }
+        }
+        
         requestOrdersRefresh();
       }
 

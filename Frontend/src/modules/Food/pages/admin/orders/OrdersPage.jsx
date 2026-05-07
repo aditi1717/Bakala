@@ -99,6 +99,33 @@ export default function OrdersPage({ statusKey = "all" }) {
   const alertLoopStartedAtRef = useRef(0)
   const ALERT_LOOP_INTERVAL_MS = 4500
   const ALERT_LOOP_MAX_MS = 120000
+  const selectedOrderRef = useRef(null)
+
+  const getOrderKeys = (order = {}) => {
+    if (!order) return []
+    return Array.from(
+      new Set(
+        [
+          order.orderId,
+          order.order_id,
+          order.orderMongoId,
+          order.order_mongo_id,
+          order._id,
+          order.id,
+          order.mongoId,
+        ]
+          .filter(Boolean)
+          .map((value) => String(value).trim())
+          .filter(Boolean),
+      ),
+    )
+  }
+
+  const hasMatchingOrderKey = (keys = [], target = {}) => {
+    if (!target || !keys.length) return false
+    const targetKeys = getOrderKeys(target)
+    return keys.some((key) => targetKeys.includes(key))
+  }
 
   const resolveAudioSource = useCallback((source, cacheKey = "admin-alert") => {
     if (!source) return source
@@ -629,6 +656,10 @@ export default function OrdersPage({ statusKey = "all" }) {
   }, [fetchOrders])
 
   useEffect(() => {
+    selectedOrderRef.current = selectedOrder
+  }, [selectedOrder])
+
+  useEffect(() => {
     if (statusKey !== "all") return undefined
 
     const pollId = setInterval(() => {
@@ -650,12 +681,14 @@ export default function OrdersPage({ statusKey = "all" }) {
     if (!token) return undefined
 
     const socket = io(backendUrl, {
+      path: "/socket.io/",
       transports: ["websocket", "polling"],
+      withCredentials: true,
       reconnection: true,
-      reconnectionAttempts: Infinity,
+      reconnectionAttempts: 20,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
       timeout: 20000,
+      forceNew: true,
       auth: { token },
       query: { token },
     })
@@ -700,8 +733,72 @@ export default function OrdersPage({ statusKey = "all" }) {
     })
     socket.on("admin_new_order", handleIncomingRealtimeOrder)
     socket.on("play_notification_sound", handleIncomingRealtimeOrder)
-    socket.on("order_status_update", () => fetchOrders({ silent: true }))
-    socket.on("order_cancelled", () => fetchOrders({ silent: true }))
+    const stopAlertLoop = () => {
+      if (alertLoopTimerRef.current) {
+        clearInterval(alertLoopTimerRef.current)
+        alertLoopTimerRef.current = null
+      }
+      activeOrderAlertRef.current = null
+      if (notificationAudioRef.current) {
+        notificationAudioRef.current.pause()
+        notificationAudioRef.current.currentTime = 0
+      }
+    }
+
+    socket.on("order_status_update", (data) => {
+      console.log("?? [DEBUG] Admin: Order Status Update:", data)
+      const eventKeys = getOrderKeys(data)
+      const status = String(data?.orderStatus || data?.status || "").toLowerCase()
+
+      // Optimistic Removal: If cancelled, remove from local list immediately
+      if (status.includes("cancel")) {
+        setOrders(prev => prev.filter(o => {
+          const oKeys = getOrderKeys(o)
+          return !eventKeys.some(ek => oKeys.includes(ek))
+        }))
+      }
+
+      fetchOrders({ silent: true })
+      
+      // 1. If this order was ringing/buzzing, stop it
+      if (activeOrderAlertRef.current) {
+        const matchesActive = hasMatchingOrderKey(eventKeys, activeOrderAlertRef.current)
+        if (matchesActive) {
+          console.log("?? [DEBUG] Admin: Stopping alert for matched order")
+          stopAlertLoop()
+        }
+      }
+
+      // 2. If details sheet is open and order changed status (e.g. accepted/cancelled by restaurant)
+      if (selectedOrderRef.current && status !== "pending" && status !== "created") {
+        const matchesSelected = hasMatchingOrderKey(eventKeys, selectedOrderRef.current)
+        if (matchesSelected) {
+          console.log("?? [DEBUG] Admin: Closing details sheet as order is no longer pending")
+          setIsViewOrderOpen(false)
+        }
+      }
+    })
+
+    socket.on("order_cancelled", (data) => {
+      console.log("?? [DEBUG] Admin: Order Cancelled:", data)
+      fetchOrders({ silent: true })
+      
+      const eventKeys = getOrderKeys(data)
+      
+      // 1. Stop ring if active
+      if (activeOrderAlertRef.current) {
+        if (hasMatchingOrderKey(eventKeys, activeOrderAlertRef.current)) {
+          stopAlertLoop()
+        }
+      }
+
+      // 2. Close sheet if open
+      if (selectedOrderRef.current) {
+        if (hasMatchingOrderKey(eventKeys, selectedOrderRef.current)) {
+          setIsViewOrderOpen(false)
+        }
+      }
+    })
 
     return () => {
       socket.off("admin_new_order", handleIncomingRealtimeOrder)
