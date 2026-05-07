@@ -105,6 +105,9 @@ const applyZoneConstraint = (filter = {}, adminScope = {}, fieldName = 'zoneId')
     return filter;
 };
 
+const getZoneDisplayName = (zone) =>
+    zone?.zoneName || zone?.name || zone?.serviceLocation || '';
+
 const toFiniteNumber = (value) => {
     if (value === null || value === undefined || value === '') return null;
     const num = typeof value === 'number' ? value : Number(String(value).trim());
@@ -482,11 +485,20 @@ export async function getRestaurants(query, adminScope = {}) {
             .skip(skip)
             .limit(limit)
             .select('restaurantName location area city profileImage coverImages menuImages status ownerName ownerPhone zoneId')
-            .populate('zoneId', 'name zoneName')
+            .populate('zoneId', 'name zoneName serviceLocation')
             .lean(),
         FoodRestaurant.countDocuments(filter)
     ]);
-    return { restaurants, total, page, limit };
+    return {
+        restaurants: restaurants.map((restaurant) => ({
+            ...restaurant,
+            zoneName: getZoneDisplayName(restaurant.zoneId),
+            zone: getZoneDisplayName(restaurant.zoneId),
+        })),
+        total,
+        page,
+        limit
+    };
 }
 
 const CANCELLED_ORDER_STATUSES = ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'cancelled_by_user_unavailable'];
@@ -2933,7 +2945,8 @@ export async function getPendingRestaurants() {
     return restaurants.map((r, i) => ({
         ...r,
         sl: i + 1,
-        zone: r.zoneId?.serviceLocation || r.zoneId?.zoneName || r.zoneId?.name || null,
+        zone: getZoneDisplayName(r.zoneId) || null,
+        zoneName: getZoneDisplayName(r.zoneId) || null,
     }));
 }
 

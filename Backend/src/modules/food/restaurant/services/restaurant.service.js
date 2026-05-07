@@ -122,6 +122,8 @@ const parseEstimatedDeliveryMinutes = (value) => {
 
 const toRestaurantProfile = (doc) => {
     if (!doc) return null;
+    const zoneDoc = doc.zoneId && typeof doc.zoneId === 'object' ? doc.zoneId : null;
+    const zoneId = zoneDoc?._id || doc.zoneId || '';
     const loc = doc.location && typeof doc.location === 'object' ? doc.location : null;
     const location =
         (loc?.formattedAddress ||
@@ -170,7 +172,6 @@ const toRestaurantProfile = (doc) => {
         restaurantId: doc.restaurantId || undefined,
         name: doc.restaurantName || '',
         restaurantName: doc.restaurantName || '',
-        zoneId: doc.zoneId ? String(doc.zoneId) : '',
         cuisines: Array.isArray(doc.cuisines) ? doc.cuisines : [],
         location,
         ownerName: doc.ownerName || '',
@@ -195,8 +196,8 @@ const toRestaurantProfile = (doc) => {
         upiId: doc.upiId || '',
         upiQrImage: doc.upiQrImage ? { url: doc.upiQrImage } : null,
         pureVegRestaurant: Boolean(doc.pureVegRestaurant),
-        zoneId: doc.zoneId ? String(doc.zoneId?._id || doc.zoneId) : '',
-        zoneName: doc.zoneId?.name || doc.zoneId?.zoneName || doc.zoneId?.serviceLocation || '',
+        zoneId: zoneId ? String(zoneId) : '',
+        zoneName: zoneDoc?.name || zoneDoc?.zoneName || zoneDoc?.serviceLocation || '',
         profileImage: doc.profileImage ? { url: doc.profileImage } : null,
         menuImages,
         coverImages,
@@ -579,7 +580,7 @@ export const updateRestaurantProfile = async (restaurantId, body = {}, files = {
     }
 
     const currentRestaurant = await FoodRestaurant.findById(restaurantId)
-        .select('restaurantName restaurantNameNormalized ownerPhone ownerPhoneDigits ownerPhoneLast10 primaryContactNumber status')
+        .select('restaurantName restaurantNameNormalized ownerPhone ownerPhoneDigits ownerPhoneLast10 primaryContactNumber status menuImages')
         .lean();
 
     if (!currentRestaurant) {
@@ -588,13 +589,18 @@ export const updateRestaurantProfile = async (restaurantId, body = {}, files = {
 
     const update = {};
 
-    // Zone ID handling
     if (body.zoneId !== undefined) {
         const zoneIdRaw = String(body.zoneId || '').trim();
-        if (zoneIdRaw && mongoose.Types.ObjectId.isValid(zoneIdRaw)) {
-            update.zoneId = new mongoose.Types.ObjectId(zoneIdRaw);
-        } else if (!zoneIdRaw) {
+        if (!zoneIdRaw) {
             update.zoneId = null;
+        } else if (!mongoose.Types.ObjectId.isValid(zoneIdRaw)) {
+            throw new ValidationError('Invalid zoneId');
+        } else {
+            const zoneExists = await FoodZone.exists({ _id: zoneIdRaw });
+            if (!zoneExists) {
+                throw new ValidationError('Selected zone not found');
+            }
+            update.zoneId = new mongoose.Types.ObjectId(zoneIdRaw);
         }
     }
 
@@ -674,13 +680,6 @@ export const updateRestaurantProfile = async (restaurantId, body = {}, files = {
         } else {
             throw new ValidationError('pureVegRestaurant must be a boolean');
         }
-    }
-
-    if (body.zoneId !== undefined) {
-        const zoneId = String(body.zoneId || '').trim();
-        update.zoneId = zoneId && mongoose.Types.ObjectId.isValid(zoneId)
-            ? new mongoose.Types.ObjectId(zoneId)
-            : undefined;
     }
 
     // Bank + UPI fields (Explore -> Update Bank Details page)
@@ -995,7 +994,9 @@ export const updateRestaurantProfile = async (restaurantId, body = {}, files = {
                     'zoneId'
                 ].join(' ')
             }
-        ).lean();
+        )
+            .populate('zoneId', 'name zoneName serviceLocation')
+            .lean();
 
         if (requiresApproval && currentRestaurant.status !== 'pending') {
             const restaurantNameForNotification =

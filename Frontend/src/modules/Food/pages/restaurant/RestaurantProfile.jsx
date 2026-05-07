@@ -86,6 +86,14 @@ const getProfileUpdateErrorMessage = (error) => {
   return backendMessage || "Failed to save changes"
 }
 
+const getZoneIdValue = (zone) => String(zone?._id || zone?.id || "").trim()
+
+const normalizeProfileZoneId = (value) => {
+  if (!value) return ""
+  if (typeof value === "object") return getZoneIdValue(value)
+  return String(value).trim()
+}
+
 const RestaurantProfile = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -357,7 +365,7 @@ const RestaurantProfile = () => {
           landmark: data.landmark || data.location?.landmark || "",
           latitude: data.location?.latitude || data.latitude || 0,
           longitude: data.location?.longitude || data.longitude || 0,
-          zoneId: data.zoneId || "",
+          zoneId: normalizeProfileZoneId(data.zoneId),
           formattedAddress: data.location?.formattedAddress || data.formattedAddress || "",
         })
 
@@ -445,6 +453,10 @@ const RestaurantProfile = () => {
       const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/
       if (!ifscRegex.test(bankInfo.ifscCode)) return toast.error("Invalid IFSC code format (e.g., ABCD0123456)")
       if (!/^[a-zA-Z\s]*$/.test(bankInfo.accountHolderName)) return toast.error("Account holder name should only contain letters")
+    } else if (section === 'location') {
+      const selectedZoneId = normalizeProfileZoneId(location.zoneId)
+      const selectedZone = zones.find((zone) => getZoneIdValue(zone) === selectedZoneId)
+      if (!selectedZoneId || !selectedZone) return toast.error("Please select a valid service zone")
     }
 
     setSavingSection(section)
@@ -460,7 +472,7 @@ const RestaurantProfile = () => {
         formData.append("ownerPhone", basicInfo.ownerPhone)
         formData.append("primaryContactNumber", basicInfo.primaryContactNumber)
       } else if (section === 'location') {
-        formData.append("zoneId", location.zoneId)
+        formData.append("zoneId", normalizeProfileZoneId(location.zoneId))
         formData.append("addressLine1", location.addressLine1)
         formData.append("addressLine2", location.addressLine2)
         formData.append("area", location.area)
@@ -800,7 +812,7 @@ const RestaurantProfile = () => {
               >
                 <option value="">{zonesLoading ? "Loading zones..." : "Select a zone"}</option>
                 {zones.map((z) => {
-                  const id = String(z?._id || z?.id || "")
+                  const id = getZoneIdValue(z)
                   const label = z?.name || z?.zoneName || z?.serviceLocation || id
                   return (
                     <option key={id} value={id}>

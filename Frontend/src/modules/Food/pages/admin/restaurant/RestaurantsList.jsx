@@ -244,6 +244,14 @@ const getPrimaryRestaurantImage = (restaurant, fallback = "") => {
   )
 }
 
+const getZoneIdValue = (zone) => String(zone?._id || zone?.id || zone || "").trim()
+
+const getZoneLabel = (zone) =>
+  zone?.zoneName ||
+  zone?.name ||
+  zone?.serviceLocation ||
+  ""
+
 
 export default function RestaurantsList() {
   const navigate = useNavigate()
@@ -367,18 +375,19 @@ export default function RestaurantsList() {
 
         const zoneLabelFromRestaurant = (restaurant) => {
           const zid = restaurant?.zoneId
-          const zoneName =
-            (typeof zid === "object" ? (zid?.name || zid?.zoneName) : "") ||
-            ""
-          if (zoneName) return zoneName
+          const populatedZoneName = typeof zid === "object" ? getZoneLabel(zid) : ""
+          if (populatedZoneName) return populatedZoneName
+
+          if (restaurant?.zoneName) return restaurant.zoneName
+          if (restaurant?.zone) return restaurant.zone
 
           const zoneIdString =
             typeof zid === "string"
               ? zid
               : (zid?._id || zid?.id || "")
           if (zoneIdString && Array.isArray(zones) && zones.length > 0) {
-            const match = zones.find((z) => (z?._id || z?.id) === zoneIdString)
-            const label = match?.name || match?.zoneName
+            const match = zones.find((z) => getZoneIdValue(z) === zoneIdString)
+            const label = getZoneLabel(match)
             if (label) return label
           }
 
@@ -590,7 +599,7 @@ export default function RestaurantsList() {
     const longitude = (hasValidNumbers && !looksUnset) ? lngNum : ""
 
     return {
-      zoneId: restaurant?.zoneId || restaurant?.location?.zoneId || "",
+      zoneId: getZoneIdValue(restaurant?.zoneId || restaurant?.location?.zoneId),
       latitude: latitude || "",
       longitude: longitude || "",
       formattedAddress: loc.formattedAddress || loc.address || "",
@@ -890,12 +899,10 @@ export default function RestaurantsList() {
             (item._id === restaurantId || item.id === restaurantId)
               ? {
                 ...item,
-                zone:
-                  updatedRestaurant.location.area ||
-                  updatedRestaurant.location.city ||
-                  item.zone,
+                zone: getZoneLabel(updatedRestaurant.zoneId) || updatedRestaurant.zoneName || updatedRestaurant.zone || item.zone,
                 originalData: {
                   ...(item.originalData || {}),
+                  ...updatedRestaurant,
                   location: updatedRestaurant.location,
                 },
               }
@@ -1097,7 +1104,7 @@ export default function RestaurantsList() {
                 name: updatedRestaurant.name || item.name,
                 ownerName: updatedRestaurant.ownerName || item.ownerName,
                 ownerPhone: updatedRestaurant.ownerPhone || updatedRestaurant.phone || item.ownerPhone,
-                zone: updatedRestaurant.location?.area || updatedRestaurant.location?.city || item.zone,
+                zone: getZoneLabel(updatedRestaurant.zoneId) || updatedRestaurant.zoneName || updatedRestaurant.zone || item.zone,
                 isActive: updatedRestaurant.isActive !== false,
                 approvalStatus: normalizeApprovalStatus(updatedRestaurant),
                 logo: getPrimaryRestaurantImage(updatedRestaurant, item.logo),

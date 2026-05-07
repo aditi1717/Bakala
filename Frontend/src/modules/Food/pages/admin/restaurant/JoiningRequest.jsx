@@ -9,11 +9,11 @@ const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
 const getZoneLabel = (request) =>
-  request?.zone ||
-  request?.zoneName ||
-  request?.zoneId?.name ||
   request?.zoneId?.zoneName ||
+  request?.zoneId?.name ||
   request?.zoneId?.serviceLocation ||
+  request?.zoneName ||
+  request?.zone ||
   "—"
 
 const normalizeRequestRecord = (request, index) => ({
