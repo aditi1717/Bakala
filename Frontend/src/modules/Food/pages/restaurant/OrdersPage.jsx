@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
 import BottomNavOrders from "@food/components/restaurant/BottomNavOrders"
@@ -26,6 +26,43 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
+const transformRestaurantDashboardOrder = (order) => {
+  const createdAt = new Date(order.createdAt)
+  const now = new Date()
+  const diffMs = now - createdAt
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  let timeAgo = ""
+  if (diffMins < 1) {
+    timeAgo = "Just now"
+  } else if (diffMins < 60) {
+    timeAgo = `${diffMins} min${diffMins > 1 ? 's' : ''} ago`
+  } else if (diffHours < 24) {
+    timeAgo = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+  } else if (diffDays < 7) {
+    timeAgo = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+  } else {
+    const weeks = Math.floor(diffDays / 7)
+    timeAgo = `${weeks} week${weeks > 1 ? 's' : ''} ago`
+  }
+
+  return {
+    id: order.orderId || order._id,
+    mongoId: order._id,
+    items: order.items?.length || 0,
+    timeAgo,
+    deliveryType: 'Home Delivery',
+    amount: order.pricing?.total || 0,
+    status: order.orderStatus || order.status || 'pending',
+    createdAt: order.createdAt,
+    customerName: order.userId?.name || order.customerName || 'Customer',
+    customerPhone: order.userId?.phone || order.customerPhone || '',
+    address: order.address
+  }
+}
+
 
 export default function OrdersPage() {
   const navigate = useNavigate()
@@ -35,6 +72,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const showOrdersSkeleton = useDelayedLoading(loading, { delay: 120, minDuration: 360 })
+  const lastRealtimeRefreshRef = useRef(0)
 
   // Restaurant notifications hook
   const { newOrder, clearNewOrder, cancelledOrderId, cancelledOrderInfo, clearCancelledOrderId, isConnected } = useRestaurantNotifications()
@@ -149,185 +187,77 @@ export default function OrdersPage() {
   
   const summaryCards = calculateSummaryCards()
 
-  // Fetch orders from API
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
+  const fetchOrders = useCallback(async ({ silent = false } = {}) => {
+    try {
+      if (!silent) {
         setLoading(true)
-        setError(null)
-        
-        const response = await restaurantAPI.getOrders()
-        
-        if (response.data?.success && response.data.data?.orders) {
-          // Transform API orders to match component structure
-          const transformedOrders = response.data.data.orders.map(order => {
-            const createdAt = new Date(order.createdAt)
-            const now = new Date()
-            const diffMs = now - createdAt
-            const diffMins = Math.floor(diffMs / 60000)
-            const diffHours = Math.floor(diffMs / 3600000)
-            const diffDays = Math.floor(diffMs / 86400000)
-            
-            let timeAgo = ""
-            if (diffMins < 1) {
-              timeAgo = "Just now"
-            } else if (diffMins < 60) {
-              timeAgo = `${diffMins} min${diffMins > 1 ? 's' : ''} ago`
-            } else if (diffHours < 24) {
-              timeAgo = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
-            } else if (diffDays < 7) {
-              timeAgo = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
-            } else {
-              const weeks = Math.floor(diffDays / 7)
-              timeAgo = `${weeks} week${weeks > 1 ? 's' : ''} ago`
-            }
-            
-            return {
-              id: order.orderId || order._id,
-              mongoId: order._id,
-              items: order.items?.length || 0,
-              timeAgo: timeAgo,
-              deliveryType: 'Home Delivery',
-              amount: order.pricing?.total || 0,
-              status: order.status || 'pending',
-              createdAt: order.createdAt,
-              customerName: order.userId?.name || order.customerName || 'Customer',
-              customerPhone: order.userId?.phone || order.customerPhone || '',
-              address: order.address
-            }
-          })
-          
-          setOrders(transformedOrders)
-        } else {
-          setOrders([])
-        }
-      } catch (err) {
-        debugError('Error fetching orders:', err)
-        setError(err.response?.data?.message || 'Failed to fetch orders')
+      }
+      setError(null)
+
+      const response = await restaurantAPI.getOrders()
+
+      if (response.data?.success && response.data.data?.orders) {
+        const transformedOrders = response.data.data.orders.map(transformRestaurantDashboardOrder)
+        setOrders(transformedOrders)
+      } else {
         setOrders([])
-      } finally {
+      }
+    } catch (err) {
+      debugError('Error fetching orders:', err)
+      setError(err.response?.data?.message || 'Failed to fetch orders')
+      setOrders([])
+    } finally {
+      if (!silent) {
         setLoading(false)
       }
     }
+  }, [])
 
+  // Fetch orders from API
+  useEffect(() => {
     fetchOrders()
 
     // Set up interval to refresh orders every 10 seconds (fallback if Socket.IO fails)
     const refreshInterval = setInterval(() => {
-      fetchOrders()
+      fetchOrders({ silent: true })
     }, 10000)
 
     return () => {
       clearInterval(refreshInterval)
     }
-  }, [])
+  }, [fetchOrders])
 
   // Refresh orders when new order notification is received
   useEffect(() => {
     if (newOrder) {
       debugLog('?? New order notification received, refreshing orders list')
-      const fetchOrders = async () => {
-        try {
-          const response = await restaurantAPI.getOrders()
-          if (response.data?.success && response.data.data?.orders) {
-            const transformedOrders = response.data.data.orders.map(order => {
-              const createdAt = new Date(order.createdAt)
-              const now = new Date()
-              const diffMs = now - createdAt
-              const diffMins = Math.floor(diffMs / 60000)
-              const diffHours = Math.floor(diffMs / 3600000)
-              const diffDays = Math.floor(diffMs / 86400000)
-              
-              let timeAgo = ""
-              if (diffMins < 1) {
-                timeAgo = "Just now"
-              } else if (diffMins < 60) {
-                timeAgo = `${diffMins} min${diffMins > 1 ? 's' : ''} ago`
-              } else if (diffHours < 24) {
-                timeAgo = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
-              } else if (diffDays < 7) {
-                timeAgo = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
-              } else {
-                const weeks = Math.floor(diffDays / 7)
-                timeAgo = `${weeks} week${weeks > 1 ? 's' : ''} ago`
-              }
-              
-              return {
-                id: order.orderId || order._id,
-                mongoId: order._id,
-                items: order.items?.length || 0,
-                timeAgo: timeAgo,
-                deliveryType: 'Home Delivery',
-                amount: order.pricing?.total || 0,
-                status: order.status || 'pending',
-                createdAt: order.createdAt,
-                customerName: order.userId?.name || order.customerName || 'Customer',
-                customerPhone: order.userId?.phone || order.customerPhone || '',
-                address: order.address
-              }
-            })
-            setOrders(transformedOrders)
-          }
-        } catch (err) {
-          debugError('Error refreshing orders:', err)
-        }
-      }
-      fetchOrders()
+      fetchOrders({ silent: true })
     }
-  }, [newOrder])
+  }, [newOrder, fetchOrders])
 
   // Refresh orders when new order notification is cleared
   useEffect(() => {
     if (!newOrder) {
-      const fetchOrders = async () => {
-        try {
-          const response = await restaurantAPI.getOrders()
-          if (response.data?.success && response.data.data?.orders) {
-            const transformedOrders = response.data.data.orders.map(order => {
-              const createdAt = new Date(order.createdAt)
-              const now = new Date()
-              const diffMs = now - createdAt
-              const diffMins = Math.floor(diffMs / 60000)
-              const diffHours = Math.floor(diffMs / 3600000)
-              const diffDays = Math.floor(diffMs / 86400000)
-              
-              let timeAgo = ""
-              if (diffMins < 1) {
-                timeAgo = "Just now"
-              } else if (diffMins < 60) {
-                timeAgo = `${diffMins} min${diffMins > 1 ? 's' : ''} ago`
-              } else if (diffHours < 24) {
-                timeAgo = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
-              } else if (diffDays < 7) {
-                timeAgo = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
-              } else {
-                const weeks = Math.floor(diffDays / 7)
-                timeAgo = `${weeks} week${weeks > 1 ? 's' : ''} ago`
-              }
-              
-              return {
-                id: order.orderId || order._id,
-                mongoId: order._id,
-                items: order.items?.length || 0,
-                timeAgo: timeAgo,
-                deliveryType: 'Home Delivery',
-                amount: order.pricing?.total || 0,
-                status: order.status || 'pending',
-                createdAt: order.createdAt,
-                customerName: order.userId?.name || order.customerName || 'Customer',
-                customerPhone: order.userId?.phone || order.customerPhone || '',
-                address: order.address
-              }
-            })
-            setOrders(transformedOrders)
-          }
-        } catch (err) {
-          debugError('Error refreshing orders:', err)
-        }
-      }
-      fetchOrders()
+      fetchOrders({ silent: true })
     }
-  }, [newOrder])
+  }, [newOrder, fetchOrders])
+
+  useEffect(() => {
+    const handleRestaurantRealtimeRefresh = () => {
+      const now = Date.now()
+      if (now - lastRealtimeRefreshRef.current < 1200) return
+      lastRealtimeRefreshRef.current = now
+      fetchOrders({ silent: true })
+    }
+
+    window.addEventListener('restaurantOrderStatusUpdated', handleRestaurantRealtimeRefresh)
+    window.addEventListener('restaurantNewOrderReceived', handleRestaurantRealtimeRefresh)
+
+    return () => {
+      window.removeEventListener('restaurantOrderStatusUpdated', handleRestaurantRealtimeRefresh)
+      window.removeEventListener('restaurantNewOrderReceived', handleRestaurantRealtimeRefresh)
+    }
+  }, [fetchOrders])
 
   // Calculate filter tab counts dynamically from actual orders
   // Show active orders (pending, confirmed, preparing, ready) and history orders (delivered, cancelled)

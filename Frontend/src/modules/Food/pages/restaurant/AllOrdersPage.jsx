@@ -178,6 +178,7 @@ export default function AllOrdersPage() {
   const [error, setError] = useState(null)
   const [restaurantData, setRestaurantData] = useState(null)
   const { newOrder } = useRestaurantNotifications()
+  const lastRealtimeRefreshRef = useRef(0)
 
   const getOrderKeys = useCallback((orderLike = {}) => (
     [
@@ -330,55 +331,54 @@ export default function AllOrdersPage() {
     }
   }, [restaurantData])
 
-  // Fetch orders from backend
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
+  const fetchOrders = useCallback(async ({ silent = false } = {}) => {
+    try {
+      if (!silent) {
         setLoading(true)
-        setError(null)
-        
-        // Build query params
-        const params = {
-          page: 1,
-          limit: 1000 // Get all orders, we'll filter by date on frontend
-        }
-        
-        // Fetch all orders (we'll filter by date range on frontend)
-        const response = await restaurantAPI.getOrders(params)
-        
-        if (response.data?.success && response.data.data?.orders) {
-          // Transform orders
-          const transformedOrders = response.data.data.orders.map(transformOrder)
-          
-          // Filter by date range
-          const filteredByDate = transformedOrders.filter(order => {
-            if (!order.createdAt) return false
-            const orderDate = new Date(order.createdAt)
-            const start = new Date(startDate)
-            start.setHours(0, 0, 0, 0)
-            const end = new Date(endDate)
-            end.setHours(23, 59, 59, 999)
-            return orderDate >= start && orderDate <= end
-          })
-          
-          setOrders(filteredByDate)
-        } else {
-          setOrders([])
-        }
-      } catch (err) {
-        // Suppress 401 errors as they're handled by axios interceptor
-        if (err.response?.status !== 401) {
-          debugError('Error fetching orders:', err)
-          setError(err.message || 'Failed to fetch orders')
-        }
+      }
+      setError(null)
+
+      const params = {
+        page: 1,
+        limit: 1000
+      }
+
+      const response = await restaurantAPI.getOrders(params)
+
+      if (response.data?.success && response.data.data?.orders) {
+        const transformedOrders = response.data.data.orders.map(transformOrder)
+
+        const filteredByDate = transformedOrders.filter(order => {
+          if (!order.createdAt) return false
+          const orderDate = new Date(order.createdAt)
+          const start = new Date(startDate)
+          start.setHours(0, 0, 0, 0)
+          const end = new Date(endDate)
+          end.setHours(23, 59, 59, 999)
+          return orderDate >= start && orderDate <= end
+        })
+
+        setOrders(filteredByDate)
+      } else {
         setOrders([])
-      } finally {
+      }
+    } catch (err) {
+      if (err.response?.status !== 401) {
+        debugError('Error fetching orders:', err)
+        setError(err.message || 'Failed to fetch orders')
+      }
+      setOrders([])
+    } finally {
+      if (!silent) {
         setLoading(false)
       }
     }
-    
+  }, [endDate, startDate, transformOrder])
+
+  // Fetch orders from backend
+  useEffect(() => {
     fetchOrders()
-  }, [startDate, endDate, transformOrder])
+  }, [fetchOrders])
 
   // Realtime: instantly prepend new orders (no refresh)
   useEffect(() => {
@@ -445,6 +445,12 @@ export default function AllOrdersPage() {
 
         return next
       })
+
+      const now = Date.now()
+      if (now - lastRealtimeRefreshRef.current > 1200) {
+        lastRealtimeRefreshRef.current = now
+        fetchOrders({ silent: true })
+      }
     }
 
     window.addEventListener(
@@ -458,7 +464,15 @@ export default function AllOrdersPage() {
         handleRestaurantOrderStatusUpdated,
       )
     }
-  }, [getOrderKeys, transformOrder])
+  }, [fetchOrders, getOrderKeys, transformOrder])
+
+  useEffect(() => {
+    if (!newOrder) return
+    const now = Date.now()
+    if (now - lastRealtimeRefreshRef.current < 1200) return
+    lastRealtimeRefreshRef.current = now
+    fetchOrders({ silent: true })
+  }, [fetchOrders, newOrder])
 
   // Close calendar when clicking outside
   useEffect(() => {
