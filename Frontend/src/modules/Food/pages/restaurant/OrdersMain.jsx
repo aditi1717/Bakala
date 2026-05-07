@@ -1539,6 +1539,8 @@ export default function OrdersMain() {
   useEffect(() => {
     const handleRestaurantOrderStatusUpdated = (event) => {
       const payload = event?.detail || {};
+      console.log("?? [DEBUG] OrdersMain: Global Status Update Event Received:", payload);
+
       const hasDispatchUpdate =
         payload?.dispatchStatus != null ||
         payload?.dispatch_status != null;
@@ -1547,6 +1549,7 @@ export default function OrdersMain() {
 
       // Always refresh the background list for any status change
       if (hasDispatchUpdate || hasOrderStatusUpdate) {
+        console.log("?? [DEBUG] OrdersMain: Refreshing order list...");
         requestOrdersRefresh();
       }
 
@@ -1555,8 +1558,11 @@ export default function OrdersMain() {
       ).toLowerCase();
       const isPendingReviewStatus = statusLower === "created";
       
+      console.log("?? [DEBUG] OrdersMain: Status:", statusLower, "isPendingReview:", isPendingReviewStatus);
+
       // If popup is NOT showing and sheet is NOT open, nothing else to do
       if (!showNewOrderPopupRef.current && !isSheetOpenRef.current) {
+        console.log("?? [DEBUG] OrdersMain: Neither popup nor sheet open. Ignoring.");
         return;
       }
 
@@ -1576,7 +1582,12 @@ export default function OrdersMain() {
             .filter(Boolean),
         ),
       );
-      if (eventKeys.length === 0) return;
+      if (eventKeys.length === 0) {
+        console.log("?? [DEBUG] OrdersMain: No order keys found in payload.");
+        return;
+      }
+
+      console.log("?? [DEBUG] OrdersMain: Event Keys:", eventKeys);
 
       // Condition 1: If popup is open and order is no longer 'created' (Accepted/Cancelled by others)
       if (showNewOrderPopupRef.current && !isPendingReviewStatus) {
@@ -1584,7 +1595,10 @@ export default function OrdersMain() {
           hasMatchingOrderKey(eventKeys, popupOrderRef.current) ||
           hasMatchingOrderKey(eventKeys, newOrderRef.current);
 
+        console.log("?? [DEBUG] OrdersMain: Popup is OPEN. Matches Order?", matchesPopupOrder);
+
         if (matchesPopupOrder) {
+          console.log("?? [DEBUG] OrdersMain: MATCH FOUND. Closing New Order Popup.");
           if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
@@ -1604,7 +1618,11 @@ export default function OrdersMain() {
 
       // Condition 2: If order details sheet is open and order gets cancelled
       if (isSheetOpenRef.current && statusLower.includes("cancel")) {
-        if (hasMatchingOrderKey(eventKeys, selectedOrderRef.current)) {
+        const matchesSelected = hasMatchingOrderKey(eventKeys, selectedOrderRef.current);
+        console.log("?? [DEBUG] OrdersMain: Sheet is OPEN. Matches Selected?", matchesSelected);
+
+        if (matchesSelected) {
+          console.log("?? [DEBUG] OrdersMain: MATCH FOUND. Closing Details Sheet.");
           setIsSheetOpen(false);
           setSelectedOrder(null);
           setShowCancelPopup(false);

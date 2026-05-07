@@ -758,6 +758,7 @@ export const useRestaurantNotifications = () => {
 
     // Listen for order status updates
     socketRef.current.on('order_status_update', (data) => {
+      console.log('?? [DEBUG] Order Status Update Received:', data);
       debugLog('?? Order status update:', data);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
@@ -768,7 +769,10 @@ export const useRestaurantNotifications = () => {
       }
       const status = String(data?.orderStatus || data?.status || '').toLowerCase();
       const eventOrderKeys = getOrderKeys(data);
+      console.log('?? [DEBUG] Status:', status, 'OrderKeys:', eventOrderKeys);
+      
       if (status.includes('cancel')) {
+        console.log('?? [DEBUG] Order cancellation detected in status update');
         const orderKeys = eventOrderKeys;
         const primaryOrderId = orderKeys[0] || '';
         if (primaryOrderId) {
@@ -805,6 +809,7 @@ export const useRestaurantNotifications = () => {
             eventOrderKeys.includes(key),
           );
           if (matchesActive) {
+            console.log('?? [DEBUG] Clearing active order alert loop');
             stopAlertLoop();
             activeOrderRef.current = null;
           }
@@ -816,6 +821,7 @@ export const useRestaurantNotifications = () => {
           const matchesCurrent = prevOrderKeys.some((key) =>
             eventOrderKeys.includes(key),
           );
+          if (matchesCurrent) console.log('?? [DEBUG] Clearing newOrder state (null)');
           return matchesCurrent ? null : prev;
         });
       }
@@ -823,6 +829,7 @@ export const useRestaurantNotifications = () => {
 
     // Listen for specialized order cancellation events
     socketRef.current.on('order_cancelled', (data) => {
+      console.log('?? [DEBUG] Specialized Order Cancelled Event Received:', data);
       debugLog('?? Order cancelled event received:', data);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
@@ -840,6 +847,7 @@ export const useRestaurantNotifications = () => {
             eventOrderKeys.includes(key),
           );
           if (matchesActive) {
+            console.log('?? [DEBUG] Specialized: Clearing active order alert loop');
             stopAlertLoop();
             activeOrderRef.current = null;
           }
@@ -851,6 +859,7 @@ export const useRestaurantNotifications = () => {
           const matchesCurrent = prevOrderKeys.some((key) =>
             eventOrderKeys.includes(key),
           );
+          if (matchesCurrent) console.log('?? [DEBUG] Specialized: Clearing newOrder state (null)');
           return matchesCurrent ? null : prev;
         });
 
