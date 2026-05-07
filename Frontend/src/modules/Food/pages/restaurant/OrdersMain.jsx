@@ -811,6 +811,14 @@ export default function OrdersMain() {
   const mouseStartX = useRef(0);
   const mouseEndX = useRef(0);
   const isMouseDown = useRef(false);
+  const {
+    newOrder,
+    clearNewOrder,
+    cancelledOrderId,
+    cancelledOrderInfo,
+    clearCancelledOrderId,
+    isConnected
+  } = useRestaurantNotifications();
 
   // New order popup states
   const [showNewOrderPopup, setShowNewOrderPopup] = useState(false);
@@ -838,6 +846,9 @@ export default function OrdersMain() {
     isLoading: true,
   });
   const [isReverifying, setIsReverifying] = useState(false);
+  const [ordersRefreshToken, setOrdersRefreshToken] = useState(0);
+  const requestOrdersRefresh = () => setOrdersRefreshToken((t) => t + 1);
+
   const audioUnlockedRef = useRef(false);
   const showNewOrderPopupRef = useRef(showNewOrderPopup);
   const isMutedRef = useRef(isMuted);
@@ -1111,15 +1122,8 @@ export default function OrdersMain() {
     return variantParts.join(" | ");
   };
 
-  // Restaurant notifications hook for real-time orders
-  const {
-    newOrder,
-    clearNewOrder,
-    cancelledOrderId,
-    cancelledOrderInfo,
-    clearCancelledOrderId,
-    isConnected
-  } = useRestaurantNotifications();
+  // Restaurant notifications hook moved to top of component to avoid ReferenceError
+
 
   const rejectReasons = [
     "Restaurant is too busy",
@@ -1512,8 +1516,6 @@ export default function OrdersMain() {
     };
   }, []);
 
-  const [ordersRefreshToken, setOrdersRefreshToken] = useState(0);
-  const requestOrdersRefresh = () => setOrdersRefreshToken((t) => t + 1);
 
   useEffect(() => {
     const handleRestaurantOrderStatusUpdated = (event) => {
