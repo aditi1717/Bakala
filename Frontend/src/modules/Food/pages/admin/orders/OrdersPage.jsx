@@ -700,10 +700,14 @@ export default function OrdersPage({ statusKey = "all" }) {
     })
     socket.on("admin_new_order", handleIncomingRealtimeOrder)
     socket.on("play_notification_sound", handleIncomingRealtimeOrder)
+    socket.on("order_status_update", () => fetchOrders({ silent: true }))
+    socket.on("order_cancelled", () => fetchOrders({ silent: true }))
 
     return () => {
       socket.off("admin_new_order", handleIncomingRealtimeOrder)
       socket.off("play_notification_sound", handleIncomingRealtimeOrder)
+      socket.off("order_status_update")
+      socket.off("order_cancelled")
       socket.disconnect()
       socketRef.current = null
     }

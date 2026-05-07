@@ -845,6 +845,8 @@ export default function OrdersMain() {
   const popupOrderRef = useRef(null);
   const popupHydrationRef = useRef("");
   const selectedOrderHydrationRef = useRef("");
+  const isSheetOpenRef = useRef(isSheetOpen);
+  const selectedOrderRef = useRef(selectedOrder);
   const bodyScrollLockRef = useRef(null);
 
   const markOrderAsShown = (orderLike) => {
@@ -1357,6 +1359,14 @@ export default function OrdersMain() {
     popupOrderRef.current = popupOrder;
   }, [popupOrder]);
 
+  useEffect(() => {
+    isSheetOpenRef.current = isSheetOpen;
+  }, [isSheetOpen]);
+
+  useEffect(() => {
+    selectedOrderRef.current = selectedOrder;
+  }, [selectedOrder]);
+
   // Hydrate popup with latest backend order details so fields stay linked
   // with tracking/report data (items variants, payment snapshot, pricing, earnings).
   useEffect(() => {
@@ -1400,85 +1410,9 @@ export default function OrdersMain() {
     };
   }, [showNewOrderPopup, popupOrder, newOrder]);
 
-  // Real-time: close popup if the order currently shown gets cancelled by user
-  useEffect(() => {
-    if (!cancelledOrderId || !showNewOrderPopup) return;
+  // Real-time: order status updates are handled via the "restaurantOrderStatusUpdated" 
+  // event listener below to ensure synchronization across all tabs and status types.
 
-    const eventKeys = Array.from(
-      new Set(
-        [
-          ...(Array.isArray(cancelledOrderInfo?.orderKeys)
-            ? cancelledOrderInfo.orderKeys
-            : []),
-          cancelledOrderId,
-        ]
-          .filter(Boolean)
-          .map((value) => String(value).trim())
-          .filter(Boolean),
-      ),
-    );
-    const matchesPopupOrder =
-      hasMatchingOrderKey(eventKeys, popupOrder) ||
-      hasMatchingOrderKey(eventKeys, newOrder);
-
-    if (matchesPopupOrder) {
-      // Stop audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
-      setShowNewOrderPopup(false);
-      setPopupOrder(null);
-      clearNewOrder();
-      clearCancelledOrderId();
-      requestOrdersRefresh();
-      const cancelledBy = String(cancelledOrderInfo?.cancelledBy || "").toLowerCase();
-      const customMessage = String(cancelledOrderInfo?.message || "").trim();
-      const messageFromPayload =
-        customMessage && /cancel/i.test(customMessage)
-          ? customMessage
-          : cancelledBy === "restaurant"
-            ? "Order was cancelled by the restaurant."
-            : cancelledBy === "admin"
-              ? "Order was cancelled by admin."
-              : "Order was cancelled by the customer.";
-      toast.error(messageFromPayload);
-    }
-  }, [cancelledOrderId, cancelledOrderInfo]);
-
-  // Close open order details sheet if that order gets cancelled by user/admin.
-  useEffect(() => {
-    if (!cancelledOrderId || !isSheetOpen || !selectedOrder) return;
-
-    const eventKeys = Array.from(
-      new Set(
-        [
-          ...(Array.isArray(cancelledOrderInfo?.orderKeys)
-            ? cancelledOrderInfo.orderKeys
-            : []),
-          cancelledOrderId,
-        ]
-          .filter(Boolean)
-          .map((value) => String(value).trim())
-          .filter(Boolean),
-      ),
-    );
-
-    if (!hasMatchingOrderKey(eventKeys, selectedOrder)) return;
-
-    setIsSheetOpen(false);
-    setSelectedOrder(null);
-    setShowCancelPopup(false);
-    setOrderToCancel(null);
-    requestOrdersRefresh();
-    clearCancelledOrderId();
-  }, [
-    cancelledOrderId,
-    cancelledOrderInfo,
-    isSheetOpen,
-    selectedOrder,
-    clearCancelledOrderId,
-  ]);
 
   // Hydrate selected order with latest backend payload when details sheet opens.
   useEffect(() => {
@@ -1540,7 +1474,7 @@ export default function OrdersMain() {
     return () => {
       active = false;
     };
-  }, [isSheetOpen, selectedOrder]);
+  }, [isSheetOpen, selectedOrder, ordersRefreshToken]);
 
   // Best-effort unlock for popup buzzer so it can keep playing when tab is backgrounded.
   useEffect(() => {
@@ -1590,6 +1524,7 @@ export default function OrdersMain() {
       const hasOrderStatusUpdate =
         payload?.orderStatus != null || payload?.status != null;
 
+      // Always refresh the background list for any status change
       if (hasDispatchUpdate || hasOrderStatusUpdate) {
         requestOrdersRefresh();
       }
@@ -1598,7 +1533,9 @@ export default function OrdersMain() {
         payload?.orderStatus || payload?.status || "",
       ).toLowerCase();
       const isPendingReviewStatus = statusLower === "created";
-      if (!statusLower || isPendingReviewStatus || !showNewOrderPopupRef.current) {
+      
+      // If popup is NOT showing and sheet is NOT open, nothing else to do
+      if (!showNewOrderPopupRef.current && !isSheetOpenRef.current) {
         return;
       }
 
@@ -1611,6 +1548,7 @@ export default function OrdersMain() {
             payload?.order_id,
             payload?._id,
             payload?.id,
+            payload?.mongoId,
           ]
             .filter(Boolean)
             .map((value) => String(value).trim())
@@ -1619,19 +1557,40 @@ export default function OrdersMain() {
       );
       if (eventKeys.length === 0) return;
 
-      const matchesPopupOrder =
-        hasMatchingOrderKey(eventKeys, popupOrderRef.current) ||
-        hasMatchingOrderKey(eventKeys, newOrderRef.current);
+      // Condition 1: If popup is open and order is no longer 'created' (Accepted/Cancelled by others)
+      if (showNewOrderPopupRef.current && !isPendingReviewStatus) {
+        const matchesPopupOrder =
+          hasMatchingOrderKey(eventKeys, popupOrderRef.current) ||
+          hasMatchingOrderKey(eventKeys, newOrderRef.current);
 
-      if (!matchesPopupOrder) return;
-
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+        if (matchesPopupOrder) {
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+          setShowNewOrderPopup(false);
+          setPopupOrder(null);
+          clearNewOrder();
+          
+          const actor = String(payload?.updatedByRole || payload?.actor || "").toLowerCase();
+          if (statusLower.includes("cancel")) {
+            toast.error(payload?.message || "Order was cancelled.");
+          } else if (statusLower === "confirmed" || statusLower === "preparing") {
+            toast.info(`Order was accepted by ${actor || "admin"}.`);
+          }
+        }
       }
-      setShowNewOrderPopup(false);
-      setPopupOrder(null);
-      clearNewOrder();
+
+      // Condition 2: If order details sheet is open and order gets cancelled
+      if (isSheetOpenRef.current && statusLower.includes("cancel")) {
+        if (hasMatchingOrderKey(eventKeys, selectedOrderRef.current)) {
+          setIsSheetOpen(false);
+          setSelectedOrder(null);
+          setShowCancelPopup(false);
+          setOrderToCancel(null);
+          toast.error("The order you were viewing has been cancelled.");
+        }
+      }
     };
 
     window.addEventListener(
