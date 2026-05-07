@@ -7,6 +7,7 @@ import { restaurantAPI } from "@food/api"
 import {
   setAuthData as setRestaurantAuthData,
   setRestaurantPendingPhone,
+  clearModuleAuth,
 } from "@food/utils/auth"
 import { checkOnboardingStatus, isRestaurantOnboardingComplete } from "@food/utils/onboardingUtils"
 import { useCompanyName } from "@food/hooks/useCompanyName"
@@ -241,6 +242,8 @@ export default function RestaurantOTP() {
       const normalizedPhone = data?.phone || phone
 
       if (needsRegistration) {
+        // Clear any existing stale restaurant data/session before starting fresh onboarding
+        clearModuleAuth("restaurant")
         setRestaurantPendingPhone(normalizedPhone)
         sessionStorage.removeItem("restaurantAuthData")
         sessionStorage.removeItem("restaurantLoginPhone")

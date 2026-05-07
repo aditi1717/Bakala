@@ -16,6 +16,7 @@ import {
 import loginBg from "@food/assets/loginbanner.webp"
 import { useCompanyName } from "@food/hooks/useCompanyName"
 import BRAND_THEME from "@/config/brandTheme"
+import { clearModuleAuth } from "@food/utils/auth"
 
 const countryCodes = [
   { code: "+91", country: "IN", flag: "🇮🇳" },
@@ -110,6 +111,9 @@ export default function RestaurantSignup() {
     const fullPhone = `${formData.countryCode} ${formData.phone}`.trim()
 
     try {
+      // Clear any existing restaurant session data before starting a new signup
+      clearModuleAuth("restaurant")
+
       // Send OTP with purpose 'register'
       await restaurantAPI.sendOTP(fullPhone, "register")
 

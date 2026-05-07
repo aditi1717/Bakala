@@ -2531,154 +2531,166 @@ export default function Cart() {
 
               {/* Delivery Address */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-5 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-800">
-                <div className="flex items-start justify-between w-full text-left">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="bg-brand-50 dark:bg-brand-900/20 p-2 rounded-xl mt-0.5">
-                      <MapPin className="h-5 w-5" style={{ color: BRAND_THEME.colors.brand.primary }} />
-                    </div>
-                    <div className="flex-1">
-                        <div className="flex flex-col">
-                          <p className="text-sm md:text-base text-gray-800 dark:text-gray-200">
-                            Delivery Address
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2 pr-4">
-                            {defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Add delivery address") : "Add delivery address"}
-                          </p>
-                        </div>
-                        {!hasSavedAddress && (
-                          <p className="text-xs mt-2 text-gray-500 dark:text-gray-400">
-                            No saved address yet. Please add one to continue.
-                          </p>
-                        )}
-                        {/* Address Selection Buttons */}
-                        {addresses.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {["Home", "Work", "Other"].map((label) => {
-                              const normalizedLabel = normalizeAddressLabel(label)
-                              const addressExists = addresses.some(addr => normalizeAddressLabel(addr.label) === normalizedLabel)
-                              return (
-                                <button
-                                  key={label}
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    handleSelectAddressByLabel(label)
-                                  }}
-                                  disabled={!addressExists}
-                                  className={`text-xs px-4 py-1.5 rounded-full font-semibold transition-all ${addressExists
-                                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-300'
-                                    : 'bg-gray-50 text-gray-400 border border-gray-100 cursor-not-allowed dark:bg-gray-900'
-                                    }`}
-                                >
-                                  {label}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        )}
-                        {addresses.length > 0 && (
-                          <div className="mt-4 space-y-3">
-                            {addresses.map((address) => {
-                              const addressId = getAddressId(address)
-                              const isSelected = addressId && addressId === selectedAddressId
-                              return (
-                                <button
-                                  key={addressId || `${address.label}-${address.street}-${address.city}`}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    handleSelectSavedAddress(address)
-                                  }}
-                                  className={`w-full text-left rounded-xl border-2 p-3 transition-colors ${isSelected
-                                    ? "border-transparent"
-                                    : "border-slate-100 dark:border-gray-800 hover:border-slate-200"
-                                    }`}
-                                  style={isSelected ? { borderColor: BRAND_THEME.colors.brand.primary, backgroundColor: `${BRAND_THEME.colors.brand.primary}14` } : undefined}
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                                        {getDisplayAddressLabel(address.label)}
-                                      </p>
-                                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-1">
-                                        {formatFullAddress(address) || address.address || "Address details"}
-                                      </p>
-                                    </div>
-                                    {isSelected && (
-                                      <span
-                                        className="text-[10px] text-white px-2 py-0.5 rounded uppercase font-bold tracking-wider whitespace-nowrap"
-                                        style={{ backgroundColor: BRAND_THEME.colors.brand.primary }}
-                                      >
-                                        Selected
-                                      </span>
-                                    )}
-                                  </div>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        )}
-                    </div>
+                <div className="flex items-start gap-4 w-full text-left">
+                  <div className="bg-brand-50 dark:bg-brand-900/20 p-2 rounded-xl mt-0.5 flex-shrink-0">
+                    <MapPin className="h-5 w-5" style={{ color: BRAND_THEME.colors.brand.primary }} />
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleOpenAddressSelector}
-                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold bg-brand-50 hover:bg-brand-100 transition-colors dark:bg-brand-900/20 dark:hover:bg-brand-900/40 whitespace-nowrap"
-                    style={{ color: BRAND_THEME.colors.brand.primary }}
-                    aria-label="Open location selector"
-                  >
-                    {addresses.length > 0 ? "Change" : "Add New Address"}
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                  
+                  <div className="flex-1 min-w-0">
+                    {/* Title and Change Button Container */}
+                    <div className="flex flex-row flex-wrap items-center justify-between gap-2 mb-2">
+                      <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-semibold">
+                        Delivery Address
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleOpenAddressSelector}
+                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] md:text-xs font-bold bg-brand-50 hover:bg-brand-100 transition-colors dark:bg-brand-900/20 dark:hover:bg-brand-900/40 whitespace-nowrap"
+                        style={{ color: BRAND_THEME.colors.brand.primary }}
+                        aria-label="Open location selector"
+                      >
+                        {addresses.length > 0 ? "Change" : "Add New"}
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Address details */}
+                    <div className="flex flex-col">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 pr-4">
+                        {defaultAddress ? (formatFullAddress(defaultAddress) || defaultAddress?.formattedAddress || defaultAddress?.address || "Add delivery address") : "Add delivery address"}
+                      </p>
+                      {!hasSavedAddress && (
+                        <p className="text-xs mt-2 text-gray-500 dark:text-gray-400">
+                          No saved address yet. Please add one to continue.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Address Selection Buttons */}
+                    {addresses.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {["Home", "Work", "Other"].map((label) => {
+                          const normalizedLabel = normalizeAddressLabel(label)
+                          const addressExists = addresses.some(addr => normalizeAddressLabel(addr.label) === normalizedLabel)
+                          return (
+                            <button
+                              key={label}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleSelectAddressByLabel(label)
+                              }}
+                              disabled={!addressExists}
+                              className={`text-xs px-4 py-1.5 rounded-full font-semibold transition-all ${addressExists
+                                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-300'
+                                : 'bg-gray-50 text-gray-400 border border-gray-100 cursor-not-allowed dark:bg-gray-900'
+                                }`}
+                            >
+                              {label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Address Cards List */}
+                    {addresses.length > 0 && (
+                      <div className="mt-4 space-y-3">
+                        {addresses.map((address) => {
+                          const addressId = getAddressId(address)
+                          const isSelected = addressId && addressId === selectedAddressId
+                          return (
+                            <button
+                              key={addressId || `${address.label}-${address.street}-${address.city}`}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleSelectSavedAddress(address)
+                              }}
+                              className={`w-full text-left rounded-xl border-2 p-3 transition-colors ${isSelected
+                                ? "border-transparent"
+                                : "border-slate-100 dark:border-gray-800 hover:border-slate-200"
+                                }`}
+                              style={isSelected ? { borderColor: BRAND_THEME.colors.brand.primary, backgroundColor: `${BRAND_THEME.colors.brand.primary}14` } : undefined}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                                    {getDisplayAddressLabel(address.label)}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-1">
+                                    {formatFullAddress(address) || address.address || "Address details"}
+                                  </p>
+                                </div>
+                                {isSelected && (
+                                  <span
+                                    className="text-[10px] text-white px-2 py-0.5 rounded uppercase font-bold tracking-wider whitespace-nowrap"
+                                    style={{ backgroundColor: BRAND_THEME.colors.brand.primary }}
+                                  >
+                                    Selected
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Contact */}
               <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-4 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-800">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
-                    <Phone className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium">
-                        {recipientName}, <span className="font-semibold">{recipientPhone || "+91-XXXXXXXXXX"}</span>
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Order recipient details
-                      </p>
+                <div className="flex items-start gap-4 w-full">
+                  <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded-xl flex-shrink-0 mt-0.5">
+                    <Phone className="h-4 w-4 md:h-5 md:w-5 text-gray-500 dark:text-gray-400" />
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-row flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-medium truncate">
+                          {recipientName}, <span className="font-semibold">{recipientPhone || "+91-XXXXXXXXXX"}</span>
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          Recipient details
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isEditingRecipient) {
+                            const cleanName = sanitizeRecipientName(recipientDetails.name || "")
+                            const cleanPhone = sanitizeRecipientPhone(recipientDetails.phone || "")
+
+                            if (cleanName && !isValidRecipientName(cleanName)) {
+                              toast.error("Recipient name should contain letters only")
+                              return
+                            }
+
+                            if (cleanPhone && !isValidRecipientPhone(cleanPhone)) {
+                              toast.error("Phone number must be a valid 10-digit mobile number")
+                              return
+                            }
+
+                            setRecipientDetails((prev) => ({
+                              ...prev,
+                              name: cleanName,
+                              phone: cleanPhone,
+                            }))
+                          }
+
+                          setIsEditingRecipient((prev) => !prev)
+                        }}
+                        className="text-xs md:text-sm font-semibold whitespace-nowrap bg-brand-50 hover:bg-brand-100 dark:bg-brand-900/20 px-3 py-1.5 rounded-full"
+                        style={{ color: BRAND_THEME.colors.brand.primary }}
+                      >
+                        {isEditingRecipient ? "Done" : "Change"}
+                      </button>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isEditingRecipient) {
-                        const cleanName = sanitizeRecipientName(recipientDetails.name || "")
-                        const cleanPhone = sanitizeRecipientPhone(recipientDetails.phone || "")
-
-                        if (cleanName && !isValidRecipientName(cleanName)) {
-                          toast.error("Recipient name should contain letters only")
-                          return
-                        }
-
-                        if (cleanPhone && !isValidRecipientPhone(cleanPhone)) {
-                          toast.error("Phone number must be a valid 10-digit mobile number")
-                          return
-                        }
-
-                        setRecipientDetails((prev) => ({
-                          ...prev,
-                          name: cleanName,
-                          phone: cleanPhone,
-                        }))
-                      }
-
-                      setIsEditingRecipient((prev) => !prev)
-                    }}
-                    className="text-xs md:text-sm font-semibold whitespace-nowrap"
-                    style={{ color: BRAND_THEME.colors.brand.primary }}
-                  >
-                    {isEditingRecipient ? "Done" : "Change"}
-                  </button>
                 </div>
 
                 {isEditingRecipient && (
