@@ -997,7 +997,13 @@ export default function OrderTracking() {
       debugLog('?? Order status notification received:', { message, status, idMatches });
 
       if (idMatches) {
-        if (String(payload.orderStatus || status || '').toLowerCase().includes('cancel')) {
+        const isCancelled = String(payload.orderStatus || status || '').toLowerCase().includes('cancel');
+        if (isCancelled) {
+          terminalPollStopRef.current = true;
+          setOrderStatus('cancelled');
+          toast.error("This order has been cancelled.");
+        }
+        if (isCancelled) {
           setOrder((prev) =>
             prev
               ? {
@@ -1011,6 +1017,8 @@ export default function OrderTracking() {
               : prev,
           )
         }
+        if (isCancelled) return;
+
         const next = mapOrderToTrackingUiStatus({
           status,
           orderStatus: payload.orderStatus || status,
