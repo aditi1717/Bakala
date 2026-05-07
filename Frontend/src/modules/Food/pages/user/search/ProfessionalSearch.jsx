@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useSearchParams, Link, useNavigate } from "react-router-dom"
 import { 
-  ArrowLeft, Star, Clock, Search,
+  ArrowLeft, Star, Clock, Search, BadgePercent,
   X, Loader2
 } from "lucide-react"
 import { Button } from "@food/components/ui/button"
