@@ -237,6 +237,20 @@ export default function Cart() {
   const [placedOrderId, setPlacedOrderId] = useState(null)
   const [selectedAddressId, setSelectedAddressId] = useState(null)
 
+  const getOrderIdentityKeys = useCallback((orderLike = {}) => (
+    [
+      orderLike?.orderMongoId,
+      orderLike?.orderId,
+      orderLike?.order_id,
+      orderLike?._id,
+      orderLike?.id,
+      typeof orderLike === "string" ? orderLike : null,
+    ]
+      .filter(Boolean)
+      .map((value) => String(value).trim())
+      .filter(Boolean)
+  ), [])
+
   useEffect(() => {
     const audio = new Audio(zoopSound)
     audio.preload = "auto"
@@ -259,6 +273,67 @@ export default function Cart() {
       debugWarn("Order success sound blocked by browser:", error?.message || error)
     })
   }, [showOrderSuccess])
+
+  useEffect(() => {
+    const handleOrderStatusNotification = (event) => {
+      const payload = event?.detail || {}
+      const statusLower = String(
+        payload?.orderStatus || payload?.status || "",
+      ).toLowerCase()
+      if (!statusLower.includes("cancel")) return
+      if (!showOrderSuccess) return
+
+      const placedOrderKeys = getOrderIdentityKeys(placedOrderId)
+      const eventKeys = getOrderIdentityKeys(payload)
+      if (
+        placedOrderKeys.length === 0 ||
+        eventKeys.length === 0 ||
+        !placedOrderKeys.some((key) => eventKeys.includes(key))
+      ) {
+        return
+      }
+
+      if (orderSuccessAudioRef.current) {
+        orderSuccessAudioRef.current.pause()
+        orderSuccessAudioRef.current.currentTime = 0
+      }
+
+      setShowOrderSuccess(false)
+      setShowPlacingOrder(false)
+      setIsPlacingOrder(false)
+
+      const message =
+        payload?.message ||
+        "Your order was cancelled. Opening order details."
+      toast.error(message, { id: "order-cancelled-after-placement" })
+
+      const targetOrderId =
+        payload?.orderMongoId ||
+        payload?.orderId ||
+        placedOrderId
+
+      if (targetOrderId) {
+        navigate(
+          `/food/orders/${encodeURIComponent(String(targetOrderId))}?cancelled=true`,
+          { replace: true },
+        )
+      } else {
+        navigate("/food/orders", { replace: true })
+      }
+    }
+
+    window.addEventListener(
+      "orderStatusNotification",
+      handleOrderStatusNotification,
+    )
+
+    return () => {
+      window.removeEventListener(
+        "orderStatusNotification",
+        handleOrderStatusNotification,
+      )
+    }
+  }, [showOrderSuccess, placedOrderId, getOrderIdentityKeys, navigate])
 
   // Restaurant and pricing state
   const [restaurantData, setRestaurantData] = useState(null)

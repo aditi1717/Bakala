@@ -37,6 +37,19 @@ const isDispatchAccepted = (orderLike) =>
 const getOrderRouteId = (order) =>
   order?.mongoId || order?._id || order?.id || order?.orderId || ""
 
+const buildOrderKeys = (orderLike = {}) =>
+  [
+    orderLike?.mongoId,
+    orderLike?._id,
+    orderLike?.id,
+    orderLike?.orderId,
+    orderLike?.orderMongoId,
+    orderLike?.order_id,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).trim())
+    .filter(Boolean)
+
 
 export default function Orders() {
   const navigate = useNavigate()
@@ -300,6 +313,9 @@ export default function Orders() {
               /rejected by restaurant|restaurant rejected|restaurant cancelled|restaurant is too busy|item not available|outside delivery area|kitchen closing|technical issue|order not accepted within time limit|restaurant did not respond/i.test(cancellationReason)
             )
             const isUserCancelled = isCancelled && order.cancelledBy === 'user'
+            const isAdminCancelled =
+              isCancelled &&
+              (order.cancelledBy === 'admin' || backendStatus === 'cancelled_by_admin')
 
             // Get original status from backend before transformation
             const originalStatus = backendStatus
@@ -348,7 +364,9 @@ export default function Orders() {
               cancellationReason: cancellationReason,
               isRestaurantCancelled: isRestaurantCancelled,
               isUserCancelled: isUserCancelled,
+              isAdminCancelled: isAdminCancelled,
               cancelledBy: order.cancelledBy,
+              cancelledAt: order.cancelledAt || null,
               eta: order.eta || { min: order.estimatedDeliveryTime || 30, max: order.estimatedDeliveryTime || 30 },
               estimatedDeliveryTime: order.estimatedDeliveryTime || 30,
               preparationTime: order.preparationTime || 0,
@@ -414,6 +432,53 @@ export default function Orders() {
     }, 20000) // Poll every 20 seconds
 
     return () => clearInterval(pollInterval)
+  }, [])
+
+  useEffect(() => {
+    const handleOrderStatusNotification = (event) => {
+      const payload = event?.detail || {}
+      const nextStatus = String(payload.orderStatus || payload.status || '').toLowerCase()
+      if (!nextStatus) return
+
+      const incomingKeys = buildOrderKeys(payload)
+      if (!incomingKeys.length) return
+
+      setOrders((prev) =>
+        prev.map((order) => {
+          const orderKeys = buildOrderKeys(order)
+          const matches = incomingKeys.some((key) => orderKeys.includes(key))
+          if (!matches) return order
+
+          const isCancelled = nextStatus === 'cancelled' || nextStatus.includes('cancel')
+          const cancelledBy = payload.cancelledBy || order.cancelledBy || null
+          const cancellationReason = payload.cancellationReason || order.cancellationReason || ''
+          const isRestaurantCancelled =
+            isCancelled &&
+            (cancelledBy === 'restaurant' ||
+              /rejected by restaurant|restaurant rejected|restaurant cancelled|restaurant is too busy|item not available|outside delivery area|kitchen closing|technical issue|order not accepted within time limit|restaurant did not respond/i.test(
+                cancellationReason,
+              ))
+          const isUserCancelled = isCancelled && cancelledBy === 'user'
+          const isAdminCancelled =
+            isCancelled && (cancelledBy === 'admin' || nextStatus === 'cancelled_by_admin')
+
+          return {
+            ...order,
+            originalStatus: nextStatus,
+            status: isRestaurantCancelled ? 'restaurant_cancelled' : getOrderStatus({ ...order, status: nextStatus }),
+            cancelledBy,
+            cancellationReason,
+            cancelledAt: payload.cancelledAt || order.cancelledAt || null,
+            isRestaurantCancelled,
+            isUserCancelled,
+            isAdminCancelled,
+          }
+        }),
+      )
+    }
+
+    window.addEventListener('orderStatusNotification', handleOrderStatusNotification)
+    return () => window.removeEventListener('orderStatusNotification', handleOrderStatusNotification)
   }, [])
 
   // Format date helper
@@ -799,6 +864,10 @@ Order again from this restaurant in the ${companyName} app.`
             const isDelivered = order.status === 'delivered'
             const isRestaurantCancelled = order.isRestaurantCancelled || order.status === 'restaurant_cancelled'
             const isUserCancelled = order.isUserCancelled || (isCancelled && order.cancelledBy === 'user')
+            const isAdminCancelled =
+              order.isAdminCancelled ||
+              (isCancelled &&
+                (order.cancelledBy === 'admin' || order.originalStatus === 'cancelled_by_admin'))
             // Prefer food image from first item; fallback to restaurant image, then generic food photo
             const firstItemImage = order.items?.[0]?.image
             const restaurantImage = firstItemImage
@@ -1032,7 +1101,10 @@ Order again from this restaurant in the ${companyName} app.`
                     {isUserCancelled && (
                       <p className="text-xs font-medium text-gray-500 mt-1">Cancelled by you</p>
                     )}
-                    {isCancelled && !isRestaurantCancelled && !isUserCancelled && (
+                    {isAdminCancelled && (
+                      <p className="text-xs font-medium text-red-500 mt-1">Cancelled by admin</p>
+                    )}
+                    {isCancelled && !isRestaurantCancelled && !isUserCancelled && !isAdminCancelled && (
                       <p className="text-xs font-medium text-gray-500 mt-1">Cancelled</p>
                     )}
                   </div>

@@ -2090,6 +2090,13 @@ export async function updateOrderStatusAdmin(
   if (from === normalizedStatus) return order.toObject();
 
   order.orderStatus = normalizedStatus;
+  if (normalizedStatus === "cancelled_by_admin") {
+    order.cancelledBy = "admin";
+    order.cancelledAt = order.cancelledAt || new Date();
+    if (reason) {
+      order.cancellationReason = reason;
+    }
+  }
   if (normalizedStatus === "delivered") {
     order.payment.status = "paid";
     order.deliveryState = {
@@ -2162,6 +2169,9 @@ export async function updateOrderStatusAdmin(
       orderId: order.orderId,
       orderMongoId: order._id?.toString?.() || "",
       orderStatus: normalizedStatus,
+      cancelledBy: order.cancelledBy || null,
+      cancellationReason: order.cancellationReason || "",
+      cancelledAt: order.cancelledAt || null,
     },
   });
 
@@ -2172,6 +2182,9 @@ export async function updateOrderStatusAdmin(
         orderMongoId: order._id?.toString?.(),
         orderId: order.orderId,
         orderStatus: normalizedStatus,
+        cancelledBy: order.cancelledBy || null,
+        cancellationReason: order.cancellationReason || "",
+        cancelledAt: order.cancelledAt || null,
         title,
         message: body,
       };

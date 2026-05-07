@@ -997,6 +997,20 @@ export default function OrderTracking() {
       debugLog('?? Order status notification received:', { message, status, idMatches });
 
       if (idMatches) {
+        if (String(payload.orderStatus || status || '').toLowerCase().includes('cancel')) {
+          setOrder((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: payload.orderStatus || status,
+                  orderStatus: payload.orderStatus || status,
+                  cancelledBy: payload.cancelledBy || prev.cancelledBy || null,
+                  cancellationReason: payload.cancellationReason || prev.cancellationReason || prev.cancelReason || '',
+                  cancelledAt: payload.cancelledAt || prev.cancelledAt || null,
+                }
+              : prev,
+          )
+        }
         const next = mapOrderToTrackingUiStatus({
           status,
           orderStatus: payload.orderStatus || status,
@@ -1269,6 +1283,33 @@ export default function OrderTracking() {
   }
 
   const currentStatus = statusConfig[orderStatus] || statusConfig.placed
+  const resolvedCancelledByLabel =
+    order?.cancelledBy === 'admin'
+      ? 'admin'
+      : order?.cancelledBy === 'restaurant'
+        ? 'restaurant'
+        : order?.cancelledBy === 'user'
+          ? 'you'
+          : ''
+  const cancelledStatusCopy =
+    orderStatus === 'cancelled'
+      ? {
+          ...currentStatus,
+          title:
+            resolvedCancelledByLabel === 'admin'
+              ? 'Order cancelled by admin'
+              : resolvedCancelledByLabel === 'restaurant'
+                ? 'Order cancelled by restaurant'
+                : resolvedCancelledByLabel === 'you'
+                  ? 'Order cancelled'
+                  : currentStatus.title,
+          subtitle: resolvedCancellationReason
+            ? `Reason: ${resolvedCancellationReason}`
+            : resolvedCancelledByLabel
+              ? `This order was cancelled by ${resolvedCancelledByLabel}`
+              : currentStatus.subtitle,
+        }
+      : currentStatus
   const isRiderAcceptedForUi =
     order?.dispatch?.status === "accepted" ||
     order?.assignmentInfo?.status === "accepted" ||
@@ -1283,8 +1324,8 @@ export default function OrderTracking() {
     <div className="min-h-screen bg-gray-100 dark:bg-[#0a0a0a]">
       {/* Green Header */}
       <motion.div
-        className={`${!currentStatus.color.startsWith('#') ? currentStatus.color : ''} text-white sticky top-0 z-40`}
-        style={{ backgroundColor: currentStatus.color.startsWith('#') ? currentStatus.color : undefined }}
+        className={`${!cancelledStatusCopy.color.startsWith('#') ? cancelledStatusCopy.color : ''} text-white sticky top-0 z-40`}
+        style={{ backgroundColor: cancelledStatusCopy.color.startsWith('#') ? cancelledStatusCopy.color : undefined }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
@@ -1308,11 +1349,11 @@ export default function OrderTracking() {
           <div className="px-4 pb-4 text-center">
             <motion.h1
               className="text-2xl font-bold mb-3 text-black"
-              key={currentStatus.title}
+              key={cancelledStatusCopy.title}
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              {currentStatus.title}
+              {cancelledStatusCopy.title}
             </motion.h1>
 
             {/* Status pill */}
@@ -1322,7 +1363,7 @@ export default function OrderTracking() {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2 }}
             >
-              <span className="text-sm text-black">{currentStatus.subtitle}</span>
+              <span className="text-sm text-black">{cancelledStatusCopy.subtitle}</span>
               {orderStatus === 'preparing' && (
                 <>
                   <span className="w-1 h-1 rounded-full bg-white" />
@@ -1355,35 +1396,35 @@ export default function OrderTracking() {
         >
           <div className="flex items-center gap-4">
             <div className={`w-14 h-14 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm border border-gray-100 ${
-              currentStatus.iconType === 'rider' ? 'bg-brand-50' : 
-              currentStatus.iconType === 'cancelled' ? 'bg-red-50' : 
-              currentStatus.iconType === 'delivered' ? 'bg-green-50' : 
+              cancelledStatusCopy.iconType === 'rider' ? 'bg-brand-50' : 
+              cancelledStatusCopy.iconType === 'cancelled' ? 'bg-red-50' : 
+              cancelledStatusCopy.iconType === 'delivered' ? 'bg-green-50' : 
               'bg-brand-50'
             }`}>
-              {currentStatus.iconType === 'rider' ? (
+              {cancelledStatusCopy.iconType === 'rider' ? (
                 <div 
                   dangerouslySetInnerHTML={{ __html: RIDER_BIKE_SVG.replace(/width="\d+"/, 'width="100%"').replace(/height="\d+"/, 'height="100%"') }} 
                   className="w-full h-full" 
                 />
-              ) : currentStatus.iconType === 'cancelled' ? (
+              ) : cancelledStatusCopy.iconType === 'cancelled' ? (
                 <div className="w-full h-full flex items-center justify-center p-2 text-red-500">
                   <X className="w-full h-full" />
                 </div>
-              ) : currentStatus.iconType === 'delivered' ? (
+              ) : cancelledStatusCopy.iconType === 'delivered' ? (
                 <div className="w-full h-full flex items-center justify-center p-2 text-green-500">
                   <Check className="w-full h-full" />
                 </div>
               ) : (
                 <img
                   src={circleIcon}
-                  alt={currentStatus.title}
+                  alt={cancelledStatusCopy.title}
                   className="w-10 h-10 object-contain"
                 />
               )}
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-gray-900 leading-tight">{currentStatus.title}</p>
-              <p className="text-sm text-gray-500 mt-1 leading-snug">{currentStatus.subtitle}</p>
+              <p className="font-semibold text-gray-900 leading-tight">{cancelledStatusCopy.title}</p>
+              <p className="text-sm text-gray-500 mt-1 leading-snug">{cancelledStatusCopy.subtitle}</p>
               {isCancelledOrder && resolvedCancellationReason && (
                 <p className="text-xs text-red-600 mt-1 leading-snug">
                   Reason: {resolvedCancellationReason}
