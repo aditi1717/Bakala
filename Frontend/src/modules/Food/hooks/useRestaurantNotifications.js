@@ -821,6 +821,54 @@ export const useRestaurantNotifications = () => {
       }
     });
 
+    // Listen for specialized order cancellation events
+    socketRef.current.on('order_cancelled', (data) => {
+      debugLog('?? Order cancelled event received:', data);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('restaurantOrderStatusUpdated', {
+            detail: { ...data, status: 'cancelled' },
+          }),
+        );
+      }
+      
+      const eventOrderKeys = getOrderKeys(data);
+      if (eventOrderKeys.length > 0) {
+        if (activeOrderRef.current) {
+          const activeOrderKeys = getOrderKeys(activeOrderRef.current);
+          const matchesActive = activeOrderKeys.some((key) =>
+            eventOrderKeys.includes(key),
+          );
+          if (matchesActive) {
+            stopAlertLoop();
+            activeOrderRef.current = null;
+          }
+        }
+
+        setNewOrder((prev) => {
+          if (!prev) return prev;
+          const prevOrderKeys = getOrderKeys(prev);
+          const matchesCurrent = prevOrderKeys.some((key) =>
+            eventOrderKeys.includes(key),
+          );
+          return matchesCurrent ? null : prev;
+        });
+
+        // Also set cancelled order info for toasts/banners
+        const primaryOrderId = eventOrderKeys[0] || '';
+        if (primaryOrderId) {
+          setCancelledOrderId(primaryOrderId);
+          setCancelledOrderInfo({
+            orderId: primaryOrderId,
+            orderKeys: eventOrderKeys,
+            cancelledBy: 'user', // Default to user if from order_cancelled
+            title: data?.title || 'Order Cancelled',
+            message: data?.message || 'Order has been cancelled by the user',
+          });
+        }
+      }
+    });
+
     socketRef.current.on('admin_notification', (payload) => {
       debugLog('?? Admin broadcast received:', payload);
       storeRestaurantAdminNotification(payload);

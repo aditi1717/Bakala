@@ -347,9 +347,11 @@ function CompletedOrders({ onSelectOrder, refreshToken = 0 }) {
 
                     <div className="mt-2 flex items-end justify-between gap-2">
                       <div className="flex flex-col gap-1">
-                        <p className="text-[11px] text-gray-500">
-                          {order.type}
-                        </p>
+                        {order.tableOrToken && (
+                          <p className="text-[11px] text-gray-500">
+                            {order.tableOrToken}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-baseline gap-1">
                         <span className="text-[11px] text-gray-500">
@@ -603,9 +605,11 @@ function CancelledOrders({ onSelectOrder, refreshToken = 0 }) {
 
                     <div className="mt-2 flex items-end justify-between gap-2">
                       <div className="flex flex-col gap-1">
-                        <p className="text-[11px] text-gray-500">
-                          {order.type}
-                        </p>
+                        {order.tableOrToken && (
+                          <p className="text-[11px] text-gray-500">
+                            {order.tableOrToken}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-baseline gap-1">
                         <span className="text-[11px] text-gray-500">
@@ -889,8 +893,10 @@ export default function OrdersMain() {
   const getOrderKeys = (orderLike) =>
     [
       orderLike?.orderMongoId,
+      orderLike?.order_mongo_id,
       orderLike?.mongoId,
       orderLike?.orderId,
+      orderLike?.order_id,
       orderLike?._id,
       orderLike?.id,
     ]
@@ -1350,6 +1356,11 @@ export default function OrdersMain() {
       window.scrollTo(0, previous.scrollY);
     };
   }, [showNewOrderPopup]);
+  
+  useEffect(() => {
+    showNewOrderPopupRef.current = showNewOrderPopup;
+  }, [showNewOrderPopup]);
+
 
   useEffect(() => {
     isMutedRef.current = isMuted;
@@ -1370,6 +1381,14 @@ export default function OrdersMain() {
   useEffect(() => {
     selectedOrderRef.current = selectedOrder;
   }, [selectedOrder]);
+
+  useEffect(() => {
+    // If the hook clears newOrder (because it was cancelled/accepted), 
+    // and we're showing a popup that came from newOrder, close it.
+    if (!newOrder && showNewOrderPopup && !popupOrder) {
+      setShowNewOrderPopup(false);
+    }
+  }, [newOrder, showNewOrderPopup, popupOrder]);
 
   // Hydrate popup with latest backend order details so fields stay linked
   // with tracking/report data (items variants, payment snapshot, pricing, earnings).
@@ -1544,10 +1563,10 @@ export default function OrdersMain() {
       const eventKeys = Array.from(
         new Set(
           [
-            payload?.orderMongoId,
-            payload?.order_mongo_id,
             payload?.orderId,
             payload?.order_id,
+            payload?.orderMongoId,
+            payload?.order_mongo_id,
             payload?._id,
             payload?.id,
             payload?.mongoId,
@@ -3307,12 +3326,11 @@ export default function OrdersMain() {
                   <p className="text-xs text-gray-500 mt-1">
                     {selectedOrder.customerName}
                   </p>
-                  <p className="text-[11px] text-gray-500 mt-1">
-                    {selectedOrder.type}
-                    {selectedOrder.tableOrToken
-                      ? ` • ${selectedOrder.tableOrToken}`
-                      : ""}
-                  </p>
+                  {selectedOrder.tableOrToken && (
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      {selectedOrder.tableOrToken}
+                    </p>
+                  )}
                   {selectedOrder.deliveryPartnerName ? (
                     <p className="text-[11px] text-gray-600 mt-1">
                       Delivery Partner:{" "}
@@ -3620,10 +3638,11 @@ function OrderCard({
           {/* Bottom row */}
           <div className="mt-2 flex items-end justify-between gap-2">
             <div className="flex flex-col gap-1">
-              <p className="text-[11px] text-gray-500">
-                {type}
-                {tableOrToken ? ` • ${tableOrToken}` : ""}
-              </p>
+              {tableOrToken && (
+                <p className="text-[11px] text-gray-500">
+                  {tableOrToken}
+                </p>
+              )}
               {/* Delivery Assignment Status - Only show for active orders */}
               {(isPreparing || isReady || normalizedStatus === "confirmed") && (
                 <div className="flex items-center gap-1.5 flex-wrap">
