@@ -179,6 +179,20 @@ export default function AllOrdersPage() {
   const [restaurantData, setRestaurantData] = useState(null)
   const { newOrder } = useRestaurantNotifications()
 
+  const getOrderKeys = useCallback((orderLike = {}) => (
+    [
+      orderLike?.orderMongoId,
+      orderLike?.mongoId,
+      orderLike?.orderId,
+      orderLike?.order_id,
+      orderLike?._id,
+      orderLike?.id,
+    ]
+      .filter(Boolean)
+      .map((value) => String(value).trim())
+      .filter(Boolean)
+  ), [])
+
   // Fetch restaurant data
   useEffect(() => {
     const fetchRestaurantData = async () => {
@@ -380,6 +394,71 @@ export default function AllOrdersPage() {
       return [transformed, ...prev]
     })
   }, [newOrder, transformOrder])
+
+  useEffect(() => {
+    const handleRestaurantOrderStatusUpdated = (event) => {
+      const payload = event?.detail || {}
+      const eventKeys = getOrderKeys(payload)
+      if (eventKeys.length === 0) return
+
+      const statusLower = String(
+        payload?.orderStatus || payload?.status || "",
+      ).toLowerCase()
+
+      setOrders((prev) => {
+        if (!Array.isArray(prev) || prev.length === 0) return prev
+
+        const next = prev.map((order) => {
+          const orderKeys = getOrderKeys(order)
+          const matches = orderKeys.some((key) => eventKeys.includes(key))
+          if (!matches) return order
+
+          if (statusLower.includes("cancel")) {
+            return {
+              ...order,
+              status: "CANCELLED",
+              statusLabel: "CANCELLED",
+              reason: payload?.message || order.reason || "Cancelled by User",
+            }
+          }
+
+          if (!statusLower) {
+            return order
+          }
+
+          const transformed = transformOrder({
+            ...payload,
+            _id: payload?._id || payload?.orderMongoId || order.mongoId,
+            orderId: payload?.orderId || order.id,
+            createdAt: order.createdAt,
+            pricing: payload?.pricing || { total: order.totalPrice || 0 },
+            items: payload?.items || order.items || [],
+            deliveryAddress: payload?.deliveryAddress,
+            customerAddress: payload?.customerAddress,
+          })
+
+          return {
+            ...order,
+            ...transformed,
+          }
+        })
+
+        return next
+      })
+    }
+
+    window.addEventListener(
+      "restaurantOrderStatusUpdated",
+      handleRestaurantOrderStatusUpdated,
+    )
+
+    return () => {
+      window.removeEventListener(
+        "restaurantOrderStatusUpdated",
+        handleRestaurantOrderStatusUpdated,
+      )
+    }
+  }, [getOrderKeys, transformOrder])
 
   // Close calendar when clicking outside
   useEffect(() => {

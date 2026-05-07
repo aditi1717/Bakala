@@ -37,7 +37,7 @@ export default function OrdersPage() {
   const showOrdersSkeleton = useDelayedLoading(loading, { delay: 120, minDuration: 360 })
 
   // Restaurant notifications hook
-  const { newOrder, clearNewOrder, cancelledOrderId, clearCancelledOrderId, isConnected } = useRestaurantNotifications()
+  const { newOrder, clearNewOrder, cancelledOrderId, cancelledOrderInfo, clearCancelledOrderId, isConnected } = useRestaurantNotifications()
 
   const notificationOrder = newOrder
     ? {
@@ -51,12 +51,25 @@ export default function OrdersPage() {
   // Real-time: dismiss notification if the shown order gets cancelled by user
   useEffect(() => {
     if (!cancelledOrderId || !newOrder) return
-    const shownId = String(newOrder.orderMongoId || newOrder.orderId || newOrder._id || newOrder.id || "").trim()
-    if (shownId && String(cancelledOrderId).trim() === shownId) {
+    const eventKeys = Array.from(new Set([
+      cancelledOrderId,
+      ...(Array.isArray(cancelledOrderInfo?.orderKeys) ? cancelledOrderInfo.orderKeys : []),
+    ].filter(Boolean).map((value) => String(value).trim()).filter(Boolean)))
+    const shownKeys = [
+      newOrder.orderMongoId,
+      newOrder.orderId,
+      newOrder._id,
+      newOrder.id,
+    ]
+      .filter(Boolean)
+      .map((value) => String(value).trim())
+      .filter(Boolean)
+
+    if (shownKeys.some((key) => eventKeys.includes(key))) {
       clearNewOrder()
       clearCancelledOrderId()
     }
-  }, [cancelledOrderId])
+  }, [cancelledOrderId, cancelledOrderInfo, newOrder, clearNewOrder, clearCancelledOrderId])
 
   // Lenis smooth scrolling
   useEffect(() => {
