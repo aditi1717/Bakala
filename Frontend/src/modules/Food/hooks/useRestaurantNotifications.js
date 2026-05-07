@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
 import { API_BASE_URL } from '@food/api/config';
 import { restaurantAPI } from '@food/api';
@@ -126,6 +126,7 @@ export const useRestaurantNotifications = () => {
   const userInteractedRef = useRef(false); // Track user interaction for autoplay policy
   const audioUnlockAttemptedRef = useRef(false);
   const [restaurantId, setRestaurantId] = useState(null);
+  const joinedRestaurantRoomRef = useRef(null);
   const lastConnectErrorLogRef = useRef(0);
   const lastAlertAtByOrderRef = useRef(new Map());
   const lastBrowserNotificationAtByOrderRef = useRef(new Map());
@@ -253,7 +254,7 @@ export const useRestaurantNotifications = () => {
     }, ALERT_LOOP_INTERVAL_MS);
   };
 
-  const handleIncomingOrderAlert = (orderData) => {
+  const handleIncomingOrderAlert = useCallback((orderData) => {
     if (!shouldProcessOrderAlert(orderData)) {
       return;
     }
@@ -265,7 +266,58 @@ export const useRestaurantNotifications = () => {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
       showBackgroundOrderNotification(orderData);
     }
-  };
+  }, []);
+
+  const recoverRestaurantState = useCallback(async () => {
+    if (!restaurantId) return;
+
+    try {
+      const response = await restaurantAPI.getOrders({ page: 1, limit: 30 });
+      const rows =
+        response?.data?.data?.orders ||
+        response?.data?.data?.data?.orders ||
+        [];
+
+      const pendingReview = (rows || [])
+        .filter((o) => {
+          const status = String(o?.orderStatus || o?.status || "").toLowerCase();
+          return status === "created";
+        })
+        .sort((a, b) => {
+          const at = a?.updatedAt || a?.createdAt || 0;
+          const bt = b?.updatedAt || b?.createdAt || 0;
+          return new Date(bt).getTime() - new Date(at).getTime();
+        });
+
+      if (pendingReview.length === 0) {
+        return;
+      }
+
+      const latestPendingOrder = pendingReview[0];
+      setNewOrder((prev) => prev || latestPendingOrder);
+      pendingReview.slice(0, 5).forEach((order) => handleIncomingOrderAlert(order));
+    } catch (error) {
+      debugWarn('Restaurant recovery sync failed:', error?.message || error);
+    }
+  }, [restaurantId, handleIncomingOrderAlert]);
+
+  const joinRestaurantRoomIfPossible = useCallback(() => {
+    if (!socketRef.current?.connected || !restaurantId) {
+      return false;
+    }
+
+    if (joinedRestaurantRoomRef.current === restaurantId) {
+      return true;
+    }
+
+    debugLog('Joining restaurant room', {
+      restaurantId,
+      socketId: socketRef.current?.id,
+    });
+    socketRef.current.emit('join-restaurant', restaurantId);
+    joinedRestaurantRoomRef.current = restaurantId;
+    return true;
+  }, [restaurantId]);
 
   // Get restaurant ID from API
   useEffect(() => {
@@ -298,28 +350,7 @@ export const useRestaurantNotifications = () => {
       if (isCancelled) return;
 
       try {
-        const response = await restaurantAPI.getOrders({ page: 1, limit: 30 });
-        const rows =
-          response?.data?.data?.orders ||
-          response?.data?.data?.data?.orders ||
-          [];
-
-        // Alert only for orders that have not been accepted/rejected by the restaurant yet.
-        const pendingReview = (rows || [])
-          .filter((o) => {
-            const status = String(o?.orderStatus || o?.status || "").toLowerCase();
-            return status === "created";
-          })
-          .sort((a, b) => {
-            const at = a?.updatedAt || a?.createdAt || 0;
-            const bt = b?.updatedAt || b?.createdAt || 0;
-            return new Date(bt).getTime() - new Date(at).getTime();
-          });
-
-        if (pendingReview.length > 0) {
-          // Trigger alerts for newest pending-review orders (dedupe prevents spam).
-          pendingReview.slice(0, 5).forEach((o) => handleIncomingOrderAlert(o));
-        }
+        await recoverRestaurantState();
       } catch (error) {
         // Non-blocking: keep polling.
       }
@@ -333,7 +364,7 @@ export const useRestaurantNotifications = () => {
       isCancelled = true;
       clearInterval(intervalId);
     };
-  }, [restaurantId]);
+  }, [restaurantId, recoverRestaurantState]);
 
   useEffect(() => {
     if (!supportsBrowserNotifications()) return;
@@ -368,18 +399,46 @@ export const useRestaurantNotifications = () => {
   useEffect(() => {
     const onVisibilityChange = () => {
       if (typeof document === 'undefined') return;
-      if (document.visibilityState !== 'hidden') return;
-      if (!activeOrderRef.current) return;
 
-      playNotificationSound(activeOrderRef.current);
-      showBackgroundOrderNotification(activeOrderRef.current);
+      if (document.visibilityState === 'hidden') {
+        if (!activeOrderRef.current) return;
+        playNotificationSound(activeOrderRef.current);
+        showBackgroundOrderNotification(activeOrderRef.current);
+        return;
+      }
+
+      if (!socketRef.current?.connected) {
+        socketRef.current?.connect();
+      }
+      joinRestaurantRoomIfPossible();
+      void recoverRestaurantState();
+    };
+
+    const onWindowFocus = () => {
+      if (!socketRef.current?.connected) {
+        socketRef.current?.connect();
+      }
+      joinRestaurantRoomIfPossible();
+      void recoverRestaurantState();
+    };
+
+    const onPageShow = () => {
+      if (!socketRef.current?.connected) {
+        socketRef.current?.connect();
+      }
+      joinRestaurantRoomIfPossible();
+      void recoverRestaurantState();
     };
 
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onWindowFocus);
+    window.addEventListener('pageshow', onPageShow);
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onWindowFocus);
+      window.removeEventListener('pageshow', onPageShow);
     };
-  }, []);
+  }, [joinRestaurantRoomIfPossible, recoverRestaurantState]);
 
   useEffect(() => {
     if (!API_BASE_URL || !String(API_BASE_URL).trim()) {
@@ -566,23 +625,27 @@ export const useRestaurantNotifications = () => {
       debugLog('? Socket ID:', socketRef.current.id);
       debugLog('? Socket URL:', socketUrl);
       setIsConnected(true);
+      joinedRestaurantRoomRef.current = null;
       
       // Join restaurant room immediately after connection with retry
       if (restaurantId) {
         const joinRoom = () => {
           debugLog('?? Joining restaurant room with ID:', restaurantId);
           socketRef.current.emit('join-restaurant', restaurantId);
+          joinedRestaurantRoomRef.current = restaurantId;
           
           // Retry join after 2 seconds if no confirmation received
           setTimeout(() => {
             if (socketRef.current?.connected) {
               debugLog('?? Retrying restaurant room join...');
               socketRef.current.emit('join-restaurant', restaurantId);
+              joinedRestaurantRoomRef.current = restaurantId;
             }
           }, 2000);
         };
         
         joinRoom();
+        void recoverRestaurantState();
       } else {
         debugWarn('?? Cannot join restaurant room: restaurantId is missing');
       }
@@ -593,6 +656,7 @@ export const useRestaurantNotifications = () => {
       debugLog('? Restaurant room joined successfully:', data);
       debugLog('? Room:', data?.room);
       debugLog('? Restaurant ID in room:', data?.restaurantId);
+      joinedRestaurantRoomRef.current = data?.restaurantId || restaurantId;
     });
 
     // Listen for connection errors (throttle logs to avoid console spam on reconnect loops)
@@ -622,6 +686,7 @@ export const useRestaurantNotifications = () => {
     socketRef.current.on('disconnect', (reason) => {
       debugLog('? Restaurant Socket disconnected:', reason);
       setIsConnected(false);
+      joinedRestaurantRoomRef.current = null;
       
       if (reason === 'io server disconnect') {
         // Server disconnected the socket, reconnect manually
@@ -638,11 +703,14 @@ export const useRestaurantNotifications = () => {
     socketRef.current.on('reconnect', (attemptNumber) => {
       debugLog(`? Reconnected after ${attemptNumber} attempts`);
       setIsConnected(true);
+      joinedRestaurantRoomRef.current = null;
       
       // Rejoin restaurant room after reconnection
       if (restaurantId) {
         socketRef.current.emit('join-restaurant', restaurantId);
+        joinedRestaurantRoomRef.current = restaurantId;
       }
+      void recoverRestaurantState();
     });
 
     // Listen for new order notifications
@@ -759,6 +827,28 @@ export const useRestaurantNotifications = () => {
       dispatchNotificationInboxRefresh();
     });
 
+    const handleAuthChange = () => {
+      const newToken = localStorage.getItem('restaurant_accessToken') || localStorage.getItem('accessToken');
+      if (socketRef.current && newToken) {
+        socketRef.current.auth.token = newToken;
+        if (!socketRef.current.connected) {
+          socketRef.current.connect();
+        }
+      }
+    };
+
+    const handleAuthRefreshed = (e) => {
+      if (e.detail?.module === 'restaurant' && socketRef.current && e.detail.token) {
+        socketRef.current.auth.token = e.detail.token;
+        if (!socketRef.current.connected) {
+          socketRef.current.connect();
+        }
+      }
+    };
+
+    window.addEventListener('restaurantAuthChanged', handleAuthChange);
+    window.addEventListener('authRefreshed', handleAuthRefreshed);
+
     // Load notification sound
     audioRef.current = new Audio(resolveAudioSource(alertSound));
     audioRef.current.preload = 'auto';
@@ -766,6 +856,9 @@ export const useRestaurantNotifications = () => {
 
     return () => {
       stopAlertLoop();
+      joinedRestaurantRoomRef.current = null;
+      window.removeEventListener('restaurantAuthChanged', handleAuthChange);
+      window.removeEventListener('authRefreshed', handleAuthRefreshed);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -775,7 +868,19 @@ export const useRestaurantNotifications = () => {
         audioRef.current = null;
       }
     };
-  }, [restaurantId]);
+  }, [restaurantId, recoverRestaurantState]);
+
+  useEffect(() => {
+    if (!restaurantId) {
+      return;
+    }
+
+    joinRestaurantRoomIfPossible();
+
+    if (socketRef.current?.connected) {
+      void recoverRestaurantState();
+    }
+  }, [restaurantId, joinRestaurantRoomIfPossible, recoverRestaurantState]);
 
   // Track user interaction for autoplay policy
   useEffect(() => {
