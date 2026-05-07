@@ -144,6 +144,22 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 })
 
+window.addEventListener('error', (event) => {
+  const error = event?.error || null
+  const errorMsg = error?.message || String(event?.message || '') || ''
+  const errorStack = String(error?.stack || '')
+  const filename = String(event?.filename || '')
+
+  if (
+    errorMsg.includes("Cannot read properties of undefined") &&
+    errorMsg.includes("payload") &&
+    (filename.includes("core.js") || errorStack.includes("core.js") || errorStack.includes(" Tx "))
+  ) {
+    event.preventDefault()
+    event.stopImmediatePropagation?.()
+  }
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { AppProviders } from './app/providers.jsx'

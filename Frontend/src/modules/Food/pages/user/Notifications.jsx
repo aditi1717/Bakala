@@ -92,7 +92,12 @@ export default function Notifications() {
   // Real-time: Listen for status updates from useUserNotifications hook
   useEffect(() => {
     const handleOrderUpdate = (event) => {
-      const { orderId, status, message, title } = event.detail
+      const detail =
+        event && typeof event === "object" && event.detail && typeof event.detail === "object"
+          ? event.detail
+          : {}
+      const { orderId, status, message, title } = detail
+      if (!orderId && !status && !message && !title) return
       const isCancelled = String(status || "").toLowerCase().includes('cancel')
       
       const newNotification = {
