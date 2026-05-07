@@ -3428,6 +3428,11 @@ export async function assignDeliveryPartnerAdmin(
     throw new ValidationError("Delivery partner does not belong to this order zone");
   }
 
+  const previousDeliveryPartnerId =
+    order.dispatch?.deliveryPartnerId?._id?.toString?.() ||
+    order.dispatch?.deliveryPartnerId?.toString?.() ||
+    "";
+
   const from = order.dispatch?.status || 'unassigned';
   order.dispatch.status = 'assigned';
   order.dispatch.deliveryPartnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
@@ -3438,6 +3443,37 @@ export async function assignDeliveryPartnerAdmin(
 
   await order.populate('dispatch.deliveryPartnerId', 'name phone zoneId');
   await notifyAssignedDeliveryPartner(order);
+
+  try {
+    const nextDeliveryPartnerId = String(deliveryPartnerId || "");
+    if (
+      previousDeliveryPartnerId &&
+      nextDeliveryPartnerId &&
+      previousDeliveryPartnerId !== nextDeliveryPartnerId
+    ) {
+      const io = getIO();
+      if (io) {
+        io.to(rooms.delivery(previousDeliveryPartnerId)).emit("order_reassigned_elsewhere", {
+          orderId: order.orderId,
+          orderMongoId: order._id?.toString?.() || "",
+          previousDeliveryPartnerId,
+          deliveryPartnerId: nextDeliveryPartnerId,
+          status: "reassigned",
+        });
+        io.to(rooms.delivery(previousDeliveryPartnerId)).emit("order_status_update", {
+          orderId: order.orderId,
+          orderMongoId: order._id?.toString?.() || "",
+          deliveryPartnerId: nextDeliveryPartnerId,
+          previousDeliveryPartnerId,
+          status: "reassigned",
+          orderStatus: "reassigned",
+        });
+      }
+    }
+  } catch (error) {
+    logger.warn(`Old delivery partner reassignment emit failed: ${error?.message || error}`);
+  }
+
   enqueueOrderEvent('delivery_partner_assigned', {
       orderMongoId: order._id?.toString?.(),
       orderId: order.orderId,

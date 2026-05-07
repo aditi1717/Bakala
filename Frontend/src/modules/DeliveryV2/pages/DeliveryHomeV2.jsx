@@ -1306,6 +1306,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       const isIncomingOrderUpdate = eventOrderId && eventOrderId === getOrderIdentity(incomingOrder);
       const isCancelledEvent = eventStatus.includes('cancel') || eventStatus === 'deleted';
       const isDeliveredEvent = ['delivered', 'completed'].includes(eventStatus);
+      const isReassignedEvent = ['reassigned', 'unassigned', 'removed'].includes(eventStatus);
 
       const applyRealtimeStatus = (orderLike) => {
         if (!orderLike || getOrderIdentity(orderLike) !== eventOrderId) return orderLike;
@@ -1366,6 +1367,28 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           }
         }
       }
+
+      if (isReassignedEvent) {
+        if (isIncomingOrderUpdate) {
+          persistFocusedOrder('');
+          setIncomingOrder(null);
+          clearPersistedIncomingOrder();
+        }
+
+        if (eventOrderId) {
+          removeAdvancedOrder(orderStatusUpdate);
+        }
+
+        if (isActiveOrderUpdate) {
+          toast.error('Order assigned to another delivery boy');
+          if (!promoteNextAcceptedOrder()) {
+            resetTrip();
+          }
+        } else {
+          toast.error('Queued order assigned to another delivery boy');
+        }
+      }
+
       if (currentTab === 'orders') {
         setOrdersRefreshTick((prev) => prev + 1);
       }

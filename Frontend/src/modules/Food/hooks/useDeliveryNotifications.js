@@ -958,11 +958,30 @@ export const useDeliveryNotifications = () => {
 
     socketRef.current.on('order_reassigned_elsewhere', (data) => {
       debugLog('?? Order reassigned to another partner:', data);
-      if (data.orderId === activeOrderRef.current?._id || data.orderId === activeOrderRef.current?.orderId) {
-        debugLog('?? Removing reassigned order from local state');
+      const eventOrderId = String(
+        data?.orderMongoId ||
+        data?.orderId ||
+        ''
+      ).trim();
+      const activeOrderId = String(
+        activeOrderRef.current?.orderMongoId ||
+        activeOrderRef.current?.orderId ||
+        activeOrderRef.current?._id ||
+        activeOrderRef.current?.id ||
+        ''
+      ).trim();
+
+      if (eventOrderId && eventOrderId === activeOrderId) {
+        debugLog('?? Removing reassigned order from local alert state');
         stopActiveAlert();
         setNewOrder(null);
       }
+
+      setOrderStatusUpdate({
+        ...(data || {}),
+        status: 'reassigned',
+        orderStatus: 'reassigned',
+      });
     });
 
     socketRef.current.on('admin_notification', (payload) => {
