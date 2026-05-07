@@ -22,6 +22,7 @@ import { useLocation } from "@food/hooks/useLocation";
 import { useZone } from "@food/hooks/useZone";
 import OptimizedImage from "@food/components/OptimizedImage";
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability";
+import { sortRestaurantsByAvailability } from "@food/utils/sortRestaurantsByAvailability";
 import FoodHeroHeaderShell from "@food/components/user/home/FoodHeroHeaderShell";
 import PromoRow from "@food/components/user/home/PromoRow";
 import BRAND_THEME from "@/config/brandTheme";
@@ -206,12 +207,15 @@ export default function Home() {
   ]);
 
   const filteredRestaurants = useMemo(() => {
-    if (!vegMode) return pagedRestaurants;
-    if (vegModeOption === "pure-veg") {
-      return pagedRestaurants.filter((r) => r.pureVegRestaurant);
-    }
-    return pagedRestaurants;
-  }, [pagedRestaurants, vegMode, vegModeOption]);
+    const now = new Date(availabilityTick);
+    const sourceRestaurants = !vegMode
+      ? pagedRestaurants
+      : vegModeOption === "pure-veg"
+        ? pagedRestaurants.filter((r) => r.pureVegRestaurant)
+        : pagedRestaurants;
+
+    return sortRestaurantsByAvailability(sourceRestaurants, now);
+  }, [pagedRestaurants, vegMode, vegModeOption, availabilityTick]);
 
   const visibleRestaurants = useMemo(() => filteredRestaurants, [filteredRestaurants]);
 

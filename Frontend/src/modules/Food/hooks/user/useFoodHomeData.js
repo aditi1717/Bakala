@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, startTransition, useMemo } from "react";
 import { publicGetOnce, restaurantAPI, adminAPI } from "@food/api";
 import { API_BASE_URL } from "@food/api/config";
+import { sortRestaurantsByAvailability } from "@food/utils/sortRestaurantsByAvailability";
 
 const DEFAULT_UNDER_PRICE_LIMIT = 250;
 const UNDER_PRICE_DEFAULT_STORAGE_KEY = "food-under-price-default";
@@ -263,9 +264,10 @@ export const useFoodHomeData = ({ location, zoneId, zoneStatus, vegMode }) => {
           console.log("Normalized first restaurant image:", transformed[0].name, transformed[0].image);
         }
 
-        homeRestaurantsCache.set(cacheKey, { at: Date.now(), data: transformed });
+        const sortedRestaurants = sortRestaurantsByAvailability(transformed);
+        homeRestaurantsCache.set(cacheKey, { at: Date.now(), data: sortedRestaurants });
         startTransition(() => {
-          setRestaurants(transformed);
+          setRestaurants(sortedRestaurants);
         });
       }
     } catch (error) {
