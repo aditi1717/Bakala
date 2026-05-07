@@ -1,10 +1,11 @@
-import { Routes, Route, Navigate, useLocation } from "react-router-dom"
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom"
 import { useEffect, Suspense, lazy } from "react"
 import ProtectedRoute from "@food/components/ProtectedRoute"
 import AuthRedirect from "@food/components/AuthRedirect"
 import Loader from "@food/components/Loader"
 import PushSoundEnableButton from "@food/components/PushSoundEnableButton"
 import AppMaintenanceOverlay from "@food/components/common/AppMaintenanceOverlay"
+import NewOrderNotification from "@food/components/restaurant/NewOrderNotification"
 import { registerWebPushForCurrentModule } from "@food/utils/firebaseMessaging"
 import { isModuleAuthenticated } from "@food/utils/auth"
 import { useRestaurantNotifications } from "@food/hooks/useRestaurantNotifications"
@@ -34,8 +35,29 @@ function ScrollToTop() {
 }
 
 function RestaurantGlobalNotificationListenerInner() {
-  useRestaurantNotifications()
-  return null
+  const navigate = useNavigate()
+  const { newOrder, clearNewOrder } = useRestaurantNotifications()
+  const notificationOrder = newOrder
+    ? {
+        ...newOrder,
+        orderMongoId: newOrder.orderMongoId || newOrder._id || newOrder.id,
+        total: newOrder.total ?? newOrder.pricing?.total ?? 0,
+        customerAddress: newOrder.customerAddress || newOrder.deliveryAddress || newOrder.address,
+      }
+    : null
+
+  return (
+    <NewOrderNotification
+      order={notificationOrder}
+      onClose={clearNewOrder}
+      onViewOrder={(order) => {
+        const id = order?.orderMongoId || order?._id || order?.id || order?.orderId
+        if (id) {
+          navigate(`/food/restaurant/orders/${id}`)
+        }
+      }}
+    />
+  )
 }
 
 function RestaurantGlobalNotificationListener() {
