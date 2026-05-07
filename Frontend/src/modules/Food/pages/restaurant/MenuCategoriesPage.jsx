@@ -99,6 +99,11 @@ const getApiErrorMessage = (error, fallback) => {
   )
 }
 
+const isCategoryEnabled = (category) => {
+  if (!category || typeof category !== "object") return true
+  return category?.isActive !== false && category?.status !== false
+}
+
 export default function MenuCategoriesPage() {
   const goBack = useRestaurantBackNavigation()
   const fileInputRef = useRef(null)
@@ -158,7 +163,7 @@ export default function MenuCategoriesPage() {
       name: category?.name || "",
       type: category?.type || "",
       image: category?.image || "",
-      isActive: category?.isActive !== false,
+      isActive: isCategoryEnabled(category),
       foodTypeScope: category?.foodTypeScope || "Veg",
       visibilityStartHour: start.hour,
       visibilityStartMinute: start.minute,
@@ -243,11 +248,13 @@ export default function MenuCategoriesPage() {
         return
       }
 
+      const nextIsActive = formData.isActive !== false
       const payload = {
         name: String(formData.name || "").trim(),
         type: String(formData.type || "").trim(),
         image: imageUrl || undefined,
-        isActive: formData.isActive !== false,
+        isActive: nextIsActive,
+        status: nextIsActive,
         foodTypeScope: formData.foodTypeScope || "Veg",
         visibilityStartTime: startTime24,
         visibilityEndTime: endTime24,
@@ -272,8 +279,10 @@ export default function MenuCategoriesPage() {
 
   const handleToggleStatus = async (category) => {
     try {
+      const nextIsActive = !isCategoryEnabled(category)
       await restaurantAPI.updateCategory(category.id || category._id, {
-        isActive: category?.isActive === false,
+        isActive: nextIsActive,
+        status: nextIsActive,
       })
       toast.success("Category status updated")
       await loadCategories()
@@ -397,7 +406,7 @@ export default function MenuCategoriesPage() {
                           onClick={() => handleToggleStatus(category)}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         >
-                          {category?.isActive === false ? "Enable" : "Disable"}
+                          {isCategoryEnabled(category) ? "Disable" : "Enable"}
                         </button>
                         <button
                           type="button"

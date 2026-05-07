@@ -96,6 +96,12 @@ const getUpdatedFoodPricing = (existing = {}, body = {}) => {
     return update;
 };
 
+const valuesEqual = (a, b) => {
+    if (a === b) return true;
+    if (a == null && b == null) return true;
+    return JSON.stringify(a) === JSON.stringify(b);
+};
+
 const getRestaurantContext = async (restaurantId) => {
     if (!restaurantId || !mongoose.Types.ObjectId.isValid(String(restaurantId))) {
         throw new ValidationError('Invalid restaurant id');
@@ -261,18 +267,48 @@ export async function updateRestaurantFood(restaurantId, foodId, body = {}) {
         const name = toStr(body.name);
         if (!name) throw new ValidationError('Item name is required');
         if (name.length > 200) throw new ValidationError('Item name is too long');
-        update.name = name;
+        if (!valuesEqual(name, toStr(existing.name))) update.name = name;
     }
-    if (body.description !== undefined) update.description = toStr(body.description);
-    if (body.image !== undefined) update.image = toStr(body.image);
-    Object.assign(update, getUpdatedFoodPricing(existing, body));
-    if (body.isAvailable !== undefined) update.isAvailable = body.isAvailable !== false;
-    if (body.preparationTime !== undefined) update.preparationTime = toStr(body.preparationTime);
-    if (body.availabilityTimeStart !== undefined) update.availabilityTimeStart = normalizeAvailabilityTime(body.availabilityTimeStart);
-    if (body.availabilityTimeEnd !== undefined) update.availabilityTimeEnd = normalizeAvailabilityTime(body.availabilityTimeEnd);
+    if (body.description !== undefined) {
+        const description = toStr(body.description);
+        if (!valuesEqual(description, toStr(existing.description))) update.description = description;
+    }
+    if (body.image !== undefined) {
+        const image = toStr(body.image);
+        if (!valuesEqual(image, toStr(existing.image))) update.image = image;
+    }
+    const pricingUpdate = getUpdatedFoodPricing(existing, body);
+    if (pricingUpdate.price !== undefined && !valuesEqual(pricingUpdate.price, existing.price)) {
+        update.price = pricingUpdate.price;
+    }
+    if (pricingUpdate.variants !== undefined && !valuesEqual(pricingUpdate.variants, existing.variants || [])) {
+        update.variants = pricingUpdate.variants;
+    }
+    if (body.isAvailable !== undefined) {
+        const isAvailable = body.isAvailable !== false;
+        if (!valuesEqual(isAvailable, existing.isAvailable !== false)) update.isAvailable = isAvailable;
+    }
+    if (body.preparationTime !== undefined) {
+        const preparationTime = toStr(body.preparationTime);
+        if (!valuesEqual(preparationTime, toStr(existing.preparationTime))) update.preparationTime = preparationTime;
+    }
+    if (body.availabilityTimeStart !== undefined) {
+        const availabilityTimeStart = normalizeAvailabilityTime(body.availabilityTimeStart);
+        if (!valuesEqual(availabilityTimeStart, toStr(existing.availabilityTimeStart))) {
+            update.availabilityTimeStart = availabilityTimeStart;
+        }
+    }
+    if (body.availabilityTimeEnd !== undefined) {
+        const availabilityTimeEnd = normalizeAvailabilityTime(body.availabilityTimeEnd);
+        if (!valuesEqual(availabilityTimeEnd, toStr(existing.availabilityTimeEnd))) {
+            update.availabilityTimeEnd = availabilityTimeEnd;
+        }
+    }
 
     const targetFoodType = body.foodType !== undefined ? normalizeFoodType(body.foodType) : normalizeFoodType(existing.foodType);
-    if (body.foodType !== undefined) update.foodType = targetFoodType;
+    if (body.foodType !== undefined && !valuesEqual(targetFoodType, normalizeFoodType(existing.foodType))) {
+        update.foodType = targetFoodType;
+    }
 
     if (
         body.categoryId !== undefined ||
@@ -284,11 +320,29 @@ export async function updateRestaurantFood(restaurantId, foodId, body = {}) {
             categoryName: body.categoryName !== undefined ? body.categoryName : existing.categoryName,
             foodType: targetFoodType
         });
-        update.categoryId = categoryObjectId;
-        update.categoryName = categoryName || '';
+        const nextCategoryName = categoryName || '';
+        if (!valuesEqual(String(categoryObjectId), String(existing.categoryId || ''))) {
+            update.categoryId = categoryObjectId;
+        }
+        if (!valuesEqual(nextCategoryName, toStr(existing.categoryName))) {
+            update.categoryName = nextCategoryName;
+        }
     }
 
-    const shouldResubmitForApproval = Object.keys(update).length > 0;
+    const approvalFields = new Set([
+        'name',
+        'description',
+        'image',
+        'price',
+        'variants',
+        'foodType',
+        'categoryId',
+        'categoryName'
+    ]);
+    const shouldResubmitForApproval = Object.keys(update).some((key) => approvalFields.has(key));
+    if (Object.keys(update).length === 0) {
+        return existing;
+    }
 
     if (shouldResubmitForApproval) {
         update.approvalStatus = 'pending';

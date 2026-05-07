@@ -5,6 +5,54 @@ import { FoodZone } from '../../admin/models/zone.model.js';
 import mongoose from 'mongoose';
 import { isCategoryVisibleNow } from '../../shared/categoryWorkflow.js';
 
+const parse12HourTimeToMinutes = (value) => {
+    const text = String(value || '').trim();
+    const match = text.match(/^(0?[1-9]|1[0-2]):([0-5]\d)\s?(AM|PM)$/i);
+    if (!match) return null;
+    let hour = Number(match[1]);
+    const minute = Number(match[2]);
+    const meridiem = String(match[3] || '').toUpperCase();
+    if (meridiem === 'AM') {
+        if (hour === 12) hour = 0;
+    } else if (hour !== 12) {
+        hour += 12;
+    }
+    return hour * 60 + minute;
+};
+
+const getCurrentMinutesForTimezone = (timezone = 'Asia/Kolkata') => {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: timezone
+    });
+    const parts = formatter.formatToParts(new Date());
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value || 0);
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value || 0);
+    return hour * 60 + minute;
+};
+
+const isFoodVisibleNow = (food = {}, options = {}) => {
+    const start = String(food?.availabilityTimeStart || '').trim();
+    const end = String(food?.availabilityTimeEnd || '').trim();
+    if (!start && !end) return true;
+
+    const nowMinutes = Number.isFinite(options.currentMinutes)
+        ? Number(options.currentMinutes)
+        : getCurrentMinutesForTimezone(options.timezone || 'Asia/Kolkata');
+    const startMinutes = parse12HourTimeToMinutes(start);
+    const endMinutes = parse12HourTimeToMinutes(end);
+
+    if (start && !end && startMinutes !== null) return nowMinutes >= startMinutes;
+    if (!start && end && endMinutes !== null) return nowMinutes <= endMinutes;
+    if (startMinutes === null || endMinutes === null) return true;
+    if (startMinutes <= endMinutes) {
+        return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+    }
+    return nowMinutes >= startMinutes || nowMinutes <= endMinutes;
+};
+
 const zoneToPolygon = (zoneDoc) => {
     const coords = Array.isArray(zoneDoc?.coordinates) ? zoneDoc.coordinates : [];
     if (coords.length < 3) return null;
@@ -48,7 +96,7 @@ const APPROVED_FOOD_FILTER = {
 };
 
 const buildFoodSearchFilter = (regex, { isVeg } = {}) => {
-    const filters = [APPROVED_FOOD_FILTER];
+    const filters = [APPROVED_FOOD_FILTER, { isAvailable: { $ne: false } }];
     if (isVeg === 'true') {
         filters.push({ foodType: 'Veg' });
     }
@@ -140,9 +188,13 @@ export const searchUnified = async (query = {}, options = {}) => {
     // 2. Handle Category Filtering (Restaurants don't have categoryId, FoodItems do)
     if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
         const selectedCategory = await FoodCategory.findById(categoryId)
-            .select('visibilityStartTime visibilityEndTime')
+            .select('isActive visibilityStartTime visibilityEndTime')
             .lean();
-        if (!selectedCategory || !isCategoryVisibleNow(selectedCategory, { timezone: 'Asia/Kolkata' })) {
+        if (
+            !selectedCategory ||
+            selectedCategory.isActive === false ||
+            !isCategoryVisibleNow(selectedCategory, { timezone: 'Asia/Kolkata' })
+        ) {
             return {
                 success: true,
                 data: { restaurants: [], total: 0, page: parseInt(page), limit: parseInt(limit) }
@@ -152,6 +204,7 @@ export const searchUnified = async (query = {}, options = {}) => {
         const catFoodItems = await FoodItem.find({
             $and: [
                 APPROVED_FOOD_FILTER,
+                { isAvailable: { $ne: false } },
                 { categoryId: new mongoose.Types.ObjectId(categoryId) }
             ]
         }).select('restaurantId').lean();
@@ -200,17 +253,20 @@ export const searchUnified = async (query = {}, options = {}) => {
         const categoryVisibilityMap = new Map();
         if (matchedFoodCategoryIds.length > 0) {
             const categoryDocs = await FoodCategory.find({ _id: { $in: matchedFoodCategoryIds } })
-                .select('visibilityStartTime visibilityEndTime')
+                .select('isActive visibilityStartTime visibilityEndTime')
                 .lean();
             categoryDocs.forEach((doc) => {
                 categoryVisibilityMap.set(
                     String(doc._id),
+                    doc?.isActive !== false &&
                     isCategoryVisibleNow(doc, { timezone: 'Asia/Kolkata' })
                 );
             });
         }
 
         const matchedFoods = matchedFoodsRaw.filter((food) => {
+            if (food?.isAvailable === false) return false;
+            if (!isFoodVisibleNow(food, { timezone: 'Asia/Kolkata' })) return false;
             if (!food?.categoryId) return true;
             const key = String(food.categoryId);
             if (!categoryVisibilityMap.has(key)) return true;

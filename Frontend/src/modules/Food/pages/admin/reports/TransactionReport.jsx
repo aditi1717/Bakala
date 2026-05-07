@@ -131,6 +131,93 @@ export default function TransactionReport() {
     return transactions // Backend already filters, so just return transactions
   }, [transactions])
 
+  const capturedTransactions = useMemo(() => {
+    return filteredTransactions.filter(
+      (transaction) => String(transaction?.status || "").toLowerCase() === "captured",
+    )
+  }, [filteredTransactions])
+
+  const capturedTotals = useMemo(() => {
+    return capturedTransactions.reduce(
+      (acc, transaction) => {
+        acc.platformFee += Number(transaction?.platformFee) || 0
+        acc.deliveryCharge += Number(transaction?.deliveryCharge) || 0
+        acc.tax += Number(transaction?.vatTax) || 0
+        acc.couponByAdmin += Number(transaction?.couponByAdmin) || 0
+        acc.couponByRestaurant += Number(transaction?.couponByRestaurant) || 0
+        acc.restaurantCommission += Number(transaction?.restaurantCommission) || 0
+        return acc
+      },
+      {
+        platformFee: 0,
+        deliveryCharge: 0,
+        tax: 0,
+        couponByAdmin: 0,
+        couponByRestaurant: 0,
+        restaurantCommission: 0,
+      },
+    )
+  }, [capturedTransactions])
+
+  const adminEarningCardAmount = useMemo(() => {
+    return (
+      capturedTotals.deliveryCharge +
+      capturedTotals.tax +
+      capturedTotals.platformFee +
+      capturedTotals.restaurantCommission +
+      capturedTotals.couponByRestaurant
+    )
+  }, [capturedTotals])
+
+  const capturedRestaurantEarning = useMemo(() => {
+    return capturedTransactions.reduce(
+      (sum, transaction) => sum + (Number(transaction?.restaurantShare) || 0),
+      0,
+    )
+  }, [capturedTransactions])
+
+  const capturedDeliverymanEarning = useMemo(() => {
+    return capturedTransactions.reduce(
+      (sum, transaction) => sum + (Number(transaction?.riderShare) || 0),
+      0,
+    )
+  }, [capturedTransactions])
+
+  const breakdownCards = useMemo(() => {
+    return [
+      {
+        label: "Platform Fee",
+        value: capturedTotals.platformFee,
+        valueClassName: "text-slate-900",
+      },
+      {
+        label: "Delivery Fee",
+        value: capturedTotals.deliveryCharge,
+        valueClassName: "text-slate-900",
+      },
+      {
+        label: "GST / Tax",
+        value: capturedTotals.tax,
+        valueClassName: "text-slate-900",
+      },
+      {
+        label: "Restaurant Commission",
+        value: capturedTotals.restaurantCommission,
+        valueClassName: "text-slate-900",
+      },
+      {
+        label: "Coupon By Admin",
+        value: capturedTotals.couponByAdmin,
+        valueClassName: "text-red-600",
+      },
+      {
+        label: "Coupon By Restaurant",
+        value: capturedTotals.couponByRestaurant,
+        valueClassName: "text-emerald-600",
+      },
+    ]
+  }, [capturedTotals])
+
   const handleExport = (format) => {
     if (filteredTransactions.length === 0) {
       alert("No data to export")
@@ -347,7 +434,7 @@ export default function TransactionReport() {
                     </div>
                   </div>
                 </div>
-                <p className="text-base font-bold text-slate-900">{formatCurrency(summary.adminEarning)}</p>
+                <p className="text-base font-bold text-slate-900">{formatCurrency(adminEarningCardAmount)}</p>
               </div>
             </div>
 
@@ -365,7 +452,7 @@ export default function TransactionReport() {
                     </div>
                   </div>
                 </div>
-                <p className="text-base font-bold text-green-600">{formatCurrency(summary.restaurantEarning)}</p>
+                <p className="text-base font-bold text-green-600">{formatCurrency(capturedRestaurantEarning)}</p>
               </div>
             </div>
 
@@ -383,11 +470,30 @@ export default function TransactionReport() {
                     </div>
                   </div>
                 </div>
-                <p className="text-base font-bold text-orange-600">{formatCurrency(summary.deliverymanEarning)}</p>
+                <p className="text-base font-bold text-orange-600">{formatCurrency(capturedDeliverymanEarning)}</p>
               </div>
             </div>
 
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-3">
+          {breakdownCards.map((card) => (
+            <div
+              key={card.label}
+              className="rounded-lg shadow-sm border border-slate-200 p-3 bg-white"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                    <Info className="w-3.5 h-3.5 text-slate-600" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-900">{card.label}</p>
+                </div>
+                <p className={`text-sm font-bold ${card.valueClassName}`}>{formatFullCurrency(card.value)}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Order Transactions Section */}

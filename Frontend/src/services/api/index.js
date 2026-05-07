@@ -631,6 +631,26 @@ export const adminAPI = {
     apiClient.get("/food/restaurant/categories/public", {
       params: params ?? {},
       ...config,
+    }).then((response) => {
+      const list =
+        response?.data?.data?.categories ||
+        response?.data?.categories ||
+        []
+
+      if (!Array.isArray(list)) return response
+
+      const filtered = list.filter(
+        (category) =>
+          category?.status !== false && category?.isActive !== false,
+      )
+
+      if (Array.isArray(response?.data?.data?.categories)) {
+        response.data.data.categories = filtered
+      } else if (Array.isArray(response?.data?.categories)) {
+        response.data.categories = filtered
+      }
+
+      return response
     }),
 
   /** Offers & Coupons (admin) */

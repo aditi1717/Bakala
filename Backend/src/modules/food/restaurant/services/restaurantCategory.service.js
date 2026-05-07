@@ -284,14 +284,23 @@ export async function updateRestaurantCategory(restaurantId, id, body = {}) {
         throw new ValidationError('Pure veg restaurants can only keep veg categories');
     }
 
+    let requiresApprovalResubmission = false;
+
     if (body.name !== undefined) {
         const name = String(body.name || '').trim();
         if (!name) throw new ValidationError('Category name is required');
         if (name.length > 200) throw new ValidationError('Category name is too long');
         doc.name = name;
+        requiresApprovalResubmission = true;
     }
-    if (body.image !== undefined) doc.image = String(body.image || '').trim();
-    if (body.type !== undefined) doc.type = String(body.type || '').trim();
+    if (body.image !== undefined) {
+        doc.image = String(body.image || '').trim();
+        requiresApprovalResubmission = true;
+    }
+    if (body.type !== undefined) {
+        doc.type = String(body.type || '').trim();
+        requiresApprovalResubmission = true;
+    }
     if (body.isActive !== undefined) doc.isActive = body.isActive !== false;
     if (body.sortOrder !== undefined) doc.sortOrder = Number(body.sortOrder) || 0;
     if (body.visibilityStartTime !== undefined) {
@@ -311,15 +320,18 @@ export async function updateRestaurantCategory(restaurantId, id, body = {}) {
             throw new ValidationError(`This category already has ${incompatibleFoods} food item(s) outside the selected diet type`);
         }
         doc.foodTypeScope = nextFoodTypeScope;
+        requiresApprovalResubmission = true;
     }
 
     doc.createdByRestaurantId = doc.createdByRestaurantId || context.restaurantId;
-    doc.approvalStatus = 'pending';
-    doc.isApproved = false;
-    doc.rejectionReason = '';
-    doc.requestedAt = new Date();
-    doc.approvedAt = undefined;
-    doc.rejectedAt = undefined;
+    if (requiresApprovalResubmission) {
+        doc.approvalStatus = 'pending';
+        doc.isApproved = false;
+        doc.rejectionReason = '';
+        doc.requestedAt = new Date();
+        doc.approvedAt = undefined;
+        doc.rejectedAt = undefined;
+    }
 
     await doc.save();
     return doc.toObject();

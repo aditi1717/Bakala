@@ -357,9 +357,20 @@ function TimePickerWheel({
     }, 150)
   }
 
+  const readWheelValue = (container, values, fallback) => {
+    if (!container) return fallback
+    const padding = 80
+    const itemHeight = 40
+    const index = Math.round((container.scrollTop - padding) / itemHeight)
+    const clampedIndex = Math.max(0, Math.min(index, values.length - 1))
+    return values[clampedIndex] ?? fallback
+  }
+
   const handleConfirm = () => {
-    const hourStr = selectedHour.toString()
-    const minuteStr = selectedMinute.toString().padStart(2, '0')
+    const finalHour = readWheelValue(hourRef.current, hours, selectedHour)
+    const finalMinute = readWheelValue(minuteRef.current, minutes, selectedMinute)
+    const hourStr = String(finalHour)
+    const minuteStr = String(finalMinute).padStart(2, '0')
     onConfirm(hourStr, minuteStr, selectedPeriod)
     onClose()
   }
@@ -506,58 +517,21 @@ function TimePickerWheel({
               </div>
             </div>
 
-            <div className="flex-1 flex flex-col items-center">
-              <div
-                ref={periodRef}
-                className="w-full h-48 overflow-y-scroll time-picker-scroll snap-y snap-mandatory"
-                style={{
-                  scrollSnapType: 'y mandatory',
-                  scrollBehavior: 'smooth',
-                  WebkitOverflowScrolling: 'touch'
-                }}
-                onScroll={() => handleScroll(periodRef.current, setSelectedPeriod, periods, 40)}
-                onTouchEnd={() => {
-                  setTimeout(() => {
-                    if (periodRef.current) {
-                      const padding = 80
-                      const itemHeight = 40
-                      const scrollTop = periodRef.current.scrollTop
-                      const index = Math.round((scrollTop - padding) / itemHeight)
-                      const clampedIndex = Math.max(0, Math.min(index, periods.length - 1))
-                      const snapPosition = padding + (clampedIndex * itemHeight)
-                      periodRef.current.scrollTop = snapPosition
-                      if (periods[clampedIndex] !== undefined) {
-                        setSelectedPeriod(periods[clampedIndex])
-                      }
-                      setTimeout(() => {
-                        periodRef.current?.scrollTo({
-                          top: snapPosition,
-                          behavior: 'smooth'
-                        })
-                      }, 50)
-                    }
-                  }, 100)
-                }}
-              >
-                <div className="h-20"></div>
-                {periods.map((period) => (
-                  <div
-                    key={period}
-                    className="h-10 flex items-center justify-center snap-center"
-                    style={{ minHeight: '40px' }}
-                  >
-                    <span
-                      className={`text-lg transition-all duration-200 ${selectedPeriod === period
-                          ? 'font-bold text-gray-900 text-xl'
-                          : 'font-normal text-gray-400 text-base'
-                        }`}
-                    >
-                      {period}
-                    </span>
-                  </div>
-                ))}
-                <div className="h-20"></div>
-              </div>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3">
+              {periods.map((period) => (
+                <button
+                  key={period}
+                  type="button"
+                  onClick={() => setSelectedPeriod(period)}
+                  className={`w-16 rounded-lg border px-3 py-2 text-base font-semibold transition-colors ${
+                    selectedPeriod === period
+                      ? "border-brand-600 bg-brand-50 text-brand-700"
+                      : "border-gray-200 bg-white text-gray-500"
+                  }`}
+                >
+                  {period.toUpperCase()}
+                </button>
+              ))}
             </div>
 
             <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -568,6 +542,7 @@ function TimePickerWheel({
 
           <div className="border-t border-gray-200 px-4 py-4 flex justify-center">
             <button
+              type="button"
               onClick={handleConfirm}
               className="text-brand-600 hover:text-brand-700 font-medium text-base transition-colors"
             >
@@ -640,6 +615,14 @@ function SimpleCalendar({ selectedDate, onDateSelect, isOpen, onClose }) {
     return date.toDateString() === new Date().toDateString()
   }
 
+  const isPastDate = (date) => {
+    const day = new Date(date)
+    day.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return day.getTime() < today.getTime()
+  }
+
   const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"]
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -707,13 +690,18 @@ function SimpleCalendar({ selectedDate, onDateSelect, isOpen, onClose }) {
 
                 return (
                   <button
+                    type="button"
                     key={index}
                     onClick={() => {
+                      if (isPastDate(date)) return
                       onDateSelect(new Date(date))
                       onClose()
                     }}
+                    disabled={isPastDate(date)}
                     className={`h-10 text-sm rounded transition-colors ${!isCurrent
                         ? 'text-gray-300'
+                        : isPastDate(date)
+                          ? 'text-gray-300 cursor-not-allowed'
                         : isSelectedDate
                         ? 'text-white'
                           : isTodayDate
@@ -779,7 +767,6 @@ export default function Inventory() {
   const [selectedDate, setSelectedDate] = useState(null)
   const [selectedTime, setSelectedTime] = useState({ hour: "2", minute: "30", period: "pm" })
   const [showCalendar, setShowCalendar] = useState(false)
-  const [showTimePicker, setShowTimePicker] = useState(false)
   const [restaurantProfile, setRestaurantProfile] = useState(null)
   const [stockRules, setStockRules] = useState(() => {
     try {
@@ -1686,10 +1673,11 @@ export default function Inventory() {
     setToggleTarget({ type, categoryId, itemId })
     setSelectedOption("specific-time")
     setHours(3)
-    setSelectedDate(null)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    setSelectedDate(today)
     setSelectedTime({ hour: "2", minute: "30", period: "pm" })
     setShowCalendar(false)
-    setShowTimePicker(false)
     setTogglePopupOpen(true)
   }
 
@@ -1711,6 +1699,30 @@ export default function Inventory() {
     })
 
     if (selectedOption === "custom-date-time") {
+      if (!String(selectedTime?.hour || "").trim()) {
+        toast.error("Please enter a valid hour (1-12)")
+        return
+      }
+      if (!String(selectedTime?.minute || "").trim()) {
+        toast.error("Please enter valid minutes (00-59)")
+        return
+      }
+      const hourNum = Number(selectedTime?.hour)
+      const minuteNum = Number(selectedTime?.minute)
+      const period = String(selectedTime?.period || "").toLowerCase()
+      if (!Number.isFinite(hourNum) || hourNum < 1 || hourNum > 12) {
+        toast.error("Please enter a valid hour (1-12)")
+        return
+      }
+      if (!Number.isFinite(minuteNum) || minuteNum < 0 || minuteNum > 59) {
+        toast.error("Please enter valid minutes (00-59)")
+        return
+      }
+      if (period !== "am" && period !== "pm") {
+        toast.error("Please select AM or PM")
+        return
+      }
+
       if (!nextRule.resumeAt) {
         toast.error("Please select a valid custom date and time")
         return
@@ -1798,10 +1810,78 @@ export default function Inventory() {
     return `${time.hour}:${minute} ${period}`
   }
 
-  // Handle time picker confirm
-  const handleTimePickerConfirm = (hour, minute, period) => {
-    setSelectedTime({ hour, minute, period })
-    setShowTimePicker(false)
+  const clampHour12 = (value) => {
+    const digits = String(value || "").replace(/[^\d]/g, "")
+    if (!digits) return ""
+
+    if (digits.length === 1) {
+      const num = Number.parseInt(digits, 10)
+      if (!Number.isFinite(num) || num === 0) return ""
+      return String(Math.min(9, num))
+    }
+
+    const num = Number.parseInt(digits.slice(0, 2), 10)
+    if (Number.isFinite(num) && num >= 1 && num <= 12) {
+      return String(num)
+    }
+
+    const lastDigit = Number.parseInt(digits[digits.length - 1], 10)
+    if (Number.isFinite(lastDigit) && lastDigit >= 1 && lastDigit <= 9) {
+      return String(lastDigit)
+    }
+
+    return "12"
+  }
+
+  const clampMinute = (value) => {
+    const digits = String(value || "").replace(/[^\d]/g, "")
+    if (!digits) return ""
+
+    if (digits.length === 1) {
+      const num = Number.parseInt(digits, 10)
+      if (!Number.isFinite(num)) return ""
+      return String(Math.max(0, Math.min(9, num)))
+    }
+
+    const num = Number.parseInt(digits.slice(0, 2), 10)
+    if (!Number.isFinite(num)) return ""
+    return String(Math.max(0, Math.min(59, num))).padStart(2, "0")
+  }
+
+  const handleTypedHourChange = (value) => {
+    const hour = clampHour12(value)
+    setSelectedTime((prev) => ({
+      ...prev,
+      hour,
+    }))
+  }
+
+  const handleTypedMinuteChange = (value) => {
+    const minute = clampMinute(value)
+    setSelectedTime((prev) => ({
+      ...prev,
+      minute,
+    }))
+  }
+
+  const normalizeTypedHour = () => {
+    setSelectedTime((prev) => {
+      const hour = clampHour12(prev?.hour)
+      return {
+        ...prev,
+        hour,
+      }
+    })
+  }
+
+  const normalizeTypedMinute = () => {
+    setSelectedTime((prev) => {
+      const minute = clampMinute(prev?.minute)
+      return {
+        ...prev,
+        minute: minute ? minute.padStart(2, "0") : "",
+      }
+    })
   }
 
   // Toggle category expansion
@@ -2758,21 +2838,56 @@ export default function Inventory() {
                     </div>
                   </label>
                   {selectedOption === "custom-date-time" && (
-                    <div className="ml-auto py-3 flex items-center justify-center gap-4">
+                    <div className="ml-auto py-3 flex flex-col gap-3">
+                      <div className="flex items-center justify-center gap-4">
                       <button
+                        type="button"
                         onClick={() => setShowCalendar(true)}
-                        className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white hover:bg-gray-50 transition-colors flex items-center justify-between"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white hover:bg-gray-50 transition-colors flex items-center justify-between"
                       >
-                        <span>{selectedDate ? formatDate(selectedDate) : "15 Dec 2025"}</span>
+                        <span>{selectedDate ? formatDate(selectedDate) : "Select date"}</span>
                         <ChevronDown className="w-4 h-4 text-gray-500" />
                       </button>
-                      <button
-                        onClick={() => setShowTimePicker(true)}
-                        className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white hover:bg-gray-50 transition-colors flex items-center justify-between"
-                      >
-                        <span>{formatTime(selectedTime)}</span>
-                        <ChevronDown className="w-4 h-4 text-gray-500" />
-                      </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={2}
+                          value={selectedTime.hour}
+                          onChange={(e) => handleTypedHourChange(e.target.value)}
+                          onBlur={normalizeTypedHour}
+                          onFocus={(e) => e.target.select()}
+                          onClick={(e) => e.target.select()}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none"
+                          placeholder="HH"
+                        />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={2}
+                          value={selectedTime.minute}
+                          onChange={(e) => handleTypedMinuteChange(e.target.value)}
+                          onBlur={normalizeTypedMinute}
+                          onFocus={(e) => e.target.select()}
+                          onClick={(e) => e.target.select()}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none"
+                          placeholder="MM"
+                        />
+                        <select
+                          value={String(selectedTime.period || "pm").toLowerCase()}
+                          onChange={(e) =>
+                            setSelectedTime((prev) => ({
+                              ...prev,
+                              period: String(e.target.value || "pm").toLowerCase(),
+                            }))
+                          }
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none"
+                        >
+                          <option value="am">AM</option>
+                          <option value="pm">PM</option>
+                        </select>
+                      </div>
                     </div>
                   )}
 
@@ -2801,12 +2916,14 @@ export default function Inventory() {
                 {/* Action Buttons */}
                 <div className="flex gap-3 mt-6">
                   <button
+                    type="button"
                     onClick={() => setTogglePopupOpen(false)}
                     className="flex-1 border border-gray-300 text-gray-900 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
                   >
                     Back
                   </button>
                   <button
+                    type="button"
                     onClick={handleToggleConfirm}
                     className="flex-1 text-white py-3 rounded-lg font-medium transition-colors"
                     style={{
@@ -2829,16 +2946,6 @@ export default function Inventory() {
         onDateSelect={setSelectedDate}
         isOpen={showCalendar}
         onClose={() => setShowCalendar(false)}
-      />
-
-      {/* Time Picker Popup */}
-      <TimePickerWheel
-        isOpen={showTimePicker}
-        onClose={() => setShowTimePicker(false)}
-        initialHour={selectedTime.hour}
-        initialMinute={selectedTime.minute}
-        initialPeriod={selectedTime.period}
-        onConfirm={handleTimePickerConfirm}
       />
 
       {/* Add Popup */}

@@ -84,6 +84,11 @@ const scopeBadgeClass = (scope) => {
   return "bg-slate-100 text-slate-700 border-slate-200"
 }
 
+const isCategoryEnabled = (category) => {
+  if (!category || typeof category !== "object") return true
+  return category?.status !== false && category?.isActive !== false
+}
+
 const zoneLabel = (zone, zones = []) => {
   if (!zone || zone === "global") return "Global (all zones)"
   
@@ -227,7 +232,7 @@ export default function Category() {
     setFormData({
       name: category?.name || "",
       image: category?.image || "",
-      status: category?.status !== false,
+      status: isCategoryEnabled(category),
       type: category?.type || "",
       zoneId: zoneIdValue || "global",
       foodTypeScope: category?.foodTypeScope || "Both",
@@ -587,10 +592,10 @@ export default function Category() {
                       <td className="px-4 py-5 text-center">
                         <button
                           onClick={() => handleToggleStatus(category.id)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full ${category?.status ? "bg-brand-600" : "bg-slate-300"}`}
-                          title={category?.status ? "Deactivate" : "Activate"}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full ${isCategoryEnabled(category) ? "bg-brand-600" : "bg-slate-300"}`}
+                          title={isCategoryEnabled(category) ? "Deactivate" : "Activate"}
                         >
-                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${category?.status ? "translate-x-6" : "translate-x-1"}`} />
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isCategoryEnabled(category) ? "translate-x-6" : "translate-x-1"}`} />
                         </button>
                       </td>
                       <td className="px-4 py-5">

@@ -69,12 +69,13 @@ const buildMenuFromFoods = async (foods = [], options = {}) => {
 
     const categoryDocs = categoryIds.length
         ? await FoodCategory.find({ _id: { $in: categoryIds } })
-            .select('name image sortOrder visibilityStartTime visibilityEndTime')
+            .select('name image sortOrder isActive visibilityStartTime visibilityEndTime')
             .lean()
         : [];
     const categoryMap = new Map(categoryDocs.map((doc) => [String(doc._id), doc]));
     const visibleCategoryIdSet = new Set(
         categoryDocs
+            .filter((doc) => doc?.isActive !== false)
             .filter((doc) => isCategoryVisibleNow(doc, { timezone: 'Asia/Kolkata' }))
             .map((doc) => String(doc._id))
     );
