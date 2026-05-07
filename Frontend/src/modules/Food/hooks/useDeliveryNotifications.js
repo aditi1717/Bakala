@@ -435,10 +435,11 @@ export const useDeliveryNotifications = () => {
             : [];
 
       const recoverableOrder = availableOrders.find((order) => {
-        const dispatchStatus = order?.dispatch?.status;
+        const dispatchStatus = String(order?.dispatch?.status || order?.queueStatus || '').toLowerCase();
+        const orderStatus = String(order?.orderStatus || order?.status || '').toLowerCase();
         return (
           dispatchStatus === 'assigned' &&
-          ['preparing', 'ready_for_pickup'].includes(order?.orderStatus)
+          ['accepted', 'confirmed', 'preparing', 'ready_for_pickup', 'picked_up'].includes(orderStatus)
         );
       });
 
@@ -469,6 +470,14 @@ export const useDeliveryNotifications = () => {
     joinedDeliveryRoomRef.current = deliveryPartnerId;
     return true;
   }, [deliveryPartnerId]);
+
+  const ensureSocketConnectedAndSynced = useCallback(() => {
+    if (socketRef.current && !socketRef.current.connected) {
+      socketRef.current.connect();
+    }
+    joinDeliveryRoomIfPossible();
+    void recoverDeliveryState();
+  }, [joinDeliveryRoomIfPossible, recoverDeliveryState]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -985,18 +994,28 @@ export const useDeliveryNotifications = () => {
     };
 
     const handleWindowFocus = () => {
-      void recoverDeliveryState();
+      ensureSocketConnectedAndSynced();
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void recoverDeliveryState();
+      if (document.visibilityState === 'hidden') {
+        if (!activeOrderRef.current) return;
+        playNotificationSound(activeOrderRef.current);
+        showBackgroundOrderNotification(activeOrderRef.current);
+        return;
       }
+
+      ensureSocketConnectedAndSynced();
+    };
+
+    const handlePageShow = () => {
+      ensureSocketConnectedAndSynced();
     };
 
     window.addEventListener('deliveryAuthChanged', handleAuthChange);
     window.addEventListener('authRefreshed', handleAuthRefreshed);
     window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('pageshow', handlePageShow);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
@@ -1006,6 +1025,7 @@ export const useDeliveryNotifications = () => {
       window.removeEventListener('deliveryAuthChanged', handleAuthChange);
       window.removeEventListener('authRefreshed', handleAuthRefreshed);
       window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('pageshow', handlePageShow);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (socketRef.current) {
         socketRef.current.removeAllListeners();
@@ -1013,7 +1033,7 @@ export const useDeliveryNotifications = () => {
         socketRef.current = null;
       }
     };
-  }, [deliveryPartnerId, handleIncomingOrderAlert, joinDeliveryRoomIfPossible, playNotificationSound, recoverDeliveryState, showBackgroundOrderNotification, startAlertLoop, stopActiveAlert]);
+  }, [deliveryPartnerId, ensureSocketConnectedAndSynced, handleIncomingOrderAlert, joinDeliveryRoomIfPossible, playNotificationSound, recoverDeliveryState, showBackgroundOrderNotification, startAlertLoop, stopActiveAlert]);
 
   useEffect(() => {
     if (!deliveryPartnerId) {

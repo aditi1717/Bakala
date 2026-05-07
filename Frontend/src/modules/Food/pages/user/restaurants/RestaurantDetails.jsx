@@ -57,7 +57,6 @@ import {
   getFoodVariants,
   hasFoodVariants,
 } from "@food/utils/foodVariants"
-import fssaiLogo from "@food/assets/fssai.webp"
 import { RestaurantDetailSkeleton } from "@food/components/ui/loading-skeletons"
 import RestaurantFoodCard from "@food/components/user/restaurants/RestaurantFoodCard"
 
@@ -2788,29 +2787,6 @@ function RestaurantDetailsContent() {
         )}
       </div>
 
-      {/* FSSAI License Information - Bottom of page */}
-      {restaurant?.onboarding?.step3?.fssai?.registrationNumber && (
-        <div className="px-4 py-4 mt-2 mb-40 border-t border-dashed border-gray-200 dark:border-gray-800 bg-gray-50/30 dark:bg-white/5 mx-4 rounded-xl">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-20 flex items-center justify-center bg-white rounded-lg p-1.5 shadow-sm border border-gray-100">
-              <img
-                src={fssaiLogo}
-                alt="FSSAI"
-                className="h-full w-auto object-contain"
-              />
-            </div>
-            <div className="flex-1">
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold mb-1">
-                License No.
-              </p>
-              <p className="text-sm font-semibold text-gray-600 dark:text-gray-300 font-mono tracking-wide">
-                {restaurant?.onboarding?.step3?.fssai?.registrationNumber}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Menu Button - Sticky at page bottom right (hidden when filter or menu sheet open) */}
       {!showFilterSheet && !showMenuSheet && !showMenuOptionsSheet && (
         <div className="sticky dark:bg-[#1a1a1a] bottom-4 flex justify-end px-4 z-50 mt-auto">
@@ -3801,26 +3777,6 @@ function RestaurantDetailsContent() {
                       </p>
                     </div>
 
-                    {/* FSSAI License Information */}
-                    {restaurant?.onboarding?.step3?.fssai?.registrationNumber && (
-                      <div className="mt-4 px-2 pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center gap-3 opacity-80 mb-2">
-                        <div className="h-8 w-14 flex items-center justify-center bg-white rounded p-1 border border-gray-100">
-                          <img
-                            src={fssaiLogo}
-                            alt="FSSAI"
-                            className="h-full w-auto object-contain"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
-                            Lic. No.
-                          </p>
-                          <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                            {restaurant?.onboarding?.step3?.fssai?.registrationNumber}
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Bottom Handle */}
