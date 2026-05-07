@@ -1433,6 +1433,74 @@ export default function OrdersMain() {
     };
   }, [showNewOrderPopup, popupOrder, newOrder]);
 
+  useEffect(() => {
+    if (!showNewOrderPopup) return;
+    const orderForModal = popupOrder || newOrder;
+    if (!orderForModal) return;
+
+    const lookupIdRaw =
+      orderForModal?.orderMongoId ||
+      orderForModal?._id ||
+      orderForModal?.orderId ||
+      orderForModal?.id ||
+      "";
+    const lookupId = String(lookupIdRaw).trim();
+    if (!lookupId) return;
+
+    let active = true;
+    const verifyPopupOrderStatus = async () => {
+      try {
+        const response = await restaurantAPI.getOrderById(lookupId);
+        const apiOrder =
+          response?.data?.data?.order ||
+          response?.data?.order ||
+          response?.data?.data ||
+          null;
+        if (!active || !apiOrder) return;
+
+        const status = String(apiOrder?.orderStatus || apiOrder?.status || "").toLowerCase();
+        if (status && status !== "created") {
+          const eventKeys = getOrderKeys(apiOrder);
+          window.dispatchEvent(
+            new CustomEvent("restaurantOrderStatusUpdated", {
+              detail: {
+                ...apiOrder,
+                orderStatus: status,
+                status,
+                orderKeys: eventKeys,
+                source: "restaurant_popup_status_poll",
+              },
+            }),
+          );
+
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+          setShowNewOrderPopup(false);
+          setPopupOrder(null);
+          clearNewOrder();
+          toast.info("This order was already updated.");
+          return;
+        }
+
+        setPopupOrder((prev) =>
+          normalizePopupOrderForModal(apiOrder, prev || popupOrderRef.current || newOrderRef.current || orderForModal),
+        );
+      } catch (error) {
+        debugWarn("Popup order status verification failed:", error?.message || error);
+      }
+    };
+
+    verifyPopupOrderStatus();
+    const intervalId = setInterval(verifyPopupOrderStatus, 8000);
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [showNewOrderPopup, clearNewOrder]);
+
   // Real-time: order status updates are handled via the "restaurantOrderStatusUpdated" 
   // event listener below to ensure synchronization across all tabs and status types.
 

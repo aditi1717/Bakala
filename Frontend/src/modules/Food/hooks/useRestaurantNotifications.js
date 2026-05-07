@@ -169,6 +169,26 @@ export const useRestaurantNotifications = () => {
     return payloadKeys.some((key) => keys.includes(key));
   };
 
+  const dispatchOrderNoLongerPending = (orderData = null) => {
+    if (typeof window === 'undefined' || !orderData) return;
+    const orderKeys = getOrderKeys(orderData);
+    if (orderKeys.length === 0) return;
+
+    window.dispatchEvent(
+      new CustomEvent('restaurantOrderStatusUpdated', {
+        detail: {
+          ...orderData,
+          previousOrderStatus: orderData?.orderStatus || orderData?.status || '',
+          orderStatus: 'processed',
+          status: 'processed',
+          orderKeys,
+          message: 'Order is no longer waiting for restaurant review.',
+          source: 'restaurant_pending_recovery',
+        },
+      }),
+    );
+  };
+
   const shouldProcessOrderAlert = (orderData = {}) => {
     const status = String(orderData?.orderStatus || orderData?.status || "").toLowerCase();
     if (status && status !== "created") return false;
@@ -304,12 +324,16 @@ export const useRestaurantNotifications = () => {
       );
 
       if (activeOrderRef.current && !hasMatchingOrderKey(pendingOrderKeys, activeOrderRef.current)) {
+        dispatchOrderNoLongerPending(activeOrderRef.current);
         stopAlertLoop();
         activeOrderRef.current = null;
       }
 
       if (pendingReview.length === 0) {
-        setNewOrder((prev) => (prev ? null : prev));
+        setNewOrder((prev) => {
+          if (prev) dispatchOrderNoLongerPending(prev);
+          return prev ? null : prev;
+        });
         return;
       }
 
@@ -318,6 +342,7 @@ export const useRestaurantNotifications = () => {
         if (prev && hasMatchingOrderKey(pendingOrderKeys, prev)) {
           return prev;
         }
+        if (prev) dispatchOrderNoLongerPending(prev);
         return latestPendingOrder;
       });
       pendingReview.slice(0, 5).forEach((order) => handleIncomingOrderAlert(order));
