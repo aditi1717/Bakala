@@ -343,7 +343,7 @@ export const useRestaurantNotifications = () => {
   useEffect(() => {
     if (!restaurantId) return;
 
-    const ALERT_POLL_MS = 3000;
+    const ALERT_POLL_MS = isConnected ? 30000 : 12000; // 12s if disconnected, 30s if connected
     let isCancelled = false;
 
     const pollOrders = async () => {
@@ -364,7 +364,7 @@ export const useRestaurantNotifications = () => {
       isCancelled = true;
       clearInterval(intervalId);
     };
-  }, [restaurantId, recoverRestaurantState]);
+  }, [restaurantId, recoverRestaurantState, isConnected]);
 
   useEffect(() => {
     if (!supportsBrowserNotifications()) return;

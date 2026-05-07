@@ -1647,6 +1647,11 @@ export async function cancelOrder(orderId, userId, reason) {
       io.to(rooms.user(userId)).emit("order_status_update", payload);
       io.to(rooms.restaurant(order.restaurantId)).emit("order_status_update", payload);
       io.to(rooms.admin()).emit("order_status_update", payload);
+
+      // Explicitly emit order_cancelled to trigger instant UI removal
+      const cancelPayload = { ...payload, status: order.orderStatus, type: 'order_cancelled' };
+      io.to(rooms.restaurant(order.restaurantId)).emit("order_cancelled", cancelPayload);
+      io.to(rooms.admin()).emit("order_cancelled", cancelPayload);
     }
   } catch (err) {
     logger.warn(`cancelOrder socket emit failed: ${err?.message || err}`);
@@ -1902,6 +1907,13 @@ export async function updateOrderStatusRestaurant(
         );
         io.to(rooms.user(order.userId)).emit("order_status_update", payload);
         io.to(rooms.admin()).emit("order_status_update", payload);
+
+        // Explicitly emit order_cancelled to trigger instant UI removal
+        if (String(orderStatus).includes("cancel")) {
+          const cancelPayload = { ...payload, status: orderStatus, type: 'order_cancelled' };
+          io.to(rooms.restaurant(restaurantId)).emit("order_cancelled", cancelPayload);
+          io.to(rooms.admin()).emit("order_cancelled", cancelPayload);
+        }
       }
 
     const notifyList = [
