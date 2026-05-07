@@ -152,8 +152,18 @@ const triggerWebViewNativeNotification = async (orderData = {}) => {
 
       for (const handlerName of handlerNames) {
         try {
-          await window.flutter_inappwebview.callHandler(handlerName, bridgePayload);
-          return true;
+          const result = await window.flutter_inappwebview.callHandler(handlerName, bridgePayload);
+          if (
+            result === true ||
+            result === 'true' ||
+            result === 'ok' ||
+            result === 'played' ||
+            result?.handled === true ||
+            result?.played === true ||
+            result?.success === true
+          ) {
+            return true;
+          }
         } catch {
           // Try next handler name.
         }
@@ -267,14 +277,10 @@ export const useDeliveryNotifications = () => {
   
   const playNotificationSound = useCallback(async (orderData = {}) => {
     try {
-      const usedNativeBridge = await triggerWebViewNativeNotification(orderData);
+      await triggerWebViewNativeNotification(orderData);
 
       if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
         navigator.vibrate([200, 100, 200, 100, 300]);
-      }
-
-      if (usedNativeBridge) {
-        return;
       }
 
       // Get current selected sound preference from localStorage
