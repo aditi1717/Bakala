@@ -20,6 +20,25 @@ const getMediaUrl = (url) => {
   return `${origin}${url.startsWith('/') ? url : '/' + url}`;
 };
 
+const getRestaurantRouteId = (restaurant) => {
+  const objectId = String(restaurant?._id || restaurant?.id || "").trim()
+  if (objectId) return objectId
+
+  const normalizedName = String(
+    restaurant?.restaurantNameNormalized ||
+    restaurant?.nameNormalized ||
+    restaurant?.restaurantName ||
+    restaurant?.name ||
+    ""
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, " ")
+    .replace(/\s+/g, "-")
+
+  return normalizedName
+}
+
 // Debounce hook for real-time search
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value)
@@ -182,7 +201,7 @@ export default function ProfessionalSearch() {
                 </div>
                 <div className="grid gap-4">
                   {results.dishes.map((r) => (
-                    <Link to={`/food/restaurants/${r.slug || r._id}${r.matchedDishId ? `?dish=${r.matchedDishId}` : ''}`} key={r._id} className="flex gap-4 p-3 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-800 hover:shadow-md transition-shadow group">
+                    <Link to={`/food/restaurants/${getRestaurantRouteId(r)}${r.matchedDishId ? `?dish=${r.matchedDishId}` : ''}`} key={r._id} className="flex gap-4 p-3 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-800 hover:shadow-md transition-shadow group">
                        <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 relative">
                            <img 
                             src={getMediaUrl(r.matchedDishImage || r.profileImage || r.image || (Array.isArray(r.images) && r.images[0]))} 
@@ -226,7 +245,7 @@ export default function ProfessionalSearch() {
                 </div>
                 <div className="grid gap-6">
                   {results.restaurants.map((r) => (
-                    <Link to={`/food/restaurants/${r.slug || r._id}`} key={r._id} className="block group">
+                    <Link to={`/food/restaurants/${getRestaurantRouteId(r)}`} key={r._id} className="block group">
                       <div className="relative rounded-3xl overflow-hidden aspect-[16/9] mb-3 bg-slate-200">
                          <img 
                           src={getMediaUrl(r.profileImage || r.image || (Array.isArray(r.images) && r.images[0]))} 
