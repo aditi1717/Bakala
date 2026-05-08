@@ -1614,10 +1614,24 @@ const getPublicRestaurantOutletTimingsOnce = (id, config = {}) => {
 let restaurantCurrentInFlight = null;
 let restaurantCurrentCached = null;
 let restaurantCurrentCacheTime = 0;
+let restaurantCurrentCacheToken = null;
 const RESTAURANT_CURRENT_CACHE_MS = 3000;
 
 const getRestaurantCurrentOnce = () => {
   const now = Date.now();
+  const currentToken =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("restaurant_accessToken")
+      : null;
+
+  // Prevent cross-account stale cache when token changes quickly after logout/login/signup.
+  if (restaurantCurrentCacheToken !== currentToken) {
+    restaurantCurrentInFlight = null;
+    restaurantCurrentCached = null;
+    restaurantCurrentCacheTime = 0;
+    restaurantCurrentCacheToken = currentToken;
+  }
+
   if (
     restaurantCurrentCached &&
     now - restaurantCurrentCacheTime < RESTAURANT_CURRENT_CACHE_MS
@@ -1630,6 +1644,7 @@ const getRestaurantCurrentOnce = () => {
       .then((res) => {
         restaurantCurrentCached = res;
         restaurantCurrentCacheTime = Date.now();
+        restaurantCurrentCacheToken = currentToken;
         return res;
       })
       .finally(() => {
