@@ -11,6 +11,7 @@ import { useLocation } from "@food/hooks/useLocation"
 import { useZone } from "@food/hooks/useZone"
 import { restaurantAPI, adminAPI } from "@food/api"
 import { useDelayedLoading } from "@food/hooks/useDelayedLoading"
+import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
 import BRAND_THEME from "@/config/brandTheme"
 
 const debugLog = (...args) => {}
@@ -43,6 +44,7 @@ export default function SearchResults() {
   const menuEnrichmentRequestRef = useRef(0)
   const [restaurantsData, setRestaurantsData] = useState([])
   const [loadingRestaurants, setLoadingRestaurants] = useState(true)
+  const [availabilityTick, setAvailabilityTick] = useState(Date.now())
   const [categories, setCategories] = useState([
     { id: 'all', name: "All", image: "" }
   ])
@@ -60,6 +62,23 @@ export default function SearchResults() {
       return true
     })
   }
+  const sortOpenRestaurantsFirst = (list) => {
+    const now = new Date(availabilityTick)
+    return [...list].sort((a, b) => {
+      const aClosed = getRestaurantAvailabilityStatus(a, now).isOpen ? 0 : 1
+      const bClosed = getRestaurantAvailabilityStatus(b, now).isOpen ? 0 : 1
+      if (aClosed !== bClosed) return aClosed - bClosed
+      return 0
+    })
+  }
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setAvailabilityTick(Date.now())
+    }, 60000)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   // Fetch categories from admin API
   useEffect(() => {
@@ -72,9 +91,15 @@ export default function SearchResults() {
           const categoriesArray = response.data.data.categories
 
           // Transform API categories to match expected format
+          const activeCategories = categoriesArray.filter((cat) =>
+            cat?.status !== false &&
+            cat?.isActive !== false &&
+            String(cat?.approvalStatus || "approved").toLowerCase() !== "rejected"
+          )
+
           const transformedCategories = [
             { id: 'all', name: "All", image: "" },
-            ...categoriesArray.map((cat) => ({
+            ...activeCategories.map((cat) => ({
               id: cat.slug || cat.id,
               name: cat.name,
               image: cat.image || cat.imageUrl || "",
@@ -86,7 +111,7 @@ export default function SearchResults() {
 
           // Generate category keywords dynamically from category names
           const keywordsMap = {}
-          categoriesArray.forEach((cat) => {
+          activeCategories.forEach((cat) => {
             const categoryId = cat.slug || cat.id
             const categoryName = cat.name.toLowerCase()
 
@@ -132,6 +157,7 @@ export default function SearchResults() {
       // Check items in section
       if (section.items && Array.isArray(section.items)) {
         for (const item of section.items) {
+          if (item?.isAvailable === false) continue
           // Check item name
           const itemNameLower = (item.name || '').toLowerCase()
           if (keywords.some(keyword => itemNameLower.includes(keyword))) {
@@ -164,6 +190,7 @@ export default function SearchResults() {
     for (const section of menu.sections) {
       if (section.items && Array.isArray(section.items)) {
         for (const item of section.items) {
+          if (item?.isAvailable === false) continue
           const itemNameLower = (item.name || '').toLowerCase()
           const itemCategoryLower = (item.category || '').toLowerCase()
 
@@ -303,6 +330,7 @@ export default function SearchResults() {
               }
 
               return {
+                ...restaurant,
                 id: restaurantId,
                 name: restaurant.name,
                 cuisine: cuisine,
@@ -651,8 +679,8 @@ export default function SearchResults() {
       filtered = filtered.filter(r => r.offer && r.offer.includes('50%'))
     }
 
-    return uniqueRestaurants(filtered)
-  }, [deferredQuery, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories])
+    return sortOpenRestaurantsFirst(uniqueRestaurants(filtered))
+  }, [deferredQuery, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories, availabilityTick])
 
   const filteredAllRestaurants = useMemo(() => {
     // Use ONLY backend data - no hardcoded fallback
@@ -759,8 +787,8 @@ export default function SearchResults() {
       filtered = filtered.filter(r => r.offer && r.offer.includes('50%'))
     }
 
-    return uniqueRestaurants(filtered)
-  }, [deferredQuery, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories])
+    return sortOpenRestaurantsFirst(uniqueRestaurants(filtered))
+  }, [deferredQuery, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories, availabilityTick])
 
   const recommendedIds = useMemo(
     () => new Set(filteredRecommended.slice(0, 6).map((restaurant) => restaurant.id)),
@@ -921,13 +949,16 @@ export default function SearchResults() {
             {/* Small Restaurant Cards - Horizontal Scroll */}
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 sm:gap-4 lg:gap-5">
               {filteredRecommended.slice(0, 6).map((restaurant) => {
+                const availability = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick))
+                const isRestaurantOffline = !availability.isOpen
+                const isUnavailableNow = shouldShowGrayscale || isRestaurantOffline
                 return (
                   <Link
                     key={restaurant.id}
                     to={`/user/restaurants/${restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, '-')}`}
                     className="block"
                   >
-                    <div className={`group ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
+                    <div className={`group ${isUnavailableNow ? 'grayscale opacity-75' : ''}`}>
                       {/* Image Container */}
                       <div className="relative aspect-square rounded-xl overflow-hidden mb-2 bg-gray-200 dark:bg-gray-800">
                         {restaurant.image ? (
@@ -953,6 +984,9 @@ export default function SearchResults() {
                             {restaurant.offer}
                           </div>
                         )}
+                        <div className={`absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-white ${isRestaurantOffline ? 'bg-gray-700/90' : 'bg-emerald-600/90'}`}>
+                          {isRestaurantOffline ? "Offline" : "Open"}
+                        </div>
                       </div>
 
                       {/* Rating Badge - Only show if rating exists */}
@@ -994,10 +1028,13 @@ export default function SearchResults() {
             {nonRepeatedAllRestaurants.map((restaurant) => {
               const restaurantSlug = restaurant.name.toLowerCase().replace(/\s+/g, "-")
               const isFavorite = favorites.has(restaurant.id)
+              const availability = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick))
+              const isRestaurantOffline = !availability.isOpen
+              const isUnavailableNow = shouldShowGrayscale || isRestaurantOffline
 
               return (
                 <Link key={restaurant.id} to={`/user/restaurants/${restaurant.slug || restaurantSlug}`} className="h-full flex">
-                  <Card className={`overflow-hidden cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md flex flex-col h-full w-full ${shouldShowGrayscale ? 'grayscale opacity-75' : ''
+                  <Card className={`overflow-hidden cursor-pointer border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md flex flex-col h-full w-full ${isUnavailableNow ? 'grayscale opacity-75' : ''
                     }`}>
                     {/* Image Section */}
                     <div className="relative h-44 sm:h-52 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0 bg-gray-200 dark:bg-gray-800">
@@ -1048,6 +1085,9 @@ export default function SearchResults() {
                           Ad
                         </div>
                       )}
+                      <div className={`absolute bottom-3 left-3 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-sm ${isRestaurantOffline ? 'bg-gray-800/90' : 'bg-emerald-600/90'}`}>
+                        {isRestaurantOffline ? "Offline" : "Open now"}
+                      </div>
 
                       {/* Bookmark Icon - Top Right */}
                         <Button

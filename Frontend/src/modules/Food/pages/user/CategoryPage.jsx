@@ -22,6 +22,7 @@ import { useLocation } from "@food/hooks/useLocation"
 import { useZone } from "@food/hooks/useZone"
 import { useDelayedLoading } from "@food/hooks/useDelayedLoading"
 import { getMenuFromResponse } from "@food/utils/menuItems"
+import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
 import BRAND_THEME from "@/config/brandTheme"
 
 // Filter options
@@ -71,6 +72,7 @@ export default function CategoryPage() {
   const [isEnrichingMenus, setIsEnrichingMenus] = useState(false)
   const [approvedFoodsData, setApprovedFoodsData] = useState([])
   const [categoryKeywords, setCategoryKeywords] = useState({})
+  const [availabilityTick, setAvailabilityTick] = useState(Date.now())
   const showCategorySkeleton = useDelayedLoading(loadingCategories)
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const BACKEND_ORIGIN = useMemo(() => API_BASE_URL.replace(/\/api\/?$/, ""), [])
@@ -183,6 +185,13 @@ export default function CategoryPage() {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAvailabilityTick(Date.now())
+    }, 60000)
+    return () => clearInterval(interval)
   }, [])
 
   const buildFallbackMenuFromFoods = (foods, restaurant) => {
@@ -562,6 +571,15 @@ export default function CategoryPage() {
     return uniqueByRestaurant(nextRows)
   }
 
+  const sortUnavailableToEnd = (rows) => {
+    const now = new Date(availabilityTick)
+    return [...rows].sort((left, right) => {
+      const leftClosed = getRestaurantAvailabilityStatus(left, now).isOpen ? 0 : 1
+      const rightClosed = getRestaurantAvailabilityStatus(right, now).isOpen ? 0 : 1
+      return leftClosed - rightClosed
+    })
+  }
+
   // Fetch categories from admin API
   useEffect(() => {
     let isCancelled = false;
@@ -577,9 +595,15 @@ export default function CategoryPage() {
           const categoriesArray = response.data.data.categories
 
           // Transform API categories to match expected format
+          const activeCategories = categoriesArray.filter((cat) =>
+            cat?.status !== false &&
+            cat?.isActive !== false &&
+            String(cat?.approvalStatus || "approved").toLowerCase() !== "rejected"
+          )
+
           const transformedCategories = [
             { id: 'all', name: "All", image: null, slug: 'all' },
-            ...categoriesArray.map((cat) => ({
+            ...activeCategories.map((cat) => ({
               id: cat.slug || cat.id,
               name: cat.name,
               image: cat.image || foodImages[0],
@@ -592,7 +616,7 @@ export default function CategoryPage() {
 
           // Generate category keywords dynamically from category names
           const keywordsMap = {}
-          categoriesArray.forEach((cat) => {
+          activeCategories.forEach((cat) => {
             const categoryId = cat.slug || cat.id
             const categoryName = cat.name.toLowerCase()
 
@@ -664,6 +688,7 @@ export default function CategoryPage() {
 
       if (section.items && Array.isArray(section.items)) {
         for (const item of section.items) {
+          if (item?.isAvailable === false) continue
           const itemNameLower = (item.name || '').toLowerCase()
           const itemCategoryLower = (item.categoryName || item.category || '').toLowerCase()
 
@@ -686,6 +711,7 @@ export default function CategoryPage() {
 
           const subItems = Array.isArray(subsection?.items) ? subsection.items : []
           for (const item of subItems) {
+            if (item?.isAvailable === false) continue
             const itemNameLower = (item?.name || "").toLowerCase()
             const itemCategoryLower = (item?.categoryName || item?.category || "").toLowerCase()
             if (
@@ -721,6 +747,7 @@ export default function CategoryPage() {
 
       if (section.items && Array.isArray(section.items)) {
         for (const item of section.items) {
+          if (item?.isAvailable === false) continue
           const itemNameLower = (item.name || '').toLowerCase()
           const itemCategoryLower = (item.categoryName || item.category || '').toLowerCase()
 
@@ -760,6 +787,7 @@ export default function CategoryPage() {
           const subItems = Array.isArray(subsection?.items) ? subsection.items : []
 
           for (const item of subItems) {
+            if (item?.isAvailable === false) continue
             const itemNameLower = (item?.name || "").toLowerCase()
             const itemCategoryLower = (item?.categoryName || item?.category || "").toLowerCase()
             const itemMatches =
@@ -896,6 +924,17 @@ export default function CategoryPage() {
                 slug: restaurant.slug || (restaurant.restaurantName || restaurant.name)?.toLowerCase().replace(/\s+/g, '-'),
                 restaurantId: restaurantId,
                 mongoId: restaurant._id || null,
+                isActive: restaurant.isActive,
+                isAcceptingOrders: restaurant.isAcceptingOrders,
+                isOnline: restaurant.isOnline,
+                availabilityStatus: restaurant.availabilityStatus || restaurant.availability?.status || restaurant.status,
+                availability: restaurant.availability || null,
+                outletTimings: restaurant.outletTimings || null,
+                deliveryTimings: restaurant.deliveryTimings || null,
+                openingTime: restaurant.openingTime || null,
+                closingTime: restaurant.closingTime || null,
+                openDays: Array.isArray(restaurant.openDays) ? restaurant.openDays : [],
+                status: restaurant.status || null,
                 hasPaneer: false,
                 category: 'all',
               }
@@ -1201,8 +1240,8 @@ export default function CategoryPage() {
       }
     }
 
-    return applyFiltersAndSorting(filtered)
-  }, [selectedCategory, activeFilters, deferredSearchQuery, restaurantsData, categoryKeywords, vegMode, approvedFoodsData, sortBy])
+    return sortUnavailableToEnd(applyFiltersAndSorting(filtered))
+  }, [selectedCategory, activeFilters, deferredSearchQuery, restaurantsData, categoryKeywords, vegMode, approvedFoodsData, sortBy, availabilityTick])
 
   const filteredAllRestaurants = useMemo(() => {
     const sourceData = restaurantsData.length > 0 ? restaurantsData : []
@@ -1251,8 +1290,8 @@ export default function CategoryPage() {
       }
     }
 
-    return applyFiltersAndSorting(filtered)
-  }, [selectedCategory, activeFilters, deferredSearchQuery, restaurantsData, categoryKeywords, vegMode, approvedFoodsData, sortBy])
+    return sortUnavailableToEnd(applyFiltersAndSorting(filtered))
+  }, [selectedCategory, activeFilters, deferredSearchQuery, restaurantsData, categoryKeywords, vegMode, approvedFoodsData, sortBy, availabilityTick])
 
   const showRestaurantSkeleton = useDelayedLoading(
     isLoadingFilterResults || loadingRestaurants || (isEnrichingMenus && selectedCategory !== 'all' && filteredRecommended.length === 0),
@@ -1458,13 +1497,15 @@ export default function CategoryPage() {
                   ? filteredRecommended
                   : filteredRecommended.slice(0, 6)
                 ).map((restaurant) => {
+                  const availability = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick))
+                  const isUnavailableNow = !availability.isOpen
                   return (
                     <Link
                       key={restaurant.id}
                       to={`/user/restaurants/${restaurant.name.toLowerCase().replace(/\s+/g, '-')}`}
                       className="block"
                     >
-                      <div className={`group ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
+                      <div className={`group ${(shouldShowGrayscale || isUnavailableNow) ? 'grayscale opacity-75' : ''}`}>
                         {/* Image Container */}
                         <div className="relative aspect-square rounded-xl md:rounded-2xl overflow-hidden mb-2">
                           {/* Use category dish image if available, otherwise restaurant image */}
@@ -1563,10 +1604,12 @@ export default function CategoryPage() {
               {filteredAllRestaurants.map((restaurant) => {
                 const restaurantSlug = restaurant.name.toLowerCase().replace(/\s+/g, "-")
                 const isFavorite = favorites.has(restaurant.id)
+                const availability = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick))
+                const isUnavailableNow = !availability.isOpen
 
                 return (
                   <Link key={restaurant.id} to={`/user/restaurants/${restaurantSlug}`} className="h-full flex">
-                    <Card className={`overflow-hidden cursor-pointer gap-0 border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md h-full flex flex-col w-full ${shouldShowGrayscale ? 'grayscale opacity-75' : ''
+                    <Card className={`overflow-hidden cursor-pointer gap-0 border-0 dark:border-gray-800 group bg-white dark:bg-[#1a1a1a] shadow-md hover:shadow-xl transition-all duration-300 py-0 rounded-md h-full flex flex-col w-full ${(shouldShowGrayscale || isUnavailableNow) ? 'grayscale opacity-75' : ''
                       }`}>
                       {/* Image Section */}
                       <div className="relative h-44 sm:h-52 md:h-60 lg:h-64 xl:h-72 w-full overflow-hidden rounded-t-md flex-shrink-0">

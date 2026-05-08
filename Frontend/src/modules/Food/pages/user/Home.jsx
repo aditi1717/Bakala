@@ -542,9 +542,7 @@ export default function Home() {
             
             {visibleRestaurants.map((r, i) => (
               (() => {
-                const availability = getRestaurantAvailabilityStatus(r, new Date(availabilityTick), {
-                  ignoreOperationalStatus: true,
-                });
+                const availability = getRestaurantAvailabilityStatus(r, new Date(availabilityTick));
                 const isUnavailableNow = !availability.isOpen;
 
                 return (

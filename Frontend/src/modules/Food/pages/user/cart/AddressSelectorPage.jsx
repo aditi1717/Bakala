@@ -9,6 +9,7 @@ import { useLocation as useGeoLocation } from "@food/hooks/useLocation"
 import { useProfile } from "@food/context/ProfileContext"
 import { toast } from "sonner"
 import { locationAPI, userAPI } from "@food/api"
+import { isModuleAuthenticated } from "@food/utils/auth"
 import { Loader } from '@googlemaps/js-api-loader'
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
@@ -482,6 +483,18 @@ export default function AddressSelectorPage({ formOnly = false }) {
   }, [navigate, routerLocation.hash, routerLocation.pathname, routerLocation.search])
 
   const handleAddAddressClick = () => {
+    const isLoggedInUser = isModuleAuthenticated("user")
+    if (!isLoggedInUser) {
+      toast.error("Please login first to add a new address")
+      navigate("/user/auth/login", {
+        replace: true,
+        state: {
+          from: `${routerLocation.pathname || "/food/user/address-selector"}${routerLocation.search || ""}`,
+        },
+      })
+      return
+    }
+
     if (!isFormRoute) {
       openAddressFormPage()
       return

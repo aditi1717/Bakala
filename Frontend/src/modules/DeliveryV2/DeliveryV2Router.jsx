@@ -45,8 +45,8 @@ const DeliveryV2Router = () => {
         <Route path="privacy" element={<PrivacyPolicyV2 />} />
 
         {/* Protected Core Routes */}
-        <Route path="/" element={<ProtectedRoute><DeliveryHomeV2 tab="feed" /></ProtectedRoute>} />
-        <Route path="/feed" element={<ProtectedRoute><DeliveryHomeV2 tab="feed" /></ProtectedRoute>} />
+        <Route path="/" element={<Navigate to="/food/delivery/orders" replace />} />
+        <Route path="/feed" element={<Navigate to="/food/delivery/orders" replace />} />
         <Route path="/orders" element={<ProtectedRoute><DeliveryHomeV2 tab="orders" /></ProtectedRoute>} />
         <Route path="/orders/:orderId" element={<ProtectedRoute><OrderDetailV2 /></ProtectedRoute>} />
         <Route path="/pocket" element={<ProtectedRoute><DeliveryHomeV2 tab="pocket" /></ProtectedRoute>} />
@@ -72,7 +72,7 @@ const DeliveryV2Router = () => {
         <Route path="/pocket/details" element={<ProtectedRoute><PocketDetailsV2 /></ProtectedRoute>} />
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/food/delivery" replace />} />
+        <Route path="*" element={<Navigate to="/food/delivery/orders" replace />} />
       </Routes>
     </Suspense>
   );

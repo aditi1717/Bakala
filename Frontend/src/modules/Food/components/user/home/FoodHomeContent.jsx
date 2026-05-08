@@ -68,9 +68,7 @@ const FoodRestaurantCard = memo(function FoodRestaurantCard({
       ? restaurant.slug.trim()
       : fallbackSlugSource.toLowerCase().replace(/\s+/g, "-");
 
-  const availability = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick), {
-    ignoreOperationalStatus: true,
-  });
+  const availability = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick));
   const favorite = isFavorite(restaurantSlug);
 
   return (

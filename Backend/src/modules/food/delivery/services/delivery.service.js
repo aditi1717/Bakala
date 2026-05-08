@@ -4,6 +4,7 @@ import { DeliverySupportTicket } from '../models/supportTicket.model.js';
 import { DeliveryBonusTransaction } from '../../admin/models/deliveryBonusTransaction.model.js';
 import { FoodPayoutSettlement } from '../../admin/models/foodPayoutSettlement.model.js';
 import { FoodEarningAddon } from '../../admin/models/earningAddon.model.js';
+import { FoodZone } from '../../admin/models/zone.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { sanitizeOrderForExternal } from '../../orders/services/order.helpers.js';
 import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
@@ -17,11 +18,34 @@ const queueDeliveryPartnerForReview = (partner) => {
     if (currentStatus !== 'pending') {
         partner.status = 'pending';
     }
+    // Clear previous decision metadata when profile/docs are resubmitted for review.
+    partner.approvedAt = null;
+    partner.rejectedAt = null;
+    partner.rejectionReason = '';
+};
+
+const resolveActiveDeliveryZoneId = async (zoneId) => {
+    const rawZoneId = String(zoneId || '').trim();
+    if (!rawZoneId) return null;
+    if (!mongoose.Types.ObjectId.isValid(rawZoneId)) {
+        throw new ValidationError('Invalid zone');
+    }
+
+    const zone = await FoodZone.findOne({
+        _id: new mongoose.Types.ObjectId(rawZoneId),
+        isActive: { $ne: false }
+    }).select('_id').lean();
+
+    if (!zone) {
+        throw new ValidationError('Selected zone is not available');
+    }
+
+    return zone._id;
 };
 
 export const registerDeliveryPartner = async (payload, files) => {
     const { 
-        name, phone, email, countryCode, address, city, state, 
+        name, phone, email, countryCode, address, city, state, zoneId,
         vehicleType, vehicleName, vehicleNumber, drivingLicenseNumber, panNumber, aadharNumber,
         fcmToken, platform 
     } = payload;
@@ -54,6 +78,8 @@ export const registerDeliveryPartner = async (payload, files) => {
         );
     }
 
+    const resolvedZoneId = await resolveActiveDeliveryZoneId(zoneId);
+
     const partner = await FoodDeliveryPartner.create({
         name,
         phone,
@@ -62,6 +88,7 @@ export const registerDeliveryPartner = async (payload, files) => {
         address,
         city,
         state,
+        zoneId: resolvedZoneId,
         vehicleType,
         vehicleName,
         vehicleNumber,
@@ -122,20 +149,29 @@ export const updateDeliveryPartnerProfile = async (userId, payload, files) => {
     }
 
     const {
-        name, countryCode, address, city, state,
+        name, countryCode, address, city, state, zoneId,
         vehicleType, vehicleName, vehicleNumber, drivingLicenseNumber, panNumber, aadharNumber,
         fcmToken, platform
     } = payload;
+    const previousZoneId = partner.zoneId ? String(partner.zoneId) : '';
+    let nextZoneId = previousZoneId;
 
     if (name) partner.name = name;
     if (countryCode !== undefined) partner.countryCode = countryCode;
     if (address !== undefined) partner.address = address;
     if (city !== undefined) partner.city = city;
     if (state !== undefined) partner.state = state;
+    if (zoneId !== undefined) {
+        const resolvedZoneId = await resolveActiveDeliveryZoneId(zoneId);
+        nextZoneId = resolvedZoneId ? String(resolvedZoneId) : '';
+        partner.zoneId = resolvedZoneId;
+    }
     if (vehicleType !== undefined) partner.vehicleType = vehicleType;
     if (vehicleName !== undefined) partner.vehicleName = vehicleName;
     if (vehicleNumber !== undefined) partner.vehicleNumber = vehicleNumber;
     if (drivingLicenseNumber !== undefined) partner.drivingLicenseNumber = drivingLicenseNumber;
+    if (panNumber !== undefined) partner.panNumber = panNumber;
+    if (aadharNumber !== undefined) partner.aadharNumber = aadharNumber;
 
     if (fcmToken) {
         if (platform === 'mobile') {
@@ -176,22 +212,46 @@ export const updateDeliveryPartnerProfile = async (userId, payload, files) => {
         address !== undefined ||
         city !== undefined ||
         state !== undefined ||
+        zoneId !== undefined ||
         vehicleType !== undefined ||
         vehicleName !== undefined ||
         vehicleNumber !== undefined ||
-        drivingLicenseNumber !== undefined
+        drivingLicenseNumber !== undefined ||
+        panNumber !== undefined ||
+        aadharNumber !== undefined
     ) {
         updatedProfile = true;
     }
 
-    if (updatedProfile) {
+    const zoneChanged = zoneId !== undefined && previousZoneId !== nextZoneId;
+    const requiresReapproval = zoneChanged || updatedProfile;
+    if (requiresReapproval) {
         queueDeliveryPartnerForReview(partner);
     }
 
     await partner.save();
+
+    // Notify admins when re-approval is required.
+    if (requiresReapproval) {
+        try {
+            const { notifyAdminsSafely } = await import('../../../../core/notifications/firebase.service.js');
+            void notifyAdminsSafely({
+                title: 'Delivery Partner Update 🚲',
+                body: `Delivery partner "${partner.name}" has updated profile details and requires re-approval.`,
+                data: {
+                    type: 'profile_update',
+                    subType: 'delivery_partner',
+                    id: String(partner._id)
+                }
+            });
+        } catch (e) {
+            console.error('Failed to notify admins of delivery partner update:', e);
+        }
+    }
+
     return {
         partner: partner.toObject(),
-        requiresReapproval: updatedProfile
+        requiresReapproval
     };
 };
 
@@ -201,38 +261,44 @@ export const updateDeliveryPartnerDetails = async (userId, payload) => {
         throw new ValidationError('Delivery partner not found');
     }
 
-    let updatedProfile = false;
+    const previousZoneId = partner.zoneId ? String(partner.zoneId) : '';
+    let nextZoneId = previousZoneId;
+    let zoneChanged = false;
+    if (payload?.zoneId !== undefined) {
+        const resolvedZoneId = await resolveActiveDeliveryZoneId(payload.zoneId);
+        nextZoneId = resolvedZoneId ? String(resolvedZoneId) : '';
+        partner.zoneId = resolvedZoneId;
+        zoneChanged = previousZoneId !== nextZoneId;
+    }
     const vehicle = payload?.vehicle;
     if (vehicle && typeof vehicle === 'object') {
         if (vehicle.number !== undefined) {
             partner.vehicleNumber = String(vehicle.number || '').trim();
-            updatedProfile = true;
         }
         if (vehicle.type !== undefined) {
             partner.vehicleType = String(vehicle.type || '').trim();
-            updatedProfile = true;
         }
         if (vehicle.brand !== undefined) {
             partner.vehicleName = String(vehicle.brand || '').trim();
-            updatedProfile = true;
         }
         if (vehicle.model !== undefined) {
             partner.vehicleName = String(vehicle.model || '').trim();
-            updatedProfile = true;
         }
     }
 
     if (payload?.profilePhoto !== undefined) {
         partner.profilePhoto = payload.profilePhoto ? String(payload.profilePhoto).trim() : '';
-        updatedProfile = true;
     }
 
-    if (updatedProfile) {
+    if (zoneChanged || vehicle !== undefined || payload?.profilePhoto !== undefined) {
         queueDeliveryPartnerForReview(partner);
     }
 
     await partner.save();
-    return partner.toObject();
+    return {
+        partner: partner.toObject(),
+        requiresReapproval: zoneChanged || vehicle !== undefined || payload?.profilePhoto !== undefined
+    };
 };
 
 export const updateDeliveryPartnerProfilePhotoBase64 = async (userId, payload) => {
@@ -256,7 +322,10 @@ export const updateDeliveryPartnerProfilePhotoBase64 = async (userId, payload) =
     partner.profilePhoto = await uploadImageBuffer(buffer, 'food/delivery/profile');
     queueDeliveryPartnerForReview(partner);
     await partner.save();
-    return partner.toObject();
+    return {
+        partner: partner.toObject(),
+        requiresReapproval: true
+    };
 };
 
 export const updateDeliveryPartnerBankDetails = async (userId, payload, files) => {
@@ -324,7 +393,10 @@ export const updateDeliveryPartnerBankDetails = async (userId, payload, files) =
     }
 
     await partner.save();
-    return partner.toObject();
+    return {
+        partner: partner.toObject(),
+        requiresReapproval: updatedBankDetails
+    };
 };
 
 function generateTicketId() {

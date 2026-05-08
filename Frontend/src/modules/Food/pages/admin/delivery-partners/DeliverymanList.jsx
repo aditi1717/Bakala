@@ -336,8 +336,24 @@ availableCashLimit: wallet?.availableCashLimit || 0,
       const response = await adminAPI.getDeliveryPartnerById(deliveryman._id)
       
       if (response.data && response.data.success) {
+        const deliveryData = response.data.data.delivery || {}
+        const normalizedBankDetails =
+          deliveryData?.documents?.bankDetails ||
+          {
+            accountHolderName: deliveryData?.bankAccountHolderName || deliveryData?.accountHolderName || "",
+            accountNumber: deliveryData?.bankAccountNumber || deliveryData?.accountNumber || "",
+            ifscCode: deliveryData?.bankIfscCode || deliveryData?.ifscCode || "",
+            bankName: deliveryData?.bankName || "",
+            upiId: deliveryData?.upiId || "",
+            upiQrCode: deliveryData?.upiQrCode || "",
+          }
+
         setViewDetails({
-          ...response.data.data.delivery,
+          ...deliveryData,
+          documents: {
+            ...(deliveryData?.documents || {}),
+            bankDetails: normalizedBankDetails,
+          },
           walletSummary: deliveryman.walletSummary || null,
 pocketBalance: deliveryman.pocketBalance || 0,
 cashInHand: deliveryman.cashInHand || 0,
@@ -780,7 +796,7 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                         )}
                         {visibleColumns.zone && (
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-slate-700">{dm.zone}</span>
+                            <span className="text-sm text-slate-700">{dm.zone || "Unassigned"}</span>
                           </td>
                         )}
                         {visibleColumns.vehicleType && (
@@ -890,6 +906,14 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">Delivery ID</label>
                       <p className="text-sm font-medium text-slate-900 mt-1">{viewDetails.deliveryId || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> Zone
+                      </label>
+                      <p className="text-sm text-slate-900 mt-1">
+                        {viewDetails.zone || viewDetails.zoneName || viewDetails.zoneDetails?.zoneName || viewDetails.zoneDetails?.name || viewDetails.zoneDetails?.serviceLocation || "Unassigned"}
+                      </p>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">Status</label>

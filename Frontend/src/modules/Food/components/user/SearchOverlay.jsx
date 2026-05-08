@@ -7,6 +7,7 @@ import { searchAPI } from "@/services/api"
 import BRAND_THEME from "@/config/brandTheme"
 import { useLocation as useGeoLocation } from "@food/hooks/useLocation"
 import { useZone } from "@food/hooks/useZone"
+import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
 
 const SEARCH_HISTORY_KEY = "user_recent_searches_v1"
 
@@ -125,6 +126,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                 id: item?.matchedDishId || `${item?._id || "restaurant"}-dish-${index}`,
                 name: String(item.matchedDish).trim(),
                 image: item?.matchedDishImage || item?.image || item?.profileImage || "",
+                restaurantData: item,
               }
             }
 
@@ -133,12 +135,19 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                 id: item?._id || `restaurant-${index}`,
                 name: String(item.restaurantName).trim(),
                 image: item?.image || item?.profileImage || "",
+                restaurantData: item,
               }
             }
 
             return null
           })
           .filter(Boolean)
+          .sort((left, right) => {
+            const now = new Date()
+            const leftClosed = getRestaurantAvailabilityStatus(left?.restaurantData || left, now).isOpen ? 0 : 1
+            const rightClosed = getRestaurantAvailabilityStatus(right?.restaurantData || right, now).isOpen ? 0 : 1
+            return leftClosed - rightClosed
+          })
 
         if (searchRequestIdRef.current === requestId) {
           setFilteredFoods(normalizedFoods)
@@ -268,9 +277,13 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
           {filteredFoods.length > 0 ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
               {filteredFoods.map((food, index) => (
+                (() => {
+                  const availability = getRestaurantAvailabilityStatus(food?.restaurantData || food, new Date())
+                  const isUnavailableNow = !availability.isOpen
+                  return (
                 <div
                   key={food.id}
-                  className="flex flex-col items-center gap-2 sm:gap-3 cursor-pointer group"
+                  className={`flex flex-col items-center gap-2 sm:gap-3 cursor-pointer group ${isUnavailableNow ? "grayscale opacity-75" : ""}`}
                   style={{
                     animation: `slideUp 0.3s ease-out ${0.25 + 0.05 * (index % 12)}s both`
                   }}
@@ -296,6 +309,8 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
                     </span>
                   </div>
                 </div>
+                  )
+                })()
               ))}
             </div>
           ) : (

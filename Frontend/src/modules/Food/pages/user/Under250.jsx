@@ -18,6 +18,7 @@ import api from "@food/api"
 import { restaurantAPI, adminAPI } from "@food/api"
 import { isModuleAuthenticated } from "@food/utils/auth"
 import { flattenMenuItems, getMenuFromResponse } from "@food/utils/menuItems"
+import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
 import {
   buildCartLineId,
   getDefaultFoodVariant,
@@ -123,6 +124,7 @@ export default function Under250() {
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0)
   const [under250Restaurants, setUnder250Restaurants] = useState([])
   const [loadingRestaurants, setLoadingRestaurants] = useState(true)
+  const [availabilityTick, setAvailabilityTick] = useState(Date.now())
   const [hasScrolledPastBanner, setHasScrolledPastBanner] = useState(false)
   const bannerShellRef = useRef(null)
   const stickyHeaderRef = useRef(null)
@@ -152,6 +154,14 @@ export default function Under250() {
     ],
     [],
   )
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setAvailabilityTick(Date.now())
+    }, 60000)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   const sortOptions = [
     { id: null, label: 'Relevance' },
@@ -315,8 +325,14 @@ export default function Under250() {
       // No additional sorting needed
     }
 
-    return filtered
-  }, [under250Restaurants, selectedSort, under30MinsFilter, activeCategory, categories, vegMode])
+    const now = new Date(availabilityTick)
+    return [...filtered].sort((a, b) => {
+      const aClosed = getRestaurantAvailabilityStatus(a, now).isOpen ? 0 : 1
+      const bClosed = getRestaurantAvailabilityStatus(b, now).isOpen ? 0 : 1
+      if (aClosed !== bClosed) return aClosed - bClosed
+      return 0
+    })
+  }, [under250Restaurants, selectedSort, under30MinsFilter, activeCategory, categories, vegMode, availabilityTick])
 
   // Fetch under-price banner from public API
   useEffect(() => {
@@ -436,6 +452,22 @@ export default function Under250() {
 
   // Fetch restaurants with dishes under selected price from backend
   useEffect(() => {
+    const isCategoryActiveForItem = (item) => {
+      const category = item?.categoryDetails || item?.categoryObj || item?.categoryData || item?.category
+      const categoryStatus = String(
+        item?.categoryStatus ||
+        item?.categoryApprovalStatus ||
+        category?.approvalStatus ||
+        ""
+      ).toLowerCase()
+      if (item?.isCategoryActive === false) return false
+      if (item?.categoryIsActive === false) return false
+      if (category?.isActive === false) return false
+      if (category?.status === false) return false
+      if (categoryStatus === "inactive" || categoryStatus === "rejected" || categoryStatus === "disabled") return false
+      return true
+    }
+
     const fetchRestaurantsUnder250 = async () => {
       try {
         setLoadingRestaurants(true)
@@ -455,7 +487,12 @@ export default function Under250() {
               const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurantId)
               const menu = getMenuFromResponse(menuResponse)
               const menuItems = flattenMenuItems(menu)
-                .filter((item) => Number(item?.price || 0) <= maxPrice && item?.isAvailable !== false)
+                .filter((item) =>
+                  Number(item?.price || 0) <= maxPrice &&
+                  item?.isAvailable !== false &&
+                  String(item?.approvalStatus || "approved").toLowerCase() !== "rejected" &&
+                  isCategoryActiveForItem(item)
+                )
                 .map((item) => {
                   const foodType = String(item?.foodType || "").toLowerCase()
                   const isVeg = foodType.includes("veg") && !foodType.includes("non")
@@ -504,6 +541,7 @@ export default function Under250() {
                   : (restaurant?.distance || "")
 
               return {
+                ...restaurant,
                 id: String(restaurantId),
                 restaurantId: String(restaurantId),
                 slug:
@@ -552,6 +590,11 @@ export default function Under250() {
           : []
 
         const mappedCategories = categoriesRaw
+          .filter((cat) =>
+            cat?.status !== false &&
+            cat?.isActive !== false &&
+            String(cat?.approvalStatus || "approved").toLowerCase() !== "rejected"
+          )
           .map((cat, index) => {
             const name = String(cat?.name || "").trim()
             if (!name) return null
@@ -756,6 +799,12 @@ export default function Under250() {
     // Find restaurant name from the item or use provided parameter
     const restaurant = restaurantName || item.restaurant || underPriceDisplay
 
+    const restaurantAvailability = getRestaurantAvailabilityStatus(item?.restaurantSnapshot || item, new Date(availabilityTick))
+    if (!restaurantAvailability.isOpen) {
+      toast.error("Restaurant is currently offline. Please try again later.")
+      return
+    }
+
     // Prepare cart item with all required properties
     const cartItem = {
       id: lineItemId,
@@ -854,6 +903,7 @@ export default function Under250() {
       ...item,
       restaurant: restaurant.name,
       restaurantSlug: restaurant.slug || restaurant.restaurantId || "",
+      restaurantSnapshot: restaurant,
       description: item.description || `${item.name} from ${restaurant.name}`,
     }
     setSelectedItem(itemWithRestaurant)
@@ -964,6 +1014,10 @@ export default function Under250() {
 
   // Check if should show grayscale (only when user is out of service)
   const shouldShowGrayscale = isOutOfService
+  const selectedItemAvailability = selectedItem?.restaurantSnapshot
+    ? getRestaurantAvailabilityStatus(selectedItem.restaurantSnapshot, new Date(availabilityTick))
+    : { isOpen: true }
+  const shouldDisableSelectedItemActions = shouldShowGrayscale || !selectedItemAvailability.isOpen
 
   return (
 
@@ -1132,17 +1186,27 @@ export default function Under250() {
         ) : (
           sortedAndFilteredRestaurants.map((restaurant) => {
             const restaurantSlug = restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, "-")
+            const availability = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick))
+            const isRestaurantOffline = !availability.isOpen
+            const restaurantDisabled = shouldShowGrayscale || isRestaurantOffline
             return (
-              <section key={restaurant.id} className="pt-4 sm:pt-6 md:pt-8 lg:pt-10">
+              <section key={restaurant.id} className={`pt-4 sm:pt-6 md:pt-8 lg:pt-10 ${isRestaurantOffline ? 'grayscale opacity-75' : ''}`}>
                 {/* Restaurant Header */}
                 <div className="flex items-start justify-between mb-3 md:mb-4 lg:mb-6">
                   <div className="flex-1">
                     <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900 dark:text-white mb-1 md:mb-2">
                       {restaurant.name}
                     </h3>
-                    <div className="flex items-center gap-2 text-sm md:text-base lg:text-lg text-gray-500 dark:text-gray-400">
-                      <Clock className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" strokeWidth={1.5} />
-                      <span className="font-medium">{restaurant.deliveryTime}</span>
+                    <div className="flex flex-wrap items-center gap-2 text-sm md:text-base lg:text-lg text-gray-500 dark:text-gray-400">
+                      {restaurant.deliveryTime && (
+                        <>
+                          <Clock className="h-4 w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" strokeWidth={1.5} />
+                          <span className="font-medium">{restaurant.deliveryTime}</span>
+                        </>
+                      )}
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${isRestaurantOffline ? 'bg-gray-200 text-gray-700 dark:bg-gray-800 dark:text-gray-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'}`}>
+                        {isRestaurantOffline ? "Offline" : "Open now"}
+                      </span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end">
@@ -1175,8 +1239,10 @@ export default function Under250() {
                         return (
                           <motion.div
                             key={item.id}
-                            className="flex-shrink-0 w-[200px] sm:w-[220px] md:w-full bg-white dark:bg-[#1a1a1a] rounded-lg md:rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden cursor-pointer"
-                            onClick={() => handleItemClick(item, restaurant)}
+                            className={`flex-shrink-0 w-[200px] sm:w-[220px] md:w-full bg-white dark:bg-[#1a1a1a] rounded-lg md:rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden ${restaurantDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                            onClick={() => {
+                              if (!restaurantDisabled) handleItemClick(item, restaurant)
+                            }}
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true, margin: "-50px" }}
@@ -1267,19 +1333,19 @@ export default function Under250() {
                                   <Button
                                     variant={"outline"}
                                     size="sm"
-                                    disabled={shouldShowGrayscale}
-                                    className={`h-7 md:h-8 lg:h-9 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-base ${shouldShowGrayscale
+                                    disabled={restaurantDisabled}
+                                    className={`h-7 md:h-8 lg:h-9 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-base ${restaurantDisabled
                                       ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-300 dark:border-gray-700 cursor-not-allowed opacity-50'
                                       : ''
                                       }`}
-                                    style={shouldShowGrayscale ? undefined : {
+                                    style={restaurantDisabled ? undefined : {
                                       background: BRAND_THEME.gradients.primary,
                                       color: "#ffffff",
                                       border: "none",
                                     }}
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        if (!shouldShowGrayscale) {
+                                        if (!restaurantDisabled) {
                                           handleItemClick(item, restaurant)
                                         }
                                       }}
@@ -1590,26 +1656,26 @@ export default function Under250() {
               <div className="border-t dark:border-gray-800 border-gray-200 px-4 md:px-6 lg:px-8 xl:px-10 py-4 md:py-5 lg:py-6 bg-white dark:bg-[#1a1a1a]">
                 <div className="flex items-center gap-4 md:gap-5 lg:gap-6">
                   {/* Quantity Selector */}
-                  <div className={`flex items-center gap-3 md:gap-4 lg:gap-5 border-2 rounded-lg md:rounded-xl px-3 md:px-4 lg:px-5 h-[44px] md:h-[50px] lg:h-[56px] ${shouldShowGrayscale
+                  <div className={`flex items-center gap-3 md:gap-4 lg:gap-5 border-2 rounded-lg md:rounded-xl px-3 md:px-4 lg:px-5 h-[44px] md:h-[50px] lg:h-[56px] ${shouldDisableSelectedItemActions
                     ? 'border-gray-300 dark:border-gray-700 opacity-50'
                     : 'border-gray-300 dark:border-gray-700'
                     }`}>
                     <button
                       onClick={(e) => {
-                        if (!shouldShowGrayscale) {
+                        if (!shouldDisableSelectedItemActions) {
                           e.stopPropagation()
                           setItemDetailQuantity((prev) => Math.max(1, prev - 1))
                         }
                       }}
-                      disabled={itemDetailQuantity <= 1 || shouldShowGrayscale}
-                      className={`${shouldShowGrayscale
+                      disabled={itemDetailQuantity <= 1 || shouldDisableSelectedItemActions}
+                      className={`${shouldDisableSelectedItemActions
                         ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 disabled:text-gray-300 dark:disabled:text-gray-600 disabled:cursor-not-allowed'
                         }`}
                     >
                       <Minus className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7" />
                     </button>
-                    <span className={`text-lg md:text-xl lg:text-2xl font-semibold min-w-[2rem] md:min-w-[2.5rem] lg:min-w-[3rem] text-center ${shouldShowGrayscale
+                    <span className={`text-lg md:text-xl lg:text-2xl font-semibold min-w-[2rem] md:min-w-[2.5rem] lg:min-w-[3rem] text-center ${shouldDisableSelectedItemActions
                       ? 'text-gray-400 dark:text-gray-600'
                       : 'text-gray-900 dark:text-white'
                       }`}>
@@ -1617,13 +1683,13 @@ export default function Under250() {
                     </span>
                     <button
                       onClick={(e) => {
-                        if (!shouldShowGrayscale) {
+                        if (!shouldDisableSelectedItemActions) {
                           e.stopPropagation()
                           setItemDetailQuantity((prev) => prev + 1)
                         }
                       }}
-                      disabled={shouldShowGrayscale}
-                      className={shouldShowGrayscale
+                      disabled={shouldDisableSelectedItemActions}
+                      className={shouldDisableSelectedItemActions
                         ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                       }
@@ -1633,13 +1699,13 @@ export default function Under250() {
                   </div>
                   {/* Add Item Button */}
                   <Button
-                    className={`flex-1 h-[44px] md:h-[50px] lg:h-[56px] rounded-lg md:rounded-xl font-semibold flex items-center justify-center gap-2 text-sm md:text-base lg:text-lg ${shouldShowGrayscale
+                    className={`flex-1 h-[44px] md:h-[50px] lg:h-[56px] rounded-lg md:rounded-xl font-semibold flex items-center justify-center gap-2 text-sm md:text-base lg:text-lg ${shouldDisableSelectedItemActions
                       ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-600 cursor-not-allowed opacity-50'
                       : ''
                       }`}
-                    style={!shouldShowGrayscale ? { backgroundColor: BRAND_THEME.colors.brand.primary, color: '#fff' } : undefined}
+                    style={!shouldDisableSelectedItemActions ? { backgroundColor: BRAND_THEME.colors.brand.primary, color: '#fff' } : undefined}
                     onClick={(e) => {
-                      if (!shouldShowGrayscale) {
+                      if (!shouldDisableSelectedItemActions) {
                         const variant = hasFoodVariants(selectedItem)
                           ? getFoodVariants(selectedItem).find(v => v.id === selectedVariantId)
                           : null
@@ -1647,7 +1713,7 @@ export default function Under250() {
                         closeItemDetail()
                       }
                     }}
-                    disabled={shouldShowGrayscale}
+                    disabled={shouldDisableSelectedItemActions}
                   >
                     <span>Add item</span>
                     <div className="flex items-center gap-1 md:gap-2">

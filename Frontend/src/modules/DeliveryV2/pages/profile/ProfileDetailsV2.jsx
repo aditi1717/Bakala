@@ -1,950 +1,509 @@
-import { useRef, useState, useEffect } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { 
-  ArrowLeft, Plus, Edit2, Eye, X, Loader2, User, Camera, 
-  QrCode, Smartphone, Banknote, Shield, CheckCircle, 
-  Info, AlertCircle, Copy, Check, MapPin, Truck, FileText,
-  Bike, Car, Image as ImageIcon
-} from "lucide-react"
-import BottomPopup from "@delivery/components/BottomPopup"
+import { ArrowLeft, Loader2, Camera, Image as ImageIcon } from "lucide-react"
 import { toast } from "sonner"
-import { openCamera, isFlutterBridgeAvailable } from "@food/utils/imageUploadUtils"
-import { deliveryAPI } from "@food/api"
-import { motion, AnimatePresence } from "framer-motion"
-import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
+import { deliveryAPI, zoneAPI } from "@food/api"
 import { clearModuleAuth } from "@food/utils/auth"
+import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
+import { openCamera } from "@food/utils/imageUploadUtils"
 
-const debugLog = (...args) => {}
-const debugWarn = (...args) => {}
-const debugError = (...args) => {}
+const emptyForm = {
+  name: "",
+  phone: "",
+  email: "",
+  address: "",
+  city: "",
+  state: "",
+  vehicleType: "",
+  vehicleName: "",
+  vehicleNumber: "",
+  drivingLicenseNumber: "",
+  aadharNumber: "",
+  panNumber: "",
+  accountHolderName: "",
+  accountNumber: "",
+  ifscCode: "",
+  bankName: "",
+  upiId: "",
+}
 
-/**
- * ProfileDetailsV2 - Betterised Premium UI for Delivery Partner Profile.
- */
 export const ProfileDetailsV2 = () => {
   const navigate = useNavigate()
   const goBack = useDeliveryBackNavigation()
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [vehicleNumber, setVehicleNumber] = useState("")
-  const [vehicleBrand, setVehicleBrand] = useState("")
-  const [vehicleType, setVehicleType] = useState("")
-  const [showVehiclePopup, setShowVehiclePopup] = useState(false)
-  const [vehicleInput, setVehicleInput] = useState({ number: "", brand: "", type: "" })
-  const [selectedDocument, setSelectedDocument] = useState(null)
-  const [showDocumentModal, setShowDocumentModal] = useState(false)
-  const [showBankDetailsPopup, setShowBankDetailsPopup] = useState(false)
-  const [walletBalance, setWalletBalance] = useState(null)
-  const [bankDetails, setBankDetails] = useState({
-    accountHolderName: "",
-    accountNumber: "",
-    ifscCode: "",
-    bankName: "",
-    panNumber: "",
-    upiId: "",
-    upiQrCode: null
-  })
-  const [upiQrFile, setUpiQrFile] = useState(null)
-  const [upiQrPreview, setUpiQrPreview] = useState(null)
+  const profilePhotoInputRef = useRef(null)
+  const aadharInputRef = useRef(null)
+  const panInputRef = useRef(null)
+  const drivingInputRef = useRef(null)
   const upiQrInputRef = useRef(null)
 
-  const [bankDetailsErrors, setBankDetailsErrors] = useState({})
-  const [isUpdatingBankDetails, setIsUpdatingBankDetails] = useState(false)
-  const [isUploadingImage, setIsUploadingImage] = useState(false)
-  const fileInputRef = useRef(null)
-  const profileCameraInputRef = useRef(null)
-  const [uploadTarget, setUploadTarget] = useState(null) // 'profilePhoto' only for instant picker
-  const [showDeletePopup, setShowDeletePopup] = useState(false)
-  const [isDeletingImage, setIsDeletingImage] = useState(false)
-  const [activePicker, setActivePicker] = useState(null) // { target: 'profilePhoto' | 'upiQrCode', ref: any, title: string }
-  const drivingLicenseInputRef = useRef(null)
-  const upiQrCameraInputRef = useRef(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState("")
+  const [zones, setZones] = useState([])
+  const [profile, setProfile] = useState(null)
+  const [zoneId, setZoneId] = useState("")
+  const [form, setForm] = useState(emptyForm)
+  const [editingBasic, setEditingBasic] = useState(false)
+  const [editingVehicle, setEditingVehicle] = useState(false)
+  const [editingDocuments, setEditingDocuments] = useState(false)
+  const [editingBank, setEditingBank] = useState(false)
 
-  // Fetch profile data
+  const profileImageUrl = profile?.profileImage?.url || profile?.profilePhoto || null
+  const aadharNumber = profile?.documents?.aadhar?.number || profile?.aadharNumber || "Not added"
+  const panNumber = profile?.documents?.pan?.number || profile?.panNumber || "Not added"
+  const drivingNumber = profile?.documents?.drivingLicense?.number || profile?.drivingLicenseNumber || "Not added"
+  const aadharPhotoUrl = profile?.documents?.aadhar?.document || null
+  const panPhotoUrl = profile?.documents?.pan?.document || null
+  const drivingPhotoUrl = profile?.documents?.drivingLicense?.document || null
+  const upiQrUrl = profile?.documents?.bankDetails?.upiQrCode || null
+
+  const selectedZoneLabel = useMemo(() => {
+    const zone = zones.find((z) => String(z?._id || z?.id || "") === String(zoneId || ""))
+    return zone?.zoneName || zone?.name || zone?.serviceLocation || "Unassigned"
+  }, [zones, zoneId])
+
+  const applyProfile = (p) => {
+    setProfile(p)
+    setZoneId(String(p?.zone?._id || p?.zoneId || ""))
+    setForm({
+      name: p?.name || "",
+      phone: p?.phone || "",
+      email: p?.email || "",
+      address: p?.location?.addressLine1 || p?.address || "",
+      city: p?.location?.city || p?.city || "",
+      state: p?.location?.state || p?.state || "",
+      vehicleType: p?.vehicle?.type || p?.vehicleType || "",
+      vehicleName: p?.vehicle?.brand || p?.vehicleName || "",
+      vehicleNumber: p?.vehicle?.number || p?.vehicleNumber || "",
+      drivingLicenseNumber: p?.documents?.drivingLicense?.number || p?.drivingLicenseNumber || "",
+      aadharNumber: p?.documents?.aadhar?.number || p?.aadharNumber || "",
+      panNumber: p?.documents?.pan?.number || p?.panNumber || "",
+      accountHolderName: p?.documents?.bankDetails?.accountHolderName || "",
+      accountNumber: p?.documents?.bankDetails?.accountNumber || "",
+      ifscCode: p?.documents?.bankDetails?.ifscCode || "",
+      bankName: p?.documents?.bankDetails?.bankName || "",
+      upiId: p?.documents?.bankDetails?.upiId || "",
+    })
+  }
+
+  const refresh = async () => {
+    const [profileRes, zoneRes] = await Promise.all([
+      deliveryAPI.getProfile(),
+      zoneAPI.getPublicZones(),
+    ])
+    const p = profileRes?.data?.data?.profile
+    if (!p) throw new Error("Failed to load profile")
+    const zoneList = zoneRes?.data?.data?.zones || zoneRes?.data?.zones || []
+    setZones(Array.isArray(zoneList) ? zoneList : [])
+    applyProfile(p)
+  }
+
   useEffect(() => {
-    const parseWalletBalance = (response) => {
-      const data = response?.data
-      const wallet = (data?.success && data?.data?.wallet) || data?.wallet || data?.data || data
-      const possibleBalance = wallet?.totalBalance || wallet?.balance || wallet?.pocketBalance || 0
-      return Number(possibleBalance) || 0
-    }
-
-    const fetchWalletBalance = async () => {
-      try {
-        const walletResponse = await deliveryAPI.getWallet()
-        setWalletBalance(parseWalletBalance(walletResponse))
-      } catch (error) {
-        debugError("Error fetching wallet balance:", error)
-      }
-    }
-
-    const fetchProfile = async () => {
+    let mounted = true
+    ;(async () => {
       try {
         setLoading(true)
-        const [profileResponse] = await Promise.allSettled([
-          deliveryAPI.getProfile(),
-          fetchWalletBalance()
-        ])
-
-        if (
-          profileResponse?.status === "fulfilled" &&
-          profileResponse?.value?.data?.success &&
-          profileResponse?.value?.data?.data?.profile
-        ) {
-          const profileData = profileResponse.value.data.data.profile
-          setProfile(profileData)
-          const vNum = profileData?.vehicle?.number || ""
-          const vBrand = profileData?.vehicle?.brand || ""
-          const vType = profileData?.vehicle?.type || ""
-          setVehicleNumber(vNum)
-          setVehicleBrand(vBrand)
-          setVehicleType(vType)
-          setVehicleInput({ number: formatVehicleNumberInput(vNum), brand: vBrand, type: vType })
-          // Set bank details
-          setBankDetails({
-            accountHolderName: profileData?.documents?.bankDetails?.accountHolderName || "",
-            accountNumber: profileData?.documents?.bankDetails?.accountNumber || "",
-            ifscCode: profileData?.documents?.bankDetails?.ifscCode || "",
-            bankName: profileData?.documents?.bankDetails?.bankName || "",
-            panNumber: profileData?.documents?.pan?.number || "",
-            upiId: profileData?.documents?.bankDetails?.upiId || "",
-            upiQrCode: profileData?.documents?.bankDetails?.upiQrCode || null
-          })
-        } else {
-          throw new Error("Profile fetch failed")
-        }
-      } catch (error) {
-        debugError("Error fetching profile:", error)
-        if (error.response?.status === 401) {
+        await refresh()
+      } catch (e) {
+        if (e?.response?.status === 401) {
           toast.error("Session expired. Please login again.")
-          setTimeout(() => {
-            navigate("/food/delivery/login", { replace: true })
-          }, 2000)
-        } else {
-          toast.error("Failed to load profile data")
+          navigate("/food/delivery/login", { replace: true })
+          return
         }
+        toast.error("Failed to load profile")
       } finally {
-        setLoading(false)
+        if (mounted) setLoading(false)
       }
-    }
-
-    fetchProfile()
+    })()
+    return () => { mounted = false }
   }, [navigate])
 
-  const isAdminApproved = ["approved", "active"].includes(String(profile?.status || "").toLowerCase())
-
-  const getDocumentVerificationLabel = (doc) => {
-    if (!doc?.document) return "Not uploaded"
-    if (doc?.verified || isAdminApproved) return "Verified"
-    return "Pending Verification"
+  const onInput = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const getDocumentNumber = (doc) => {
-    return String(
-      doc?.number ||
-      doc?.idNumber ||
-      doc?.documentNumber ||
-      "",
-    ).trim()
+  const resetFromProfile = () => {
+    if (profile) applyProfile(profile)
   }
 
-  const getDrivingLicenseNumber = () =>
-    String(
-      profile?.documents?.drivingLicense?.number ||
-      profile?.documents?.drivingLicense?.idNumber ||
-      profile?.documents?.drivingLicense?.documentNumber ||
-      profile?.drivingLicenseNumber ||
-      profile?.documents?.drivingLicenseNumber ||
-      "",
-    ).trim()
-
-  const parseNumericValue = (...values) => {
-    for (const value of values) {
-      const numeric = Number(value)
-      if (Number.isFinite(numeric) && numeric > 0) {
-        return numeric
-      }
-    }
-    return null
-  }
-
-  const ratingValue = parseNumericValue(
-    profile?.metrics?.rating,
-    profile?.ratings?.average,
-    profile?.averageRating,
-    profile?.rating,
-    profile?.stats?.averageRating,
-    profile?.analytics?.averageRating,
-  )
-
-  const ratingCount = Number(
-    profile?.metrics?.ratingCount ||
-    profile?.ratings?.count ||
-    profile?.totalRatings ||
-    profile?.reviewCount ||
-    profile?.reviewsCount ||
-    profile?.stats?.totalRatings ||
-    profile?.analytics?.totalRatings ||
-    0,
-  )
-
-  const ratingDisplay = ratingValue
-    ? `${ratingValue.toFixed(1)}${ratingCount > 0 ? ` (${ratingCount})` : ""}`
-    : "-"
-
-  const getRiderLevel = () => {
-    if (!Number.isFinite(ratingValue) || ratingValue <= 0 || ratingCount <= 0) return "New Rider"
-    if (ratingValue >= 4.8 && ratingCount >= 100) return "Champion"
-    if (ratingValue >= 4.6 && ratingCount >= 50) return "Elite"
-    if (ratingValue >= 4.3 && ratingCount >= 20) return "Pro"
-    if (ratingValue >= 4.0 && ratingCount >= 10) return "Rising"
-    return "Starter"
-  }
-  const riderLevel = getRiderLevel()
-
-  const profileImageUrl = profile?.profileImage?.url || profile?.documents?.photo || null
-  const formatVehicleNumberInput = (rawValue = "") => {
-    const compact = String(rawValue || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
-    const p1 = compact.slice(0, 2)
-    const p2 = compact.slice(2, 4)
-    const p3 = compact.slice(4, 6)
-    const p4 = compact.slice(6, 10)
-    return [p1, p2, p3, p4].filter(Boolean).join(" ")
-  }
-
-  const redirectToLoginAfterProfileUpdate = (message = "Update submitted. Your approval request has been sent to admin. Please log in again.") => {
+  const handleReapprovalRedirect = (response, message = "Profile updated and sent for approval. Please login again after approval.") => {
+    const requiresReapproval =
+      response?.data?.data?.partner?.requiresReapproval ||
+      response?.data?.data?.requiresReapproval ||
+      false
+    if (!requiresReapproval) return false
     clearModuleAuth("delivery")
     localStorage.removeItem("app:isOnline")
     toast.success(message)
     navigate("/food/delivery/login", { replace: true })
+    return true
   }
 
-  const refreshProfile = async () => {
-    const response = await deliveryAPI.getProfile()
-    if (response?.data?.success && response?.data?.data?.profile) {
-      setProfile(response.data.data.profile)
-      const pd = response.data.data.profile
-      setBankDetails({
-        accountHolderName: pd?.documents?.bankDetails?.accountHolderName || "",
-        accountNumber: pd?.documents?.bankDetails?.accountNumber || "",
-        ifscCode: pd?.documents?.bankDetails?.ifscCode || "",
-        bankName: pd?.documents?.bankDetails?.bankName || "",
-        panNumber: pd?.documents?.pan?.number || "",
-        upiId: pd?.documents?.bankDetails?.upiId || "",
-        upiQrCode: pd?.documents?.bankDetails?.upiQrCode || null
-      })
-    }
-  }
-
-  const handleTakeCameraPhoto = (target) => {
-    if (isFlutterBridgeAvailable()) {
-      openCamera({
-        onSelectFile: (file) => {
-          if (target === "profilePhoto") {
-            setUploadTarget("profilePhoto")
-            uploadProfileFile(file)
-            return
-          }
-
-          if (target === "upiQrCode") {
-            uploadUpiQrFile(file)
-          }
-        },
-        fileNamePrefix: `profile-${target}`,
-      })
-      return
-    }
-
-    if (target === "profilePhoto") {
-      profileCameraInputRef.current?.click()
-      return
-    }
-
-    if (target === "upiQrCode") {
-      upiQrCameraInputRef.current?.click()
-    }
-  }
-
-  const handlePickFromGallery = (target, ref) => {
-    setUploadTarget(target)
-    ref.current?.click()
-  }
-
-
-  const uploadProfileFile = async (file) => {
-    try {
-      setIsUploadingImage(true)
-      const formData = new FormData()
-      formData.append("profilePhoto", file)
-      const response = await deliveryAPI.updateProfileMultipart(formData)
-      if (response?.data?.success) {
-        redirectToLoginAfterProfileUpdate("Profile photo updated. Your approval request has been sent to admin. Please log in again.")
-      } else {
-        toast.error("Update failed")
-      }
-    } catch (error) {
-      toast.error("Update failed")
-    } finally {
-      setIsUploadingImage(false)
-      setUploadTarget(null)
-    }
-  }
-
-  const handleFileSelected = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file || !uploadTarget) return
-    if (uploadTarget === "profilePhoto") {
-       uploadProfileFile(file);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = ""
-  }
-
-  const handleProfileCameraSelected = async (e) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setUploadTarget("profilePhoto")
-      await uploadProfileFile(file)
-    }
-    if (profileCameraInputRef.current) profileCameraInputRef.current.value = ""
-  }
-
-  const handleDeletePhoto = async () => {
-    try {
-      setIsDeletingImage(true)
-      const response = await deliveryAPI.updateProfileDetails({ profilePhoto: "" })
-      // Backend might return different structures; check for success
-      if (response?.status === 200) {
-        setShowDeletePopup(false)
-        redirectToLoginAfterProfileUpdate("Profile photo removed. Your approval request has been sent to admin. Please log in again.")
-      } else {
-        toast.error("Failed to remove photo")
-      }
-    } catch (error) {
-       toast.error("Delete failed")
-    } finally {
-      setIsDeletingImage(false)
-    }
-  }
-
-  const handleUpiQrSelected = (e) => {
-    const file = e.target.files?.[0]
-    if (file) uploadUpiQrFile(file)
-    if (upiQrInputRef.current) upiQrInputRef.current.value = ""
-  }
-
-  const handleUpiQrCameraSelected = (e) => {
-    const file = e.target.files?.[0]
-    if (file) uploadUpiQrFile(file)
-    if (upiQrCameraInputRef.current) upiQrCameraInputRef.current.value = ""
-  }
-
-  const uploadUpiQrFile = (file) => {
+  const uploadSingleFile = async (field, file) => {
     if (!file) return
-
-    if (!String(file.type || "").startsWith("image/")) {
-      toast.error("Please select an image file")
-      return
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB")
-      return
-    }
-
-    setUpiQrFile(file)
-    setUpiQrPreview(URL.createObjectURL(file))
-    toast.success("UPI QR selected")
-  }
-
-  const submitBankDetails = async () => {
-    setIsUpdatingBankDetails(true)
     try {
-      // Validation
-      const { accountNumber, ifscCode, panNumber, upiId } = bankDetails
-
-      if (accountNumber && !/^\d{9,18}$/.test(accountNumber.trim())) {
-        return toast.error("Invalid Account Number (9-18 digits)")
-      }
-
-      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/
-      if (ifscCode && !ifscRegex.test(ifscCode.trim().toUpperCase())) {
-        return toast.error("Invalid IFSC Code (e.g. SBIN0001234)")
-      }
-
-      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/
-      if (panNumber && !panRegex.test(panNumber.trim().toUpperCase())) {
-        return toast.error("Invalid PAN Card format (e.g. ABCDE1234F)")
-      }
-
-      const upiRegex = /^[\w\.-]+@[\w\.-]+$/
-      if (upiId && !upiRegex.test(upiId.trim())) {
-        return toast.error("Invalid UPI ID (e.g. user@bank)")
-      }
-
-      // Send as FormData to support optional QR upload
-      const formData = new FormData()
-      formData.append("documents[bankDetails][accountHolderName]", (bankDetails.accountHolderName || "").trim())
-      formData.append("documents[bankDetails][accountNumber]", (bankDetails.accountNumber || "").trim())
-      formData.append("documents[bankDetails][ifscCode]", (bankDetails.ifscCode || "").trim().toUpperCase())
-      formData.append("documents[bankDetails][bankName]", (bankDetails.bankName || "").trim())
-      formData.append("documents[bankDetails][upiId]", (bankDetails.upiId || "").trim())
-      formData.append("documents[pan][number]", (bankDetails.panNumber || "").trim().toUpperCase())
-
-      if (upiQrFile) {
-        formData.append("upiQrCode", upiQrFile)
-      }
-
-      await deliveryAPI.updateBankDetailsMultipart(formData)
-      setShowBankDetailsPopup(false)
-      setUpiQrFile(null)
-      setUpiQrPreview(null)
-      redirectToLoginAfterProfileUpdate("Bank details updated. Your approval request has been sent to admin. Please log in again.")
-    } catch (error) {
-      toast.error("Update failed")
+      setUploading(field)
+      const fd = new FormData()
+      fd.append(field, file)
+      const response = await deliveryAPI.updateProfileMultipart(fd)
+      if (handleReapprovalRedirect(response)) return
+      await refresh()
+      toast.success("Updated")
+    } catch {
+      toast.error("Upload failed")
     } finally {
-      setIsUpdatingBankDetails(false)
+      setUploading("")
     }
   }
 
+  const saveBasicDetails = async () => {
+    try {
+      setSaving(true)
+      const fd = new FormData()
+      fd.append("name", String(form.name || "").trim())
+      fd.append("email", String(form.email || "").trim())
+      fd.append("address", String(form.address || "").trim())
+      fd.append("city", String(form.city || "").trim())
+      fd.append("state", String(form.state || "").trim())
+      const response = await deliveryAPI.updateProfileMultipart(fd)
+      if (handleReapprovalRedirect(response)) return
+      await refresh()
+      toast.success("Basic details updated")
+    } catch {
+      toast.error("Failed to update basic details")
+    } finally {
+      setSaving(false)
+    }
+  }
 
+  const saveVehicleDetails = async () => {
+    try {
+      setSaving(true)
+      const response = await deliveryAPI.updateProfileDetails({
+        vehicle: {
+          type: String(form.vehicleType || "").trim(),
+          brand: String(form.vehicleName || "").trim(),
+          number: String(form.vehicleNumber || "").trim().toUpperCase(),
+        },
+      })
+      if (handleReapprovalRedirect(response)) return
+      await refresh()
+      toast.success("Vehicle details updated")
+    } catch {
+      toast.error("Failed to update vehicle details")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveBankDetails = async () => {
+    try {
+      setSaving(true)
+      const bankFd = new FormData()
+      bankFd.append("documents[bankDetails][accountHolderName]", String(form.accountHolderName || "").trim())
+      bankFd.append("documents[bankDetails][accountNumber]", String(form.accountNumber || "").trim())
+      bankFd.append("documents[bankDetails][ifscCode]", String(form.ifscCode || "").trim().toUpperCase())
+      bankFd.append("documents[bankDetails][bankName]", String(form.bankName || "").trim())
+      bankFd.append("documents[bankDetails][upiId]", String(form.upiId || "").trim())
+      bankFd.append("documents[pan][number]", String(form.panNumber || "").trim().toUpperCase())
+      const response = await deliveryAPI.updateBankDetailsMultipart(bankFd)
+      if (handleReapprovalRedirect(response)) return
+      await refresh()
+      toast.success("Bank details updated")
+    } catch {
+      toast.error("Failed to update bank details")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveDocumentDetails = async () => {
+    try {
+      setSaving(true)
+      const fd = new FormData()
+      fd.append("aadharNumber", String(form.aadharNumber || "").trim())
+      fd.append("panNumber", String(form.panNumber || "").trim().toUpperCase())
+      fd.append("drivingLicenseNumber", String(form.drivingLicenseNumber || "").trim().toUpperCase())
+      const response = await deliveryAPI.updateProfileMultipart(fd)
+      if (handleReapprovalRedirect(response)) return
+      await refresh()
+      toast.success("Document details updated")
+    } catch {
+      toast.error("Failed to update document details")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveZoneOnly = async () => {
+    if (!zoneId) return toast.error("Please select a zone")
+    try {
+      setSaving(true)
+      const res = await deliveryAPI.updateProfileDetails({ zoneId })
+      const requiresReapproval =
+        res?.data?.data?.partner?.requiresReapproval ||
+        res?.data?.data?.requiresReapproval ||
+        false
+      if (requiresReapproval) {
+        clearModuleAuth("delivery")
+        localStorage.removeItem("app:isOnline")
+        toast.success("Zone changed. Sent for approval. Please login again after approval.")
+        navigate("/food/delivery/login", { replace: true })
+        return
+      }
+      await refresh()
+      toast.success("Zone updated")
+    } catch {
+      toast.error("Failed to update zone")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const onPick = (ref) => ref.current?.click()
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center font-poppins">
-         <div className="flex flex-col items-center gap-4">
-            <div className="relative">
-               <div className="w-16 h-16 border-4 border-emerald-100 border-t-[#005128] rounded-full animate-spin" />
-               <div className="absolute inset-0 flex items-center justify-center">
-                  <User className="w-5 h-5 text-[#005128]" />
-               </div>
-            </div>
-            <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">Initializing Profile...</p>
-         </div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex items-center gap-2 text-slate-600">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>Loading profile...</span>
+        </div>
       </div>
     )
   }
 
-  const InfoCard = ({ icon: Icon, label, value, color = "blue", badge = null, onEdit = null }) => (
-    <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100/80 flex items-center justify-between group">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg bg-${color}-50 flex items-center justify-center text-${color}-600 border border-${color}-100 transition-transform group-hover:scale-105`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <div>
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.14em] mb-0.5">{label}</p>
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-bold text-gray-900">{value || "—"}</h4>
-            {badge}
-          </div>
-        </div>
-      </div>
-      {onEdit && (
-        <button onClick={onEdit} className="p-2 hover:bg-gray-50 rounded-lg text-gray-400 hover:text-[#005128] transition-all active:scale-90">
-          <Edit2 className="w-4 h-4" />
-        </button>
-      )}
-    </div>
-  )
+  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#005128]"
 
   return (
-    <div className="min-h-screen bg-[#FDFEFE] font-poppins pb-16">
-      {/* ─── HEADER ─── */}
-      <div className="fixed top-0 inset-x-0 h-14 bg-white/90 backdrop-blur-xl border-b border-gray-100 z-50 px-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={goBack} className="p-2 hover:bg-gray-100 rounded-xl transition-all active:scale-90">
-            <ArrowLeft className="w-5 h-5 text-gray-700" />
-          </button>
-          <h1 className="text-base font-black text-black uppercase tracking-tight leading-none">Profile</h1>
-        </div>
-        <div className="bg-[#005128] text-white px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg shadow-[#005128]/20">
-          ID: {profile?.deliveryId || "..."}
-        </div>
+    <div className="min-h-screen bg-slate-50 pb-24">
+      <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur px-4 py-3 flex items-center gap-3">
+        <button onClick={goBack} className="p-2 rounded-lg hover:bg-slate-100">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="text-base font-bold">Profile Details</h1>
       </div>
 
-      <div className="pt-16 px-3 space-y-3 max-w-lg mx-auto">
-        {/* ─── PROFILE AVATAR BLOCK ─── */}
-        <div className="relative group">
-           <div className="w-24 h-24 rounded-[1.8rem] bg-gray-100 border-2 border-white shadow-xl mx-auto overflow-hidden relative">
-              {profileImageUrl ? (
-                <img src={profileImageUrl} alt="Avatar" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center"><User className="w-12 h-12 text-gray-300" /></div>
-              )}
-              {isUploadingImage && (
-                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 text-white animate-spin" />
-                </div>
-              )}
-           </div>
-           
-           <div className="flex items-center justify-center absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 gap-2">
-              <button 
-                onClick={() => handleTakeCameraPhoto('profilePhoto')}
-                className="bg-black text-white p-2.5 rounded-xl shadow-xl hover:bg-gray-900 transition-all active:scale-95 border-2 border-white flex items-center justify-center"
-                title="Take Photo"
-              >
-                <Camera className="w-4 h-4" />
-              </button>
-              
-              <button 
-                onClick={() => handlePickFromGallery('profilePhoto', fileInputRef)}
-                className="bg-[#005128] text-white p-2.5 rounded-xl shadow-xl hover:bg-[#0b6b3a] transition-all active:scale-95 border-2 border-white flex items-center justify-center"
-                title="Gallery"
-              >
-                <ImageIcon className="w-4 h-4" />
-              </button>
-
-              {profileImageUrl && (
-                <button 
-                  onClick={() => setShowDeletePopup(true)}
-                  className="bg-red-500 text-white p-2.5 rounded-xl shadow-xl hover:bg-red-600 transition-all active:scale-95 border-2 border-white flex items-center justify-center"
-                  title="Remove"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-           </div>
-        </div>
-
-        <div className="text-center pt-3">
-           <h2 className="text-lg font-black text-gray-900 leading-none">{profile?.name}</h2>
-           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.16em] mt-1.5 mb-3">Delivery Partner • {profile?.location?.city}</p>
-           
-           <div className="flex items-center justify-center gap-2">
-              <div className="bg-[#10B981]/10 text-[#10B981] px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-[#10B981]/20 flex items-center gap-2">
-                 <CheckCircle className="w-4 h-4" /> {profile?.status}
-              </div>
-              <div className="bg-[#005128]/10 text-[#005128] px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-[#005128]/20 flex items-center gap-2">
-                 <Smartphone className="w-4 h-4" /> {profile?.phone}
-              </div>
-           </div>
-        </div>
-
-        {/* ─── RIDER STATS ─── */}
-        <div className="grid grid-cols-2 gap-2.5">
-           <div className="bg-white border border-gray-100 p-3 rounded-2xl shadow-sm text-center">
-              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Rider Level</p>
-              <h4 className="text-lg font-black text-gray-900">{riderLevel}</h4>
-           </div>
-           <div className="bg-white border border-gray-100 p-3 rounded-2xl shadow-sm text-center">
-              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Rating</p>
-              <h4 className="text-lg font-black text-gray-900">{ratingDisplay}</h4>
-           </div>
-        </div>
-
-        {/* ─── VEHICLE SECTION ─── */}
-        <section>
-          <div className="flex items-center justify-between mb-3 px-1">
-             <h3 className="text-xs font-black text-gray-950 uppercase tracking-widest flex items-center gap-2">
-                {(() => {
-                  const type = String(profile?.vehicle?.type || "").toLowerCase();
-                  if (type.includes("car")) return <Car className="w-4 h-4 text-gray-400" />;
-                  if (type.includes("bike") || type.includes("scooter") || type.includes("motorcycle")) return <Bike className="w-4 h-4 text-gray-400" />;
-                  if (type.includes("bicycle")) return <Bike className="w-4 h-4 text-gray-400" />;
-                  return <Truck className="w-4 h-4 text-gray-400" />;
-                })()} Vehicle Assets
-             </h3>
+      <div className="max-w-xl mx-auto px-3 pt-3 space-y-3">
+        <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+          <h2 className="text-sm font-semibold">Profile Photo</h2>
+          <div className="flex items-center gap-3">
+            <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 flex items-center justify-center">
+              {profileImageUrl ? <img src={profileImageUrl} alt="Profile" className="w-full h-full object-cover" /> : <span className="text-xs text-slate-400">No Photo</span>}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => openCamera({ onSelectFile: (f) => uploadSingleFile("profilePhoto", f), fileNamePrefix: "profile-photo" })} className="px-3 py-2 rounded-lg border text-xs font-semibold">Camera</button>
+              <button onClick={() => onPick(profilePhotoInputRef)} className="px-3 py-2 rounded-lg border text-xs font-semibold">Gallery</button>
+            </div>
           </div>
-          <InfoCard 
-            icon={(() => {
-              const type = String(profile?.vehicle?.type || "").toLowerCase();
-              if (type.includes("car")) return Car;
-              if (type.includes("bike") || type.includes("scooter") || type.includes("motorcycle")) return Bike;
-              if (type.includes("bicycle")) return Bike;
-              return Truck;
-            })()} 
-            label="Vehicle Details" 
-            value={[profile?.vehicle?.type, profile?.vehicle?.brand, vehicleNumber].filter(Boolean).map(v => String(v).toUpperCase()).join(" • ") || "N/A"} 
-            color="emerald"
-            badge={!vehicleNumber && <span className="text-[9px] bg-red-50 text-red-500 px-1.5 rounded uppercase font-bold">Missing</span>}
-            onEdit={() => { 
-                setVehicleInput({ number: formatVehicleNumberInput(vehicleNumber), brand: vehicleBrand, type: vehicleType }); 
-                setShowVehiclePopup(true); 
-            }}
-          />
+          <input ref={profilePhotoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadSingleFile("profilePhoto", e.target.files?.[0])} />
         </section>
 
-        {/* ─── BANK & PAYMENTS SECTION (ENHANCED) ─── */}
-        <section>
-           <div className="flex items-center justify-between mb-4 px-1">
-              <h3 className="text-xs font-black text-gray-950 uppercase tracking-widest flex items-center gap-2">
-                 <Banknote className="w-4 h-4 text-gray-400" /> Bank & Payments
-              </h3>
-              <button 
-                onClick={() => {
-                  // Reset state to current profile data when opening
-                  setBankDetails({
-                    accountHolderName: profile?.documents?.bankDetails?.accountHolderName || "",
-                    accountNumber: profile?.documents?.bankDetails?.accountNumber || "",
-                    ifscCode: profile?.documents?.bankDetails?.ifscCode || "",
-                    bankName: profile?.documents?.bankDetails?.bankName || "",
-                    panNumber: profile?.documents?.pan?.number || "",
-                    upiId: profile?.documents?.bankDetails?.upiId || "",
-                    upiQrCode: profile?.documents?.bankDetails?.upiQrCode || null
-                  })
-                  setUpiQrFile(null)
-                  setUpiQrPreview(null)
-                  setShowBankDetailsPopup(true)
-                }} 
-                className="text-[10px] font-black text-[#005128] uppercase tracking-widest hover:underline"
-              >
-                Edit Details
-              </button>
-           </div>
-           
-           <div className="space-y-3">
-              <div className="bg-[#121212] rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden group">
-                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-white/10 transition-colors" />
-                 <div className="relative z-10">
-                    <div className="flex justify-between items-start mb-10">
-                       <div>
-                          <p className="text-white/40 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Bank Account</p>
-                          <h4 className="text-lg font-bold tracking-tight">{bankDetails.bankName || "Link Account"}</h4>
-                       </div>
-                       <Banknote className="w-8 h-8 text-[#005128]/50" />
-                    </div>
-                    <div className="flex justify-between items-end">
-                       <div>
-                          <p className="text-xs font-mono font-medium text-white/60 tracking-[0.2em]">
-                             {bankDetails.accountNumber ? `•••• •••• •••• ${bankDetails.accountNumber.slice(-4)}` : "XXXX XXXX XXXX XXXX"}
-                          </p>
-                          <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-2">{bankDetails.accountHolderName || "Account Holder"}</p>
-                       </div>
-                       <div className="text-right">
-                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">IFSC Code</p>
-                          <p className="text-sm font-black tracking-widest">{bankDetails.ifscCode || "—"}</p>
-                       </div>
-                    </div>
-                 </div>
-              </div>
-
-              {/* UPI Section */}
-              <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center justify-between group">
-                 <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 border border-purple-100 group-hover:scale-105 transition-transform">
-                       <Smartphone className="w-7 h-7" />
-                    </div>
-                    <div>
-                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">UPI ID</p>
-                       <h4 className="text-base font-black text-gray-900">{bankDetails.upiId || "Not added"}</h4>
-                    </div>
-                 </div>
-                 {bankDetails.upiQrCode && (
-                    <button 
-                      onClick={() => { setSelectedDocument({ name: "UPI Scanner", url: bankDetails.upiQrCode }); setShowDocumentModal(true); }}
-                      className="w-14 h-14 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-center text-gray-400 hover:text-black hover:border-black/20 transition-all"
-                    >
-                       <QrCode className="w-5 h-5" />
-                    </button>
-                 )}
-              </div>
-           </div>
-        </section>
-
-        {/* ─── DOCUMENTS SECTION ─── */}
-        <section>
-          <div className="flex items-center justify-between mb-4 px-1">
-             <h3 className="text-xs font-black text-gray-950 uppercase tracking-widest flex items-center gap-2">
-                <Shield className="w-4 h-4 text-gray-400" /> Verification Docs
-             </h3>
-          </div>
-          
-          <div className="grid gap-3">
-             {[
-               { icon: FileText, label: "Aadhar Card", doc: profile?.documents?.aadhar },
-               { icon: FileText, label: "PAN Card", doc: profile?.documents?.pan },
-               { icon: Truck, label: "Driving License", doc: profile?.documents?.drivingLicense, number: getDrivingLicenseNumber() }
-             ].map((item, i) => (
-               <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400"><item.icon className="w-5 h-5" /></div>
-                     <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.label}</p>
-                        <p className="text-xs font-bold text-gray-600">{getDocumentVerificationLabel(item.doc)}</p>
-                        <p className="text-[11px] font-semibold text-gray-500 mt-0.5">
-                          {item.number || getDocumentNumber(item.doc) || "Number not added"}
-                        </p>
-                     </div>
-                  </div>
-                  {item.doc?.document && (
-                    <button 
-                      onClick={() => { setSelectedDocument({ name: item.label, url: item.doc.document }); setShowDocumentModal(true); }}
-                      className="p-2 bg-gray-50 text-gray-400 rounded-lg hover:text-black transition-colors"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  )}
-               </div>
-             ))}
-          </div>
-        </section>
-      </div>
-
-      <input 
-        ref={fileInputRef} 
-        type="file" 
-        accept="image/*" 
-        className="hidden" 
-        onChange={handleFileSelected} 
-        style={{ display: 'none' }}
-      />
-      <input
-        ref={profileCameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleProfileCameraSelected}
-        style={{ display: "none" }}
-      />
-
-      {/* ─── MODALS ─── */}
-      
-      {/* Delete Confirmation Popup */}
-      <BottomPopup 
-        isOpen={showDeletePopup} 
-        onClose={() => setShowDeletePopup(false)} 
-        title="Remove Photo?"
-        showCloseButton={false}
-      >
-         <div className="pb-10 pt-4 text-center">
-            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <AlertCircle className="w-10 h-10 text-red-500" />
-            </div>
-            <h3 className="text-xl font-black text-gray-950 mb-2 uppercase tracking-tight">Are you sure?</h3>
-            <p className="text-sm font-medium text-gray-500 mb-8 max-w-[200px] mx-auto">This will remove your current profile picture.</p>
-            
-            <div className="grid grid-cols-2 gap-2.5 px-2">
-                <button 
-                  onClick={() => setShowDeletePopup(false)}
-                  className="bg-gray-100 text-gray-500 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] active:scale-95"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleDeletePhoto}
-                  disabled={isDeletingImage}
-                  className="bg-red-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg shadow-red-500/20 active:scale-95 flex items-center justify-center gap-2"
-                >
-                  {isDeletingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : "Yes, Remove"}
-                </button>
-            </div>
-         </div>
-      </BottomPopup>
-
-      {/* Vehicle Popup */}
-      <BottomPopup isOpen={showVehiclePopup} onClose={() => setShowVehiclePopup(false)} title="Vehicle Info" closeOnHandleClick={true} showCloseButton={false}>
-         <div className="space-y-3 pb-6">
-            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col gap-3">
-                {/* Type Selection */}
-                <div className="flex items-center gap-3 w-full">
-                    <div className="w-8 h-8 flex items-center justify-center">
-                        {(() => {
-                           const t = String(vehicleInput.type || "").toLowerCase();
-                           if (t.includes("car")) return <Car className="w-5 h-5 text-[#005128]" />;
-                           if (t.includes("bicycle")) return <Bike className="w-5 h-5 text-[#005128]" />;
-                           return <Truck className="w-5 h-5 text-[#005128]" />;
-                        })()}
-                    </div>
-                    <div className="flex-1">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehicle Type</p>
-                        <select 
-                            value={vehicleInput.type} 
-                            onChange={(e) => setVehicleInput({...vehicleInput, type: e.target.value})} 
-                            className="w-full bg-transparent text-base font-black text-black outline-none border-b border-transparent focus:border-[#005128] cursor-pointer"
-                        >
-                            <option value="bike">Bike</option>
-                            <option value="scooter">Scooter</option>
-                            <option value="bicycle">Bicycle</option>
-                            <option value="car">Car</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div className="h-px bg-gray-200 w-full" />
-
-                {/* Name/Brand Input */}
-                <div className="flex items-center gap-3 w-full">
-                    <div className="w-8 h-8 flex items-center justify-center"><Plus className="w-4 h-4 text-[#005128]/50" /></div>
-                    <div className="flex-1">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehicle Name/Brand</p>
-                        <input 
-                            type="text" 
-                            value={vehicleInput.brand} 
-                            onChange={(e) => setVehicleInput({...vehicleInput, brand: e.target.value})} 
-                            placeholder="E.g. Honda Splendor"
-                            className="w-full bg-transparent text-base font-black text-black outline-none border-b border-transparent focus:border-[#005128] placeholder:text-gray-200"
-                        />
-                    </div>
-                </div>
-
-                <div className="h-px bg-gray-200 w-full" />
-
-                {/* Number Input */}
-                <div className="flex items-center gap-3 w-full">
-                    <div className="w-8 h-8 flex items-center justify-center"><QrCode className="w-4 h-4 text-[#005128]/50" /></div>
-                    <div className="flex-1">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehicle Number</p>
-                        <input
-                            type="text"
-                            value={vehicleInput.number}
-                            onChange={(e) => setVehicleInput({...vehicleInput, number: formatVehicleNumberInput(e.target.value)})}
-                            placeholder="E.g. UP 80 AB 1234"
-                            className="w-full bg-transparent text-base font-black text-black outline-none border-b border-transparent focus:border-[#005128] placeholder:text-gray-200"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <button 
-               onClick={async () => {
-                 const num = formatVehicleNumberInput(vehicleInput.number || "").trim();
-                 const brand = vehicleInput.brand.trim();
-                 const type = vehicleInput.type;
-
-                 if (!num) return toast.error("Vehicle number is required");
-                 if (!brand) return toast.error("Vehicle brand is required");
-
-                 // Validate compact Indian registration format.
-                 const compactNum = num.replace(/\s+/g, "");
-                 const numRegex = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{4}$/i;
-                 if (!numRegex.test(compactNum)) {
-                    return toast.error("Please enter a valid vehicle number (e.g. MH12AB1234)");
-                 }
-
-                 try {
-                     await deliveryAPI.updateProfileDetails({ 
-                         vehicle: { 
-                             number: num,
-                             brand: brand,
-                             type: type
-                         } 
-                     })
-                     setShowVehiclePopup(false)
-                     redirectToLoginAfterProfileUpdate("Vehicle details updated. Your approval request has been sent to admin. Please log in again.")
-                   } catch (e) { toast.error("Cloud storage sync failed") }
-               }}
-               className="w-full bg-black text-white py-3.5 rounded-2xl font-black uppercase tracking-[0.16em] shadow-lg hover:bg-gray-900 transition-all active:scale-95 text-sm"
+        <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Basic Details</h2>
+            <button
+              onClick={async () => {
+                if (!editingBasic) return setEditingBasic(true)
+                await saveBasicDetails()
+                setEditingBasic(false)
+              }}
+              disabled={saving || !!uploading}
+              className="text-xs font-semibold text-[#005128] disabled:opacity-50"
             >
-               Save Changes
+              {editingBasic ? "Save" : "Edit"}
             </button>
-         </div>
-      </BottomPopup>
+          </div>
+          <input disabled={!editingBasic} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Full Name" value={form.name} onChange={(e) => onInput("name", e.target.value)} />
+          <input disabled={!editingBasic} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Phone" value={form.phone} onChange={(e) => onInput("phone", e.target.value)} />
+          <input disabled={!editingBasic} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Email" value={form.email} onChange={(e) => onInput("email", e.target.value)} />
+          <input disabled={!editingBasic} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Address" value={form.address} onChange={(e) => onInput("address", e.target.value)} />
+          <div className="grid grid-cols-2 gap-2">
+            <input disabled={!editingBasic} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="City" value={form.city} onChange={(e) => onInput("city", e.target.value)} />
+            <input disabled={!editingBasic} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="State" value={form.state} onChange={(e) => onInput("state", e.target.value)} />
+          </div>
+        </section>
 
-      {/* Bank Details Modal (Expanded with UPI) */}
-      <BottomPopup 
-        isOpen={showBankDetailsPopup} 
-        onClose={() => setShowBankDetailsPopup(false)} 
-        title="Bank & Payments"
-        maxHeight="85vh"
-        closeOnHandleClick={true}
-        showCloseButton={false}
-      >
-        <div className="space-y-5 pb-10">
-          <div className="grid gap-4">
-             {[
-               { label: "Account Holder", key: "accountHolderName", icon: User, maxLength: 60 },
-               { label: "Account Number", key: "accountNumber", icon: Banknote, maxLength: 18, isNumeric: true },
-               { label: "IFSC Code", key: "ifscCode", icon: Shield, format: (v) => v.toUpperCase(), maxLength: 11 },
-               { label: "Bank Name", key: "bankName", icon: MapPin, maxLength: 60 },
-               { label: "PAN Number", key: "panNumber", icon: FileText, format: (v) => v.toUpperCase(), maxLength: 10 },
-               { label: "UPI ID", key: "upiId", icon: Smartphone, maxLength: 60 }
-             ].map((field) => (
-               <div key={field.key} className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 group focus-within:border-[#005128]/50 transition-all">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-2">
-                     <field.icon className="w-3.5 h-3.5" /> {field.label}
-                  </label>
-                  <input 
-                    type="text" 
-                    value={bankDetails[field.key]} 
-                    onChange={(e) => {
-                        let val = e.target.value;
-                        if (field.isNumeric) val = val.replace(/\D/g, "");
-                        if (field.maxLength && val.length > field.maxLength) return;
-                        if (field.format) val = field.format(val);
-                        setBankDetails({...bankDetails, [field.key]: val})
-                    }} 
-                    className="w-full bg-transparent text-sm font-bold text-gray-950 outline-none"
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                  />
-               </div>
-             ))}
+        <section className="bg-white rounded-2xl border border-amber-200 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Zone Edit (Group)</h2>
+            <span className="text-[10px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">Approval Required</span>
+          </div>
+          <p className="text-xs text-amber-700">If you change zone, profile will go for admin approval.</p>
+          <p className="text-xs text-slate-500">Current zone: {selectedZoneLabel}</p>
+          <select className={inputClass} value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
+            <option value="">Select zone</option>
+            {zones.map((z) => {
+              const id = String(z?._id || z?.id || "")
+              if (!id) return null
+              return <option key={id} value={id}>{z?.zoneName || z?.name || z?.serviceLocation}</option>
+            })}
+          </select>
+          <button onClick={saveZoneOnly} disabled={saving} className="w-full rounded-xl bg-amber-600 text-white py-3 text-sm font-semibold disabled:opacity-60">
+            {saving ? "Saving..." : "Update Zone"}
+          </button>
+        </section>
 
-             {/* UPI Scanner Upload */}
-             <div className="bg-purple-50 p-6 rounded-3xl border border-purple-100 flex flex-col items-center gap-4 text-center">
-                <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest">UPI Payment QR Scanner</p>
-                
-                {upiQrPreview || bankDetails.upiQrCode ? (
-                  <div className="relative">
-                    <img src={upiQrPreview || bankDetails.upiQrCode} alt="QR Preview" className="w-32 h-32 rounded-xl object-cover border-4 border-white shadow-xl" />
-                    <button 
-                      onClick={() => { setUpiQrFile(null); setUpiQrPreview(null); }}
-                      className="absolute -top-3 -right-3 bg-red-500 text-white p-1.5 rounded-full shadow-lg"
-                    >
-                       <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-full flex gap-3">
-                    <div 
-                      onClick={() => handleTakeCameraPhoto("upiQrCode")}
-                      className="flex-1 aspect-square rounded-3xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 transition-all"
-                    >
-                       <Camera className="w-5 h-5 text-purple-300" />
-                       <span className="text-[8px] font-black text-purple-400 uppercase">Camera</span>
-                    </div>
-                    <div 
-                      onClick={() => handlePickFromGallery("upiQrCode", upiQrInputRef)}
-                      className="flex-1 aspect-square rounded-3xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 transition-all"
-                    >
-                       <ImageIcon className="w-5 h-5 text-purple-300" />
-                       <span className="text-[8px] font-black text-purple-400 uppercase">Gallery</span>
-                    </div>
-                  </div>
-                )}
-                <input ref={upiQrInputRef} type="file" accept="image/*" className="hidden" onChange={handleUpiQrSelected} />
-                <input ref={upiQrCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUpiQrCameraSelected} />
-                <p className="text-[9px] text-purple-400 font-medium">Upload your UPI QR code from Google Pay, PhonePe, etc. to receive easy payouts.</p>
-             </div>
+        <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Vehicle Details</h2>
+            <button
+              onClick={async () => {
+                if (!editingVehicle) return setEditingVehicle(true)
+                await saveVehicleDetails()
+                setEditingVehicle(false)
+              }}
+              disabled={saving || !!uploading}
+              className="text-xs font-semibold text-[#005128] disabled:opacity-50"
+            >
+              {editingVehicle ? "Save" : "Edit"}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input disabled={!editingVehicle} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Vehicle Type" value={form.vehicleType} onChange={(e) => onInput("vehicleType", e.target.value)} />
+            <input disabled={!editingVehicle} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Vehicle Brand/Name" value={form.vehicleName} onChange={(e) => onInput("vehicleName", e.target.value)} />
+          </div>
+          <input disabled={!editingVehicle} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Vehicle Number" value={form.vehicleNumber} onChange={(e) => onInput("vehicleNumber", e.target.value.toUpperCase())} />
+        </section>
+
+        <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Documents</h2>
+            <button
+              onClick={async () => {
+                if (!editingDocuments) return setEditingDocuments(true)
+                await saveDocumentDetails()
+                setEditingDocuments(false)
+              }}
+              disabled={saving || !!uploading}
+              className="text-xs font-semibold text-[#005128] disabled:opacity-50"
+            >
+              {editingDocuments ? "Save" : "Edit"}
+            </button>
           </div>
 
-          <button 
-            onClick={submitBankDetails} 
-            disabled={isUpdatingBankDetails} 
-            className="w-full bg-black text-white py-5 rounded-[1.5rem] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-gray-900 transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {isUpdatingBankDetails ? <><Loader2 className="w-5 h-5 animate-spin" /> saving...</> : "Update Systems"}
-          </button>
-        </div>
-      </BottomPopup>
+          <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+            <p className="text-xs font-semibold text-slate-700">Aadhar</p>
+            <input
+              disabled={!editingDocuments}
+              className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`}
+              placeholder="Aadhar Number"
+              value={form.aadharNumber}
+              onChange={(e) => onInput("aadharNumber", e.target.value)}
+            />
+            <button
+              disabled={!editingDocuments}
+              onClick={() => onPick(aadharInputRef)}
+              className="w-full rounded-xl border py-2 text-xs font-semibold disabled:opacity-50"
+            >
+              Upload Aadhar Photo
+            </button>
+            {aadharPhotoUrl ? (
+              <img src={aadharPhotoUrl} alt="Aadhar" className="w-full h-24 object-cover rounded-lg border border-slate-200" />
+            ) : (
+              <div className="w-full h-24 rounded-lg bg-slate-100 text-[10px] text-slate-400 flex items-center justify-center">No Aadhar photo</div>
+            )}
+          </div>
 
+          <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+            <p className="text-xs font-semibold text-slate-700">PAN</p>
+            <input
+              disabled={!editingDocuments}
+              className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`}
+              placeholder="PAN Number"
+              value={form.panNumber}
+              onChange={(e) => onInput("panNumber", e.target.value.toUpperCase())}
+            />
+            <button
+              disabled={!editingDocuments}
+              onClick={() => onPick(panInputRef)}
+              className="w-full rounded-xl border py-2 text-xs font-semibold disabled:opacity-50"
+            >
+              Upload PAN Photo
+            </button>
+            {panPhotoUrl ? (
+              <img src={panPhotoUrl} alt="PAN" className="w-full h-24 object-cover rounded-lg border border-slate-200" />
+            ) : (
+              <div className="w-full h-24 rounded-lg bg-slate-100 text-[10px] text-slate-400 flex items-center justify-center">No PAN photo</div>
+            )}
+          </div>
 
+          <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+            <p className="text-xs font-semibold text-slate-700">Driving License</p>
+            <input
+              disabled={!editingDocuments}
+              className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`}
+              placeholder="Driving License Number"
+              value={form.drivingLicenseNumber}
+              onChange={(e) => onInput("drivingLicenseNumber", e.target.value.toUpperCase())}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                disabled={!editingDocuments}
+                onClick={() => onPick(drivingInputRef)}
+                className="rounded-xl border py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                Upload DL Photo
+              </button>
+              <button
+                disabled={!editingDocuments}
+                onClick={() => openCamera({ onSelectFile: (f) => uploadSingleFile("drivingLicensePhoto", f), fileNamePrefix: "driving-license" })}
+                className="rounded-xl border py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                DL Camera
+              </button>
+            </div>
+            {drivingPhotoUrl ? (
+              <img src={drivingPhotoUrl} alt="Driving License" className="w-full h-24 object-cover rounded-lg border border-slate-200" />
+            ) : (
+              <div className="w-full h-24 rounded-lg bg-slate-100 text-[10px] text-slate-400 flex items-center justify-center">No License photo</div>
+            )}
+          </div>
+          <input ref={aadharInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadSingleFile("aadharPhoto", e.target.files?.[0])} />
+          <input ref={panInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadSingleFile("panPhoto", e.target.files?.[0])} />
+          <input ref={drivingInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadSingleFile("drivingLicensePhoto", e.target.files?.[0])} />
+        </section>
 
-      {/* Fullscreen Document Viewer */}
-      <AnimatePresence>
-        {showDocumentModal && selectedDocument && (
-          <motion.div 
-             initial={{ opacity: 0 }}
-             animate={{ opacity: 1 }}
-             exit={{ opacity: 0 }}
-             className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-xl flex flex-col items-center p-6"
-          >
-             <div className="w-full flex justify-between items-center mb-10 pt-safe">
-                <h3 className="text-white text-lg font-black uppercase tracking-widest">{selectedDocument.name}</h3>
-                <button onClick={() => setShowDocumentModal(false)} className="bg-white/10 text-white p-3 rounded-2xl hover:bg-white/20 transition-all active:scale-90">
-                   <X className="w-5 h-5" />
-                </button>
-             </div>
-             <div className="flex-1 w-full flex items-center justify-center">
-                <img src={selectedDocument.url} alt="Doc" className="max-w-full max-h-full object-contain rounded-3xl shadow-2xl" />
-             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Bank & Payments</h2>
+            <button
+              onClick={async () => {
+                if (!editingBank) return setEditingBank(true)
+                await saveBankDetails()
+                setEditingBank(false)
+              }}
+              disabled={saving || !!uploading}
+              className="text-xs font-semibold text-[#005128] disabled:opacity-50"
+            >
+              {editingBank ? "Save" : "Edit"}
+            </button>
+          </div>
+          <input disabled={!editingBank} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Account Holder Name" value={form.accountHolderName} onChange={(e) => onInput("accountHolderName", e.target.value)} />
+          <input disabled={!editingBank} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Account Number" value={form.accountNumber} onChange={(e) => onInput("accountNumber", e.target.value.replace(/\D/g, ""))} />
+          <div className="grid grid-cols-2 gap-2">
+            <input disabled={!editingBank} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="IFSC Code" value={form.ifscCode} onChange={(e) => onInput("ifscCode", e.target.value.toUpperCase())} />
+            <input disabled={!editingBank} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Bank Name" value={form.bankName} onChange={(e) => onInput("bankName", e.target.value)} />
+          </div>
+          <input disabled={!editingBank} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="UPI ID" value={form.upiId} onChange={(e) => onInput("upiId", e.target.value)} />
+
+          <div className="flex gap-2">
+            <button disabled={!editingBank} onClick={() => openCamera({ onSelectFile: (f) => uploadSingleFile("upiQrCode", f), fileNamePrefix: "upi-qr" })} className="flex-1 rounded-xl border py-2 text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"><Camera className="w-3.5 h-3.5" /> QR Camera</button>
+            <button disabled={!editingBank} onClick={() => onPick(upiQrInputRef)} className="flex-1 rounded-xl border py-2 text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"><ImageIcon className="w-3.5 h-3.5" /> QR Gallery</button>
+          </div>
+          <div className="rounded-xl border border-slate-200 p-2">
+            <p className="text-[10px] font-semibold text-slate-500 mb-1">Existing UPI QR</p>
+            {upiQrUrl ? (
+              <img src={upiQrUrl} alt="UPI QR" className="w-28 h-28 object-cover rounded-lg" />
+            ) : (
+              <div className="w-28 h-28 rounded-lg bg-slate-100 text-[10px] text-slate-400 flex items-center justify-center">No QR</div>
+            )}
+          </div>
+          <input ref={upiQrInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadSingleFile("upiQrCode", e.target.files?.[0])} />
+        </section>
+      </div>
     </div>
   )
 }
 
 export default ProfileDetailsV2
-
-

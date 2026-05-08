@@ -47,9 +47,17 @@ export const ProfileDocsV2 = () => {
      try {
         const res = await deliveryAPI.updateProfileMultipart(formData);
         if (res?.data?.success) {
-           setRedirectingAfterUpdate(true);
-           toast.success("Document updated. Your approval request has been sent to admin. Redirecting to login...");
-           redirectToLoginAfterDocumentUpdate();
+           const requiresReapproval =
+             res?.data?.data?.requiresReapproval ??
+             res?.data?.data?.partner?.requiresReapproval ??
+             false;
+           if (requiresReapproval) {
+             setRedirectingAfterUpdate(true);
+             toast.success("Document updated. Your approval request has been sent to admin. Redirecting to login...");
+             redirectToLoginAfterDocumentUpdate();
+           } else {
+             toast.success("Document updated successfully.");
+           }
         }
      } catch (e) { toast.error("Upload failed"); }
      finally {

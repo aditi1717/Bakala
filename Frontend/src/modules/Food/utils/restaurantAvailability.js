@@ -179,8 +179,23 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
   }
 
   const ignoreOperationalStatus = options?.ignoreOperationalStatus === true
+  const availabilityStatus = String(
+    restaurant?.availabilityStatus ||
+    restaurant?.availability?.status ||
+    restaurant?.status ||
+    ""
+  ).toLowerCase()
+  const hasOnlineFlag =
+    restaurant?.availability?.isOnline === true ||
+    restaurant?.availability?.isOnline === false ||
+    restaurant?.isOnline === true ||
+    restaurant?.isOnline === false
+  const isOnlineByFlag = hasOnlineFlag
+    ? (restaurant?.availability?.isOnline ?? restaurant?.isOnline) !== false
+    : true
+  const isOfflineByStatus = availabilityStatus === "offline" || availabilityStatus === "closed"
   const isActive = restaurant.isActive !== false
-  const isAcceptingOrders = restaurant.isAcceptingOrders !== false
+  const isAcceptingOrders = restaurant.isAcceptingOrders !== false && isOnlineByFlag && !isOfflineByStatus
 
   if (!ignoreOperationalStatus && !isActive) {
     return {

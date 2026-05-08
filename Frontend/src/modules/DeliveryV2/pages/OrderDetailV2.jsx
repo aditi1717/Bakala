@@ -268,19 +268,6 @@ const getDeliveryInstructions = (order) =>
     order?.deliveryAddress?.note,
   );
 
-const getGoogleMapsHref = (location, addressText = '') => {
-  const lat = Number(location?.lat);
-  const lng = Number(location?.lng);
-
-  if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    return `https://www.google.com/maps?q=${lat},${lng}`;
-  }
-
-  const query = String(addressText || '').trim();
-  if (!query) return '';
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-};
-
 const getDispatchStatus = (order) =>
   String(order?.dispatch?.status || order?.queueStatus || '').toLowerCase();
 
@@ -540,8 +527,6 @@ const OrderDetailV2 = () => {
   const paymentMethodMeta = useMemo(() => getPaymentMethodMeta(order), [order]);
   const paymentStatusMeta = useMemo(() => getPaymentStatusMeta(order), [order]);
   const orderDisplayId = useMemo(() => getOrderDisplayId(order), [order]);
-  const restaurantLocation = order?.restaurantLocation;
-  const customerLocation = order?.customerLocation;
   const restaurantAddress = pickFirstText(
     order?.restaurantAddress,
     order?.restaurantId?.address,
@@ -555,7 +540,6 @@ const OrderDetailV2 = () => {
     [order],
   );
   const deliveryInstructions = useMemo(() => getDeliveryInstructions(order), [order]);
-  const dropMapHref = getGoogleMapsHref(customerLocation, customerAddress);
   const pickupMeta = useMemo(() => getPickupContactMeta(order), [order]);
   const pickupDisplayPhone = getDisplayPhone(pickupMeta.phone);
   const customerDisplayPhone = getDisplayPhone(customerMeta.phone);
@@ -584,18 +568,6 @@ const OrderDetailV2 = () => {
     order?.total ??
     order?.amount,
   ) ?? Math.max(0, subtotal + deliveryCharge);
-
-  const openOrderMapInApp = useCallback(() => {
-    const targetOrderId = getOrderIdentity(order) || String(orderId || '').trim();
-    if (!targetOrderId) return;
-    try {
-      localStorage.setItem(ORDER_FOCUS_STORAGE_KEY, targetOrderId);
-    } catch {
-      // Ignore storage errors.
-    }
-    if (order) syncStoreWithOrder(order);
-    navigate('/food/delivery/feed');
-  }, [navigate, order, orderId, syncStoreWithOrder]);
 
   const runAction = useCallback(async (actionKey, runner, options = {}) => {
     const { skipRefresh = false, onSuccess } = options;
@@ -872,16 +844,6 @@ const OrderDetailV2 = () => {
           )}
 
         </section>
-
-        {!isPassedTaskFlow && dropMapHref && !isClosedOrder && (
-          <button
-            type="button"
-            onClick={openOrderMapInApp}
-            className="w-full rounded-xl bg-[#16a34a] px-4 py-3 text-sm font-semibold text-white"
-          >
-            View in map
-          </button>
-        )}
 
         {!isPassedTaskFlow && (
           <>

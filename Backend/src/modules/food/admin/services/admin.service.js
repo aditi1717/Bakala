@@ -310,6 +310,89 @@ const validateOpeningClosingTimes = (openingTime, closingTime) => {
     }
 };
 
+const serializeDeliveryPartnerForAdmin = (doc, options = {}) => {
+    const { sl = null, includeAvailability = false, statusOverride } = options;
+    const rawStatus = String(doc?.status || '');
+    const mappedStatus = statusOverride || rawStatus;
+    const zoneName = getZoneDisplayName(doc?.zoneId) || doc?.city || doc?.state || doc?.address || '';
+    const docId = doc?._id ? String(doc._id) : '';
+
+    return {
+        _id: doc?._id || null,
+        ...(sl !== null ? { sl } : {}),
+        name: doc?.name || '',
+        email: doc?.email || '',
+        phone: doc?.phone || '',
+        deliveryId: docId ? `DP-${docId.slice(-8).toUpperCase()}` : null,
+        zoneId: doc?.zoneId?._id || doc?.zoneId || null,
+        zone: zoneName,
+        zoneName,
+        vehicleType: doc?.vehicleType || '',
+        status: mappedStatus,
+        rejectionReason: doc?.rejectionReason || undefined,
+        availabilityStatus: doc?.availabilityStatus || 'offline',
+        lastLat: Number(doc?.lastLat) || 0,
+        lastLng: Number(doc?.lastLng) || 0,
+        lastLocationAt: doc?.lastLocationAt || null,
+        ...(includeAvailability
+            ? {
+                availability: {
+                    isOnline: String(doc?.availabilityStatus || '').toLowerCase() === 'online',
+                    status: doc?.availabilityStatus || 'offline',
+                    lastLocationUpdate: doc?.lastLocationAt || null,
+                    currentLocation:
+                        Array.isArray(doc?.lastLocation?.coordinates) && doc.lastLocation.coordinates.length >= 2
+                            ? {
+                                type: 'Point',
+                                coordinates: doc.lastLocation.coordinates,
+                                lastUpdate: doc?.lastLocationAt || null,
+                            }
+                            : (Number.isFinite(Number(doc?.lastLat)) && Number.isFinite(Number(doc?.lastLng))
+                                ? {
+                                    type: 'Point',
+                                    coordinates: [Number(doc.lastLng), Number(doc.lastLat)],
+                                    lastUpdate: doc?.lastLocationAt || null,
+                                }
+                                : null),
+                },
+            }
+            : {}),
+        profilePhoto: doc?.profilePhoto || null,
+        profileImage: doc?.profilePhoto ? { url: doc.profilePhoto } : null,
+        location: (doc?.address || doc?.city || doc?.state)
+            ? { addressLine1: doc.address, city: doc.city, state: doc.state }
+            : null,
+        vehicle: (doc?.vehicleType || doc?.vehicleName || doc?.vehicleNumber)
+            ? {
+                type: doc.vehicleType,
+                brand: doc.vehicleName,
+                model: doc.vehicleName,
+                number: doc.vehicleNumber
+            }
+            : null,
+        documents: {
+            aadhar: (doc?.aadharPhoto || doc?.aadharNumber)
+                ? { number: doc.aadharNumber || null, document: doc.aadharPhoto || null }
+                : null,
+            pan: (doc?.panPhoto || doc?.panNumber)
+                ? { number: doc.panNumber || null, document: doc.panPhoto || null }
+                : null,
+            drivingLicense: doc?.drivingLicensePhoto ? { document: doc.drivingLicensePhoto } : null,
+            bankDetails:
+                doc?.bankAccountHolderName || doc?.bankAccountNumber || doc?.bankIfscCode || doc?.bankName || doc?.upiId || doc?.upiQrCode || doc?.accountHolderName || doc?.accountNumber || doc?.ifscCode
+                    ? {
+                        accountHolderName: doc.bankAccountHolderName || doc.accountHolderName || null,
+                        accountNumber: doc.bankAccountNumber || doc.accountNumber || null,
+                        ifscCode: doc.bankIfscCode || doc.ifscCode || null,
+                        bankName: doc.bankName || null,
+                        upiId: doc.upiId || null,
+                        upiQrCode: doc.upiQrCode || null,
+                    }
+                    : null
+        }
+    };
+};
+
 export async function getRestaurantComplaints(query = {}) {
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 500);
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
@@ -4409,12 +4492,31 @@ export async function getDeliveryJoinRequests(query) {
     }
     if (zone && zone.trim()) {
         const z = zone.trim();
+        const zoneOr = [
+            { city: { $regex: z, $options: 'i' } },
+            { state: { $regex: z, $options: 'i' } },
+            { address: { $regex: z, $options: 'i' } }
+        ];
+
+        if (mongoose.Types.ObjectId.isValid(z)) {
+            zoneOr.push({ zoneId: new mongoose.Types.ObjectId(z) });
+        } else {
+            const matchingZones = await FoodZone.find({
+                isActive: { $ne: false },
+                $or: [
+                    { name: { $regex: z, $options: 'i' } },
+                    { zoneName: { $regex: z, $options: 'i' } },
+                    { serviceLocation: { $regex: z, $options: 'i' } }
+                ]
+            }).select('_id').lean();
+
+            if (matchingZones.length) {
+                zoneOr.push({ zoneId: { $in: matchingZones.map((item) => item._id) } });
+            }
+        }
+
         andParts.push({
-            $or: [
-                { city: { $regex: z, $options: 'i' } },
-                { state: { $regex: z, $options: 'i' } },
-                { address: { $regex: z, $options: 'i' } }
-            ]
+            $or: zoneOr
         });
     }
     if (andParts.length) filter.$and = andParts;
@@ -4429,21 +4531,12 @@ export async function getDeliveryJoinRequests(query) {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
+        .populate('zoneId', 'name zoneName serviceLocation')
         .lean();
 
-    const requests = list.map((doc, index) => ({
-        _id: doc._id,
+    const requests = list.map((doc, index) => serializeDeliveryPartnerForAdmin(doc, {
         sl: skip + index + 1,
-        name: doc.name || '',
-        email: doc.email || '',
-        phone: doc.phone || '',
-        zone: doc.city || doc.state || doc.address || '',
-        jobType: doc.jobType || '',
-        vehicleType: doc.vehicleType || '',
-        status: doc.status === 'rejected' ? 'denied' : doc.status,
-        rejectionReason: doc.rejectionReason || undefined,
-        profilePhoto: doc.profilePhoto || null,
-        profileImage: doc.profilePhoto ? { url: doc.profilePhoto } : null
+        statusOverride: doc.status === 'rejected' ? 'denied' : doc.status
     }));
 
     return { requests };
@@ -4638,47 +4731,9 @@ export async function getDeliveryPartners(query, adminScope = {}) {
         FoodDeliveryPartner.countDocuments(filter)
     ]);
 
-    const deliveryPartners = list.map((doc, index) => ({
-        _id: doc._id,
-        sl: skip + index + 1,
-        name: doc.name || '',
-        email: doc.email || '',
-        phone: doc.phone || '',
-        deliveryId: doc._id ? `DP-${doc._id.toString().slice(-8).toUpperCase()}` : null,
-        zoneId: doc.zoneId?._id || doc.zoneId || null,
-        zone: doc.zoneId?.name || doc.zoneId?.zoneName || doc.zoneId?.serviceLocation || doc.city || doc.state || doc.address || '',
-        vehicleType: doc.vehicleType || '',
-        status: doc.status,
-        availabilityStatus: doc.availabilityStatus || 'offline',
-        lastLat: Number(doc?.lastLat) || 0,
-        lastLng: Number(doc?.lastLng) || 0,
-        lastLocationAt: doc?.lastLocationAt || null,
-        ...(includeAvailability
-            ? {
-                availability: {
-                    isOnline: String(doc?.availabilityStatus || '').toLowerCase() === 'online',
-                    status: doc?.availabilityStatus || 'offline',
-                    lastLocationUpdate: doc?.lastLocationAt || null,
-                    currentLocation:
-                        Array.isArray(doc?.lastLocation?.coordinates) && doc.lastLocation.coordinates.length >= 2
-                            ? {
-                                type: 'Point',
-                                coordinates: doc.lastLocation.coordinates,
-                                lastUpdate: doc?.lastLocationAt || null,
-                            }
-                            : (Number.isFinite(Number(doc?.lastLat)) && Number.isFinite(Number(doc?.lastLng))
-                                ? {
-                                    type: 'Point',
-                                    coordinates: [Number(doc.lastLng), Number(doc.lastLat)],
-                                    lastUpdate: doc?.lastLocationAt || null,
-                                }
-                                : null),
-                },
-            }
-            : {}),
-        profilePhoto: doc.profilePhoto || null,
-        profileImage: doc.profilePhoto ? { url: doc.profilePhoto } : null
-    }));
+    const deliveryPartners = list.map((doc, index) =>
+        serializeDeliveryPartnerForAdmin(doc, { sl: skip + index + 1, includeAvailability })
+    );
 
     return {
         deliveryPartners,
@@ -5261,44 +5316,26 @@ export async function checkEarningAddonCompletions(deliveryPartnerId, _force = f
 }
 
 export async function getDeliveryPartnerById(id) {
-    const partner = await FoodDeliveryPartner.findById(id).lean();
+    const partner = await FoodDeliveryPartner.findById(id)
+        .populate('zoneId', 'name zoneName serviceLocation')
+        .lean();
     if (!partner) return null;
-    const deliveryId = partner._id ? `DP-${partner._id.toString().slice(-8).toUpperCase()}` : null;
+    const zoneName = getZoneDisplayName(partner.zoneId) || null;
     return {
         ...partner,
+        ...serializeDeliveryPartnerForAdmin(partner, { statusOverride: partner.status === 'rejected' ? 'blocked' : partner.status }),
         email: partner.email || null,
-        deliveryId,
-        status: partner.status === 'rejected' ? 'blocked' : partner.status,
-        profileImage: partner.profilePhoto ? { url: partner.profilePhoto } : null,
-        documents: {
-            aadhar: (partner.aadharPhoto || partner.aadharNumber)
-                ? { number: partner.aadharNumber || null, document: partner.aadharPhoto || null }
-                : null,
-            pan: (partner.panPhoto || partner.panNumber)
-                ? { number: partner.panNumber || null, document: partner.panPhoto || null }
-                : null,
-            drivingLicense: partner.drivingLicensePhoto ? { document: partner.drivingLicensePhoto } : null,
-            bankDetails:
-                partner.bankAccountHolderName || partner.bankAccountNumber || partner.bankIfscCode || partner.bankName
-                    ? {
-                        accountHolderName: partner.bankAccountHolderName || null,
-                        accountNumber: partner.bankAccountNumber || null,
-                        ifscCode: partner.bankIfscCode || null,
-                        bankName: partner.bankName || null
-                    }
-                    : null
-        },
-        location: (partner.address || partner.city || partner.state)
-            ? { addressLine1: partner.address, city: partner.city, state: partner.state }
-            : null,
-        vehicle: (partner.vehicleType || partner.vehicleName || partner.vehicleNumber)
+        zoneId: partner.zoneId?._id || partner.zoneId || null,
+        zone: zoneName,
+        zoneName,
+        zoneDetails: partner.zoneId && typeof partner.zoneId === 'object'
             ? {
-                type: partner.vehicleType,
-                brand: partner.vehicleName,
-                model: partner.vehicleName,
-                number: partner.vehicleNumber
+                _id: partner.zoneId._id,
+                name: partner.zoneId.name || null,
+                zoneName: partner.zoneId.zoneName || null,
+                serviceLocation: partner.zoneId.serviceLocation || null
             }
-            : null
+            : null,
     };
 }
 

@@ -387,7 +387,7 @@ export default function JoinRequest() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-slate-700">{request.zone}</span>
+                          <span className="text-sm text-slate-700">{request.zone || "Unassigned"}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm text-slate-700 capitalize">{request.vehicle?.type || request.vehicleType}</span>
@@ -578,6 +578,14 @@ export default function JoinRequest() {
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">Delivery ID</label>
                       <p className="text-sm font-medium text-slate-900 mt-1">{viewDetails.deliveryId || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> Zone
+                      </label>
+                      <p className="text-sm text-slate-900 mt-1">
+                        {viewDetails.zone || viewDetails.zoneName || viewDetails.zoneDetails?.zoneName || viewDetails.zoneDetails?.name || viewDetails.zoneDetails?.serviceLocation || "Unassigned"}
+                      </p>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">Status</label>

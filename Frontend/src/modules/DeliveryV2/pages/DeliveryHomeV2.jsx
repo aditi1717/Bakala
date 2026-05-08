@@ -11,7 +11,6 @@ import { BRAND_THEME } from '@/config/brandTheme';
 import { useNavigate } from 'react-router-dom';
 
 // Components
-import LiveMap from '@/modules/DeliveryV2/components/map/LiveMap';
 
 // Sub Pages
 import PocketV2 from '@/modules/DeliveryV2/pages/PocketV2';
@@ -593,7 +592,7 @@ function OrdersTabV2({
  * DeliveryHomeV2 - Premium 1:1 Match with Original App UI.
  * Featuring logical tab switching for Feed, Pocket, History, and Profile.
  */
-export default function DeliveryHomeV2({ tab = 'feed' }) {
+export default function DeliveryHomeV2({ tab = 'orders' }) {
   const navigate = useNavigate();
   const { isOnline, setOnline, activeOrder, tripStatus, setRiderLocation, setActiveOrder, updateTripStatus, clearActiveOrder } = useDeliveryStore();
   const { distanceToTarget } = useProximityCheck();
@@ -1613,87 +1612,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       {/* ─── 2. MAIN CONTENT ─── */}
       <div
         ref={contentScrollRef}
-        className={`flex-1 relative overflow-y-auto ${currentTab === 'feed' ? 'pt-[76px]' : currentTab === 'history' ? 'pt-0' : 'pt-[64px]'}`}
+        className={`flex-1 relative overflow-y-auto ${currentTab === 'history' ? 'pt-0' : 'pt-[64px]'}`}
       >
-        {currentTab === 'feed' ? (
-          <div className="absolute inset-0 top-[-76px]">
-            <LiveMap
-              onMapLoad={(m) => mapRef.current = m}
-              onMapClick={handleMapClick}
-              onPathReceived={setSimPath}
-              onPolylineReceived={(poly) => {
-                setActivePolyline(poly);
-                // If we have an order, push the INITIAL polyline to Firebase immediately for the customer
-                const orderId = activeOrder?.orderId || activeOrder?._id;
-                if (orderId && poly) {
-                  writeOrderTracking(orderId, { polyline: poly, status: tripStatus, eta: eta }).catch(() => { });
-                }
-              }}
-              zoom={zoom}
-            />
-
-            {/* SIMULATION INDICATOR */}
-            {isSimMode && (
-              <div className="absolute top-[180px] left-4 right-4 z-[100] bg-[#005128]/70 backdrop-blur-md rounded-xl p-4 border border-white/20 flex items-center justify-between shadow-2xl">
-                <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center animate-pulse">
-                    <Play className="w-4 h-4 text-white fill-current" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-orange-500 text-[10px] font-bold uppercase tracking-widest">Auto Navigation Active</span>
-                    <span className="text-white text-[11px] font-medium">Following actual road path...</span>
-                  </div>
-                </div>
-                <button onClick={() => setIsSimMode(false)} className="bg-white/10 text-white/50 hover:text-white px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-white/10">Stop</button>
-              </div>
-            )}
-
-            <div className="absolute right-4 bottom-28 md:bottom-32 flex flex-col gap-4 z-[120]">
-              <div className="flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
-                <button onClick={() => setZoom(z => Math.min(22, z + 1))} className="p-3 hover:bg-gray-50 border-b border-gray-100 text-gray-900 active:scale-90 transition-all" aria-label="Zoom in"><Plus className="w-5 h-5 stroke-[2.75]" /></button>
-                <button onClick={() => setZoom(z => Math.max(8, z - 1))} className="p-3 hover:bg-gray-50 text-gray-900 active:scale-90 transition-all" aria-label="Zoom out"><Minus className="w-5 h-5 stroke-[2.75]" /></button>
-              </div>
-              <button
-                onClick={() => {
-                  const nextSimState = !isSimMode;
-                  setIsSimMode(nextSimState);
-
-                  if (nextSimState) {
-                    toast.warning('Simulation Mode Active');
-                    // Initialize position if null
-                    if (!useDeliveryStore.getState().riderLocation && activeOrder) {
-                      const target = activeOrder.restaurantLocation || activeOrder.customerLocation;
-                      if (target) {
-                        setRiderLocation({
-                          lat: parseFloat(target.lat || target.latitude) + 0.001,
-                          lng: parseFloat(target.lng || target.longitude) + 0.001,
-                          heading: 0
-                        });
-                      }
-                    }
-                  }
-                }}
-                className={`w-14 h-14 rounded-full shadow-2xl flex items-center justify-center border border-gray-100 transition-all ${isSimMode ? 'bg-orange-500 text-white' : 'bg-white text-green-500'}`}
-              >
-                <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${isSimMode ? 'border-white' : 'border-green-500'}`}>
-                  <Play className={`w-4 h-4 fill-current ml-0.5 ${isSimMode ? 'animate-pulse' : ''}`} />
-                </div>
-              </button>
-              <button
-                onClick={() => mapRef.current?.setOptions({ gestureHandling: 'greedy' })}
-                className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-brand-600 border border-gray-100 active:scale-90 transition-all"
-              >
-                <div className="w-8 h-8 rounded-full border-2 border-brand-600 flex items-center justify-center"><Navigation2 className="w-4 h-4" /></div>
-              </button>
-              <button
-                onClick={handleCenterMap}
-                className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-gray-900 border border-gray-100 group active:scale-90 transition-all"
-              >
-                <Target className="w-7 h-7" />
-              </button>
-            </div>
-          </div>
-        ) : currentTab === 'orders' ? (
+        {currentTab === 'orders' ? (
           <OrdersTabV2
             activeOrder={activeOrder}
             incomingOrder={incomingOrder}
@@ -1728,9 +1649,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
       {/* ─── 3. BOTTOM NAV (Clean & Uniform) ─── */}
       <div className="bg-white border-t border-gray-100 flex justify-between items-center z-[200] safe-bottom shadow-sm">
-        <button onClick={() => navigate('/food/delivery/feed')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'feed' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
-          <LayoutGrid className="w-5 h-5" /><span className="text-[10px] font-semibold">Feed</span>
-        </button>
         <button onClick={() => navigate('/food/delivery/orders')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'orders' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
           <Package className="w-5 h-5" /><span className="text-[10px] font-semibold">Orders</span>
         </button>

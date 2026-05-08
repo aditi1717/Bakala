@@ -1660,6 +1660,12 @@ let deliveryMeCached = null;
 let deliveryMeCacheTime = 0;
 const DELIVERY_ME_CACHE_MS = 3000;
 
+const invalidateDeliveryMeCache = () => {
+  deliveryMeInFlight = null;
+  deliveryMeCached = null;
+  deliveryMeCacheTime = 0;
+};
+
 const getDeliveryMeOnce = () => {
   const now = Date.now();
   if (deliveryMeCached && now - deliveryMeCacheTime < DELIVERY_ME_CACHE_MS) {
@@ -1706,8 +1712,7 @@ export const deliveryAPI = {
       contextModule: "delivery",
     }),
   logout: async (refreshToken) => {
-    deliveryMeCached = null;
-    deliveryMeCacheTime = 0;
+    invalidateDeliveryMeCache();
     try {
       localStorage.removeItem("app:isOnline");
     } catch (_) {}
@@ -1773,36 +1778,46 @@ export const deliveryAPI = {
   },
   /** PATCH /food/delivery/profile/details - JSON updates (vehicle number, etc). */
   updateProfileDetails: (payload) =>
-    apiClient.patch("/food/delivery/profile/details", payload ?? {}, {
-      contextModule: "delivery",
-    }),
+    apiClient
+      .patch("/food/delivery/profile/details", payload ?? {}, {
+        contextModule: "delivery",
+      })
+      .finally(() => invalidateDeliveryMeCache()),
   /** PATCH /food/delivery/profile - multipart updates for photos/documents (uses same endpoint). */
   updateProfileMultipart: (formData) => {
     if (!formData || !(formData instanceof FormData)) {
       return Promise.reject(new Error("FormData is required"));
     }
-    return apiClient.patch("/food/delivery/profile", formData, {
-      contextModule: "delivery",
-    });
+    return apiClient
+      .patch("/food/delivery/profile", formData, {
+        contextModule: "delivery",
+      })
+      .finally(() => invalidateDeliveryMeCache());
   },
   /** POST /food/delivery/profile/photo-base64 - Flutter in-app camera base64 upload. */
   updateProfilePhotoBase64: (payload) =>
-    apiClient.post("/food/delivery/profile/photo-base64", payload ?? {}, {
-      contextModule: "delivery",
-    }),
+    apiClient
+      .post("/food/delivery/profile/photo-base64", payload ?? {}, {
+        contextModule: "delivery",
+      })
+      .finally(() => invalidateDeliveryMeCache()),
   /** PATCH /food/delivery/profile/bank-details - update bank details + PAN (JSON, Bearer required). */
   updateProfile: (payload) =>
-    apiClient.patch("/food/delivery/profile/bank-details", payload ?? {}, {
-      contextModule: "delivery",
-    }),
+    apiClient
+      .patch("/food/delivery/profile/bank-details", payload ?? {}, {
+        contextModule: "delivery",
+      })
+      .finally(() => invalidateDeliveryMeCache()),
   /** PATCH /food/delivery/profile/bank-details - multipart updates for bank details + UPI QR (FormData required). */
   updateBankDetailsMultipart: (formData) => {
     if (!formData || !(formData instanceof FormData)) {
       return Promise.reject(new Error("FormData is required"));
     }
-    return apiClient.patch("/food/delivery/profile/bank-details", formData, {
-      contextModule: "delivery",
-    });
+    return apiClient
+      .patch("/food/delivery/profile/bank-details", formData, {
+        contextModule: "delivery",
+      })
+      .finally(() => invalidateDeliveryMeCache());
   },
   saveFcmToken: (token, platform = "web") => {
     if (!token) return Promise.reject(new Error("FCM token is required"));

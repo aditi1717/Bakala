@@ -5,6 +5,7 @@ import { FoodAdmin } from "../admin/admin.model.js";
 import { AdminResetOtp } from "../admin/adminResetOtp.model.js";
 import { FoodRestaurant } from "../../modules/food/restaurant/models/restaurant.model.js";
 import { FoodDeliveryPartner } from "../../modules/food/delivery/models/deliveryPartner.model.js";
+import { FoodZone } from "../../modules/food/admin/models/zone.model.js";
 import { FoodReferralSettings } from "../../modules/food/admin/models/referralSettings.model.js";
 import { FoodReferralLog } from "../../modules/food/admin/models/referralLog.model.js";
 import { createOrUpdateOtp, verifyOtp } from "../otp/otp.service.js";
@@ -539,11 +540,30 @@ export const getProfile = async (userId, role) => {
     case ROLES.DELIVERY_PARTNER: {
       const partner = await FoodDeliveryPartner.findById(id).lean();
       if (!partner) break;
+      const zone =
+        partner.zoneId
+          ? await FoodZone.findById(partner.zoneId)
+              .select("_id name zoneName serviceLocation isActive")
+              .lean()
+          : null;
+      const normalizedZoneId = zone?._id || partner.zoneId || null;
       const deliveryId = partner._id
         ? `DP-${partner._id.toString().slice(-8).toUpperCase()}`
         : null;
       profile = {
         ...partner,
+        zoneId: normalizedZoneId,
+        zone:
+          zone
+            ? {
+                _id: zone._id,
+                id: zone._id,
+                name: zone.name || null,
+                zoneName: zone.zoneName || null,
+                serviceLocation: zone.serviceLocation || null,
+                isActive: zone.isActive !== false,
+              }
+            : null,
         email: partner.email || null,
         deliveryId,
         status: partner.status === "rejected" ? "blocked" : partner.status,
@@ -577,11 +597,23 @@ export const getProfile = async (userId, role) => {
             partner.bankIfscCode ||
             partner.bankName ||
             partner.upiId ||
-            partner.upiQrCode
+            partner.upiQrCode ||
+            partner.accountHolderName ||
+            partner.accountNumber ||
+            partner.ifscCode
               ? {
-                  accountHolderName: partner.bankAccountHolderName || null,
-                  accountNumber: partner.bankAccountNumber || null,
-                  ifscCode: partner.bankIfscCode || null,
+                  accountHolderName:
+                    partner.bankAccountHolderName ||
+                    partner.accountHolderName ||
+                    null,
+                  accountNumber:
+                    partner.bankAccountNumber ||
+                    partner.accountNumber ||
+                    null,
+                  ifscCode:
+                    partner.bankIfscCode ||
+                    partner.ifscCode ||
+                    null,
                   bankName: partner.bankName || null,
                   upiId: partner.upiId || null,
                   upiQrCode: partner.upiQrCode || null,

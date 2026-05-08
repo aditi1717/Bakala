@@ -3,14 +3,11 @@ import { ArrowLeft, Edit2, Loader2, Save } from 'lucide-react';
 import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import useDeliveryBackNavigation from '../../hooks/useDeliveryBackNavigation';
-import { useNavigate } from 'react-router-dom';
-import { clearModuleAuth } from '@food/utils/auth';
 
 /**
  * ProfileBankV2 - Restored Old UI for Bank Details.
  */
 export const ProfileBankV2 = () => {
-  const navigate = useNavigate();
   const goBack = useDeliveryBackNavigation();
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -59,10 +56,7 @@ export const ProfileBankV2 = () => {
 
         const response = await deliveryAPI.updateBankDetailsMultipart(formData);
         if (response?.data?.success) {
-           toast.success("Bank details updated. Your approval request has been sent to admin. Redirecting to login...");
-           clearModuleAuth("delivery");
-           localStorage.removeItem("app:isOnline");
-           navigate("/food/delivery/login", { replace: true });
+           toast.success("Bank details updated");
            setIsEditing(false);
         }
      } catch (e) { toast.error("Update failed"); }

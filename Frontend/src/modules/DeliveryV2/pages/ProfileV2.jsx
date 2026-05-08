@@ -97,7 +97,7 @@ export const ProfileV2 = () => {
         </div>
 
         {/* Action Grid (Compact) */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
            <button
              onClick={() => navigate("/food/delivery/history")}
              className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm flex items-center gap-3 active:bg-gray-50 transition-colors"
@@ -108,19 +108,6 @@ export const ProfileV2 = () => {
              <div className="text-left">
                <span className="text-xs font-semibold text-gray-800 block">Trips</span>
                <span className="text-[10px] text-gray-400 font-medium">History</span>
-             </div>
-           </button>
-           
-           <button
-             onClick={() => navigate("/food/delivery/profile/documents")}
-             className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm flex items-center gap-3 active:bg-gray-50 transition-colors"
-           >
-             <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-               <FileText className="w-4 h-4" />
-             </div>
-             <div className="text-left">
-               <span className="text-xs font-semibold text-gray-800 block">Docs</span>
-               <span className="text-[10px] text-gray-400 font-medium">Manage</span>
              </div>
            </button>
         </div>
