@@ -88,7 +88,7 @@ export default function About() {
     )
   }
 
-  const displayAppName = (aboutData.appName || companyName || "About").replace(/appzeto/gi, "Iggymet")
+  const displayAppName = (aboutData.appName || companyName || "About").replace(/appzeto/gi, "Bakalaa")
   const normalizeLogo = () => {
     const candidate = logoUrl || aboutData.logo?.url || aboutData.logo
     if (candidate && typeof candidate === "string" && candidate.trim().startsWith("http")) {
@@ -331,7 +331,7 @@ export default function About() {
           className="text-center mt-8 mb-4"
         >
           <p className="text-sm text-gray-500 dark:text-gray-500">
-            � {new Date().getFullYear()} {companyName || "Iggymet"}. All rights reserved.
+            � {new Date().getFullYear()} {companyName || "Bakalaaa"}. All rights reserved.
           </p>
         </motion.div>
       </div>

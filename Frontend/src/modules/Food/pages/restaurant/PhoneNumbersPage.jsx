@@ -45,7 +45,7 @@ export default function PhoneNumbersPage() {
 
   const handleSaveEdit = () => {
     if (!editingNumber || !phoneNumber.trim()) return
-    
+
     // Store the data to save after OTP verification
     setPendingPhoneData({
       type: editingNumber,
@@ -53,7 +53,7 @@ export default function PhoneNumbersPage() {
       countryCode: countryCode,
       phoneNumber: phoneNumber.trim()
     })
-    
+
     // Close edit popup and show OTP popup
     setEditingNumber(null)
     setShowOtpPopup(true)
@@ -68,16 +68,16 @@ export default function PhoneNumbersPage() {
 
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return // Only allow digits
-    
+
     const newOtp = [...otp]
     newOtp[index] = value.slice(-1) // Only take last character
-    
+
     // Auto-focus next input
     if (value && index < 5) {
       const nextInput = document.getElementById(`otp-${index + 1}`)
       if (nextInput) nextInput.focus()
     }
-    
+
     setOtp(newOtp)
   }
 
@@ -90,7 +90,7 @@ export default function PhoneNumbersPage() {
 
   const handleVerifyOtp = () => {
     const otpString = otp.join("")
-    
+
     // For demo purposes, accept any 6-digit OTP
     // In production, this would verify against the backend
     if (otpString.length === 6) {
@@ -101,7 +101,7 @@ export default function PhoneNumbersPage() {
           [pendingPhoneData.type]: pendingPhoneData.value
         }))
       }
-      
+
       // Close OTP popup and reset
       setShowOtpPopup(false)
       setPendingPhoneData(null)
@@ -199,7 +199,7 @@ export default function PhoneNumbersPage() {
             <div className="flex-1">
               <h2 className="text-base font-bold text-gray-900">Restaurant page number</h2>
               <p className="text-xs text-gray-600 mt-1">
-                Number for Zomato customers to call your restaurant.
+                Number for bakalaa customers to call your restaurant.
               </p>
             </div>
           </div>
@@ -282,8 +282,8 @@ export default function PhoneNumbersPage() {
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
                       placeholder="Enter phone number"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2"
-                  style={{ borderColor: BRAND_THEME.colors.brand.primary, boxShadow: `0 0 0 2px ${BRAND_THEME.colors.brand.primary}33` }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2"
+                      style={{ borderColor: BRAND_THEME.colors.brand.primary, boxShadow: `0 0 0 2px ${BRAND_THEME.colors.brand.primary}33` }}
                     />
                   </div>
                 </div>
@@ -298,11 +298,10 @@ export default function PhoneNumbersPage() {
                 <button
                   onClick={handleSaveEdit}
                   disabled={!phoneNumber.trim()}
-                  className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${
-                    phoneNumber.trim()
-                      ? "text-white"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
+                  className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${phoneNumber.trim()
+                    ? "text-white"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
                   style={phoneNumber.trim() ? { background: BRAND_THEME.gradients.primary } : undefined}
                 >
                   Save
@@ -351,20 +350,19 @@ export default function PhoneNumbersPage() {
                         setCountryCode(country.code)
                         setIsCountryCodeOpen(false)
                       }}
-                    className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${
-                      countryCode === country.code
+                      className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${countryCode === country.code
                         ? "text-white shadow-md"
                         : "bg-gray-50 text-gray-900 hover:bg-gray-100"
-                    }`}
-                    style={
-                      countryCode === country.code
-                        ? {
+                        }`}
+                      style={
+                        countryCode === country.code
+                          ? {
                             background: BRAND_THEME.gradients.primary,
                             boxShadow: `0 12px 28px -18px ${BRAND_THEME.colors.brand.primaryDark}`
                           }
-                        : undefined
-                    }
-                  >
+                          : undefined
+                      }
+                    >
                       <span className="text-xl">{country.flag}</span>
                       <span className="flex-1">{country.country}</span>
                       <span className={countryCode === country.code ? "text-white" : "text-gray-600"}>
@@ -459,11 +457,10 @@ export default function PhoneNumbersPage() {
                 <button
                   onClick={handleVerifyOtp}
                   disabled={otp.join("").length !== 6}
-                  className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${
-                    otp.join("").length === 6
-                      ? "text-white"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
+                  className={`flex-1 py-3 px-4 rounded-lg text-sm font-semibold transition-colors ${otp.join("").length === 6
+                    ? "text-white"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
                   style={otp.join("").length === 6 ? { background: BRAND_THEME.gradients.primary } : undefined}
                 >
                   Verify
