@@ -136,6 +136,7 @@ export default function TransactionReport() {
         acc.couponByAdmin += Number(transaction?.couponByAdmin) || 0
         acc.couponByRestaurant += Number(transaction?.couponByRestaurant) || 0
         acc.restaurantCommission += Number(transaction?.restaurantCommission) || 0
+        acc.riderShare += Number(transaction?.riderShare) || 0
         return acc
       },
       {
@@ -145,17 +146,21 @@ export default function TransactionReport() {
         couponByAdmin: 0,
         couponByRestaurant: 0,
         restaurantCommission: 0,
+        riderShare: 0,
       },
     )
   }, [capturedTransactions])
 
   const adminEarningCardAmount = useMemo(() => {
-    return (
+    return Math.max(
+      0,
       capturedTotals.deliveryCharge +
       capturedTotals.tax +
       capturedTotals.platformFee +
       capturedTotals.restaurantCommission +
-      capturedTotals.couponByRestaurant
+      capturedTotals.couponByRestaurant -
+      capturedTotals.riderShare -
+      capturedTotals.couponByAdmin
     )
   }, [capturedTotals])
 

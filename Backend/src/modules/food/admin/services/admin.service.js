@@ -1045,6 +1045,7 @@ export async function getTransactionReport(query = {}) {
         const discount = Number(pricing?.discount || 0) || 0;
         const total = Number(pricing?.total || 0) || 0;
         const couponByAdmin = Number(pricing?.couponByAdmin || 0) || 0;
+        const couponByRestaurant = Number(pricing?.couponByRestaurant || 0) || 0;
         const platformFee =
             pricing?.platformFee !== undefined && pricing?.platformFee !== null
                 ? Number(pricing.platformFee || 0) || 0
@@ -1060,11 +1061,15 @@ export async function getTransactionReport(query = {}) {
         const platformProfit = Number(
             tx?.amounts?.platformNetProfit ?? platformProfitFallback
         ) || 0;
+        const reportAdminEarning = Math.max(
+            0,
+            platformProfit + tax + couponByRestaurant
+        );
 
         // Calculate Summary
         if (isCompletedLikeTx(tx)) {
             completedTransaction += tx.amounts?.totalCustomerPaid || 0;
-            adminEarning += platformProfit;
+            adminEarning += reportAdminEarning;
             restaurantEarning += tx.amounts?.restaurantShare || 0;
             deliverymanEarning += tx.amounts?.riderShare || 0;
         } else if (isPendingDueNoResponseTx(tx)) {
