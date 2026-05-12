@@ -125,28 +125,30 @@ const FoodFormDialog = ({
     
     return allCategories
       .map((c) => {
-        // More robust restaurant ID extraction for categories
-        const rId = String(
+        // Global/private is determined by current owner (restaurantId), not creator.
+        // createdByRestaurantId can remain set even after category is globalized.
+        const ownerRestaurantId = String(
           c?.restaurantId?._id ||
           c?.restaurantId?.id ||
           c?.restaurantId ||
           c?.restaurant?._id ||
           c?.restaurant?.id ||
-          c?.createdByRestaurantId?._id ||
-          c?.createdByRestaurantId?.id ||
-          c?.createdByRestaurantId ||
-          c?.createdByRestaurant?._id ||
-          c?.createdByRestaurant?.id ||
           ""
         ).trim()
 
-        const isGlobal = c?.isGlobal === true || c?.isGlobal === "true" || c?.isGlobal === 1 || !rId || rId === "undefined" || rId === "null"
+        const isGlobal =
+          c?.isGlobal === true ||
+          c?.isGlobal === "true" ||
+          c?.isGlobal === 1 ||
+          !ownerRestaurantId ||
+          ownerRestaurantId === "undefined" ||
+          ownerRestaurantId === "null"
 
         return {
           id: String(c.id || c._id || c.name),
           name: String(c.name || "").trim(),
           isGlobal: isGlobal,
-          normalizedRestaurantId: rId,
+          normalizedRestaurantId: ownerRestaurantId,
         }
       })
       .filter((c) => {

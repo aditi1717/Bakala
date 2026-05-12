@@ -41,6 +41,7 @@ import { FoodPayoutSettlement } from '../models/foodPayoutSettlement.model.js';
 import {
     backfillLegacyCategoryWorkflow,
     categoryAllowsFoodType,
+    GLOBAL_CATEGORY_FILTER,
     normalizeCategoryVisibilityTime,
     normalizeCategoryFoodTypeScope,
     serializeCategoryForResponse
@@ -3230,6 +3231,20 @@ export async function getCategories(query) {
                 ]
             }];
         }
+    }
+
+    if (query.scope === 'global') {
+        filter.$and = [...(filter.$and || []), {
+            $or: [
+                ...GLOBAL_CATEGORY_FILTER,
+                { isGlobal: true }
+            ]
+        }];
+    } else if (query.scope === 'private') {
+        filter.$and = [...(filter.$and || []), {
+            restaurantId: { $exists: true, $ne: null },
+            isGlobal: { $ne: true }
+        }];
     }
 
     // Filter by restaurant if requested

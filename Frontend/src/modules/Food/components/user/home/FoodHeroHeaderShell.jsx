@@ -19,6 +19,10 @@ export default function FoodHeroHeaderShell({
   showVegMode = true,
   bannerContent = null,
   bannerShellProps = {},
+  searchValue,
+  onSearchChange,
+  onSearchSubmit,
+  searchPlaceholder,
 }) {
   const { className = "", style, ...restBannerShellProps } = bannerShellProps;
   const scrolledHeaderColor = hasScrolledPastBanner
@@ -47,6 +51,10 @@ export default function FoodHeroHeaderShell({
           showVegMode={showVegMode}
           compact
           scrolledHeaderColor={scrolledHeaderColor}
+          searchValue={searchValue}
+          onSearchChange={onSearchChange}
+          onSearchSubmit={onSearchSubmit}
+          searchPlaceholder={searchPlaceholder}
         />
       </div>
 
@@ -69,6 +77,10 @@ export default function FoodHeroHeaderShell({
           onVegModeChange={showVegMode ? onVegModeChange : undefined}
           showVegMode={showVegMode}
           bannerContent={bannerContent}
+          searchValue={searchValue}
+          onSearchChange={onSearchChange}
+          onSearchSubmit={onSearchSubmit}
+          searchPlaceholder={searchPlaceholder}
         />
       </section>
     </>

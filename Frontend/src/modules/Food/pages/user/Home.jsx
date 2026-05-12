@@ -55,7 +55,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [heroSearch, setHeroSearch] = useState("");
-  const { openSearch, searchValue, setSearchValue } = useSearchOverlay();
+  const { openSearch } = useSearchOverlay();
   const { openLocationSelector } = useLocationSelector();
   const { vegMode, setVegMode: setVegModeContext, getDefaultAddress, addFavorite, removeFavorite, isFavorite } = useProfile();
   const { addToCart, cart } = useCart();
@@ -223,9 +223,14 @@ export default function Home() {
   // Handlers
   const handleLocationClick = useCallback(() => openLocationSelector(), [openLocationSelector]);
   const handleSearchFocus = useCallback(() => {
-    if (heroSearch) setSearchValue(heroSearch);
-    openSearch();
-  }, [heroSearch, openSearch, setSearchValue]);
+    openSearch(heroSearch, "restaurant");
+  }, [heroSearch, openSearch]);
+
+  const handleSearchSubmit = useCallback((value = heroSearch) => {
+    const query = String(value || "").trim();
+    if (!query) return;
+    navigate(`/food/search?listingType=restaurant&q=${encodeURIComponent(query)}`);
+  }, [heroSearch, navigate]);
 
   const handleVegModeChange = useCallback((newValue) => {
     if (newValue) {

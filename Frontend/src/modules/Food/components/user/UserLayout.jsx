@@ -34,13 +34,17 @@ export function useSearchOverlay() {
 
 function SearchOverlayProvider({ children }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchValue, setSearchValue] = useState("")
 
-  const openSearch = (initialQuery = "") => {
-    const path = initialQuery
-      ? `/food/user/search?q=${encodeURIComponent(initialQuery)}`
-      : "/food/user/search"
-    navigate(path)
+  const openSearch = (initialQuery = "", requestedListingType = "") => {
+    const base = "/food/search"
+    const currentListingType = location.pathname.includes("/grocery") ? "grocery" : "restaurant"
+    const params = new URLSearchParams({
+      listingType: requestedListingType || currentListingType,
+    })
+    if (initialQuery) params.set("q", initialQuery)
+    navigate(`${base}?${params.toString()}`)
   }
 
   const closeSearch = () => {

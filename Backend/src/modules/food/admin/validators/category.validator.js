@@ -17,6 +17,7 @@ const listSchema = z.object({
     createdByRestaurantId: z.string().optional(),
     isApproved: booleanQuerySchema.optional(),
     approvalStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
+    scope: z.enum(['all', 'global', 'private']).optional(),
     page: z.coerce.number().int().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(1000).optional()
 });

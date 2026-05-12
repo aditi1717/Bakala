@@ -45,7 +45,7 @@ export default function BottomNavigation() {
       <div className="flex items-center justify-around h-auto px-2 sm:px-4">
         {/* Delivery Tab */}
         <Link
-          to="/food/user"
+          to="/food"
           className={`flex flex-1 flex-col items-center gap-1.5 px-2 sm:px-3 py-2 transition-all duration-200 relative ${isDelivery
               ? navigation.activeText
               : navigation.inactiveText
@@ -65,7 +65,7 @@ export default function BottomNavigation() {
 
         {/* Grocery Tab */}
         <Link
-          to="/food/user/grocery"
+          to="/food/grocery"
           className={`flex flex-1 flex-col items-center gap-1.5 px-2 sm:px-3 py-2 transition-all duration-200 relative ${isGrocery
               ? navigation.activeText
               : navigation.inactiveText

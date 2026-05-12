@@ -113,6 +113,7 @@ export const searchUnified = async (query = {}, options = {}) => {
         minRating, 
         maxDeliveryTime, 
         isVeg,
+        isRestaurant,
         page = 1,
         limit = 20
     } = query;
@@ -123,6 +124,13 @@ export const searchUnified = async (query = {}, options = {}) => {
 
     // 1. Initial Filter (approved status and basic conditions)
     const restaurantFilter = { status: 'approved' };
+
+    // Filter by listing type: isRestaurant=false => grocery, isRestaurant=true => food restaurant
+    if (isRestaurant === 'false' || isRestaurant === false) {
+        restaurantFilter.isRestaurant = false;
+    } else if (isRestaurant === 'true' || isRestaurant === true) {
+        restaurantFilter.isRestaurant = { $ne: false };
+    }
     
     console.log(`[Search-Service] Querying with term: "${term}", categoryId: "${categoryId}"`);
 

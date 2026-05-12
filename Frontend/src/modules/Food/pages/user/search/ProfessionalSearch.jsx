@@ -51,6 +51,8 @@ function useDebounce(value, delay) {
 export default function ProfessionalSearch() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initialQuery = searchParams.get("q") || ""
+  const listingType = searchParams.get("listingType") || "restaurant"
+  const isGrocery = listingType === "grocery"
   const navigate = useNavigate()
   const { location: userCoords } = useGeoLocation()
   const inputRef = useRef(null)
@@ -84,6 +86,7 @@ export default function ProfessionalSearch() {
         categoryId: catId,
         lat: userCoords?.latitude,
         lng: userCoords?.longitude,
+        isRestaurant: isGrocery ? false : true,
       })
       
       if (res.data?.success) {
@@ -99,7 +102,7 @@ export default function ProfessionalSearch() {
     } finally {
       setLoading(false)
     }
-  }, [userCoords])
+  }, [userCoords, isGrocery])
 
   useEffect(() => {
     performSearch(debouncedQuery, selectedCategoryId)
@@ -109,25 +112,25 @@ export default function ProfessionalSearch() {
     const trimmedQuery = String(query || "").trim()
     if (trimmedQuery || selectedCategoryId) {
       setSearchParams(
-        { ...(trimmedQuery ? { q: trimmedQuery } : {}), ...(selectedCategoryId ? { cat: selectedCategoryId } : {}) },
+        { listingType, ...(trimmedQuery ? { q: trimmedQuery } : {}), ...(selectedCategoryId ? { cat: selectedCategoryId } : {}) },
         { replace: true }
       )
     } else {
-      setSearchParams({}, { replace: true })
+      setSearchParams({ listingType }, { replace: true })
     }
-  }, [query, selectedCategoryId, setSearchParams])
+  }, [query, selectedCategoryId, listingType, setSearchParams])
 
   const handleClear = () => {
     skipUrlSyncRef.current = true
     setQuery("")
     setSelectedCategoryId(null)
     setResults({ restaurants: [], dishes: [] })
-    setSearchParams({}, { replace: true })
+    setSearchParams({ listingType }, { replace: true })
     inputRef.current?.focus()
   }
 
   const handleBack = () => {
-    navigate("/food")
+    navigate(isGrocery ? "/food/grocery" : "/food")
   }
 
   return (
@@ -144,7 +147,7 @@ export default function ProfessionalSearch() {
             <Input 
               ref={inputRef}
               autoFocus
-              placeholder="Search for restaurants or dishes..." 
+              placeholder={isGrocery ? "Search grocery stores..." : "Search for restaurants or dishes..."} 
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-10 pr-10 h-11 bg-slate-100 dark:bg-zinc-800 border-none focus:ring-2 focus:ring-rose-500 rounded-xl"
@@ -293,7 +296,6 @@ export default function ProfessionalSearch() {
     </div>
   )
 }
-
 
 
 

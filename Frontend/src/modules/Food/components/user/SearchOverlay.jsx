@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react"
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { X, Search, Clock, Loader2 } from "lucide-react"
 import { Button } from "@food/components/ui/button"
 import { Input } from "@food/components/ui/input"
@@ -30,12 +30,22 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
   }
   const { brand } = BRAND_THEME.colors
   const navigate = useNavigate()
+  const routeLocation = useLocation()
   const { location: userCoords } = useGeoLocation()
   const inputRef = useRef(null)
   const [filteredFoods, setFilteredFoods] = useState([])
   const [recentSuggestions, setRecentSuggestions] = useState([])
   const [loadingFoods, setLoadingFoods] = useState(false)
   const searchRequestIdRef = useRef(0)
+  const listingType = routeLocation.pathname.includes("/grocery") ? "grocery" : "restaurant"
+  const isGrocery = listingType === "grocery"
+
+  const buildSearchUrl = (term) => {
+    const params = new URLSearchParams({ listingType })
+    const value = String(term || "").trim()
+    if (value) params.set("q", value)
+    return `/food/search?${params.toString()}`
+  }
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -100,6 +110,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
           limit: 60,
           lat: userCoords?.latitude,
           lng: userCoords?.longitude,
+          isRestaurant: isGrocery ? false : true,
         })
         const restaurants = res?.data?.data?.restaurants || []
         const normalizedFoods = restaurants
@@ -147,7 +158,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     }, 250)
 
     return () => clearTimeout(timer)
-  }, [effectiveZoneId, isOpen, searchValue, userCoords?.latitude, userCoords?.longitude])
+  }, [isGrocery, isOpen, searchValue, userCoords?.latitude, userCoords?.longitude])
 
   const saveRecentSearch = (term) => {
     const value = String(term || "").trim()
@@ -169,7 +180,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     e.preventDefault()
     if (searchValue.trim()) {
       saveRecentSearch(searchValue)
-      navigate(`/food/search?q=${encodeURIComponent(searchValue.trim())}`)
+      navigate(buildSearchUrl(searchValue))
       onClose()
       onSearchChange("")
     }
@@ -177,7 +188,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
 
   const handleFoodClick = (food) => {
     saveRecentSearch(food.name)
-    navigate(`/food/search?q=${encodeURIComponent(food.name)}`)
+    navigate(buildSearchUrl(food.name))
     onClose()
     onSearchChange("")
   }

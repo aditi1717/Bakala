@@ -93,6 +93,7 @@ export default function Category() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [showPendingOnly, setShowPendingOnly] = useState(false)
+  const [globalFilter, setGlobalFilter] = useState("all") // "all" | "global" | "private"
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
   const [formData, setFormData] = useState(defaultFormData)
@@ -116,28 +117,49 @@ export default function Category() {
       fetchCategories()
     }, 300)
     return () => window.clearTimeout(timer)
-  }, [searchQuery, showPendingOnly])
+  }, [searchQuery, showPendingOnly, globalFilter])
+
+  // A category is global when:
+  // 1. backend explicitly says isGlobal === true, OR
+  // 2. restaurantId is absent/null (makeCategoryGlobal clears it), OR
+  // 3. restaurantId is an object but has no _id (edge case from hydration)
+  const resolveIsGlobal = (category) => {
+    if (category?.isGlobal === true || category?.isGlobal === "true" || category?.isGlobal === 1) return true
+    const rid = category?.restaurantId
+    if (!rid) return true                                       // null / undefined
+    if (typeof rid === "string" && rid.trim() === "") return true // empty string
+    if (typeof rid === "object" && !rid?._id) return true      // hydrated object with no _id
+    return false
+  }
 
   const filteredCategories = useMemo(() => {
     const query = String(searchQuery || "").trim().toLowerCase()
-    if (!query) return categories
     return categories.filter((category) => {
-      const creator = category?.createdByRestaurant?.name || category?.restaurant?.name || ""
-      return (
-        String(category?.name || "").toLowerCase().includes(query) ||
-        String(category?.foodTypeScope || "").toLowerCase().includes(query) ||
-        String(creator || "").toLowerCase().includes(query) ||
-        String(category?.id || "").toLowerCase().includes(query)
-      )
+      // Text search
+      if (query) {
+        const creator = category?.createdByRestaurant?.name || category?.restaurant?.name || ""
+        const matches =
+          String(category?.name || "").toLowerCase().includes(query) ||
+          String(category?.foodTypeScope || "").toLowerCase().includes(query) ||
+          String(creator || "").toLowerCase().includes(query) ||
+          String(category?.id || "").toLowerCase().includes(query)
+        if (!matches) return false
+      }
+      // Global / Private filter
+      const isGlobal = resolveIsGlobal(category)
+      if (globalFilter === "global" && !isGlobal) return false
+      if (globalFilter === "private" && isGlobal) return false
+      return true
     })
-  }, [categories, searchQuery])
+  }, [categories, searchQuery, globalFilter])
 
   const fetchCategories = async () => {
     try {
       setLoading(true)
-      const params = {}
+      const params = { limit: 1000 }
       if (searchQuery) params.search = searchQuery
       if (showPendingOnly) params.approvalStatus = "pending"
+      if (globalFilter !== "all") params.scope = globalFilter
 
       const response = await adminAPI.getCategories(params)
       const list = response?.data?.data?.categories || response?.data?.categories || []
@@ -414,20 +436,47 @@ export default function Category() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-full border border-slate-200 p-1">
+            {/* Approval filter */}
+            <div className="flex items-center gap-1 rounded-full border border-slate-200 p-1">
               <button
                 type="button"
                 onClick={() => setShowPendingOnly(false)}
-                className={`rounded-full px-3 py-2 text-xs font-semibold ${!showPendingOnly ? "bg-slate-900 text-white" : "text-slate-600"}`}
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${!showPendingOnly ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"}`}
               >
                 All
               </button>
               <button
                 type="button"
                 onClick={() => setShowPendingOnly(true)}
-                className={`rounded-full px-3 py-2 text-xs font-semibold ${showPendingOnly ? "bg-amber-600 text-white" : "text-slate-600"}`}
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${showPendingOnly ? "bg-amber-600 text-white" : "text-slate-600 hover:text-slate-900"}`}
               >
                 Pending
+              </button>
+            </div>
+
+            {/* Global / Private filter */}
+            <div className="flex items-center gap-1 rounded-full border border-slate-200 p-1">
+              <button
+                type="button"
+                onClick={() => setGlobalFilter("all")}
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${globalFilter === "all" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setGlobalFilter("global")}
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold transition-colors ${globalFilter === "global" ? "bg-sky-600 text-white" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                <Globe className="h-3 w-3" />
+                Global
+              </button>
+              <button
+                type="button"
+                onClick={() => setGlobalFilter("private")}
+                className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${globalFilter === "private" ? "bg-violet-600 text-white" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                Private
               </button>
             </div>
 
@@ -495,6 +544,7 @@ export default function Category() {
                   const creatorName = category?.createdByRestaurant?.name || category?.restaurant?.name || "Admin"
                   const approvalStatus = category?.approvalStatus || "pending"
                   const isRestaurantCategory = Boolean(category?.createdByRestaurantId || category?.restaurantId)
+                  const isGlobal = resolveIsGlobal(category)
 
                   return (
                     <tr key={category.id} className="align-top hover:bg-slate-50/80">
@@ -523,9 +573,9 @@ export default function Category() {
                         <div className="space-y-1">
                           <p className="font-medium leading-6 text-slate-800">{creatorName}</p>
                           <p className="text-xs text-slate-400">
-                            {category?.isGlobal ? "Global category" : "Private to creator"}
+                            {isGlobal ? "Global category" : "Private to creator"}
                           </p>
-                          {category?.isGlobal && isRestaurantCategory && (
+                          {isGlobal && isRestaurantCategory && (
                             <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700">
                               <Globe className="mr-1 h-3.5 w-3.5" />
                               Shared
@@ -577,7 +627,7 @@ export default function Category() {
                                 Reject
                               </button>
                             )}
-                            {isRestaurantCategory && !category?.isGlobal && approvalStatus === "approved" && (
+                            {isRestaurantCategory && !isGlobal && approvalStatus === "approved" && (
                               <button
                                 onClick={() => handleMakeGlobal(category)}
                                 className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm"

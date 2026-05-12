@@ -84,6 +84,7 @@ export default function HomeHeader({
   scrolledHeaderColor = "",
   searchValue,
   onSearchChange,
+  onSearchSubmit,
   searchPlaceholder,
 }) {
   const [notifications, setNotifications] = useState(() => {
@@ -378,6 +379,12 @@ export default function HomeHeader({
               <input
                 value={searchValue}
                 onChange={(event) => onSearchChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    onSearchSubmit?.(searchValue);
+                  }
+                }}
                 placeholder={searchPlaceholder || placeholders?.[placeholderIndex] || "Search for food..."}
                 className="h-full w-full bg-transparent pr-1 text-[13px] font-medium text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
               />

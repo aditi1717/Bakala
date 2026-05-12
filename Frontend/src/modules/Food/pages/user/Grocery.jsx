@@ -49,7 +49,7 @@ export default function Grocery() {
   }, []);
 
   const handleSearchClick = () => {
-    navigate("/food/user/search");
+    navigate("/food/search?listingType=grocery");
   };
 
   const handleFavoriteToggle = (event, restaurant) => {
@@ -137,7 +137,7 @@ export default function Grocery() {
 
               return (
                 <Link key={restaurant._id || restaurant.id || restaurantSlug} to={`/food/user/restaurants/${restaurantSlug}`} className="group flex h-full">
-                  <article className={`flex h-full w-full flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${availability.state !== "open" ? "opacity-85" : ""}`}>
+                  <article className={`flex h-full w-full flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${availability.state !== "open" ? "grayscale opacity-75" : ""}`}>
                     <div className="relative h-48 w-full overflow-hidden">
                       <OptimizedImage
                         src={restaurant.image || restaurant.profileImage?.url || restaurant.profileImage || ""}

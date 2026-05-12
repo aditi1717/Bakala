@@ -87,6 +87,14 @@ export default function DesktopNavbar({ showLogo = true }) {
         /^\/user\/under-\d+$/.test(location.pathname) ||
         /^\/food\/under-\d+$/.test(location.pathname) ||
         /^\/food\/user\/under-\d+$/.test(location.pathname)
+    const currentSearchListingType = isGrocery ? "grocery" : "restaurant"
+
+    const buildSearchUrl = (query) => {
+        const params = new URLSearchParams({ listingType: currentSearchListingType })
+        const trimmedQuery = String(query || "").trim()
+        if (trimmedQuery) params.set("q", trimmedQuery)
+        return `/food/search?${params.toString()}`
+    }
 
     // Load business settings logo
     useEffect(() => {
@@ -252,7 +260,7 @@ export default function DesktopNavbar({ showLogo = true }) {
                                             }}
                                             onKeyDown={(e) => {
                                                 if (e.key === "Enter" && heroSearch.trim()) {
-                                                    navigate(`/food/search?q=${encodeURIComponent(heroSearch.trim())}`)
+                                                    navigate(buildSearchUrl(heroSearch))
                                                 }
                                             }}
                                             className="h-6 p-0 border-0 bg-transparent text-sm font-medium placeholder:text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -331,7 +339,7 @@ export default function DesktopNavbar({ showLogo = true }) {
                         <div className="flex items-center space-x-24">
                             {/* Delivery Tab */}
                             <Link
-                                to="/food/user"
+                                to="/food"
                                 className={`flex flex-col items-center gap-1 px-2 py-1 transition-colors relative group ${isDelivery
                                     ? navigation.activeText
                                     : navigation.inactiveText
@@ -351,7 +359,7 @@ export default function DesktopNavbar({ showLogo = true }) {
 
                             {/* Quick Tab */}
                             <Link
-                                to="/food/user/quick"
+                                to="/food/quick"
                                 className={`flex flex-col items-center gap-1 px-2 py-1 transition-colors relative group ${isQuick
                                     ? navigation.activeText
                                     : navigation.inactiveText
@@ -371,7 +379,7 @@ export default function DesktopNavbar({ showLogo = true }) {
 
                             {/* Under 250 Tab */}
                             <Link
-                                to="/food/user/grocery"
+                                to="/food/grocery"
                                 className={`flex flex-col items-center gap-1 px-2 py-1 transition-colors relative group ${isGrocery
                                     ? navigation.activeText
                                     : navigation.inactiveText
