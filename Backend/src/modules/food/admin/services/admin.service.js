@@ -74,7 +74,7 @@ const normalizeAdminScope = (adminScope = {}) => {
     };
 };
 
-const assertZoneAccess = () => {};
+const assertZoneAccess = () => { };
 
 const applyZoneConstraint = (filter = {}) => {
     return filter;
@@ -651,35 +651,35 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
                             $cond: [{ $in: ['$orderStatus', ON_THE_WAY_STATUSES] }, 1, 0]
                         }
                     },
-                    revenueTotal: { 
-                        $sum: { 
-                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.total', 0] }, 0] 
-                        } 
+                    revenueTotal: {
+                        $sum: {
+                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.total', 0] }, 0]
+                        }
                     },
-                    commissionTotal: { 
-                        $sum: { 
-                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.restaurantCommission', 0] }, 0] 
-                        } 
+                    commissionTotal: {
+                        $sum: {
+                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.restaurantCommission', 0] }, 0]
+                        }
                     },
-                    platformFeeTotal: { 
-                        $sum: { 
-                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.platformFee', 0] }, 0] 
-                        } 
+                    platformFeeTotal: {
+                        $sum: {
+                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.platformFee', 0] }, 0]
+                        }
                     },
-                    deliveryFeeTotal: { 
-                        $sum: { 
-                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.deliveryFee', 0] }, 0] 
-                        } 
+                    deliveryFeeTotal: {
+                        $sum: {
+                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.deliveryFee', 0] }, 0]
+                        }
                     },
-                    gstTotal: { 
-                        $sum: { 
-                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.tax', 0] }, 0] 
-                        } 
+                    gstTotal: {
+                        $sum: {
+                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.tax', 0] }, 0]
+                        }
                     },
-                    adminNetProfit: { 
-                        $sum: { 
-                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$platformProfit', 0] }, 0] 
-                        } 
+                    adminNetProfit: {
+                        $sum: {
+                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$platformProfit', 0] }, 0]
+                        }
                     }
                 }
             }
@@ -701,10 +701,10 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
                         month: { $month: '$createdAt' }
                     },
                     orders: { $sum: 1 },
-                    revenue: { 
-                        $sum: { 
-                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.total', 0] }, 0] 
-                        } 
+                    revenue: {
+                        $sum: {
+                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.total', 0] }, 0]
+                        }
                     },
                     commission: {
                         $sum: {
@@ -728,12 +728,12 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
         FoodUser.countDocuments({}),
         FoodRestaurant.find({ ...restaurantMatch, status: 'pending' }).sort({ createdAt: -1 }).limit(5).select('restaurantName createdAt').lean(),
         FoodDeliveryPartner.find({ status: 'pending' }).sort({ createdAt: -1 }).limit(5).select('name createdAt').lean(),
-        FoodOrder.find({ 
+        FoodOrder.find({
             ...orderMatch,
             orderStatus: { $in: [...PENDING_STATUSES, ...PROCESSING_STATUSES, ...ON_THE_WAY_STATUSES] },
         }).sort({ createdAt: -1 }).limit(5).select('orderId createdAt').lean(),
         FoodOrder.find({ ...orderMatch, orderStatus: 'delivered' }).sort({ updatedAt: -1 }).limit(5).select('orderId updatedAt').lean(),
-        FoodOrder.find({ 
+        FoodOrder.find({
             ...orderMatch,
             orderStatus: { $in: CANCELLED_ORDER_STATUSES },
         }).sort({ updatedAt: -1 }).limit(5).select('orderId updatedAt').lean(),
@@ -741,7 +741,7 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
     ]);
 
     const liveSignals = [];
-    
+
     (recentPendingRestaurants || []).forEach(r => {
         liveSignals.push({
             type: 'restaurant',
@@ -915,7 +915,7 @@ export async function getTransactionReport(query = {}) {
             const restDoc = await mongoose.model('FoodRestaurant').findOne({ restaurantName: restaurant }).lean();
             if (restDoc) restFilter._id = restDoc._id;
         }
-        
+
         if (Object.keys(restFilter).length > 0) {
             const restaurantsList = await mongoose.model('FoodRestaurant').find(restFilter).select('_id').lean();
             restaurantIds = restaurantsList.map(r => r._id);
@@ -1389,11 +1389,11 @@ export async function getRestaurantReport(query = {}) {
             const totalAdminCommission = Number(x.totalAdminCommission || 0);
             const totalCouponByRestaurant = Number(x.totalCouponByRestaurant || 0);
             const totalOfferByRestaurant = Number(x.totalOfferByRestaurant || 0);
-            
+
             // Calculate restaurant payout
             // Payout = Subtotal + Packaging - Commission - Restaurant-funded discounts
             const restaurantPayout = totalSubtotal + totalPackagingFee - totalAdminCommission - totalCouponByRestaurant - totalOfferByRestaurant;
-            
+
             return [
                 String(x._id),
                 {
@@ -1655,20 +1655,20 @@ export async function getCustomers(query = {}, adminScope = {}) {
     let customers = docs.map((u) => {
         const stats = orderStatsMap.get(String(u._id)) || { totalOrder: 0, totalOrderAmount: 0 };
         return ({
-        id: u._id,
-        _id: u._id,
-        name: u.name || 'Unnamed',
-        email: u.email || '',
-        phone: u.phone || '',
-        profileImage: sanitizeUrl(u.profileImage || ''),
-        countryCode: u.countryCode || '+91',
-        status: u.isActive !== false,
-        isActive: u.isActive !== false,
-        isVerified: u.isVerified === true,
-        totalOrder: stats.totalOrder,
-        totalOrderAmount: stats.totalOrderAmount,
-        joiningDate: u.createdAt,
-        createdAt: u.createdAt
+            id: u._id,
+            _id: u._id,
+            name: u.name || 'Unnamed',
+            email: u.email || '',
+            phone: u.phone || '',
+            profileImage: sanitizeUrl(u.profileImage || ''),
+            countryCode: u.countryCode || '+91',
+            status: u.isActive !== false,
+            isActive: u.isActive !== false,
+            isVerified: u.isVerified === true,
+            totalOrder: stats.totalOrder,
+            totalOrderAmount: stats.totalOrderAmount,
+            joiningDate: u.createdAt,
+            createdAt: u.createdAt
         });
     });
 
@@ -1796,26 +1796,26 @@ export async function getSupportTickets(query = {}) {
     const [userList, userTotal, restaurantList, restaurantTotal] = await Promise.all([
         shouldFetchUser
             ? FoodSupportTicket.find(userFilter)
-                  .sort({ createdAt: -1 })
-                  .skip(source === 'all' ? 0 : skip)
-                  .limit(source === 'all' ? limit * page : limit)
-                  .populate('userId', 'name phone email')
-                  .populate('restaurantId', 'restaurantName city area')
-                  .populate({
-                      path: 'orderId',
-                      select: 'orderId displayOrderId restaurantId',
-                      populate: { path: 'restaurantId', select: 'restaurantName city area' }
-                  })
-                  .lean()
+                .sort({ createdAt: -1 })
+                .skip(source === 'all' ? 0 : skip)
+                .limit(source === 'all' ? limit * page : limit)
+                .populate('userId', 'name phone email')
+                .populate('restaurantId', 'restaurantName city area')
+                .populate({
+                    path: 'orderId',
+                    select: 'orderId displayOrderId restaurantId',
+                    populate: { path: 'restaurantId', select: 'restaurantName city area' }
+                })
+                .lean()
             : Promise.resolve([]),
         shouldFetchUser ? FoodSupportTicket.countDocuments(userFilter) : Promise.resolve(0),
         shouldFetchRestaurant
             ? FoodRestaurantSupportTicket.find(restaurantFilter)
-                  .sort({ createdAt: -1 })
-                  .skip(source === 'all' ? 0 : skip)
-                  .limit(source === 'all' ? limit * page : limit)
-                  .populate('restaurantId', 'restaurantName city area')
-                  .lean()
+                .sort({ createdAt: -1 })
+                .skip(source === 'all' ? 0 : skip)
+                .limit(source === 'all' ? limit * page : limit)
+                .populate('restaurantId', 'restaurantName city area')
+                .lean()
             : Promise.resolve([]),
         shouldFetchRestaurant ? FoodRestaurantSupportTicket.countDocuments(restaurantFilter) : Promise.resolve(0)
     ]);
@@ -1824,11 +1824,11 @@ export async function getSupportTickets(query = {}) {
         const user =
             t.userId && typeof t.userId === 'object' && t.userId !== null
                 ? {
-                      _id: t.userId._id,
-                      name: t.userId.name || '',
-                      phone: t.userId.phone || '',
-                      email: t.userId.email || ''
-                  }
+                    _id: t.userId._id,
+                    name: t.userId.name || '',
+                    phone: t.userId.phone || '',
+                    email: t.userId.email || ''
+                }
                 : null;
         const userId =
             t.userId && typeof t.userId === 'object' && t.userId !== null ? String(t.userId._id) : String(t.userId);
@@ -1846,21 +1846,21 @@ export async function getSupportTickets(query = {}) {
         const restaurant =
             restaurantDoc && typeof restaurantDoc === 'object'
                 ? {
-                      _id: restaurantDoc._id,
-                      name: restaurantDoc.restaurantName || '',
-                      city: restaurantDoc.city || '',
-                      area: restaurantDoc.area || ''
-                  }
+                    _id: restaurantDoc._id,
+                    name: restaurantDoc.restaurantName || '',
+                    city: restaurantDoc.city || '',
+                    area: restaurantDoc.area || ''
+                }
                 : null;
 
         const restaurantId =
             restaurant && restaurant._id
                 ? String(restaurant._id)
                 : t.restaurantId
-                ? String(t.restaurantId)
-                : t.orderId && typeof t.orderId === 'object' && t.orderId !== null && t.orderId.restaurantId
-                ? String(t.orderId.restaurantId)
-                : null;
+                    ? String(t.restaurantId)
+                    : t.orderId && typeof t.orderId === 'object' && t.orderId !== null && t.orderId.restaurantId
+                        ? String(t.orderId.restaurantId)
+                        : null;
 
         const restaurantName = restaurant ? restaurant.name : '';
 
@@ -1891,12 +1891,12 @@ export async function getSupportTickets(query = {}) {
         const restaurant =
             t.restaurantId && typeof t.restaurantId === 'object'
                 ? {
-                      _id: t.restaurantId._id,
-                      name: t.restaurantId.restaurantName || t.restaurantId.name || '',
-                      restaurantName: t.restaurantId.restaurantName || t.restaurantId.name || '',
-                      city: t.restaurantId.city || '',
-                      area: t.restaurantId.area || ''
-                  }
+                    _id: t.restaurantId._id,
+                    name: t.restaurantId.restaurantName || t.restaurantId.name || '',
+                    restaurantName: t.restaurantId.restaurantName || t.restaurantId.name || '',
+                    city: t.restaurantId.city || '',
+                    area: t.restaurantId.area || ''
+                }
                 : null;
         const restaurantId =
             restaurant && restaurant._id ? String(restaurant._id) : t.restaurantId ? String(t.restaurantId) : null;
@@ -1985,9 +1985,9 @@ export async function updateSupportTicket(id, body = {}) {
                 const ticketStatus = String(updated?.status || '').toLowerCase();
                 const issueType = String(
                     updated?.issueType ||
-                        updated?.subject ||
-                        updated?.category ||
-                        'support'
+                    updated?.subject ||
+                    updated?.category ||
+                    'support'
                 ).trim();
                 const shortTicketId = String(updated?._id || '').slice(-6).toUpperCase();
                 const responseText = String(updated?.adminResponse || '').trim();
@@ -2250,13 +2250,13 @@ export async function updateDeliveryCommissionRule(id, body) {
     const candidate = existing.map((r) =>
         String(r._id) === String(id)
             ? {
-                  ...r,
-                  minDistance: body.minDistance,
-                  maxDistance: body.maxDistance ?? null,
-                  commissionPerKm: body.commissionPerKm,
-                  basePayout: body.basePayout,
-                  status: r.status !== false
-              }
+                ...r,
+                minDistance: body.minDistance,
+                maxDistance: body.maxDistance ?? null,
+                commissionPerKm: body.commissionPerKm,
+                basePayout: body.basePayout,
+                status: r.status !== false
+            }
             : r
     );
     validateCommissionRuleSet(candidate);
@@ -2539,7 +2539,7 @@ export async function getContactMessages(query = {}) {
     if (query.search && String(query.search).trim()) {
         const term = String(query.search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const searchRegex = new RegExp(term, 'i');
-        
+
         const [users, restaurants, partners] = await Promise.all([
             FoodUser.find({
                 $or: [{ name: searchRegex }, { email: searchRegex }, { phone: searchRegex }]
@@ -2692,11 +2692,11 @@ export async function getRestaurantReviews(query = {}) {
     if (query.search && String(query.search).trim()) {
         const term = String(query.search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const searchRegex = new RegExp(term, 'i');
-        
+
         const restaurants = await FoodRestaurant.find({
             $or: [{ restaurantName: searchRegex }]
         }).select('_id').lean();
-        
+
         const customers = await FoodUser.find({
             $or: [{ name: searchRegex }, { email: searchRegex }]
         }).select('_id').lean();
@@ -3252,7 +3252,7 @@ export async function getCategories(query) {
         const rid = String(query.restaurantId).trim();
         const normalizeId = (id) => (mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id);
         const nid = normalizeId(rid);
-        
+
         filter.$and = [...(filter.$and || []), {
             $or: [
                 { restaurantId: nid },
@@ -3515,7 +3515,7 @@ export async function getRestaurantAddonsAdmin(query = {}) {
 export async function updateRestaurantAddonAdmin(addonId, body) {
     if (!addonId || !mongoose.Types.ObjectId.isValid(String(addonId))) return null;
     const _id = new mongoose.Types.ObjectId(String(addonId));
-    
+
     const addon = await FoodAddon.findOne({ _id, isDeleted: { $ne: true } });
     if (!addon) return null;
 
@@ -4001,7 +4001,7 @@ export async function approveRestaurant(id) {
             await notifyOwnersSafely(
                 [{ ownerType: 'RESTAURANT', ownerId: updated._id }],
                 {
-                    title: 'Congratulations! ðŸŽ‰',
+                    title: 'Congratulations!',
                     body: `Your restaurant "${updated.restaurantName}" has been approved. You can now start receiving orders!`,
                     image: updated.profileImage || 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
                     data: {
@@ -4441,26 +4441,27 @@ export async function getDeliverySupportTickets(query = {}) {
                 : fallbackPartner;
 
         return ({
-        _id: t._id,
-        ticketId: t.ticketId,
-        subject: t.subject,
-        description: t.description,
-        category: t.category,
-        priority: t.priority,
-        status: t.status,
-        adminResponse: t.adminResponse,
-        respondedAt: t.respondedAt,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-        deliveryPartner: resolvedPartner
-            ? {
-                _id: resolvedPartner._id || partnerIdRaw || null,
-                name: resolvedPartner.name || '',
-                phone: resolvedPartner.phone || '',
-                email: resolvedPartner.email || ''
-            }
-            : null
-    })});
+            _id: t._id,
+            ticketId: t.ticketId,
+            subject: t.subject,
+            description: t.description,
+            category: t.category,
+            priority: t.priority,
+            status: t.status,
+            adminResponse: t.adminResponse,
+            respondedAt: t.respondedAt,
+            createdAt: t.createdAt,
+            updatedAt: t.updatedAt,
+            deliveryPartner: resolvedPartner
+                ? {
+                    _id: resolvedPartner._id || partnerIdRaw || null,
+                    name: resolvedPartner.name || '',
+                    phone: resolvedPartner.phone || '',
+                    email: resolvedPartner.email || ''
+                }
+                : null
+        })
+    });
 
     return {
         tickets,
@@ -5038,7 +5039,7 @@ export async function cancelEarningAddonHistory(historyId, reason) {
 
 export async function checkEarningAddonCompletions(deliveryPartnerId, _force = false) {
     const now = new Date();
-    
+
     // Only search for active offers that are currently running.
     const activeOffers = await FoodEarningAddon.find({
         status: 'active',
@@ -5090,10 +5091,10 @@ export async function checkEarningAddonCompletions(deliveryPartnerId, _force = f
                     status: 'pending',
                     completedAt: now
                 });
-                
+
                 // Update current redemptions in addon
                 await FoodEarningAddon.findByIdAndUpdate(offer._id, { $inc: { currentRedemptions: 1 } });
-                
+
                 globalCompletions++;
             }
         }
@@ -5125,7 +5126,7 @@ export async function getDeliverymanReviews(query = {}) {
     if (query.search && String(query.search).trim()) {
         const term = String(query.search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const searchRegex = new RegExp(term, 'i');
-        
+
         // Find delivery partners matching search
         const partners = await FoodDeliveryPartner.find({
             $or: [
@@ -5133,7 +5134,7 @@ export async function getDeliverymanReviews(query = {}) {
                 { phone: searchRegex }
             ]
         }).select('_id').lean();
-        
+
         // Find customers matching search
         const customers = await FoodUser.find({
             $or: [
@@ -5324,7 +5325,7 @@ export async function listAdmins(query = {}) {
         ];
     }
 
-const admins = await FoodAdmin.find(filter)
+    const admins = await FoodAdmin.find(filter)
         .select('-password')
         .sort({ createdAt: -1 })
         .lean();
@@ -5506,7 +5507,7 @@ export async function getWithdrawals(query = {}) {
 
 export async function updateWithdrawalStatus(id, { status, adminNote, rejectionReason, transactionId }) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) throw new ValidationError('Invalid withdrawal ID');
-    
+
     const normalizedStatus = String(status).toLowerCase();
     const update = {
         status: normalizedStatus,
@@ -5529,13 +5530,13 @@ export async function updateWithdrawalStatus(id, { status, adminNote, rejectionR
         const restaurantId = updated.restaurantId?._id || updated.restaurantId;
         if (restaurantId) {
             await FoodTransaction.updateMany(
-                { 
-                    restaurantId, 
+                {
+                    restaurantId,
                     'settlement.isRestaurantSettled': { $ne: true },
                     status: { $in: ['captured', 'authorized'] }
                 },
-                { 
-                    $set: { 
+                {
+                    $set: {
                         'settlement.isRestaurantSettled': true,
                         'settlement.restaurantSettledAt': new Date()
                     },
@@ -5596,7 +5597,7 @@ export async function getDeliveryWithdrawals(query = {}) {
 
 export async function updateDeliveryWithdrawalStatus(id, { status, adminNote, rejectionReason, transactionId }) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) throw new ValidationError('Invalid withdrawal ID');
-    
+
     const update = {
         status: String(status).toLowerCase(),
         adminNote,
@@ -5619,11 +5620,11 @@ export async function updateDeliveryWithdrawalStatus(id, { status, adminNote, re
         if (amount > 0) {
             await FoodDeliveryWallet.findOneAndUpdate(
                 { deliveryPartnerId: updated.deliveryPartnerId?._id || updated.deliveryPartnerId },
-                { 
-                    $inc: { 
+                {
+                    $inc: {
                         balance: -amount,
-                        totalSettled: amount 
-                    } 
+                        totalSettled: amount
+                    }
                 }
             );
         }
@@ -5743,7 +5744,7 @@ export async function getDeliveryWallets(query = {}) {
         const cashInHand = Math.max(0, grossCashCollected - totalSubmittedToAdmin);
         const totalEarning = Number(wallet?.totalEarnings || 0);
         const totalWithdrawn = settlementPaidAmount;
-        
+
         return {
             walletId: wallet?._id,
             deliveryId: p._id,
@@ -5765,14 +5766,14 @@ export async function getDeliveryWallets(query = {}) {
         };
     }));
 
-    return { 
-        wallets, 
-        pagination: { 
-            total, 
-            page, 
-            limit, 
-            pages: Math.ceil(total / limit) || 1 
-        } 
+    return {
+        wallets,
+        pagination: {
+            total,
+            page,
+            limit,
+            pages: Math.ceil(total / limit) || 1
+        }
     };
 }
 
@@ -5820,14 +5821,14 @@ export async function getCashLimitSettlements(query = {}) {
         razorpayPaymentId: d.razorpayPaymentId || '-'
     }));
 
-    return { 
-        transactions, 
-        pagination: { 
-            total, 
-            page, 
-            limit, 
-            pages: Math.ceil(total / limit) || 1 
-        } 
+    return {
+        transactions,
+        pagination: {
+            total,
+            page,
+            limit,
+            pages: Math.ceil(total / limit) || 1
+        }
     };
 }
 
@@ -5905,8 +5906,8 @@ export async function getRestaurantPayoutSettlementPreview(query = {}, adminScop
         toTimeRaw,
         auto
     } = hasExplicitWindow
-        ? normalizeDateRangeOrThrow(query.fromDate, query.toDate, query.fromTime, query.toTime)
-        : await resolveAutoDateRange();
+            ? normalizeDateRangeOrThrow(query.fromDate, query.toDate, query.fromTime, query.toTime)
+            : await resolveAutoDateRange();
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 500);
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
     const skip = (page - 1) * limit;
@@ -6348,8 +6349,8 @@ export async function markAllRestaurantPayoutSettled(payload = {}, adminScope = 
         fromTimeRaw,
         toTimeRaw
     } = hasExplicitWindow
-        ? normalizeDateRangeOrThrow(payload.fromDate, payload.toDate, payload.fromTime, payload.toTime)
-        : await resolveAutoDateRange();
+            ? normalizeDateRangeOrThrow(payload.fromDate, payload.toDate, payload.fromTime, payload.toTime)
+            : await resolveAutoDateRange();
     const payoutMethod = normalizePayoutMethod(payload.payoutMethod || 'manual');
     const note = String(payload.note || '').trim();
     const referenceNumber = String(payload.referenceNumber || '').trim();
@@ -6563,8 +6564,8 @@ export async function getDeliveryPayoutSettlementPreview(query = {}, adminScope 
         toTimeRaw,
         auto
     } = hasExplicitWindow
-        ? normalizeDateRangeOrThrow(query.fromDate, query.toDate, query.fromTime, query.toTime)
-        : await resolveDeliveryAutoDateRange();
+            ? normalizeDateRangeOrThrow(query.fromDate, query.toDate, query.fromTime, query.toTime)
+            : await resolveDeliveryAutoDateRange();
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 500);
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
     const skip = (page - 1) * limit;
@@ -7081,8 +7082,8 @@ export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}
         fromTimeRaw,
         toTimeRaw
     } = hasExplicitWindow
-        ? normalizeDateRangeOrThrow(payload.fromDate, payload.toDate, payload.fromTime, payload.toTime)
-        : await resolveDeliveryAutoDateRange();
+            ? normalizeDateRangeOrThrow(payload.fromDate, payload.toDate, payload.fromTime, payload.toTime)
+            : await resolveDeliveryAutoDateRange();
     const payoutMethod = normalizePayoutMethod(payload.payoutMethod || 'manual');
     const settleCodToAdmin = payload?.settleCodToAdmin === true;
     const note = String(payload.note || '').trim();

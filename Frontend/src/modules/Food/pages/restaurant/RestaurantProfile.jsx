@@ -39,6 +39,7 @@ import {
 import { toast } from "sonner"
 import BRAND_THEME from "@/config/brandTheme"
 import { clearModuleAuth } from "@food/utils/auth"
+import { Textarea } from "@food/components/ui/textarea"
 
 const getProfileUpdateErrorMessage = (error) => {
   const backendMessage = String(
@@ -270,6 +271,8 @@ const RestaurantProfile = () => {
         formData.append("pincode", location.pincode)
         formData.append("landmark", location.landmark)
         formData.append("formattedAddress", location.formattedAddress || "")
+        if (location.latitude != null) formData.append("latitude", location.latitude)
+        if (location.longitude != null) formData.append("longitude", location.longitude)
       } else if (section === 'operations') {
         const normalizedCuisines = opsInfo.cuisines
           .map((c) => String(c || "").trim())
@@ -343,14 +346,14 @@ const RestaurantProfile = () => {
   }
 
   const SectionHeader = ({ icon: Icon, title, section, isEditing, onToggle, onSave, isSaving }) => (
-    <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-xl ${isEditing ? 'bg-[#005128] text-white' : 'bg-[#e6f0eb] text-[#005128]'}`}>
-          <Icon className="w-5 h-5" />
+    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="flex items-center gap-2.5">
+        <div className={`p-1.5 rounded-lg ${isEditing ? 'bg-[#005128] text-white' : 'bg-[#e6f0eb] text-[#005128]'}`}>
+          <Icon className="w-4 h-4" />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-          <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">{isEditing ? 'Editing Mode' : 'View Only'}</p>
+          <h2 className="text-base font-bold text-slate-900 leading-tight">{title}</h2>
+          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{isEditing ? 'Editing Mode' : 'View Only'}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -391,57 +394,56 @@ const RestaurantProfile = () => {
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       {/* Premium Cover-Style Header */}
-      <header className="bg-gradient-to-br from-[#005128] via-[#005128] to-[#003d1e] text-white pt-8 pb-12 px-6 relative overflow-hidden">
+      <header className="bg-gradient-to-br from-[#005128] via-[#005128] to-[#003d1e] text-white pt-6 pb-10 px-4 relative overflow-hidden">
         {/* Artistic Background Elements */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px] -mr-48 -mt-48 animate-pulse"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full blur-[80px] -ml-32 -mb-32"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] -mr-32 -mt-32"></div>
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
         </div>
         
         {/* Refined Bottom Curve */}
-        <div className="absolute bottom-0 left-0 right-0 h-10 bg-slate-50" style={{ clipPath: 'polygon(0 100%, 100% 100%, 100% 0, 0 100%)' }}></div>
+        <div className="absolute bottom-0 left-0 right-0 h-6 bg-slate-50" style={{ clipPath: 'polygon(0 100%, 100% 100%, 100% 0, 0 100%)' }}></div>
         
         <div className="max-w-5xl mx-auto relative z-10">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-4">
             <button 
               onClick={() => navigate('/food/restaurant/explore')}
-              className="p-2.5 bg-white/10 backdrop-blur-xl hover:bg-white/20 rounded-2xl transition-all group border border-white/20 shadow-xl"
+              className="p-2 bg-white/10 backdrop-blur-xl hover:bg-white/20 rounded-xl transition-all group border border-white/20"
             >
-              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <ArrowLeft className="w-4 h-4" />
             </button>
-            <div className="bg-white/10 backdrop-blur-xl px-4 py-2 rounded-2xl border border-white/20 flex items-center gap-2 shadow-lg">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Verified Partner</span>
+            <div className="bg-white/10 backdrop-blur-xl px-3 py-1.5 rounded-xl border border-white/20 flex items-center gap-1.5 shadow-lg">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[9px] font-black uppercase tracking-wider text-white">Verified Partner</span>
             </div>
           </div>
           
-          <div className="flex flex-col md:flex-row items-center md:items-end gap-6 text-center md:text-left pb-4">
+          <div className="flex flex-col md:flex-row items-center md:items-end gap-4 text-center md:text-left">
             <div className="relative group">
-              <div className="w-24 h-24 md:w-32 md:h-32 rounded-[2.5rem] overflow-hidden border-4 border-white shadow-2xl bg-slate-100 transition-transform group-hover:scale-105 duration-500">
+              <div className="w-20 h-20 md:w-24 md:h-24 rounded-[1.8rem] overflow-hidden border-4 border-white shadow-xl bg-slate-100">
                 {imageInfo.profileImage ? (
                   <img src={getPreviewUrl(imageInfo.profileImage)} alt="Restaurant" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-300">
-                    <Store className="w-12 h-12" />
+                    <Store className="w-8 h-8" />
                   </div>
                 )}
               </div>
-              <div className="absolute -bottom-1 -right-1 w-9 h-9 bg-[#005128] rounded-2xl flex items-center justify-center border-4 border-white shadow-xl">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-[#005128] rounded-xl flex items-center justify-center border-2 border-white shadow-xl">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
               </div>
             </div>
             <div className="flex-1">
               <div className="flex flex-col items-center md:items-start">
-                <h1 className="text-3xl md:text-5xl font-black mb-3 tracking-tight leading-tight text-white drop-shadow-md">
+                <h1 className="text-2xl md:text-4xl font-black mb-2 tracking-tight leading-tight text-white">
                   {basicInfo.name || "My Restaurant"}
                 </h1>
-                <div className="flex flex-wrap justify-center md:justify-start items-center gap-3">
-                  <div className="flex items-center gap-2 text-xs font-black bg-emerald-900/40 px-4 py-1.5 rounded-xl backdrop-blur-md border border-emerald-500/20 text-emerald-50">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-400" /> {location.area || 'Locality'}
+                <div className="flex flex-wrap justify-center md:justify-start items-center gap-2">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold bg-emerald-900/40 px-3 py-1 rounded-lg backdrop-blur-md border border-emerald-500/20 text-emerald-50 uppercase tracking-wide">
+                    <MapPin className="w-3 h-3 text-emerald-400" /> {location.area || 'Locality'}
                   </div>
-                  <div className="flex items-center gap-2 text-xs font-black bg-emerald-900/40 px-4 py-1.5 rounded-xl backdrop-blur-md border border-emerald-500/20 text-emerald-50">
-                    <User className="w-3.5 h-3.5 text-emerald-400" /> {basicInfo.ownerName || 'Owner'}
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold bg-emerald-900/40 px-3 py-1 rounded-lg backdrop-blur-md border border-emerald-500/20 text-emerald-50 uppercase tracking-wide">
+                    <User className="w-3 h-3 text-emerald-400" /> {basicInfo.ownerName || 'Owner'}
                   </div>
                 </div>
               </div>
@@ -450,10 +452,10 @@ const RestaurantProfile = () => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 mt-6 space-y-6">
+      <main className="max-w-5xl mx-auto px-4 mt-4 space-y-4">
         
         {/* Quick Stats / Indicators - More Compact */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
             { label: 'Restaurant Type', val: basicInfo.pureVegRestaurant ? 'Pure Veg' : 'Non-Veg', icon: Tag, color: 'text-green-600', bg: 'bg-green-50' },
             { label: 'Avg Delivery', val: opsInfo.estimatedDeliveryTime || '30-45 mins', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -461,18 +463,18 @@ const RestaurantProfile = () => {
             { label: 'GST Status', val: kycInfo.gstRegistered ? 'Active' : 'Unregistered', icon: ShieldCheck, color: 'text-orange-600', bg: 'bg-orange-50' },
           ].map((stat, i) => (
             <motion.div 
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.05 }}
               key={i} 
-              className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3"
+              className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2.5"
             >
-              <div className={`p-2.5 rounded-xl ${stat.bg} ${stat.color}`}>
-                <stat.icon className="w-5 h-5" />
+              <div className={`p-2 rounded-lg ${stat.bg} ${stat.color}`}>
+                <stat.icon className="w-4 h-4" />
               </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                <p className="text-sm font-bold text-slate-900">{stat.val}</p>
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">{stat.label}</p>
+                <p className="text-xs font-bold text-slate-900 truncate">{stat.val}</p>
               </div>
             </motion.div>
           ))}
@@ -480,9 +482,9 @@ const RestaurantProfile = () => {
 
         {/* Basic Information Section */}
         <motion.section 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden"
+          className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
         >
           <SectionHeader 
             icon={User} 
@@ -588,57 +590,78 @@ const RestaurantProfile = () => {
             onSave={() => handleSaveSection('location')}
             isSaving={savingSection === 'location'}
           />
-          <div className="p-6 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input 
-                value={location.addressLine1} 
-                onChange={e => setLocation({...location, addressLine1: e.target.value})}
-                disabled={!editStates.location}
-                className="rounded-xl bg-slate-50/50"
-                placeholder="Shop no. / building no.*"
-              />
-              <Input 
-                value={location.addressLine2} 
-                onChange={e => setLocation({...location, addressLine2: e.target.value})}
-                disabled={!editStates.location}
-                className="rounded-xl bg-slate-50/50"
-                placeholder="Floor / tower*"
-              />
-              <Input 
-                value={location.landmark} 
-                onChange={e => setLocation({...location, landmark: e.target.value})}
-                disabled={!editStates.location}
-                className="rounded-xl bg-slate-50/50"
-                placeholder="Nearby landmark*"
-              />
-              <Input 
-                value={location.area} 
-                onChange={e => setLocation({...location, area: e.target.value})}
-                disabled={!editStates.location}
-                className="rounded-xl bg-slate-50/50"
-                placeholder="Area / Sector / Locality*"
-              />
-              <Input 
-                value={location.city} 
-                onChange={e => setLocation({...location, city: e.target.value})}
-                disabled={!editStates.location}
-                className="rounded-xl bg-slate-50/50"
-                placeholder="City*"
-              />
-              <Input 
-                value={location.state} 
-                onChange={e => setLocation({...location, state: e.target.value})}
-                disabled={!editStates.location}
-                className="rounded-xl bg-slate-50/50"
-                placeholder="State*"
-              />
-              <Input 
-                value={location.pincode} 
-                onChange={e => setLocation({...location, pincode: e.target.value.replace(/\D/g, "").slice(0, 6)})}
-                disabled={!editStates.location}
-                className="rounded-xl bg-slate-50/50"
-                placeholder="Pincode*"
-              />
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold text-slate-500 ml-1">Shop no. / building no.*</Label>
+                <Input 
+                  value={location.addressLine1} 
+                  onChange={e => setLocation({...location, addressLine1: e.target.value})}
+                  disabled={!editStates.location}
+                  className="h-9 text-xs rounded-xl bg-slate-50/50"
+                  placeholder="Shop no. / building no.*"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold text-slate-500 ml-1">Floor / tower*</Label>
+                <Input 
+                  value={location.addressLine2} 
+                  onChange={e => setLocation({...location, addressLine2: e.target.value})}
+                  disabled={!editStates.location}
+                  className="h-9 text-xs rounded-xl bg-slate-50/50"
+                  placeholder="Floor / tower*"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold text-slate-500 ml-1">Nearby landmark*</Label>
+                <Input 
+                  value={location.landmark} 
+                  onChange={e => setLocation({...location, landmark: e.target.value})}
+                  disabled={!editStates.location}
+                  className="h-9 text-xs rounded-xl bg-slate-50/50"
+                  placeholder="Nearby landmark*"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold text-slate-500 ml-1">Area / Sector / Locality*</Label>
+                <Input 
+                  value={location.area} 
+                  onChange={e => setLocation({...location, area: e.target.value})}
+                  disabled={!editStates.location}
+                  className="h-9 text-xs rounded-xl bg-slate-50/50"
+                  placeholder="Area / Sector / Locality*"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold text-slate-500 ml-1">City*</Label>
+                <Input 
+                  value={location.city} 
+                  onChange={e => setLocation({...location, city: e.target.value})}
+                  disabled={!editStates.location}
+                  className="h-9 text-xs rounded-xl bg-slate-50/50"
+                  placeholder="City*"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold text-slate-500 ml-1">State*</Label>
+                <Input 
+                  value={location.state} 
+                  onChange={e => setLocation({...location, state: e.target.value})}
+                  disabled={!editStates.location}
+                  className="h-9 text-xs rounded-xl bg-slate-50/50"
+                  placeholder="State*"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold text-slate-500 ml-1">Pincode*</Label>
+                <Input 
+                  value={location.pincode} 
+                  onChange={e => setLocation({...location, pincode: e.target.value.replace(/\D/g, "").slice(0, 6)})}
+                  disabled={!editStates.location}
+                  className="h-9 text-xs rounded-xl bg-slate-50/50"
+                  placeholder="Pincode*"
+                />
+              </div>
             </div>
           </div>
         </motion.section>

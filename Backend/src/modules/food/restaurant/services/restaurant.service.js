@@ -540,7 +540,7 @@ export const updateRestaurantProfile = async (restaurantId, body = {}, files = {
     }
 
     const currentRestaurant = await FoodRestaurant.findById(restaurantId)
-        .select('restaurantName restaurantNameNormalized ownerPhone ownerPhoneDigits ownerPhoneLast10 primaryContactNumber status menuImages')
+        .select('restaurantName restaurantNameNormalized ownerPhone ownerPhoneDigits ownerPhoneLast10 primaryContactNumber status menuImages location')
         .lean();
 
     if (!currentRestaurant) {
@@ -707,9 +707,9 @@ export const updateRestaurantProfile = async (restaurantId, body = {}, files = {
         // Update unified location object
         update.location = {
             type: 'Point',
-            coordinates: lat !== null && lng !== null ? [lng, lat] : undefined,
-            latitude: lat ?? undefined,
-            longitude: lng ?? undefined,
+            coordinates: (lat !== null && lng !== null) ? [lng, lat] : (currentRestaurant?.location?.coordinates || undefined),
+            latitude: lat ?? (currentRestaurant?.location?.latitude || undefined),
+            longitude: lng ?? (currentRestaurant?.location?.longitude || undefined),
             formattedAddress,
             address: formattedAddress,
             addressLine1,
