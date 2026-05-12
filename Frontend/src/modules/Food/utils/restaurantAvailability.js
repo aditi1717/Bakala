@@ -55,17 +55,17 @@ const parseTimeToMinutes = (timeValue) => {
 const getTodayTiming = (restaurant, dayName) => {
   const outletTimingsArray = restaurant?.outletTimings?.timings
   if (Array.isArray(outletTimingsArray)) {
-    const exact = outletTimingsArray.find((entry) => normalizeDay(entry?.day) === dayName)
-    if (exact) return exact
+    const matches = outletTimingsArray.filter((entry) => normalizeDay(entry?.day) === dayName)
+    if (matches.length > 0) return matches
   }
 
   const outletTimingsObject = restaurant?.outletTimings
   if (outletTimingsObject && typeof outletTimingsObject === "object" && !Array.isArray(outletTimingsObject)) {
     const direct = outletTimingsObject[dayName]
-    if (direct && typeof direct === "object") return direct
+    if (direct && typeof direct === "object") return [direct]
   }
 
-  return null
+  return []
 }
 
 const getPreviousDayName = (dayName) => {
@@ -74,28 +74,38 @@ const getPreviousDayName = (dayName) => {
   return DAY_NAMES[(index + DAY_NAMES.length - 1) % DAY_NAMES.length]
 }
 
-const extractDaySlots = (timing) => {
-  const rawSlots = Array.isArray(timing?.slots) ? timing.slots : []
-  const normalizedFromSlots = rawSlots
-    .map((slot) => ({
-      openingTime: slot?.openingTime || null,
-      closingTime: slot?.closingTime || null,
-      openingMinutes: parseTimeToMinutes(slot?.openingTime),
-      closingMinutes: parseTimeToMinutes(slot?.closingTime),
-    }))
-    .filter((slot) => slot.openingMinutes !== null && slot.closingMinutes !== null)
+const extractDaySlots = (timingInput) => {
+  const timings = Array.isArray(timingInput) ? timingInput : [timingInput].filter(Boolean)
+  const allNormalizedSlots = []
 
-  if (normalizedFromSlots.length > 0) {
-    return normalizedFromSlots
+  for (const timing of timings) {
+    // 1. Try internal slots array
+    const rawSlots = Array.isArray(timing?.slots) ? timing.slots : []
+    const normalizedFromSlots = rawSlots
+      .map((slot) => ({
+        openingTime: slot?.openingTime || null,
+        closingTime: slot?.closingTime || null,
+        openingMinutes: parseTimeToMinutes(slot?.openingTime),
+        closingMinutes: parseTimeToMinutes(slot?.closingTime),
+      }))
+      .filter((slot) => slot.openingMinutes !== null && slot.closingMinutes !== null)
+
+    if (normalizedFromSlots.length > 0) {
+      allNormalizedSlots.push(...normalizedFromSlots)
+      continue
+    }
+
+    // 2. Try top-level opening/closing
+    const openingTime = timing?.openingTime || null
+    const closingTime = timing?.closingTime || null
+    const openingMinutes = parseTimeToMinutes(openingTime)
+    const closingMinutes = parseTimeToMinutes(closingTime)
+    if (openingMinutes !== null && closingMinutes !== null) {
+      allNormalizedSlots.push({ openingTime, closingTime, openingMinutes, closingMinutes })
+    }
   }
 
-  const openingTime = timing?.openingTime || null
-  const closingTime = timing?.closingTime || null
-  const openingMinutes = parseTimeToMinutes(openingTime)
-  const closingMinutes = parseTimeToMinutes(closingTime)
-  if (openingMinutes === null || closingMinutes === null) return []
-
-  return [{ openingTime, closingTime, openingMinutes, closingMinutes }]
+  return allNormalizedSlots
 }
 
 const isWithinTimeWindow = (nowMinutes, openingMinutes, closingMinutes) => {
@@ -359,15 +369,23 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
     )
   const nowMinutes = now.getHours() * 60 + now.getMinutes()
   const hasExplicitWindow = slots.length > 0 || Boolean(openingTime || closingTime)
-  // If a restaurant provides only one side of the window, treat timings as not enforced
-  // (prevents accidental "offline" due to partial data).
+  
   const activeSlot = getActiveSlot(nowMinutes, slots)
   const isWithinTimings = hasExplicitWindow ? (slots.length > 0 ? Boolean(activeSlot) : true) : true
+
+  // Find the next upcoming slot today if currently closed
+  const nextSlotToday = !isWithinTimings ? slots
+    .filter(s => s.openingMinutes > nowMinutes)
+    .sort((a, b) => a.openingMinutes - b.openingMinutes)[0] : null
+
   const minutesUntilClose = (isWithinTimings && activeSlot)
     ? getMinutesUntilClosing(nowMinutes, activeSlot.openingMinutes, activeSlot.closingMinutes)
     : null
-  const effectiveOpeningTime = activeSlot?.openingTime || openingTime
+    
+  // Use next slot's opening time if we have one, otherwise fallback
+  const effectiveOpeningTime = nextSlotToday?.openingTime || openingTime
   const effectiveClosingTime = activeSlot?.closingTime || closingTime
+  
   const formattedOpeningTime = formatTimeLabel(effectiveOpeningTime)
   const formattedClosingTime = formatTimeLabel(effectiveClosingTime)
   const closingCountdownLabel = isWithinTimings
