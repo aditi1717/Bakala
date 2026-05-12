@@ -38,38 +38,7 @@ import {
 } from "@food/components/ui/select"
 import { toast } from "sonner"
 import BRAND_THEME from "@/config/brandTheme"
-import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
-import { zoneAPI } from "@food/api"
 import { clearModuleAuth } from "@food/utils/auth"
-
-const isPointInPolygon = (latitude, longitude, polygonCoordinates) => {
-  if (!Array.isArray(polygonCoordinates) || polygonCoordinates.length < 3) return true
-  const x = Number(latitude)
-  const y = Number(longitude)
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return false
-  let inside = false
-  for (let i = 0, j = polygonCoordinates.length - 1; i < polygonCoordinates.length; j = i++) {
-    const xi = Number(polygonCoordinates[i].latitude)
-    const yi = Number(polygonCoordinates[i].longitude)
-    const xj = Number(polygonCoordinates[j].latitude)
-    const yj = Number(polygonCoordinates[j].longitude)
-    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
-    if (intersect) inside = !inside
-  }
-  return inside
-}
-
-const buildBoundsFromZone = (zone) => {
-  const coordinates = Array.isArray(zone?.coordinates) ? zone.coordinates : []
-  if (coordinates.length < 3 || !window.google?.maps?.LatLngBounds) return null
-  const bounds = new window.google.maps.LatLngBounds()
-  coordinates.forEach((point) => {
-    const lat = Number(point?.latitude)
-    const lng = Number(point?.longitude)
-    if (Number.isFinite(lat) && Number.isFinite(lng)) bounds.extend({ lat, lng })
-  })
-  return bounds
-}
 
 const getProfileUpdateErrorMessage = (error) => {
   const backendMessage = String(
@@ -84,14 +53,6 @@ const getProfileUpdateErrorMessage = (error) => {
   }
 
   return backendMessage || "Failed to save changes"
-}
-
-const getZoneIdValue = (zone) => String(zone?._id || zone?.id || "").trim()
-
-const normalizeProfileZoneId = (value) => {
-  if (!value) return ""
-  if (typeof value === "object") return getZoneIdValue(value)
-  return String(value).trim()
 }
 
 const RestaurantProfile = () => {
@@ -116,9 +77,6 @@ const RestaurantProfile = () => {
     state: "",
     pincode: "",
     landmark: "",
-    latitude: 0,
-    longitude: 0,
-    zoneId: "",
     formattedAddress: "",
   })
 
@@ -165,178 +123,9 @@ const RestaurantProfile = () => {
     images: false,
   })
 
-  const [zones, setZones] = useState([])
-  const [zonesLoading, setZonesLoading] = useState(false)
-  const locationSearchInputRef = useRef(null)
-  const placesAutocompleteRef = useRef(null)
-  const mapsScriptLoadedRef = useRef(false)
-  const selectedZoneRef = useRef(null)
-
-  const isAutofilled = !!(location.latitude && location.longitude)
-
   useEffect(() => {
     fetchInitialData()
-    loadZones()
   }, [])
-
-  const loadZones = async () => {
-    try {
-      setZonesLoading(true)
-      const res = await zoneAPI.getPublicZones()
-      const list = res?.data?.data?.zones || res?.data?.zones || []
-      setZones(Array.isArray(list) ? list : [])
-    } catch (err) {
-      console.error("Failed to load zones:", err)
-    } finally {
-      setZonesLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!editStates.location) {
-      placesAutocompleteRef.current = null
-      return
-    }
-
-    let cancelled = false
-
-    const init = async () => {
-      const apiKey = await getGoogleMapsApiKey()
-      if (!apiKey) {
-        console.error("Google Maps API key is missing")
-        return
-      }
-
-      const loadMaps = async () => {
-        if (window.google?.maps?.places?.Autocomplete) return true
-        
-        const existingScript = document.getElementById("restaurant-onboarding-maps-script")
-        if (existingScript) {
-          for (let i = 0; i < 50; i++) {
-            if (window.google?.maps?.places?.Autocomplete) return true
-            await new Promise((r) => setTimeout(r, 100))
-          }
-          return !!window.google?.maps?.places?.Autocomplete
-        }
-
-        return new Promise((resolve) => {
-          const script = document.createElement("script")
-          script.id = "restaurant-onboarding-maps-script"
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=weekly`
-          script.async = true
-          script.defer = true
-          script.onload = () => resolve(true)
-          script.onerror = () => resolve(false)
-          document.head.appendChild(script)
-        })
-      }
-
-      const ok = await loadMaps()
-      if (!ok || cancelled || !locationSearchInputRef.current) return
-
-      // Ensure input is enabled and ready
-      await new Promise(r => setTimeout(r, 200))
-
-      if (placesAutocompleteRef.current) {
-        // Remove existing pac-containers to avoid duplicates
-        const containers = document.querySelectorAll('.pac-container')
-        containers.forEach(c => c.remove())
-        placesAutocompleteRef.current = null
-      }
-
-      placesAutocompleteRef.current = new window.google.maps.places.Autocomplete(
-        locationSearchInputRef.current,
-        {
-          fields: ["formatted_address", "address_components", "geometry"],
-          componentRestrictions: { country: "in" },
-          strictBounds: true,
-        }
-      )
-
-      // Apply initial bounds if zone is selected
-      if (location.zoneId) {
-        const zone = zones.find(z => String(z._id || z.id) === String(location.zoneId))
-        if (zone?.coordinates?.length >= 3) {
-          const bounds = new window.google.maps.LatLngBounds()
-          zone.coordinates.forEach(coord => {
-            bounds.extend({ lat: Number(coord.latitude), lng: Number(coord.longitude) })
-          })
-          placesAutocompleteRef.current.setBounds(bounds)
-        }
-      }
-
-      const parsePlace = (place) => {
-        const comps = Array.isArray(place?.address_components) ? place.address_components : []
-        const get = (types) => comps.find((c) => types.some((t) => c.types?.includes(t)))?.long_name || ""
-        return {
-          formattedAddress: place?.formatted_address || "",
-          area: get(["sublocality_level_1", "sublocality", "neighborhood"]) || get(["locality"]),
-          city: get(["locality"]) || get(["administrative_area_level_2"]),
-          state: get(["administrative_area_level_1"]),
-          pincode: get(["postal_code"]),
-          latitude: place?.geometry?.location?.lat?.(),
-          longitude: place?.geometry?.location?.lng?.(),
-        }
-      }
-
-      placesAutocompleteRef.current.addListener("place_changed", () => {
-        const place = placesAutocompleteRef.current.getPlace()
-        if (!place.geometry) return
-
-        const parsed = parsePlace(place)
-
-        if (parsed.latitude && parsed.longitude && selectedZoneRef.current) {
-          const zoneCoords = selectedZoneRef.current.coordinates
-          if (Array.isArray(zoneCoords) && zoneCoords.length >= 3) {
-            const isInside = isPointInPolygon(parsed.latitude, parsed.longitude, zoneCoords)
-            if (!isInside) {
-              toast.error(`Selected location is outside your service zone.`)
-              return
-            }
-          }
-        }
-
-        setLocation((prev) => ({
-          ...prev,
-          formattedAddress: parsed.formattedAddress || prev.formattedAddress,
-          addressLine1: prev.addressLine1 || parsed.formattedAddress || "",
-          area: parsed.area || prev.area,
-          city: parsed.city || prev.city,
-          state: parsed.state || prev.state,
-          pincode: parsed.pincode || prev.pincode,
-          latitude: parsed.latitude !== undefined ? parsed.latitude : prev.latitude,
-          longitude: parsed.longitude !== undefined ? parsed.longitude : prev.longitude,
-        }))
-      })
-    }
-
-    init()
-
-    return () => { cancelled = true }
-  }, [editStates.location])
-
-  useEffect(() => {
-    if (!placesAutocompleteRef.current || !location.zoneId || zones.length === 0) return
-    
-    const selectedZone = zones.find((z) => String(z?._id || z?.id) === String(location.zoneId))
-    selectedZoneRef.current = selectedZone
-    
-    if (window.google?.maps) {
-      const bounds = buildBoundsFromZone(selectedZone)
-      if (bounds) {
-        placesAutocompleteRef.current.setBounds(bounds)
-        placesAutocompleteRef.current.setOptions({
-          strictBounds: true,
-          componentRestrictions: { country: "in" }
-        })
-      } else {
-        placesAutocompleteRef.current.setOptions({
-          strictBounds: false,
-          componentRestrictions: { country: "in" }
-        })
-      }
-    }
-  }, [editStates.location, location.zoneId, zones])
 
   const fetchInitialData = async () => {
     try {
@@ -363,9 +152,6 @@ const RestaurantProfile = () => {
           state: data.state || data.location?.state || "",
           pincode: data.pincode || data.location?.pincode || "",
           landmark: data.landmark || data.location?.landmark || "",
-          latitude: data.location?.latitude || data.latitude || 0,
-          longitude: data.location?.longitude || data.longitude || 0,
-          zoneId: normalizeProfileZoneId(data.zoneId),
           formattedAddress: data.location?.formattedAddress || data.formattedAddress || "",
         })
 
@@ -454,9 +240,13 @@ const RestaurantProfile = () => {
       if (!ifscRegex.test(bankInfo.ifscCode)) return toast.error("Invalid IFSC code format (e.g., ABCD0123456)")
       if (!/^[a-zA-Z\s]*$/.test(bankInfo.accountHolderName)) return toast.error("Account holder name should only contain letters")
     } else if (section === 'location') {
-      const selectedZoneId = normalizeProfileZoneId(location.zoneId)
-      const selectedZone = zones.find((zone) => getZoneIdValue(zone) === selectedZoneId)
-      if (!selectedZoneId || !selectedZone) return toast.error("Please select a valid service zone")
+      if (!location.addressLine1?.trim()) return toast.error("Shop/building address is required")
+      if (!location.addressLine2?.trim()) return toast.error("Floor/tower address is required")
+      if (!location.landmark?.trim()) return toast.error("Nearby landmark is required")
+      if (!location.area?.trim()) return toast.error("Area/Sector/Locality is required")
+      if (!location.city?.trim()) return toast.error("City is required")
+      if (!location.state?.trim()) return toast.error("State is required")
+      if (!/^\d{6}$/.test(String(location.pincode || "").trim())) return toast.error("Pincode must be exactly 6 digits")
     }
 
     setSavingSection(section)
@@ -472,7 +262,6 @@ const RestaurantProfile = () => {
         formData.append("ownerPhone", basicInfo.ownerPhone)
         formData.append("primaryContactNumber", basicInfo.primaryContactNumber)
       } else if (section === 'location') {
-        formData.append("zoneId", normalizeProfileZoneId(location.zoneId))
         formData.append("addressLine1", location.addressLine1)
         formData.append("addressLine2", location.addressLine2)
         formData.append("area", location.area)
@@ -480,8 +269,6 @@ const RestaurantProfile = () => {
         formData.append("state", location.state)
         formData.append("pincode", location.pincode)
         formData.append("landmark", location.landmark)
-        formData.append("latitude", String(location.latitude))
-        formData.append("longitude", String(location.longitude))
         formData.append("formattedAddress", location.formattedAddress || "")
       } else if (section === 'operations') {
         const normalizedCuisines = opsInfo.cuisines
@@ -802,100 +589,55 @@ const RestaurantProfile = () => {
             isSaving={savingSection === 'location'}
           />
           <div className="p-6 space-y-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 ml-1">Service zone*</Label>
-              <select
-                value={location.zoneId || ""}
-                onChange={(e) => setLocation({ ...location, zoneId: e.target.value })}
-                className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-sm focus:ring-2 focus:ring-[#005128] transition-all"
-                disabled={zonesLoading || !editStates.location}
-              >
-                <option value="">{zonesLoading ? "Loading zones..." : "Select a zone"}</option>
-                {zones.map((z) => {
-                  const id = getZoneIdValue(z)
-                  const label = z?.name || z?.zoneName || z?.serviceLocation || id
-                  return (
-                    <option key={id} value={id}>
-                      {label}
-                    </option>
-                  )
-                })}
-              </select>
-              <p className="text-[10px] text-slate-400 ml-1">Choose the service zone where your restaurant will be available.</p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="relative">
-                <Input 
-                  ref={locationSearchInputRef}
-                  disabled={!editStates.location}
-                  className="rounded-xl bg-slate-50/50 pr-10"
-                  placeholder="Search location (area, street, etc.)"
-                />
-                {editStates.location && (!!location.latitude || !!location.longitude) && (
-                  <button 
-                    onClick={() => {
-                      if (locationSearchInputRef.current) locationSearchInputRef.current.value = "";
-                      setLocation({...location, latitude: "", longitude: "", area: "", city: "", state: "", pincode: "", formattedAddress: ""});
-                    }}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              <p className="text-[10px] text-slate-400 ml-1">Select a suggestion to auto-fill area/city/state/pincode.</p>
-            </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input 
                 value={location.addressLine1} 
                 onChange={e => setLocation({...location, addressLine1: e.target.value})}
                 disabled={!editStates.location}
                 className="rounded-xl bg-slate-50/50"
-                placeholder="Shop no. / building no. (optional)"
+                placeholder="Shop no. / building no.*"
               />
               <Input 
                 value={location.addressLine2} 
                 onChange={e => setLocation({...location, addressLine2: e.target.value})}
                 disabled={!editStates.location}
                 className="rounded-xl bg-slate-50/50"
-                placeholder="Floor / tower (optional)"
+                placeholder="Floor / tower*"
               />
               <Input 
                 value={location.landmark} 
                 onChange={e => setLocation({...location, landmark: e.target.value})}
                 disabled={!editStates.location}
                 className="rounded-xl bg-slate-50/50"
-                placeholder="Nearby landmark (optional)"
+                placeholder="Nearby landmark*"
               />
               <Input 
                 value={location.area} 
-                onChange={e => !isAutofilled && setLocation({...location, area: e.target.value})}
-                disabled={!editStates.location || isAutofilled}
+                onChange={e => setLocation({...location, area: e.target.value})}
+                disabled={!editStates.location}
                 className="rounded-xl bg-slate-50/50"
                 placeholder="Area / Sector / Locality*"
               />
               <Input 
                 value={location.city} 
-                onChange={e => !isAutofilled && setLocation({...location, city: e.target.value})}
-                disabled={!editStates.location || isAutofilled}
+                onChange={e => setLocation({...location, city: e.target.value})}
+                disabled={!editStates.location}
                 className="rounded-xl bg-slate-50/50"
-                placeholder="City"
+                placeholder="City*"
               />
               <Input 
                 value={location.state} 
-                onChange={e => !isAutofilled && setLocation({...location, state: e.target.value})}
-                disabled={!editStates.location || isAutofilled}
+                onChange={e => setLocation({...location, state: e.target.value})}
+                disabled={!editStates.location}
                 className="rounded-xl bg-slate-50/50"
-                placeholder="State"
+                placeholder="State*"
               />
               <Input 
                 value={location.pincode} 
-                onChange={e => !isAutofilled && setLocation({...location, pincode: e.target.value})}
-                disabled={!editStates.location || isAutofilled}
+                onChange={e => setLocation({...location, pincode: e.target.value.replace(/\D/g, "").slice(0, 6)})}
+                disabled={!editStates.location}
                 className="rounded-xl bg-slate-50/50"
-                placeholder="Pincode"
+                placeholder="Pincode*"
               />
             </div>
           </div>

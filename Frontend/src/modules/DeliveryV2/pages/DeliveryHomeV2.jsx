@@ -4,7 +4,6 @@ import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { useProximityCheck } from '@/modules/DeliveryV2/hooks/useProximityCheck';
 import { useOrderManager } from '@/modules/DeliveryV2/hooks/useOrderManager';
 import { useDeliveryNotifications } from '@food/hooks/useDeliveryNotifications';
-import { writeOrderTracking } from '@food/realtimeTracking';
 import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import { BRAND_THEME } from '@/config/brandTheme';
@@ -19,7 +18,7 @@ import ProfileV2 from '@/modules/DeliveryV2/pages/ProfileV2';
 import ExploreV2 from '@/modules/DeliveryV2/pages/ExploreV2';
 
 // Utils
-import { getHaversineDistance, calculateETA, calculateHeading } from '@/modules/DeliveryV2/utils/geo';
+import { calculateETA, calculateHeading } from '@/modules/DeliveryV2/utils/geo';
 import { useCompanyName } from "@food/hooks/useCompanyName";
 
 // Icons
@@ -597,7 +596,7 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
   const { isOnline, setOnline, activeOrder, tripStatus, setRiderLocation, setActiveOrder, updateTripStatus, clearActiveOrder } = useDeliveryStore();
   const { distanceToTarget } = useProximityCheck();
   const { acceptOrder, rejectOrder, resetTrip } = useOrderManager();
-  const { newOrder, clearNewOrder, orderStatusUpdate, clearOrderStatusUpdate, isConnected: isSocketConnected, emitLocation, playNotificationSound } = useDeliveryNotifications();
+  const { newOrder, clearNewOrder, orderStatusUpdate, clearOrderStatusUpdate, isConnected: isSocketConnected, playNotificationSound } = useDeliveryNotifications();
   const companyName = useCompanyName();
 
   const [incomingOrder, setIncomingOrder] = useState(null);
@@ -632,8 +631,6 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
   const [profileImage, setProfileImage] = useState(null);
 
   const [eta, setEta] = useState(null);
-  const lastLocationSentAt = useRef(0);
-  const lastCoordRef = useRef(null);
   const rollingSpeedRef = useRef([]);
 
   const [zoom, setZoom] = useState(14);
@@ -832,7 +829,6 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
   }, [handleLogout]);
 
   // 0. Auto-Simulation Effect (High-Precision Smooth Glide)
-  const lastSimUpdateSentAt = useRef(0);
   useEffect(() => {
     let interval;
     if (isSimMode && simPath.length > 1 && simIndex < simPath.length - 1) {
@@ -861,44 +857,13 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
             if (mapRef.current) {
               mapRef.current.panTo({ lat, lng });
             }
-
-            // Sync with backend every 2.5 seconds during simulation so customer sees it
-            const now = Date.now();
-            if (now - lastSimUpdateSentAt.current >= 2000) { // Reduced to 2s to match backend throttle
-              lastSimUpdateSentAt.current = now;
-              const payload = {
-                lat,
-                lng,
-                heading,
-                orderId: activeOrder?.orderId || activeOrder?._id,
-                status: 'on_the_way',
-                polyline: activePolyline // Include polyline in every stream update for resilience
-              };
-              // A. HTTP Backup
-              deliveryAPI.updateLocation(lat, lng, true, { heading }).catch(() => { });
-
-              // B. SOCKET LIVE (SILKY SMOOTH)
-              if (payload.orderId) emitLocation(payload);
-
-              // C. FIREBASE REALTIME DB (Persistent Route for Customer Map)
-              if (payload.orderId) {
-                writeOrderTracking(payload.orderId, {
-                  lat,
-                  lng,
-                  heading,
-                  polyline: activePolyline,
-                  status: tripStatus,
-                  eta: eta // Publish live ETA to Firebase
-                }).catch(() => { });
-              }
-            }
           }
           return nextProgress;
         });
       }, 50); // 20 FPS movement
     }
     return () => clearInterval(interval);
-  }, [isSimMode, simPath, simIndex, activeOrder, emitLocation, activePolyline, eta, tripStatus]);
+  }, [isSimMode, simPath, simIndex]);
 
   // Fetch profile data for header
   useEffect(() => {
@@ -990,105 +955,12 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
     }
   }, [distanceToTarget]);
 
-  // 3. Location logic (Smart Frequency Tracking)
-  useEffect(() => {
-    if (!isOnline) {
-      return;
-    }
-
-    const watchId = navigator.geolocation.watchPosition((pos) => {
-      // CRITICAL: In Simulation Mode, we disable actual GPS to prevent overwriting our test position
-      if (isSimMode) return;
-
-      const { latitude: lat, longitude: lng, heading, speed } = pos.coords;
-      const now = Date.now();
-
-      const currentRiderPos = { lat, lng, heading: heading || 0 };
-      setRiderLocation(currentRiderPos);
-
-      // Calculate Rolling Average Speed for Smart ETA
-      if (speed && speed > 0) {
-        rollingSpeedRef.current = [...rollingSpeedRef.current.slice(-4), speed]; // keep last 5 points
-      }
-
-      const avgSpeed = rollingSpeedRef.current.length > 0
-        ? rollingSpeedRef.current.reduce((a, b) => a + b, 0) / rollingSpeedRef.current.length
-        : speed || 0;
-
-      // ETA update is now handled by a separate globally-synchronized effect
-
-      // Check threshold for Sync (distance-based or 7s time-based)
-      const distMoved = lastCoordRef.current
-        ? getHaversineDistance(lat, lng, lastCoordRef.current.lat, lastCoordRef.current.lng)
-        : 1000; // assume huge distance if first update
-
-      if (distMoved >= 25 || (now - lastLocationSentAt.current >= 7000)) {
-        lastLocationSentAt.current = now;
-        lastCoordRef.current = { lat, lng };
-
-        const payload = {
-          lat,
-          lng,
-          heading: heading || 0,
-          speed: speed || 0,
-          accuracy: pos.coords.accuracy,
-          orderId: activeOrder?.orderId || activeOrder?._id,
-          status: 'on_the_way',
-          polyline: activePolyline
-        };
-
-        // A. HTTP Backup
-        deliveryAPI.updateLocation(lat, lng, true, {
-          heading: heading || 0,
-          speed: speed || 0,
-          accuracy: pos.coords.accuracy
-        }).catch(() => { });
-
-        // B. SOCKET LIVE (SILKY SMOOTH)
-        if (payload.orderId) emitLocation(payload);
-
-        // C. FIREBASE REALTIME DB (Persistent)
-        if (payload.orderId) {
-          writeOrderTracking(payload.orderId, {
-            lat,
-            lng,
-            heading: heading || 0,
-            polyline: activePolyline,
-            status: tripStatus,
-            eta: eta // Publish live ETA to Firebase for customer
-          }).catch(() => { });
-        }
-      }
-    }, () => {
-      // Browser geolocation can fail repeatedly while online; keep tracking retrying silently.
-    }, {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 5000
-    });
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [isOnline, setRiderLocation, isSimMode]);
-
-  // 3.5. Background Ping / Heartbeat
-  // If watchPosition stops firing (e.g. app in background or device stationary),
-  // this ensures we ping the backend periodically. This keeps the token fresh (via 401 interceptor)
-  // and keeps the Delivery Partner "online" in the backend.
+  // 3. Availability heartbeat keeps online status fresh without browser location.
   useEffect(() => {
     if (!isOnline) return;
 
     const pingInterval = setInterval(() => {
-      const now = Date.now();
-      // If no natural GPS update happened in the last 15 seconds, force a ping
-      if (now - lastLocationSentAt.current >= 15000 && lastCoordRef.current) {
-        lastLocationSentAt.current = now;
-        deliveryAPI.updateLocation(
-          lastCoordRef.current.lat,
-          lastCoordRef.current.lng,
-          true,
-          { heading: 0, speed: 0, accuracy: null }
-        ).catch(() => { });
-      }
+      deliveryAPI.updateOnlineStatus(true).catch(() => { });
     }, 10000); // Check every 10 seconds
 
     return () => clearInterval(pingInterval);
@@ -1505,30 +1377,7 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
                   onClick={async () => {
                     const nextState = !isOnline;
                     try {
-                      if (nextState) {
-                        const wentOnline = await new Promise((resolve) => {
-                          navigator.geolocation.getCurrentPosition(async (pos) => {
-                            try {
-                              await deliveryAPI.updateLocation(pos.coords.latitude, pos.coords.longitude, true);
-                              resolve(true);
-                            } catch {
-                              resolve(false);
-                            }
-                          }, async () => {
-                            try {
-                              await deliveryAPI.updateOnlineStatus(true);
-                              resolve(true);
-                            } catch {
-                              resolve(false);
-                            }
-                          }, { enableHighAccuracy: true });
-                        });
-                        if (!wentOnline) {
-                          throw new Error('Failed to update availability status');
-                        }
-                      } else {
-                        await deliveryAPI.updateOnlineStatus(false);
-                      }
+                      await deliveryAPI.updateOnlineStatus(nextState);
                       setOnline(nextState);
                     } catch (error) {
                       toast.error(error?.response?.data?.message || 'Failed to update availability status');

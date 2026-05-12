@@ -58,7 +58,6 @@ export default function LandingPageSettings({ type = "admin" }) {
     "Earn money",
     "Why choose us",
     "Testimonials",
-    "Available zone",
     "Fixed data",
     "Button & links",
     "Background color",
@@ -72,7 +71,6 @@ export default function LandingPageSettings({ type = "admin" }) {
     "Categories",
     "Download Apps",
     "Gallery",
-    "Available zone",
     "Registration section",
     "Testimonials",
   ];
@@ -790,47 +788,6 @@ export default function LandingPageSettings({ type = "admin" }) {
                     placeholder="Enter number"
                     className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                   />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <button type="button" onClick={handleReset} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors text-xs sm:text-sm font-medium flex items-center gap-1.5">
-                  <RotateCcw className="w-3 h-3" /> Reset
-                </button>
-                <button type="button" onClick={handleSave} className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors text-xs sm:text-sm font-medium flex items-center gap-1.5">
-                  <Save className="w-3 h-3" /> Save
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Available zone Section */}
-          {adminActiveTab === "Available zone" && (
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-4 w-full overflow-hidden" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <input type="checkbox" className="w-4 h-4 text-brand-600 rounded border-slate-300" defaultChecked />
-                <label className="text-xs sm:text-sm font-semibold text-slate-900">Available zone Section</label>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                    Section Title
-                    <Info className="w-3 h-3 text-slate-400" />
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Enter available zone section title"
-                    className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                    Enable Zone Display
-                    <Info className="w-3 h-3 text-slate-400" />
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" className="w-4 h-4 text-brand-600 rounded border-slate-300" defaultChecked />
-                    <span className="text-xs sm:text-sm text-slate-700">Show available zones</span>
-                  </div>
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-4">
@@ -1694,57 +1651,6 @@ export default function LandingPageSettings({ type = "admin" }) {
           </div>
         )}
 
-        {/* Available zone */}
-        {reactActiveTab === "Available zone" && (
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-4 max-w-full overflow-hidden">
-            <h2 className="text-base sm:text-lg font-semibold text-slate-900 mb-1.5">
-              Available Zone Section
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-600 mb-4">
-              Configure available delivery zones display.
-            </p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
-                  Section Title
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter section title"
-                  className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">
-                  Enable Zone Display
-                </label>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" className="w-4 h-4 text-brand-600 rounded border-slate-300" />
-                  <span className="text-xs sm:text-sm text-slate-700">Show available zones</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors text-xs sm:text-sm font-medium flex items-center gap-1.5"
-              >
-                <RotateCcw className="w-3 h-3" />
-                Reset
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors text-xs sm:text-sm font-medium flex items-center gap-1.5"
-              >
-                <Save className="w-3 h-3" />
-                Save
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Registration section */}
         {reactActiveTab === "Registration section" && (
           <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-4 max-w-full overflow-hidden">
@@ -1853,4 +1759,5 @@ export default function LandingPageSettings({ type = "admin" }) {
     </>
   );
 }
+
 

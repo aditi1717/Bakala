@@ -2,7 +2,6 @@ import { FoodRestaurant } from '../models/restaurant.model.js';
 import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import mongoose from 'mongoose';
-import { FoodZone } from '../../admin/models/zone.model.js';
 import { FoodOffer } from '../../admin/models/offer.model.js';
 import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
 import { FoodRestaurantOutletTimings } from '../models/outletTimings.model.js';
@@ -122,8 +121,6 @@ const parseEstimatedDeliveryMinutes = (value) => {
 
 const toRestaurantProfile = (doc) => {
     if (!doc) return null;
-    const zoneDoc = doc.zoneId && typeof doc.zoneId === 'object' ? doc.zoneId : null;
-    const zoneId = zoneDoc?._id || doc.zoneId || '';
     const loc = doc.location && typeof doc.location === 'object' ? doc.location : null;
     const location =
         (loc?.formattedAddress ||
@@ -196,8 +193,6 @@ const toRestaurantProfile = (doc) => {
         upiId: doc.upiId || '',
         upiQrImage: doc.upiQrImage ? { url: doc.upiQrImage } : null,
         pureVegRestaurant: Boolean(doc.pureVegRestaurant),
-        zoneId: zoneId ? String(zoneId) : '',
-        zoneName: zoneDoc?.name || zoneDoc?.zoneName || zoneDoc?.serviceLocation || '',
         profileImage: doc.profileImage ? { url: doc.profileImage } : null,
         menuImages,
         coverImages,
@@ -236,35 +231,6 @@ const parseSortBy = (value) => {
     return allowed.has(v) ? v : null;
 };
 
-const zoneToPolygon = (zoneDoc) => {
-    const coords = Array.isArray(zoneDoc?.coordinates) ? zoneDoc.coordinates : [];
-    if (coords.length < 3) return null;
-    const ring = coords
-        .map((c) => [Number(c.longitude), Number(c.latitude)])
-        .filter((pair) => pair.every((n) => Number.isFinite(n)));
-    if (ring.length < 3) return null;
-    const first = ring[0];
-    const last = ring[ring.length - 1];
-    if (first[0] !== last[0] || first[1] !== last[1]) ring.push(first);
-    return { type: 'Polygon', coordinates: [ring] };
-};
-
-const buildZoneRestaurantFilter = async (zoneIdRaw) => {
-    const trimmedZoneId = String(zoneIdRaw || '').trim();
-    if (!trimmedZoneId || !mongoose.Types.ObjectId.isValid(trimmedZoneId)) {
-        return null;
-    }
-
-    const zoneClauses = [{ zoneId: new mongoose.Types.ObjectId(trimmedZoneId) }];
-    const zoneDoc = await FoodZone.findOne({ _id: trimmedZoneId, isActive: true }).lean();
-    const polygon = zoneToPolygon(zoneDoc);
-    if (polygon) {
-        zoneClauses.push({ location: { $geoWithin: { $geometry: polygon } } });
-    }
-
-    return { $or: zoneClauses };
-};
-
 const notifyAdminsAboutRestaurantProfileReview = async (restaurantId, restaurantName) => {
     try {
         const { notifyAdminsSafely } = await import('../../../../core/notifications/firebase.service.js');
@@ -300,7 +266,6 @@ export const registerRestaurant = async (payload, files) => {
         formattedAddress,
         latitude,
         longitude,
-        zoneId,
         cuisines,
         openingTime,
         closingTime,
@@ -384,9 +349,6 @@ export const registerRestaurant = async (payload, files) => {
             ownerPhoneLast10,
             primaryContactNumber,
             pureVegRestaurant: pureVegRestaurant === true,
-            zoneId: zoneId && mongoose.Types.ObjectId.isValid(String(zoneId).trim())
-                ? new mongoose.Types.ObjectId(String(zoneId).trim())
-                : undefined,
             // Store unified location object (geo + address).
             location: {
                 type: 'Point',
@@ -479,7 +441,6 @@ export const getCurrentRestaurantProfile = async (restaurantId) => {
                 'upiId',
                 'upiQrImage',
                 'pureVegRestaurant',
-                'zoneId',
                 'profileImage',
                 'coverImages',
                 'menuImages',
@@ -508,7 +469,6 @@ export const getCurrentRestaurantProfile = async (restaurantId) => {
                 'updatedAt'
             ].join(' ')
         )
-        .populate('zoneId', 'name zoneName serviceLocation')
         .lean();
     return toRestaurantProfile(doc);
 };
@@ -588,21 +548,6 @@ export const updateRestaurantProfile = async (restaurantId, body = {}, files = {
     }
 
     const update = {};
-
-    if (body.zoneId !== undefined) {
-        const zoneIdRaw = String(body.zoneId || '').trim();
-        if (!zoneIdRaw) {
-            update.zoneId = null;
-        } else if (!mongoose.Types.ObjectId.isValid(zoneIdRaw)) {
-            throw new ValidationError('Invalid zoneId');
-        } else {
-            const zoneExists = await FoodZone.exists({ _id: zoneIdRaw });
-            if (!zoneExists) {
-                throw new ValidationError('Selected zone not found');
-            }
-            update.zoneId = new mongoose.Types.ObjectId(zoneIdRaw);
-        }
-    }
 
     // Owner/contact fields (used by restaurant Contact Details screens)
     if (body.ownerName !== undefined) {
@@ -917,7 +862,7 @@ export const updateRestaurantProfile = async (restaurantId, body = {}, files = {
     // Only reset status to 'pending' if critical fields are updated (FSSAI or Location)
     const criticalFields = [
         'fssaiNumber', 'fssaiExpiry', 'fssaiImage',
-        'location', 'addressLine1', 'addressLine2', 'area', 'city', 'state', 'pincode', 'landmark', 'zoneId'
+        'location', 'addressLine1', 'addressLine2', 'area', 'city', 'state', 'pincode', 'landmark'
     ];
     
     const requiresApproval = Object.keys(update).some(key => criticalFields.includes(key));
@@ -990,12 +935,10 @@ export const updateRestaurantProfile = async (restaurantId, body = {}, files = {
                     'estimatedDeliveryTime',
                     'estimatedDeliveryTimeMinutes',
                     'featuredDish',
-                    'featuredPrice',
-                    'zoneId'
+                    'featuredPrice'
                 ].join(' ')
             }
         )
-            .populate('zoneId', 'name zoneName serviceLocation')
             .lean();
 
         if (requiresApproval && currentRestaurant.status !== 'pending') {
@@ -1143,6 +1086,14 @@ export const listApprovedRestaurants = async (query = {}) => {
     const skip = (page - 1) * limit;
 
     const filter = { status: 'approved' };
+    if (query.isRestaurant !== undefined) {
+        const normalized = String(query.isRestaurant).trim().toLowerCase();
+        if (['true', '1', 'yes', 'on'].includes(normalized)) {
+            filter.$and = [...(filter.$and || []), { $or: [{ isRestaurant: true }, { isRestaurant: { $exists: false } }] }];
+        } else if (['false', '0', 'no', 'off'].includes(normalized)) {
+            filter.isRestaurant = false;
+        }
+    }
 
     if (query.city && String(query.city).trim()) {
         const city = String(query.city).trim().slice(0, 80);
@@ -1201,66 +1152,6 @@ export const listApprovedRestaurants = async (query = {}) => {
     const radiusKm = toFiniteNumber(query.radiusKm) ?? toFiniteNumber(query.maxDistance);
     const sortBy = parseSortBy(query.sortBy);
 
-    // ---- ZONE-BASED FILTERING ----
-    // Strategy: restaurants belong to a zone. Users are only shown restaurants
-    // from their own service zone.
-    //
-    // Step 1: Determine the zone to filter by.
-    //   - If frontend already resolved and passed zoneId → use it directly.
-    //   - Else if lat/lng provided → auto-detect zone from coordinates on backend.
-    //   - If neither → no zone filter (admin/search contexts).
-    //
-    // Step 2: If a zone is found → apply strict zone filter (only restaurants in that zone).
-    // Step 3: If lat/lng given but NO zone found → user is outside all service areas
-    //         → return 0 restaurants immediately (correct "out of service" behavior).
-
-    let resolvedZoneId = String(query.zoneId || '').trim() || null;
-
-    if (!resolvedZoneId && lat !== null && lng !== null) {
-        // Auto-detect zone from lat/lng (same ray-casting logic as /zones/detect endpoint)
-        const allZones = await FoodZone.find({ isActive: true }).lean();
-        const zoneToPolygonCoords = (zoneDoc) => {
-            const coords = Array.isArray(zoneDoc?.coordinates) ? zoneDoc.coordinates : [];
-            return coords
-                .map((c) => [Number(c.longitude), Number(c.latitude)])
-                .filter((pair) => pair.every((n) => Number.isFinite(n)));
-        };
-        const isPointInZonePolygon = (pLat, pLng, ring) => {
-            if (ring.length < 3) return false;
-            let inside = false;
-            for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-                const [xi, yi] = ring[i];
-                const [xj, yj] = ring[j];
-                // ring is [lng, lat] — swap for standard point-in-polygon
-                const intersect =
-                    yi > pLat !== yj > pLat &&
-                    pLng < ((xj - xi) * (pLat - yi)) / (yj - yi) + xi;
-                if (intersect) inside = !inside;
-            }
-            return inside;
-        };
-        for (const zone of allZones) {
-            const ring = zoneToPolygonCoords(zone);
-            if (isPointInZonePolygon(lat, lng, ring)) {
-                resolvedZoneId = String(zone._id);
-                break;
-            }
-        }
-
-        // User sent lat/lng but is outside ALL service zones → return empty result.
-        if (!resolvedZoneId) {
-            return { restaurants: [], total: 0, page, limit };
-        }
-    }
-
-    // Apply zone filter if we have a resolved zone.
-    if (resolvedZoneId) {
-        const zoneFilter = await buildZoneRestaurantFilter(resolvedZoneId);
-        if (zoneFilter) {
-            filter.$and = [...(filter.$and || []), zoneFilter];
-        }
-    }
-
     const projection = {
         restaurantName: 1,
         area: 1,
@@ -1279,6 +1170,7 @@ export const listApprovedRestaurants = async (query = {}) => {
         isAcceptingOrders: 1,
         status: 1,
         pureVegRestaurant: 1,
+        isRestaurant: 1,
         createdAt: 1,
         location: 1,
         openingTime: 1,
@@ -1287,8 +1179,6 @@ export const listApprovedRestaurants = async (query = {}) => {
     };
 
     // Use $geoNear only when geo sorting is explicitly needed (nearest / delivery time sort).
-    // Zone filter above already restricts to the correct restaurants — geoNear here is purely
-    // for ordering results by distance, not for restricting which restaurants are shown.
     const wantsGeoSort = sortBy === 'nearest' || sortBy === 'deliveryTime' || radiusKm !== null;
     if (lat !== null && lng !== null && wantsGeoSort) {
         const geoNear = {
@@ -1365,6 +1255,7 @@ export const listApprovedRestaurants = async (query = {}) => {
         name: r.restaurantName || '',
         rating: normalizeRatingValue(r.rating),
         totalRatings: normalizeTotalRatingsValue(r.totalRatings),
+        isRestaurant: r.isRestaurant !== false,
         profileImage: r.profileImage ? { url: r.profileImage } : null,
         coverImages: Array.isArray(r.coverImages) ? r.coverImages : [],
         openingTime: r.openingTime || null,

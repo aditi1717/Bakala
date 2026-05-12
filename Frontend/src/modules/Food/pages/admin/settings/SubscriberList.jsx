@@ -59,7 +59,6 @@ const restaurantRows = [
 
 export default function SubscriberList() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [zoneFilter] = useState("All Zones");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState({
     si: true,
@@ -514,4 +513,5 @@ function StatusPill({ label, variant }) {
     </span>
   );
 }
+
 

@@ -578,7 +578,7 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
             title: "Your location"
           })
 
-          // Create Accuracy Circle (Light blue zone around blue dot)
+          // Create Accuracy Circle (light blue area around blue dot)
           const accuracyCircle = new google.maps.Circle({
             strokeColor: "#4285F4",
             strokeOpacity: 0.4,

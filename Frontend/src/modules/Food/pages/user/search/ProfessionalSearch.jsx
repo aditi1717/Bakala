@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useSearchParams, Link, useNavigate } from "react-router-dom"
 import { 
   ArrowLeft, Star, Clock, Search, BadgePercent,
@@ -7,7 +7,6 @@ import {
 import { Button } from "@food/components/ui/button"
 import { Input } from "@food/components/ui/input"
 import { useLocation as useGeoLocation } from "@food/hooks/useLocation"
-import { useZone } from "@food/hooks/useZone"
 import { searchAPI } from "@/services/api"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -54,15 +53,6 @@ export default function ProfessionalSearch() {
   const initialQuery = searchParams.get("q") || ""
   const navigate = useNavigate()
   const { location: userCoords } = useGeoLocation()
-  const { zoneId } = useZone(userCoords)
-  const cachedZoneId = useMemo(() => {
-    try {
-      return localStorage.getItem("userZoneId") || ""
-    } catch {
-      return ""
-    }
-  }, [])
-  const effectiveZoneId = zoneId || cachedZoneId
   const inputRef = useRef(null)
   const skipUrlSyncRef = useRef(false)
   
@@ -87,11 +77,6 @@ export default function ProfessionalSearch() {
       return
     }
 
-    if (!effectiveZoneId) {
-      setResults({ restaurants: [], dishes: [] })
-      return
-    }
-    
     setLoading(true)
     try {
       const res = await searchAPI.unifiedSearch({
@@ -99,7 +84,6 @@ export default function ProfessionalSearch() {
         categoryId: catId,
         lat: userCoords?.latitude,
         lng: userCoords?.longitude,
-        zoneId: effectiveZoneId
       })
       
       if (res.data?.success) {
@@ -115,7 +99,7 @@ export default function ProfessionalSearch() {
     } finally {
       setLoading(false)
     }
-  }, [userCoords, effectiveZoneId])
+  }, [userCoords])
 
   useEffect(() => {
     performSearch(debouncedQuery, selectedCategoryId)
@@ -309,3 +293,7 @@ export default function ProfessionalSearch() {
     </div>
   )
 }
+
+
+
+

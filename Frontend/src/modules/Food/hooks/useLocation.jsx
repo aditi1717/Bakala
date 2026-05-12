@@ -1430,6 +1430,14 @@ export function useLocation() {
     if (stored) {
       try {
         const parsedLocation = JSON.parse(stored)
+        const lowerFormatted = String(parsedLocation?.formattedAddress || "").trim().toLowerCase()
+        const lowerAddress = String(parsedLocation?.address || "").trim().toLowerCase()
+        const lowerCity = String(parsedLocation?.city || "").trim().toLowerCase()
+        const hasPlaceholderText =
+          !lowerCity ||
+          lowerCity === "current location" ||
+          lowerFormatted === "select location" ||
+          lowerAddress === "select location"
 
         // Show cached location immediately.
         // Requirement: only geocode again on explicit manual change.
@@ -1437,13 +1445,22 @@ export function useLocation() {
         const lng = Number(parsedLocation?.longitude)
         const hasLatLng = Number.isFinite(lat) && Number.isFinite(lng)
 
-        if (parsedLocation && hasLatLng) {
+        if (parsedLocation && hasLatLng && !hasPlaceholderText) {
           setLocation(parsedLocation)
           setPermissionGranted(true)
           setLoading(false) // Set loading to false immediately
           hasInitialLocation = true
           shouldForceRefresh = false
           debugLog("?? Loaded stored location instantly (no auto-refresh):", parsedLocation)
+        } else if (hasPlaceholderText) {
+          // Ensure /food always has a real default selected location.
+          const defaultLocation = buildDefaultLocation()
+          localStorage.setItem("userLocation", JSON.stringify(defaultLocation))
+          setLocation(defaultLocation)
+          setPermissionGranted(true)
+          setLoading(false)
+          hasInitialLocation = true
+          shouldForceRefresh = false
         } else {
           // If we don't have usable coordinates, we must fetch once on first open.
           debugLog("?? Stored location missing coordinates; will fetch once")

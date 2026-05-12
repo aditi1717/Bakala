@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { Star, Clock, MapPin, ArrowDownUp, Timer, ArrowRight, ChevronDown, Bookmark, Share2, Plus, Minus, X, AlertCircle } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -8,7 +8,6 @@ import { Card, CardContent } from "@food/components/ui/card"
 import { Button } from "@food/components/ui/button"
 import { useLocationSelector, useSearchOverlay } from "@food/components/user/UserLayout"
 import { useLocation } from "@food/hooks/useLocation"
-import { useZone } from "@food/hooks/useZone"
 import { useCart } from "@food/context/CartContext"
 import offerImage from "@food/assets/offerimage.webp"
 import AddToCartAnimation from "@food/components/user/AddToCartAnimation"
@@ -33,13 +32,7 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 const RUPEE_SYMBOL = "\u20B9"
-const UNDER_PRICE_DEFAULT_STORAGE_KEY = "food-under-price-default"
 const DEFAULT_UNDER_PRICE_LIMIT = 250
-const resolveUnderPriceLimit = (value, fallback = DEFAULT_UNDER_PRICE_LIMIT) => {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
-  return Math.round(parsed)
-}
 const UNDER_250_FILTERS_STORAGE_KEY = "food-under-250-filters"
 const UNDER_250_VEG_MODE_KEY = "food-under-250-veg-mode"
 const readUnder250Filters = () => {
@@ -78,22 +71,10 @@ const readUnder250Filters = () => {
 
 
 export default function Under250() {
-  const { maxPrice: maxPriceParam } = useParams()
-  const maxPrice = useMemo(() => {
-    const storedDefault =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(UNDER_PRICE_DEFAULT_STORAGE_KEY)
-        : null
-    return resolveUnderPriceLimit(maxPriceParam, resolveUnderPriceLimit(storedDefault))
-  }, [maxPriceParam])
+  const maxPrice = DEFAULT_UNDER_PRICE_LIMIT
   const underPriceDisplay = useMemo(() => `Under ${RUPEE_SYMBOL}${maxPrice}`, [maxPrice])
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    window.localStorage.setItem(UNDER_PRICE_DEFAULT_STORAGE_KEY, String(maxPrice))
-  }, [maxPrice])
   const initialFiltersRef = useRef(readUnder250Filters())
   const { location } = useLocation()
-  const { zoneId, zoneStatus, isInService, isOutOfService } = useZone(location)
   const navigate = useNavigate()
   const { openLocationSelector } = useLocationSelector()
   const { openSearch, setSearchValue } = useSearchOverlay()
@@ -471,7 +452,7 @@ export default function Under250() {
     const fetchRestaurantsUnder250 = async () => {
       try {
         setLoadingRestaurants(true)
-        const response = await restaurantAPI.getRestaurants(zoneId ? { zoneId } : {})
+        const response = await restaurantAPI.getRestaurants({})
         const restaurantsRaw = Array.isArray(response?.data?.data?.restaurants)
           ? response.data.data.restaurants
           : []
@@ -576,7 +557,7 @@ export default function Under250() {
     }
 
     fetchRestaurantsUnder250()
-  }, [zoneId, isOutOfService, location?.latitude, location?.longitude, maxPrice])
+  }, [location?.latitude, location?.longitude, maxPrice])
 
   // Fetch categories from backend (no static fallback list)
   useEffect(() => {
@@ -584,7 +565,7 @@ export default function Under250() {
 
     const fetchCategories = async () => {
       try {
-        const response = await adminAPI.getPublicCategories(zoneId ? { zoneId } : {})
+        const response = await adminAPI.getPublicCategories({})
         const categoriesRaw = Array.isArray(response?.data?.data?.categories)
           ? response.data.data.categories
           : []
@@ -626,7 +607,7 @@ export default function Under250() {
     return () => {
       cancelled = true
     }
-  }, [zoneId])
+  }, [])
 
   // Sync quantities from cart on mount
   useEffect(() => {
@@ -777,12 +758,6 @@ export default function Under250() {
     if (!isModuleAuthenticated('user')) {
       toast.error("Please login to add items to cart")
       navigate('/food/user/auth/login', { state: { from: location.pathname } })
-      return
-    }
-
-    // CRITICAL: Check if user is in service zone
-    if (isOutOfService) {
-      toast.error('You are outside the service zone. Please select a location within the service area.')
       return
     }
 
@@ -1013,7 +988,7 @@ export default function Under250() {
   }
 
   // Check if should show grayscale (only when user is out of service)
-  const shouldShowGrayscale = isOutOfService
+  const shouldShowGrayscale = false
   const selectedItemAvailability = selectedItem?.restaurantSnapshot
     ? getRestaurantAvailabilityStatus(selectedItem.restaurantSnapshot, new Date(availabilityTick))
     : { isOpen: true }
@@ -1982,4 +1957,8 @@ export default function Under250() {
     </div>
   )
 }
+
+
+
+
 

@@ -1,10 +1,9 @@
-import { useState, useCallback, useEffect, useRef, startTransition, useMemo } from "react";
+﻿import { useState, useCallback, useEffect, useRef, startTransition, useMemo } from "react";
 import { publicGetOnce, restaurantAPI, adminAPI } from "@food/api";
 import { API_BASE_URL } from "@food/api/config";
 import { sortRestaurantsByAvailability } from "@food/utils/sortRestaurantsByAvailability";
 
 const DEFAULT_UNDER_PRICE_LIMIT = 250;
-const UNDER_PRICE_DEFAULT_STORAGE_KEY = "food-under-price-default";
 const HOME_RESTAURANT_CACHE_TTL_MS = 5 * 60 * 1000;
 const homeRestaurantsCache = new Map();
 const homeRestaurantsInFlightCache = new Map();
@@ -26,11 +25,6 @@ const buildHomeRestaurantCacheKey = (params = {}) => {
   return JSON.stringify(entries);
 };
 
-const resolveUnderPriceLimit = (value, fallback = DEFAULT_UNDER_PRICE_LIMIT) => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return Math.round(parsed);
-};
 
 const calculateDistance = (lat1, lng1, lat2, lng2) => {
   const R = 6371; // Earth's radius in kilometers
@@ -50,7 +44,7 @@ const calculateDistance = (lat1, lng1, lat2, lng2) => {
  * Super-fast unified hook for Food Homepage data.
  * Consolidates all layout, configuration, and restaurant fetching into a single parallel-execution flow.
  */
-export const useFoodHomeData = ({ location, zoneId, zoneStatus, vegMode }) => {
+export const useFoodHomeData = ({ location, vegMode, listingType = "restaurant" }) => {
   const [loading, setLoading] = useState(true);
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
   const [loadingMoreRestaurants, setLoadingMoreRestaurants] = useState(false);
@@ -102,7 +96,7 @@ export const useFoodHomeData = ({ location, zoneId, zoneStatus, vegMode }) => {
           publicGetOnce("/food/hero-banners/public").catch(() => ({ data: { data: [] } })),
           publicGetOnce("/food/explore-icons/public").catch(() => ({ data: { data: [] } })),
           publicGetOnce("/food/landing/settings/public").catch(() => ({ data: { data: {} } })),
-          adminAPI.getPublicCategories(zoneId ? { zoneId } : {}).catch(() => ({ data: { data: { categories: [] } } }))
+          adminAPI.getPublicCategories({}).catch(() => ({ data: { data: { categories: [] } } }))
         ]);
 
         if (cancelled) return;
@@ -119,8 +113,7 @@ export const useFoodHomeData = ({ location, zoneId, zoneStatus, vegMode }) => {
         const settings = settingsRes?.data?.data || {};
         setExploreHeading(settings.exploreMoreHeading || "Explore More");
         setHeaderVideoUrl(settings.headerVideoUrl || "");
-        const savedUnderPrice = resolveUnderPriceLimit(settings.defaultUnderPriceLimit);
-        setUnderPriceLimit(savedUnderPrice);
+        setUnderPriceLimit(DEFAULT_UNDER_PRICE_LIMIT);
         const recommended = (settings.recommendedRestaurants || []).map(r => {
           const image = r.image 
             || r.profileImage?.url 
@@ -148,34 +141,23 @@ export const useFoodHomeData = ({ location, zoneId, zoneStatus, vegMode }) => {
 
     fetchLayoutData();
     return () => { cancelled = true; };
-  }, [zoneId]);
+  }, []);
 
-  // 2. Restaurant Fetching - Zone & Location aware
+  // 2. Restaurant Fetching
   const fetchRestaurants = useCallback(async (filters = {}) => {
     const requestSeq = ++restaurantsRequestSeqRef.current;
 
-    // If user has a location but is confirmed out of all service zones,
-    // skip the fetch entirely and return empty — backend would return [] anyway.
     const hasLocation = Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude);
-    if (hasLocation && zoneStatus === 'OUT_OF_SERVICE') {
-      startTransition(() => {
-        setRestaurants([]);
-        setLoadingRestaurants(false);
-      });
-      return;
-    }
-
-    const params = { ...filters };
+    const params = {
+      ...filters,
+      isRestaurant: listingType === "grocery" ? false : true,
+    };
 
     if (hasLocation) {
       params.lat = location.latitude;
       params.lng = location.longitude;
     }
-    if (zoneId) params.zoneId = zoneId;
-
-    // Clear ALL cached results when building a fresh fetch — location/zone already
-    // changed (the useCallback deps changed), so cached entries for old coords
-    // must not be served.
+    // Clear cached entries when coordinates or filters change so old results are not reused.
     homeRestaurantsCache.clear();
     homeRestaurantsInFlightCache.clear();
 
@@ -278,9 +260,9 @@ export const useFoodHomeData = ({ location, zoneId, zoneStatus, vegMode }) => {
         homeRestaurantsInFlightCache.delete(cacheKey);
       }
     }
-  }, [location?.latitude, location?.longitude, zoneId, zoneStatus]);
+  }, [listingType, location?.latitude, location?.longitude]);
 
-  // Refetch restaurants when location or zone changes
+  // Refetch restaurants when location changes
   useEffect(() => {
     fetchRestaurants();
   }, [fetchRestaurants]);

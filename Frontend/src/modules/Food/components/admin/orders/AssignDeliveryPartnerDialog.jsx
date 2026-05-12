@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Loader2, MapPin, Phone, Truck } from "lucide-react"
+import { Loader2, Phone, Truck } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { toast } from "sonner"
 import {
@@ -35,24 +35,6 @@ const isPartnerOnline = (partner) => {
   return Boolean(partner?.isOnline)
 }
 
-const getPartnerZoneId = (partner) =>
-  normalizeId(partner?.zoneId?._id) ||
-  normalizeId(partner?.zoneId) ||
-  normalizeId(partner?.zone?._id) ||
-  normalizeId(partner?.zone)
-
-const getOrderRestaurantZoneId = (order) =>
-  normalizeId(order?.originalOrder?.restaurantId?.zoneId?._id) ||
-  normalizeId(order?.originalOrder?.restaurantId?.zoneId) ||
-  normalizeId(order?.restaurantZoneId)
-
-const getOrderUserZoneId = (order) =>
-  normalizeId(order?.originalOrder?.userId?.zoneId?._id) ||
-  normalizeId(order?.originalOrder?.userId?.zoneId) ||
-  normalizeId(order?.originalOrder?.deliveryAddress?.zoneId?._id) ||
-  normalizeId(order?.originalOrder?.deliveryAddress?.zoneId) ||
-  normalizeId(order?.userZoneId)
-
 export default function AssignDeliveryPartnerDialog({
   isOpen,
   onOpenChange,
@@ -64,17 +46,6 @@ export default function AssignDeliveryPartnerDialog({
   const [selectedPartnerId, setSelectedPartnerId] = useState("")
   const [isAssigning, setIsAssigning] = useState(false)
 
-  const orderZoneId =
-    normalizeId(order?.zoneId) ||
-    normalizeId(order?.originalOrder?.zoneId?._id) ||
-    normalizeId(order?.originalOrder?.zoneId) ||
-    normalizeId(order?.originalOrder?.restaurantId?.zoneId?._id) ||
-    normalizeId(order?.originalOrder?.restaurantId?.zoneId)
-  const restaurantZoneId = getOrderRestaurantZoneId(order)
-  const userZoneId = getOrderUserZoneId(order)
-  const hasZoneMismatch = Boolean(restaurantZoneId && userZoneId && restaurantZoneId !== userZoneId)
-  const resolvedZoneId = restaurantZoneId || userZoneId || orderZoneId
-
   useEffect(() => {
     if (!isOpen) {
       setDeliveryPartners([])
@@ -84,29 +55,20 @@ export default function AssignDeliveryPartnerDialog({
       return
     }
 
-    if (!resolvedZoneId || hasZoneMismatch) {
-      setDeliveryPartners([])
-      return
-    }
-
     const loadPartners = async () => {
       try {
         setIsLoading(true)
         const response = await adminAPI.getDeliveryPartners({
           page: 1,
           limit: 1000,
-          zoneId: resolvedZoneId,
           includeAvailability: true,
         })
 
-        const zoneScopedList = response?.data?.data?.deliveryPartners || []
-        const strictZonePartners = zoneScopedList.filter(
-          (partner) => getPartnerZoneId(partner) === resolvedZoneId,
-        )
-        const strictOnlineZonePartners = strictZonePartners.filter((partner) =>
+        const partners = response?.data?.data?.deliveryPartners || []
+        const onlinePartners = partners.filter((partner) =>
           isPartnerOnline(partner),
         )
-        setDeliveryPartners(strictOnlineZonePartners)
+        setDeliveryPartners(onlinePartners)
       } catch (error) {
         toast.error(error?.response?.data?.message || "Failed to load delivery partners")
         setDeliveryPartners([])
@@ -116,7 +78,7 @@ export default function AssignDeliveryPartnerDialog({
     }
 
     loadPartners()
-  }, [isOpen, resolvedZoneId, hasZoneMismatch])
+  }, [isOpen])
 
   const handleAssign = async () => {
     if (!order?.orderMongoId || !selectedPartnerId) return
@@ -149,26 +111,18 @@ export default function AssignDeliveryPartnerDialog({
         </DialogHeader>
 
         <div className="px-6 py-4">
-          {hasZoneMismatch ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-800">
-              Restaurant zone and user zone are different for this order. Please keep both in same zone before assigning delivery partner.
-            </div>
-          ) : !resolvedZoneId ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-800">
-              This order does not have a zone assigned yet, so same-zone delivery partners cannot be listed.
-            </div>
-          ) : isLoading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
             </div>
           ) : sortedPartners.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
-              No online delivery partners were found in this zone.
+              No online delivery partners were found.
             </div>
           ) : (
             <div className="space-y-3">
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                Showing <span className="font-semibold text-slate-800">{sortedPartners.length}</span> online partners in this zone
+                Showing <span className="font-semibold text-slate-800">{sortedPartners.length}</span> online partners
               </div>
               <div className="max-h-[380px] space-y-3 overflow-y-auto pr-1">
                 {sortedPartners.map((partner) => {
@@ -192,10 +146,6 @@ export default function AssignDeliveryPartnerDialog({
                             <span className="inline-flex items-center gap-1">
                               <Phone className="h-3.5 w-3.5" />
                               {partner.phone || "N/A"}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <MapPin className="h-3.5 w-3.5" />
-                              {partner.zone || "Zone not set"}
                             </span>
                             <span className="inline-flex items-center gap-1">
                               <Truck className="h-3.5 w-3.5" />
@@ -240,7 +190,7 @@ export default function AssignDeliveryPartnerDialog({
           <button
             type="button"
             onClick={handleAssign}
-            disabled={!selectedPartnerId || isAssigning || !resolvedZoneId || hasZoneMismatch}
+            disabled={!selectedPartnerId || isAssigning}
             className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isAssigning ? "Assigning..." : "Assign Partner"}

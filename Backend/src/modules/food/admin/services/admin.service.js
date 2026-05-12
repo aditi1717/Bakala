@@ -4,7 +4,6 @@ import { FoodAdmin } from '../../../../core/admin/admin.model.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { DeliverySupportTicket } from '../../delivery/models/supportTicket.model.js';
-import { FoodZone } from '../models/zone.model.js';
 import { FoodCategory } from '../models/category.model.js';
 import { FoodItem } from '../models/food.model.js';
 import { FoodOffer } from '../models/offer.model.js';
@@ -67,46 +66,20 @@ const parseBooleanLike = (value, fieldName) => {
 
 const normalizeAdminScope = (adminScope = {}) => {
     const adminType = String(adminScope?.adminType || 'SUPER_ADMIN').toUpperCase();
-    const zoneIds = Array.isArray(adminScope?.zoneIds)
-        ? adminScope.zoneIds
-            .map((id) => (id ? String(id).trim() : ''))
-            .filter((id) => mongoose.Types.ObjectId.isValid(id))
-            .map((id) => new mongoose.Types.ObjectId(id))
-        : [];
     return {
         adminType,
         isSuperAdmin: adminType === 'SUPER_ADMIN',
         isSubAdmin: adminType === 'SUB_ADMIN',
-        zoneIds,
     };
 };
 
-const assertZoneAccess = (adminScope = {}, zoneIdLike) => {
-    const scope = normalizeAdminScope(adminScope);
-    if (!scope.isSubAdmin) return;
-    const rawZoneId = zoneIdLike ? String(zoneIdLike).trim() : '';
-    if (!rawZoneId || !mongoose.Types.ObjectId.isValid(rawZoneId)) {
-        throw new ForbiddenError('Sub-admin can only access assigned zones');
-    }
-    const hasZone = scope.zoneIds.some((zoneId) => String(zoneId) === rawZoneId);
-    if (!hasZone) {
-        throw new ForbiddenError('Sub-admin can only access assigned zones');
-    }
-};
+const assertZoneAccess = () => {};
 
-const applyZoneConstraint = (filter = {}, adminScope = {}, fieldName = 'zoneId') => {
-    const scope = normalizeAdminScope(adminScope);
-    if (!scope.isSubAdmin) return filter;
-    if (!scope.zoneIds.length) {
-        filter._id = { $in: [] };
-        return filter;
-    }
-    filter[fieldName] = { $in: scope.zoneIds };
+const applyZoneConstraint = (filter = {}) => {
     return filter;
 };
 
-const getZoneDisplayName = (zone) =>
-    zone?.zoneName || zone?.name || zone?.serviceLocation || '';
+const getZoneDisplayName = () => '';
 
 const toFiniteNumber = (value) => {
     if (value === null || value === undefined || value === '') return null;
@@ -314,7 +287,6 @@ const serializeDeliveryPartnerForAdmin = (doc, options = {}) => {
     const { sl = null, includeAvailability = false, statusOverride } = options;
     const rawStatus = String(doc?.status || '');
     const mappedStatus = statusOverride || rawStatus;
-    const zoneName = getZoneDisplayName(doc?.zoneId) || doc?.city || doc?.state || doc?.address || '';
     const docId = doc?._id ? String(doc._id) : '';
 
     return {
@@ -324,9 +296,6 @@ const serializeDeliveryPartnerForAdmin = (doc, options = {}) => {
         email: doc?.email || '',
         phone: doc?.phone || '',
         deliveryId: docId ? `DP-${docId.slice(-8).toUpperCase()}` : null,
-        zoneId: doc?.zoneId?._id || doc?.zoneId || null,
-        zone: zoneName,
-        zoneName,
         vehicleType: doc?.vehicleType || '',
         status: mappedStatus,
         rejectionReason: doc?.rejectionReason || undefined,
@@ -561,27 +530,19 @@ export async function getRestaurants(query, adminScope = {}) {
     if (status && ['pending', 'approved', 'rejected'].includes(status)) {
         filter.status = status;
     }
-    applyZoneConstraint(filter, adminScope, 'zoneId');
+    if (query.isRestaurant !== undefined) {
+        filter.isRestaurant = parseBooleanLike(query.isRestaurant, 'isRestaurant');
+    }
     const [restaurants, total] = await Promise.all([
         FoodRestaurant.find(filter)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
-            .select('restaurantName location area city profileImage coverImages menuImages status ownerName ownerPhone zoneId')
-            .populate('zoneId', 'name zoneName serviceLocation')
+            .select('restaurantName location area city profileImage coverImages menuImages status ownerName ownerPhone isRestaurant')
             .lean(),
         FoodRestaurant.countDocuments(filter)
     ]);
-    return {
-        restaurants: restaurants.map((restaurant) => ({
-            ...restaurant,
-            zoneName: getZoneDisplayName(restaurant.zoneId),
-            zone: getZoneDisplayName(restaurant.zoneId),
-        })),
-        total,
-        page,
-        limit
-    };
+    return { restaurants, total, page, limit };
 }
 
 const CANCELLED_ORDER_STATUSES = ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'cancelled_by_user_unavailable'];
@@ -632,15 +593,6 @@ const formatMonthShort = (year, monthIndex) =>
 
 export async function getDashboardStats(query = {}, adminScope = {}) {
     const periodRange = getDateRangeByPeriod(query.period);
-    const scope = normalizeAdminScope(adminScope);
-    const requestedZoneId = query.zoneId && mongoose.Types.ObjectId.isValid(query.zoneId)
-        ? new mongoose.Types.ObjectId(query.zoneId)
-        : null;
-    const zoneId = scope.isSubAdmin
-        ? (requestedZoneId && scope.zoneIds.some((zid) => String(zid) === String(requestedZoneId))
-            ? requestedZoneId
-            : (scope.zoneIds[0] || null))
-        : requestedZoneId;
 
     const orderMatch = {
         $or: [
@@ -651,21 +603,8 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
     if (periodRange) {
         orderMatch.createdAt = { $gte: periodRange.start, $lte: periodRange.end };
     }
-    if (zoneId) {
-        orderMatch.zoneId = zoneId;
-    }
-
     const restaurantMatch = {};
-    if (zoneId) {
-        restaurantMatch.zoneId = zoneId;
-    }
-
-    const zoneRestaurantIds = zoneId
-        ? await FoodRestaurant.find({ zoneId }).distinct('_id')
-        : null;
-    const zoneScopedRestaurantMatch = zoneId
-        ? { restaurantId: { $in: zoneRestaurantIds || [] } }
-        : {};
+    const zoneScopedRestaurantMatch = {};
 
     const [
         orderTotalsAgg,
@@ -785,9 +724,7 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
         FoodDeliveryPartner.countDocuments({ status: 'pending' }),
         FoodItem.countDocuments({ approvalStatus: 'approved', ...zoneScopedRestaurantMatch }),
         FoodAddon.countDocuments({ approvalStatus: 'approved', isDeleted: { $ne: true }, ...zoneScopedRestaurantMatch }),
-        zoneId
-            ? FoodOrder.distinct('userId', { ...orderMatch, userId: { $ne: null } }).then((ids) => ids.length)
-            : FoodUser.countDocuments({}),
+        FoodUser.countDocuments({}),
         FoodRestaurant.find({ ...restaurantMatch, status: 'pending' }).sort({ createdAt: -1 }).limit(5).select('restaurantName createdAt').lean(),
         FoodDeliveryPartner.find({ status: 'pending' }).sort({ createdAt: -1 }).limit(5).select('name createdAt').lean(),
         FoodOrder.find({ 
@@ -799,36 +736,7 @@ export async function getDashboardStats(query = {}, adminScope = {}) {
             ...orderMatch,
             orderStatus: { $in: CANCELLED_ORDER_STATUSES },
         }).sort({ updatedAt: -1 }).limit(5).select('orderId updatedAt').lean(),
-        zoneId
-            ? FoodOrder.aggregate([
-                { $match: { ...orderMatch, userId: { $ne: null } } },
-                { $sort: { createdAt: -1 } },
-                {
-                    $group: {
-                        _id: '$userId',
-                        createdAt: { $first: '$createdAt' }
-                    }
-                },
-                { $sort: { createdAt: -1 } },
-                { $limit: 5 },
-                {
-                    $lookup: {
-                        from: 'food_users',
-                        localField: '_id',
-                        foreignField: '_id',
-                        as: 'user'
-                    }
-                },
-                { $unwind: '$user' },
-                {
-                    $project: {
-                        _id: '$user._id',
-                        name: '$user.name',
-                        createdAt: 1
-                    }
-                }
-            ])
-            : FoodUser.find({}).sort({ createdAt: -1 }).limit(5).select('name createdAt').lean()
+        FoodUser.find({}).sort({ createdAt: -1 }).limit(5).select('name createdAt').lean()
     ]);
 
     const liveSignals = [];
@@ -980,7 +888,7 @@ function formatTimeAgo(date) {
 
 
 export async function getTransactionReport(query = {}) {
-    const { fromDate, toDate, zone, restaurant, search } = query;
+    const { fromDate, toDate, restaurant, search } = query;
     const match = {};
 
     if (fromDate && toDate) {
@@ -1000,9 +908,8 @@ export async function getTransactionReport(query = {}) {
     }
 
     let restaurantIds = null;
-    if (zone || restaurant) {
+    if (restaurant) {
         const restFilter = {};
-        if (zone) restFilter.zoneId = zone; // Assuming zone is an ID or we need to lookup
         if (restaurant && restaurant !== 'All restaurants') {
             const restDoc = await mongoose.model('FoodRestaurant').findOne({ restaurantName: restaurant }).lean();
             if (restDoc) restFilter._id = restDoc._id;
@@ -1247,24 +1154,6 @@ export async function getRestaurantReport(query = {}) {
         restaurantFilter.status = { $ne: 'approved' };
     }
 
-    const zoneRaw = String(query.zone || '').trim();
-    if (zoneRaw) {
-        if (mongoose.Types.ObjectId.isValid(zoneRaw)) {
-            restaurantFilter.zoneId = new mongoose.Types.ObjectId(zoneRaw);
-        } else {
-            const matchedZone = await FoodZone.findOne({
-                $or: [{ name: zoneRaw }, { zoneName: zoneRaw }]
-            })
-                .select('_id')
-                .lean();
-            if (matchedZone?._id) {
-                restaurantFilter.zoneId = matchedZone._id;
-            } else {
-                return { restaurants: [], total: 0, page, limit };
-            }
-        }
-    }
-
     const searchRaw = String(query.search || '').trim();
     if (searchRaw) {
         const escaped = searchRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1282,8 +1171,7 @@ export async function getRestaurantReport(query = {}) {
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
-            .select('restaurantName profileImage rating totalRatings status zoneId')
-            .populate('zoneId', 'name zoneName')
+            .select('restaurantName profileImage rating totalRatings status')
             .lean(),
         FoodRestaurant.countDocuments(restaurantFilter)
     ]);
@@ -1568,8 +1456,7 @@ export async function getRestaurantReport(query = {}) {
             totalVATTAX: formatCurrency(counts.totalVATTAX),
             averageRatings: Number(restaurant.rating || 0),
             reviews: Number(restaurant.totalRatings || 0),
-            status: restaurant.status || 'pending',
-            zoneName: restaurant.zoneId?.name || restaurant.zoneId?.zoneName || ''
+            status: restaurant.status || 'pending'
         };
     });
 
@@ -1723,15 +1610,6 @@ export async function getCustomers(query = {}, adminScope = {}) {
     if (sortBy === 'name-asc') sort.name = 1;
     else if (sortBy === 'name-desc') sort.name = -1;
     else sort.createdAt = -1;
-
-    const scope = normalizeAdminScope(adminScope);
-    if (scope.isSubAdmin) {
-        if (!scope.zoneIds.length) {
-            return { customers: [], total: 0, page, limit };
-        }
-        const scopedUserIds = await FoodOrder.distinct('userId', { zoneId: { $in: scope.zoneIds } });
-        filter._id = { $in: scopedUserIds };
-    }
 
     const [docs, total] = await Promise.all([
         FoodUser.find(filter)
@@ -2861,12 +2739,8 @@ export async function getRestaurantById(id, adminScope = {}) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
     const restaurant = await FoodRestaurant.findById(id)
         .select('-__v')
-        .populate('zoneId', 'name zoneName serviceLocation isActive')
         .lean();
     if (!restaurant) return null;
-    if (normalizeAdminScope(adminScope).isSubAdmin) {
-        assertZoneAccess(adminScope, restaurant.zoneId?._id || restaurant.zoneId);
-    }
     return restaurant;
 }
 
@@ -3025,14 +2899,11 @@ export async function updateRestaurantMenuById(id, menu) {
 
 export async function getPendingRestaurants() {
     const restaurants = await FoodRestaurant.find({ status: { $in: ['pending', 'rejected'] } })
-        .populate('zoneId', 'name zoneName serviceLocation')
         .sort({ createdAt: -1 })
         .lean();
     return restaurants.map((r, i) => ({
         ...r,
         sl: i + 1,
-        zone: getZoneDisplayName(r.zoneId) || null,
-        zoneName: getZoneDisplayName(r.zoneId) || null,
     }));
 }
 
@@ -3040,7 +2911,6 @@ export async function updateRestaurantById(id, body = {}, adminScope = {}) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
     const doc = await FoodRestaurant.findById(id);
     if (!doc) return null;
-    assertZoneAccess(adminScope, doc.zoneId);
 
     const toStr = (v) => (v != null ? String(v).trim() : '');
     const toFinite = (v) => {
@@ -3061,6 +2931,10 @@ export async function updateRestaurantById(id, body = {}, adminScope = {}) {
 
     if (body.pureVegRestaurant !== undefined) {
         doc.pureVegRestaurant = parseBooleanLike(body.pureVegRestaurant, 'pureVegRestaurant');
+    }
+
+    if (body.isRestaurant !== undefined) {
+        doc.isRestaurant = parseBooleanLike(body.isRestaurant, 'isRestaurant');
     }
 
     if (body.isAcceptingOrders !== undefined) {
@@ -3142,15 +3016,14 @@ export async function updateRestaurantById(id, body = {}, adminScope = {}) {
     }
 
     await doc.save();
-    return FoodRestaurant.findById(id).select('-__v').populate('zoneId', 'name zoneName serviceLocation isActive').lean();
+    return FoodRestaurant.findById(id).select('-__v').lean();
 }
 
 export async function deleteRestaurantById(id, adminScope = {}) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
 
-    const restaurant = await FoodRestaurant.findById(id).select('_id zoneId').lean();
+    const restaurant = await FoodRestaurant.findById(id).select('_id').lean();
     if (!restaurant) return null;
-    assertZoneAccess(adminScope, restaurant.zoneId);
 
     const restaurantId = new mongoose.Types.ObjectId(String(id));
 
@@ -3243,9 +3116,8 @@ export async function deleteRestaurantById(id, adminScope = {}) {
 
 export async function updateRestaurantStatus(id, body = {}, adminScope = {}) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
-    const existing = await FoodRestaurant.findById(id).select('zoneId').lean();
+    const existing = await FoodRestaurant.findById(id).select('_id').lean();
     if (!existing) return null;
-    assertZoneAccess(adminScope, existing.zoneId);
     const raw = body.status !== undefined ? body.status : body.isActive;
     const isActive = parseBooleanLike(raw, 'status');
     const status = isActive ? 'approved' : 'rejected';
@@ -3268,7 +3140,6 @@ export async function updateRestaurantLocation(id, body = {}, adminScope = {}) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
     const doc = await FoodRestaurant.findById(id);
     if (!doc) return null;
-    assertZoneAccess(adminScope, doc.zoneId);
 
     const source = (body.location && typeof body.location === 'object') ? body.location : body;
     const toStr = (v) => (v != null ? String(v).trim() : '');
@@ -3316,20 +3187,8 @@ export async function updateRestaurantLocation(id, body = {}, adminScope = {}) {
     doc.pincode = pincode;
     doc.landmark = landmark;
 
-    if (body.zoneId !== undefined) {
-        const zoneId = String(body.zoneId || '').trim();
-        if (!zoneId) {
-            doc.zoneId = undefined;
-        } else if (!mongoose.Types.ObjectId.isValid(zoneId)) {
-            throw new ValidationError('Invalid zoneId');
-        } else {
-            assertZoneAccess(adminScope, zoneId);
-            doc.zoneId = new mongoose.Types.ObjectId(zoneId);
-        }
-    }
-
     await doc.save();
-    return FoodRestaurant.findById(id).select('-__v').populate('zoneId', 'name zoneName serviceLocation isActive').lean();
+    return FoodRestaurant.findById(id).select('-__v').lean();
 }
 
 // ----- Categories -----
@@ -3342,17 +3201,6 @@ export async function getCategories(query) {
     if (query.search && String(query.search).trim()) {
         const term = String(query.search).trim();
         filter.$or = [{ name: { $regex: term, $options: 'i' } }];
-    }
-    // Optional zone filter for admin list.
-    // - zoneId=global => only global categories (zoneId missing)
-    // - zoneId=<ObjectId> => only categories bound to that zone
-    if (query.zoneId && String(query.zoneId).trim()) {
-        const zid = String(query.zoneId).trim();
-        if (zid === 'global') {
-            filter.$or = [...(filter.$or || []), { zoneId: { $exists: false } }, { zoneId: null }];
-        } else if (mongoose.Types.ObjectId.isValid(zid)) {
-            filter.zoneId = new mongoose.Types.ObjectId(zid);
-        }
     }
     if (query.approvalStatus) {
         const approvalStatus = String(query.approvalStatus);
@@ -3444,15 +3292,6 @@ export async function createCategory(body) {
         image: typeof body.image === 'string' ? body.image.trim() : '',
         type: typeof body.type === 'string' ? body.type.trim() : '',
         foodTypeScope: normalizeCategoryFoodTypeScope(body.foodTypeScope, 'Both'),
-        zoneId:
-            body.zoneId && String(body.zoneId).trim()
-                ? (() => {
-                    const zid = String(body.zoneId).trim();
-                    if (zid === 'global') return undefined;
-                    if (!mongoose.Types.ObjectId.isValid(zid)) throw new ValidationError('Invalid zoneId');
-                    return new mongoose.Types.ObjectId(zid);
-                })()
-                : undefined,
         isActive: body.isActive !== false,
         sortOrder: Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0,
         visibilityStartTime: normalizeCategoryVisibilityTime(body.visibilityStartTime),
@@ -3520,7 +3359,6 @@ export async function makeCategoryGlobal(id) {
 
     doc.createdByRestaurantId = doc.createdByRestaurantId || doc.restaurantId;
     doc.restaurantId = undefined;
-    doc.zoneId = undefined;
     doc.approvalStatus = 'approved';
     doc.isApproved = true;
     doc.rejectionReason = '';
@@ -3553,17 +3391,6 @@ export async function updateCategory(id, body) {
     if (body.image !== undefined) doc.image = String(body.image || '').trim();
     if (body.type !== undefined) doc.type = String(body.type || '').trim();
     if (body.foodTypeScope !== undefined) doc.foodTypeScope = nextFoodTypeScope;
-    if (!doc.restaurantId && doc.createdByRestaurantId) {
-        doc.zoneId = undefined;
-    } else if (body.zoneId !== undefined) {
-        const raw = String(body.zoneId || '').trim();
-        if (!raw || raw === 'global') {
-            doc.zoneId = undefined;
-        } else {
-            if (!mongoose.Types.ObjectId.isValid(raw)) throw new ValidationError('Invalid zoneId');
-            doc.zoneId = new mongoose.Types.ObjectId(raw);
-        }
-    }
     if (body.isActive !== undefined) doc.isActive = body.isActive !== false;
     if (body.sortOrder !== undefined) doc.sortOrder = Number(body.sortOrder) || 0;
     if (body.visibilityStartTime !== undefined) {
@@ -4109,17 +3936,6 @@ export async function createRestaurantByAdmin(body) {
         approvedAt: new Date()
     };
 
-    if (body.zoneId !== undefined) {
-        const zoneId = String(body.zoneId || '').trim();
-        if (!zoneId) {
-            doc.zoneId = undefined;
-        } else if (!mongoose.Types.ObjectId.isValid(zoneId)) {
-            throw new ValidationError('Invalid zoneId');
-        } else {
-            doc.zoneId = new mongoose.Types.ObjectId(zoneId);
-        }
-    }
-
     if (latitude !== null && longitude !== null) {
         doc.location = {
             type: 'Point',
@@ -4498,23 +4314,6 @@ export async function getDeliveryJoinRequests(query) {
             { address: { $regex: z, $options: 'i' } }
         ];
 
-        if (mongoose.Types.ObjectId.isValid(z)) {
-            zoneOr.push({ zoneId: new mongoose.Types.ObjectId(z) });
-        } else {
-            const matchingZones = await FoodZone.find({
-                isActive: { $ne: false },
-                $or: [
-                    { name: { $regex: z, $options: 'i' } },
-                    { zoneName: { $regex: z, $options: 'i' } },
-                    { serviceLocation: { $regex: z, $options: 'i' } }
-                ]
-            }).select('_id').lean();
-
-            if (matchingZones.length) {
-                zoneOr.push({ zoneId: { $in: matchingZones.map((item) => item._id) } });
-            }
-        }
-
         andParts.push({
             $or: zoneOr
         });
@@ -4531,7 +4330,6 @@ export async function getDeliveryJoinRequests(query) {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .populate('zoneId', 'name zoneName serviceLocation')
         .lean();
 
     const requests = list.map((doc, index) => serializeDeliveryPartnerForAdmin(doc, {
@@ -4681,31 +4479,6 @@ export async function getDeliveryPartners(query, adminScope = {}) {
     const { page = 1, limit = 1000, search } = query;
     const filter = { status: 'approved' };
     const includeAvailability = String(query?.includeAvailability || '').toLowerCase() === 'true';
-    const scope = normalizeAdminScope(adminScope);
-
-    if (query?.zoneId && String(query.zoneId).trim()) {
-        const zoneId = String(query.zoneId).trim();
-        if (!mongoose.Types.ObjectId.isValid(zoneId)) {
-            throw new ValidationError('Invalid zoneId');
-        }
-        if (scope.isSubAdmin) {
-            assertZoneAccess(adminScope, zoneId);
-        }
-        filter.zoneId = new mongoose.Types.ObjectId(zoneId);
-    } else if (scope.isSubAdmin) {
-        if (!scope.zoneIds.length) {
-            return {
-                deliveryPartners: [],
-                pagination: {
-                    page: Number(page) || 1,
-                    limit: Math.max(1, Math.min(1000, Number(limit) || 100)),
-                    total: 0,
-                    pages: 1
-                }
-            };
-        }
-        filter.zoneId = { $in: scope.zoneIds.map((zid) => new mongoose.Types.ObjectId(zid)) };
-    }
 
     if (search && typeof search === 'string' && search.trim()) {
         const term = search.trim();
@@ -4726,7 +4499,6 @@ export async function getDeliveryPartners(query, adminScope = {}) {
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limitNum)
-            .populate('zoneId', 'name zoneName serviceLocation')
             .lean(),
         FoodDeliveryPartner.countDocuments(filter)
     ]);
@@ -5317,25 +5089,12 @@ export async function checkEarningAddonCompletions(deliveryPartnerId, _force = f
 
 export async function getDeliveryPartnerById(id) {
     const partner = await FoodDeliveryPartner.findById(id)
-        .populate('zoneId', 'name zoneName serviceLocation')
         .lean();
     if (!partner) return null;
-    const zoneName = getZoneDisplayName(partner.zoneId) || null;
     return {
         ...partner,
         ...serializeDeliveryPartnerForAdmin(partner, { statusOverride: partner.status === 'rejected' ? 'blocked' : partner.status }),
         email: partner.email || null,
-        zoneId: partner.zoneId?._id || partner.zoneId || null,
-        zone: zoneName,
-        zoneName,
-        zoneDetails: partner.zoneId && typeof partner.zoneId === 'object'
-            ? {
-                _id: partner.zoneId._id,
-                name: partner.zoneId.name || null,
-                zoneName: partner.zoneId.zoneName || null,
-                serviceLocation: partner.zoneId.serviceLocation || null
-            }
-            : null,
     };
 }
 
@@ -5518,125 +5277,6 @@ export async function rejectDeliveryPartner(id, reason) {
     return updated;
 }
 
-export async function updateDeliveryPartnerZone(id, zoneId, adminScope = {}) {
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
-
-    const partner = await FoodDeliveryPartner.findById(id);
-    if (!partner) return null;
-
-    const rawZoneId = String(zoneId || '').trim();
-    if (!rawZoneId) {
-        throw new ValidationError('zoneId is required');
-    }
-    if (!mongoose.Types.ObjectId.isValid(rawZoneId)) {
-        throw new ValidationError('Invalid zoneId');
-    }
-
-    assertZoneAccess(adminScope, rawZoneId);
-
-    const zone = await FoodZone.findById(rawZoneId).select('_id isActive').lean();
-    if (!zone) {
-        throw new ValidationError('Zone not found');
-    }
-    if (zone.isActive === false) {
-        throw new ValidationError('Cannot assign inactive zone');
-    }
-
-    partner.zoneId = new mongoose.Types.ObjectId(rawZoneId);
-    await partner.save();
-
-    return FoodDeliveryPartner.findById(partner._id)
-        .populate('zoneId', 'name zoneName serviceLocation')
-        .lean();
-}
-
-// ----- Zones CRUD -----
-export async function getZones(query, adminScope = {}) {
-    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 100, 1), 1000);
-    const page = Math.max(parseInt(query.page, 10) || 1, 1);
-    const skip = (page - 1) * limit;
-    const isActive = query.isActive;
-    const search = typeof query.search === 'string' ? query.search.trim() : '';
-
-    const filter = {};
-    if (isActive !== undefined && isActive !== '') {
-        filter.isActive = isActive === 'true' || isActive === '1';
-    }
-    if (search) {
-        filter.$or = [
-            { name: { $regex: search, $options: 'i' } },
-            { zoneName: { $regex: search, $options: 'i' } },
-            { serviceLocation: { $regex: search, $options: 'i' } },
-            { country: { $regex: search, $options: 'i' } }
-        ];
-    }
-    applyZoneConstraint(filter, adminScope, '_id');
-
-    const [zones, total] = await Promise.all([
-        FoodZone.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-        FoodZone.countDocuments(filter)
-    ]);
-    return { zones, total, page, limit };
-}
-
-export async function getZoneById(id, adminScope = {}) {
-    const zone = await FoodZone.findById(id).lean();
-    if (!zone) return null;
-    assertZoneAccess(adminScope, zone._id);
-    return zone;
-}
-
-export async function createZone(body) {
-    const name = typeof body.name === 'string' ? body.name.trim() : (body.zoneName && body.zoneName.trim()) || '';
-    if (!name) return { error: 'Zone name is required' };
-    const coordinates = Array.isArray(body.coordinates) ? body.coordinates : [];
-    if (coordinates.length < 3) return { error: 'At least 3 coordinates (polygon points) are required' };
-
-    const normalized = coordinates.map((c) => ({
-        latitude: Number(c.latitude) || 0,
-        longitude: Number(c.longitude) || 0
-    }));
-
-    const zone = new FoodZone({
-        name,
-        zoneName: body.zoneName && body.zoneName.trim() ? body.zoneName.trim() : name,
-        country: (body.country && body.country.trim()) || 'India',
-        serviceLocation: (body.serviceLocation && body.serviceLocation.trim()) || name,
-        unit: body.unit === 'miles' ? 'miles' : 'kilometer',
-        coordinates: normalized,
-        isActive: body.isActive !== false
-    });
-    await zone.save();
-    return { zone: zone.toObject() };
-}
-
-export async function updateZone(id, body) {
-    const zone = await FoodZone.findById(id);
-    if (!zone) return null;
-
-    if (body.name !== undefined) zone.name = String(body.name).trim();
-    if (body.zoneName !== undefined) zone.zoneName = String(body.zoneName).trim();
-    if (body.country !== undefined) zone.country = String(body.country).trim();
-    if (body.serviceLocation !== undefined) zone.serviceLocation = String(body.serviceLocation).trim();
-    if (body.unit !== undefined) zone.unit = body.unit === 'miles' ? 'miles' : 'kilometer';
-    if (body.isActive !== undefined) zone.isActive = body.isActive !== false;
-    if (Array.isArray(body.coordinates) && body.coordinates.length >= 3) {
-        zone.coordinates = body.coordinates.map((c) => ({
-            latitude: Number(c.latitude) || 0,
-            longitude: Number(c.longitude) || 0
-        }));
-    }
-    if (zone.name) zone.serviceLocation = zone.serviceLocation || zone.name;
-
-    await zone.save();
-    return { zone: zone.toObject() };
-}
-
-export async function deleteZone(id) {
-    const zone = await FoodZone.findByIdAndDelete(id);
-    return zone ? { id } : null;
-}
-
 // ----- Admin Management -----
 const normalizeAdminType = (value) => {
     const type = String(value || 'SUB_ADMIN').trim().toUpperCase();
@@ -5669,9 +5309,8 @@ export async function listAdmins(query = {}) {
         ];
     }
 
-    const admins = await FoodAdmin.find(filter)
+const admins = await FoodAdmin.find(filter)
         .select('-password')
-        .populate('zoneIds', 'name zoneName serviceLocation isActive')
         .sort({ createdAt: -1 })
         .lean();
     return { admins };
@@ -5692,11 +5331,9 @@ export async function createAdmin(body = {}, actor = {}) {
 
     const adminType = normalizeAdminType(body.adminType);
     const permissions = adminType === 'SUPER_ADMIN' ? [] : normalizeAdminPermissions(body.permissions || []);
-    const zoneIds = adminType === 'SUPER_ADMIN' ? [] : toObjectIdList(body.zoneIds || []);
 
     if (adminType === 'SUB_ADMIN') {
         if (!permissions.length) throw new ValidationError('At least one sidebar permission is required for sub-admin');
-        if (!zoneIds.length) throw new ValidationError('At least one zone is required for sub-admin');
     }
 
     const created = await FoodAdmin.create({
@@ -5707,14 +5344,12 @@ export async function createAdmin(body = {}, actor = {}) {
         role: 'ADMIN',
         adminType,
         permissions,
-        zoneIds,
         isActive: body.isActive !== false,
         servicesAccess: ['food'],
     });
 
     return FoodAdmin.findById(created._id)
         .select('-password')
-        .populate('zoneIds', 'name zoneName serviceLocation isActive')
         .lean();
 }
 
@@ -5752,22 +5387,16 @@ export async function updateAdmin(id, body = {}, actor = {}) {
 
     if (admin.adminType === 'SUPER_ADMIN') {
         admin.permissions = [];
-        admin.zoneIds = [];
     } else {
         if (body.permissions !== undefined) {
             admin.permissions = normalizeAdminPermissions(body.permissions || []);
         }
-        if (body.zoneIds !== undefined) {
-            admin.zoneIds = toObjectIdList(body.zoneIds || []);
-        }
         if (!admin.permissions?.length) throw new ValidationError('Sub-admin must have at least one permission');
-        if (!admin.zoneIds?.length) throw new ValidationError('Sub-admin must have at least one assigned zone');
     }
 
     await admin.save();
     return FoodAdmin.findById(admin._id)
         .select('-password')
-        .populate('zoneIds', 'name zoneName serviceLocation isActive')
         .lean();
 }
 
@@ -5782,7 +5411,6 @@ export async function updateAdminStatus(id, body = {}, actor = {}) {
         { new: true }
     )
         .select('-password')
-        .populate('zoneIds', 'name zoneName serviceLocation isActive')
         .lean();
     if (!updated) throw new ValidationError('Admin not found');
     return updated;
@@ -6204,8 +5832,6 @@ const normalizeRestaurantIdList = (value) => {
 
 const resolveRestaurantScopeIds = async (query = {}, adminScope = {}) => {
     const requestedRestaurantId = String(query.beneficiaryId || query.restaurantId || '').trim();
-    const requestedZoneId = String(query.zoneId || '').trim();
-    const scope = normalizeAdminScope(adminScope);
 
     const restaurantFilter = {};
     if (requestedRestaurantId) {
@@ -6213,22 +5839,6 @@ const resolveRestaurantScopeIds = async (query = {}, adminScope = {}) => {
             throw new ValidationError('Invalid beneficiaryId');
         }
         restaurantFilter._id = new mongoose.Types.ObjectId(requestedRestaurantId);
-    }
-
-    if (requestedZoneId) {
-        if (!mongoose.Types.ObjectId.isValid(requestedZoneId)) {
-            throw new ValidationError('Invalid zoneId');
-        }
-        if (scope.isSubAdmin) {
-            const allowed = scope.zoneIds.some((zoneId) => String(zoneId) === requestedZoneId);
-            if (!allowed) {
-                throw new ForbiddenError('Sub-admin can only access assigned zones');
-            }
-        }
-        restaurantFilter.zoneId = new mongoose.Types.ObjectId(requestedZoneId);
-    } else if (scope.isSubAdmin) {
-        if (!scope.zoneIds.length) return [];
-        restaurantFilter.zoneId = { $in: scope.zoneIds };
     }
 
     if (!Object.keys(restaurantFilter).length) {
@@ -6249,10 +5859,8 @@ const normalizeDeliveryIdList = (value) => {
 
 const resolveDeliveryScopeIds = async (query = {}, adminScope = {}) => {
     const requestedPartnerId = String(query.beneficiaryId || query.deliveryPartnerId || '').trim();
-    const requestedZoneId = String(query.zoneId || '').trim();
-    const scope = normalizeAdminScope(adminScope);
 
-    if (!requestedPartnerId && !requestedZoneId && !scope.isSubAdmin) {
+    if (!requestedPartnerId) {
         return null;
     }
 
@@ -6262,20 +5870,6 @@ const resolveDeliveryScopeIds = async (query = {}, adminScope = {}) => {
             throw new ValidationError('Invalid beneficiaryId');
         }
         partnerFilter._id = new mongoose.Types.ObjectId(requestedPartnerId);
-    }
-
-    if (requestedZoneId) {
-        if (!mongoose.Types.ObjectId.isValid(requestedZoneId)) {
-            throw new ValidationError('Invalid zoneId');
-        }
-        if (scope.isSubAdmin) {
-            const allowed = scope.zoneIds.some((zoneId) => String(zoneId) === requestedZoneId);
-            if (!allowed) throw new ForbiddenError('Sub-admin can only access assigned zones');
-        }
-        partnerFilter.zoneId = new mongoose.Types.ObjectId(requestedZoneId);
-    } else if (scope.isSubAdmin) {
-        if (!scope.zoneIds.length) return [];
-        partnerFilter.zoneId = { $in: scope.zoneIds };
     }
 
     const partners = await FoodDeliveryPartner.find(partnerFilter).select('_id').lean();
@@ -6748,8 +6342,7 @@ export async function markAllRestaurantPayoutSettled(payload = {}, adminScope = 
 
     const scopedRestaurantIds = await resolveRestaurantScopeIds(
         {
-            beneficiaryId: payload.beneficiaryId,
-            zoneId: payload.zoneId
+            beneficiaryId: payload.beneficiaryId
         },
         adminScope
     );
@@ -7483,8 +7076,7 @@ export async function markAllDeliveryPayoutSettled(payload = {}, adminScope = {}
 
     const scopedPartnerIds = await resolveDeliveryScopeIds(
         {
-            beneficiaryId: payload.beneficiaryId,
-            zoneId: payload.zoneId
+            beneficiaryId: payload.beneficiaryId
         },
         adminScope
     );

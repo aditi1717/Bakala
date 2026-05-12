@@ -8,7 +8,6 @@ import { RestaurantGridSkeleton } from "@food/components/ui/loading-skeletons"
 import StickyCartCard from "@food/components/user/StickyCartCard"
 import { useProfile } from "@food/context/ProfileContext"
 import { useLocation } from "@food/hooks/useLocation"
-import { useZone } from "@food/hooks/useZone"
 import { restaurantAPI, adminAPI } from "@food/api"
 import { useDelayedLoading } from "@food/hooks/useDelayedLoading"
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
@@ -23,7 +22,7 @@ const filterOptions = [
   { id: 'under-30-mins', label: 'Under 30 mins' },
   { id: 'price-match', label: 'Price Match', hasIcon: true },
   { id: 'flat-50-off', label: 'Flat 50% OFF', hasIcon: true },
-  { id: 'under-250', label: 'Under ₹250' },
+  { id: 'under-250', label: 'Under ?250' },
   { id: 'rating-4-plus', label: 'Rating 4.0+' },
 ]
 const SEARCH_HISTORY_KEY = "user_recent_searches_v1"
@@ -35,7 +34,6 @@ export default function SearchResults() {
   const query = searchParams.get("q") || ""
   const navigate = useNavigate()
   const { location } = useLocation()
-  const { zoneId, isOutOfService } = useZone(location)
   const [searchQuery, setSearchQuery] = useState(query)
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [activeFilters, setActiveFilters] = useState(new Set())
@@ -85,7 +83,7 @@ export default function SearchResults() {
     const fetchCategories = async () => {
       try {
         setLoadingCategories(true)
-        const response = await adminAPI.getPublicCategories(zoneId ? { zoneId } : {})
+        const response = await adminAPI.getPublicCategories({})
 
         if (response.data && response.data.success && response.data.data && response.data.data.categories) {
           const categoriesArray = response.data.data.categories
@@ -132,7 +130,7 @@ export default function SearchResults() {
     }
 
     fetchCategories()
-  }, [zoneId])
+  }, [])
 
   // Helper function to check if menu has dishes matching category keywords
   const checkCategoryInMenu = (menu, categoryId) => {
@@ -212,11 +210,7 @@ export default function SearchResults() {
       try {
         setLoadingRestaurants(true)
         debugLog('?? Fetching restaurants from API...')
-        // Optional: Add zoneId if available (for sorting/filtering, but show all restaurants)
         const params = {}
-        if (zoneId) {
-          params.zoneId = zoneId
-        }
         const response = await restaurantAPI.getRestaurants(params)
 
         debugLog('?? Full API Response:', response)
@@ -244,9 +238,9 @@ export default function SearchResults() {
 
             // Common default values from backend model
             const defaultOffers = [
-              "Flat ₹50 OFF above ₹199",
+              "Flat ?50 OFF above ?199",
               "Flat 50% OFF",
-              "Flat ₹40 OFF above ₹149"
+              "Flat ?40 OFF above ?149"
             ]
             const defaultDeliveryTimes = ["25-30 mins", "20-25 mins", "30-35 mins"]
             const defaultDistances = ["1.2 km", "1 km", "0.8 km"]
@@ -514,7 +508,7 @@ export default function SearchResults() {
     }
 
     fetchRestaurants()
-  }, [zoneId, isOutOfService])
+  }, [])
 
   // Update search query when URL changes
   useEffect(() => {
@@ -800,7 +794,7 @@ export default function SearchResults() {
   )
 
   // Check if should show grayscale (user out of service)
-  const shouldShowGrayscale = isOutOfService
+  const shouldShowGrayscale = false
 
   return (
     <div className={`min-h-screen ${BRAND_THEME.tokens.homepage.shared.pageBackground} ${shouldShowGrayscale ? 'grayscale opacity-75' : ''}`}>
@@ -1061,13 +1055,13 @@ export default function SearchResults() {
                         if (selectedCategory && selectedCategory !== 'all' && restaurant.menu) {
                           const categoryDish = getCategoryDishFromMenu(restaurant.menu, selectedCategory)
                           if (categoryDish && restaurant.featuredPrice) {
-                            displayText = `${categoryDish} • ₹${restaurant.featuredPrice}`
+                            displayText = `${categoryDish} • ?${restaurant.featuredPrice}`
                           }
                         }
 
                         // Fallback to featured dish
                         if (!displayText && restaurant.featuredDish && restaurant.featuredPrice) {
-                          displayText = `${restaurant.featuredDish} • ₹${restaurant.featuredPrice}`
+                          displayText = `${restaurant.featuredDish} • ?${restaurant.featuredPrice}`
                         }
 
                         return displayText ? (
@@ -1181,4 +1175,8 @@ export default function SearchResults() {
     </div>
   )
 }
+
+
+
+
 

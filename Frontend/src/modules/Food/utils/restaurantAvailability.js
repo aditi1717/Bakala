@@ -167,14 +167,42 @@ const formatClosingCountdown = (minutesUntilClose, closingTime) => {
   return `Closes in ${hours}h ${minutes}m`
 }
 
+const getDisplayStatus = ({ isOpen, reason, formattedOpeningTime, formattedClosingTime, closingCountdownLabel }) => {
+  if (isOpen) {
+    return {
+      badgeLabel: "Open now",
+      detailLabel: closingCountdownLabel || (formattedClosingTime ? `Closes at ${formattedClosingTime}` : "Open now"),
+      state: "open",
+    }
+  }
+
+  if (reason === "day-closed" || reason === "closed-day") {
+    return {
+      badgeLabel: "Off today",
+      detailLabel: "Off today",
+      state: "off",
+    }
+  }
+
+  return {
+    badgeLabel: "Closed",
+    detailLabel: formattedOpeningTime ? `Opens at ${formattedOpeningTime}` : "Closed",
+    state: "closed",
+  }
+}
+
 export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), options = {}) => {
   if (!restaurant) {
+    const display = getDisplayStatus({ isOpen: false, reason: "missing-restaurant" })
     return {
       isOpen: false,
       isActive: false,
       isAcceptingOrders: false,
       isWithinTimings: false,
       reason: "missing-restaurant",
+      badgeLabel: display.badgeLabel,
+      detailLabel: display.detailLabel,
+      state: display.state,
     }
   }
 
@@ -198,22 +226,30 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
   const isAcceptingOrders = restaurant.isAcceptingOrders !== false && isOnlineByFlag && !isOfflineByStatus
 
   if (!ignoreOperationalStatus && !isActive) {
+    const display = getDisplayStatus({ isOpen: false, reason: "inactive" })
     return {
       isOpen: false,
       isActive,
       isAcceptingOrders,
       isWithinTimings: false,
       reason: "inactive",
+      badgeLabel: display.badgeLabel,
+      detailLabel: display.detailLabel,
+      state: display.state,
     }
   }
 
   if (!ignoreOperationalStatus && !isAcceptingOrders) {
+    const display = getDisplayStatus({ isOpen: false, reason: "not-accepting-orders" })
     return {
       isOpen: false,
       isActive,
       isAcceptingOrders,
       isWithinTimings: false,
       reason: "not-accepting-orders",
+      badgeLabel: display.badgeLabel,
+      detailLabel: display.detailLabel,
+      state: display.state,
     }
   }
 
@@ -227,12 +263,16 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
   if (!todayTiming && openDays.length > 0) {
     const normalizedOpenDays = new Set(openDays.map((day) => normalizeDay(day)).filter(Boolean))
     if (normalizedOpenDays.size > 0 && !normalizedOpenDays.has(dayName)) {
+      const display = getDisplayStatus({ isOpen: false, reason: "closed-day" })
       return {
         isOpen: false,
         isActive,
         isAcceptingOrders,
         isWithinTimings: false,
         reason: "closed-day",
+        badgeLabel: display.badgeLabel,
+        detailLabel: display.detailLabel,
+        state: display.state,
       }
     }
   }
@@ -249,6 +289,16 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
         activeFromPreviousDay.openingMinutes,
         activeFromPreviousDay.closingMinutes
       )
+      const formattedOpeningTime = formatTimeLabel(activeFromPreviousDay.openingTime)
+      const formattedClosingTime = formatTimeLabel(activeFromPreviousDay.closingTime)
+      const closingCountdownLabel = formatClosingCountdown(minutesUntilClose, activeFromPreviousDay.closingTime)
+      const display = getDisplayStatus({
+        isOpen: true,
+        reason: null,
+        formattedOpeningTime,
+        formattedClosingTime,
+        closingCountdownLabel,
+      })
       return {
         isOpen: true,
         isActive,
@@ -257,17 +307,26 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
         reason: null,
         openingTime: activeFromPreviousDay.openingTime,
         closingTime: activeFromPreviousDay.closingTime,
+        formattedOpeningTime,
+        formattedClosingTime,
         activeSlot: activeFromPreviousDay,
         slots: prevSlots,
-        closingCountdownLabel: formatClosingCountdown(minutesUntilClose, activeFromPreviousDay.closingTime),
+        closingCountdownLabel,
+        badgeLabel: display.badgeLabel,
+        detailLabel: display.detailLabel,
+        state: display.state,
       }
     }
+    const display = getDisplayStatus({ isOpen: false, reason: "day-closed" })
     return {
       isOpen: false,
       isActive,
       isAcceptingOrders,
       isWithinTimings: false,
       reason: "day-closed",
+      badgeLabel: display.badgeLabel,
+      detailLabel: display.detailLabel,
+      state: display.state,
     }
   }
 
@@ -307,20 +366,38 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
   const minutesUntilClose = (isWithinTimings && activeSlot)
     ? getMinutesUntilClosing(nowMinutes, activeSlot.openingMinutes, activeSlot.closingMinutes)
     : null
+  const effectiveOpeningTime = activeSlot?.openingTime || openingTime
+  const effectiveClosingTime = activeSlot?.closingTime || closingTime
+  const formattedOpeningTime = formatTimeLabel(effectiveOpeningTime)
+  const formattedClosingTime = formatTimeLabel(effectiveClosingTime)
+  const closingCountdownLabel = isWithinTimings
+    ? formatClosingCountdown(minutesUntilClose, effectiveClosingTime)
+    : null
+  const reason = isWithinTimings
+    ? (isAcceptingOrders ? "open" : "open-by-timings")
+    : (hasExplicitWindow ? "outside-hours" : "no-timings")
+  const display = getDisplayStatus({
+    isOpen: isWithinTimings,
+    reason,
+    formattedOpeningTime,
+    formattedClosingTime,
+    closingCountdownLabel,
+  })
 
   return {
     isOpen: isWithinTimings,
     isActive,
     isAcceptingOrders,
     isWithinTimings,
-    openingTime: activeSlot?.openingTime || openingTime,
-    closingTime: activeSlot?.closingTime || closingTime,
+    openingTime: effectiveOpeningTime,
+    closingTime: effectiveClosingTime,
+    formattedOpeningTime,
+    formattedClosingTime,
     minutesUntilClose,
-    closingCountdownLabel: isWithinTimings
-      ? formatClosingCountdown(minutesUntilClose, activeSlot?.closingTime || closingTime)
-      : null,
-    reason: isWithinTimings
-      ? (isAcceptingOrders ? "open" : "open-by-timings")
-      : (hasExplicitWindow ? "outside-hours" : "no-timings"),
+    closingCountdownLabel,
+    reason,
+    badgeLabel: display.badgeLabel,
+    detailLabel: display.detailLabel,
+    state: display.state,
   }
 }

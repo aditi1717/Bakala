@@ -101,12 +101,10 @@ export default function RegularOrderReport() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [zones, setZones] = useState([])
   const [restaurants, setRestaurants] = useState([])
   const [customers, setCustomers] = useState([])
   
   const [filters, setFilters] = useState({
-    zone: "All Zones",
     restaurant: "All restaurants",
     customer: "All customers",
     time: "All Time",
@@ -120,16 +118,10 @@ export default function RegularOrderReport() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
-  // Fetch zones, restaurants, and customers for filter dropdowns
+  // Fetch restaurants and customers for filter dropdowns
   useEffect(() => {
     const fetchFilterData = async () => {
       try {
-        // Fetch zones
-        const zonesRes = await adminAPI.getZones({ limit: 100, isActive: true })
-        if (zonesRes.data?.success) {
-          setZones(zonesRes.data.data.zones || [])
-        }
-
         // Fetch restaurants
         const restaurantsRes = await adminAPI.getRestaurants({ limit: 100 })
         if (restaurantsRes.data?.success) {
@@ -218,7 +210,6 @@ export default function RegularOrderReport() {
           page: 1,
           limit: 10000, // Fetch all orders for report (can be optimized later)
           search: searchQuery || undefined,
-          zone: filters.zone !== "All Zones" ? filters.zone : undefined,
           restaurantId: filters.restaurant !== "All restaurants" ? filters.restaurant : undefined,
           customer: filters.customer !== "All customers" ? filters.customer : undefined,
           startDate: hasManualDate
@@ -576,7 +567,6 @@ export default function RegularOrderReport() {
 
   const handleResetFilters = () => {
     setFilters({
-      zone: "All Zones",
       restaurant: "All restaurants",
       customer: "All customers",
       time: "All Time",
@@ -586,7 +576,6 @@ export default function RegularOrderReport() {
   }
 
   const activeFiltersCount =
-    (filters.zone !== "All Zones" ? 1 : 0) +
     (filters.restaurant !== "All restaurants" ? 1 : 0) +
     (filters.customer !== "All customers" ? 1 : 0) +
     (filters.time !== "All Time" ? 1 : 0) +
@@ -727,22 +716,6 @@ export default function RegularOrderReport() {
         {/* Search Data Filters */}
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 mb-3">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <div className="relative flex-1 min-w-0">
-              <select
-                value={filters.zone}
-                onChange={(e) => handleFilterChange("zone", e.target.value)}
-                className="w-full px-2.5 py-1.5 pr-5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-xs appearance-none cursor-pointer"
-              >
-                <option value="All Zones">All Zones</option>
-                {zones.map((zone) => (
-                  <option key={zone._id} value={zone.name}>
-                    {zone.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
-            </div>
-
             <div className="relative flex-1 min-w-0">
               <select
                 value={filters.restaurant}

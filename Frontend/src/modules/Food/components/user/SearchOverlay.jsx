@@ -6,7 +6,6 @@ import { Input } from "@food/components/ui/input"
 import { searchAPI } from "@/services/api"
 import BRAND_THEME from "@/config/brandTheme"
 import { useLocation as useGeoLocation } from "@food/hooks/useLocation"
-import { useZone } from "@food/hooks/useZone"
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
 
 const SEARCH_HISTORY_KEY = "user_recent_searches_v1"
@@ -32,15 +31,6 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
   const { brand } = BRAND_THEME.colors
   const navigate = useNavigate()
   const { location: userCoords } = useGeoLocation()
-  const { zoneId } = useZone(userCoords)
-  const cachedZoneId = useMemo(() => {
-    try {
-      return localStorage.getItem("userZoneId") || ""
-    } catch {
-      return ""
-    }
-  }, [])
-  const effectiveZoneId = zoneId || cachedZoneId
   const inputRef = useRef(null)
   const [filteredFoods, setFilteredFoods] = useState([])
   const [recentSuggestions, setRecentSuggestions] = useState([])
@@ -103,12 +93,6 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
 
     const requestId = ++searchRequestIdRef.current
     const timer = setTimeout(async () => {
-      if (!effectiveZoneId) {
-        setFilteredFoods([])
-        setLoadingFoods(false)
-        return
-      }
-
       setLoadingFoods(true)
       try {
         const res = await searchAPI.unifiedSearch({
@@ -116,7 +100,6 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
           limit: 60,
           lat: userCoords?.latitude,
           lng: userCoords?.longitude,
-          zoneId: effectiveZoneId,
         })
         const restaurants = res?.data?.data?.restaurants || []
         const normalizedFoods = restaurants
@@ -374,3 +357,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     </div>
   )
 }
+
+
+
+

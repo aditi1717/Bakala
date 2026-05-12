@@ -90,7 +90,6 @@ const databaseTables = [
   { name: "Vendors", count: 16 },
   { name: "Wallet_payments", count: 2 },
   { name: "Wishlists", count: 67 },
-  { name: "Zones", count: 1 },
   
   // Column 3
   { name: "Addon_categories", count: 4 },
@@ -278,4 +277,5 @@ export default function CleanDatabase() {
     </div>
   )
 }
+
 

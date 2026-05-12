@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Navigation,
   ChevronDown,
   Search,
   Bookmark,
@@ -65,6 +64,7 @@ const foodTheme = {
 };
 const DEFAULT_HEADER_LOCATION_TITLE = "Mumbra, Thane";
 const DEFAULT_HEADER_LOCATION_SUBTITLE = "Mumbra, Thane, Maharashtra";
+const COORDINATE_TEXT_REGEX = /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/;
 
 export default function HomeHeader({
   activeTab,
@@ -82,6 +82,9 @@ export default function HomeHeader({
   quickThemeColor,
   compact = false,
   scrolledHeaderColor = "",
+  searchValue,
+  onSearchChange,
+  searchPlaceholder,
 }) {
   const [notifications, setNotifications] = useState(() => {
     if (typeof window === "undefined") return [];
@@ -117,6 +120,7 @@ export default function HomeHeader({
   const sanitizeLocationText = (value = "") => {
     const text = String(value || "").trim();
     if (!text) return "";
+    if (COORDINATE_TEXT_REGEX.test(text)) return "";
     const lower = text.toLowerCase();
     if (
       lower === "select location" ||
@@ -147,6 +151,7 @@ export default function HomeHeader({
   const floatingIconClass = isScrolledFoodHeader ? "text-slate-700 dark:text-white" : "text-white";
   const { brand, semantic } = BRAND_THEME.colors;
   const { header, searchOverlay } = BRAND_THEME.tokens;
+  const isControlledSearch = typeof searchValue === "string" && typeof onSearchChange === "function";
 
   const mergedNotifications = useMemo(() => {
     const localItems = Array.isArray(notifications)
@@ -254,11 +259,6 @@ export default function HomeHeader({
             <div className="flex items-start gap-2 cursor-pointer flex-1 min-w-0" onClick={handleLocationClick}>
               {isFood ? (
                 <>
-                  <Navigation
-                    className="h-[14px] w-[14px] rotate-[15deg] mt-[5px] shrink-0"
-                    style={{ color: theme.accent, fill: theme.accent }}
-                    strokeWidth={2.5}
-                  />
                   <div className="flex min-w-0 max-w-[190px] flex-col">
                     <div className="flex items-center gap-[3px]">
                       <span className={`truncate text-[16px] font-extrabold tracking-[-0.3px] ${headerTextClass}`}>
@@ -367,27 +367,36 @@ export default function HomeHeader({
           <div className="flex items-center gap-2">
           <div
             className="flex-1 rounded-[12px] h-[46px] flex items-center px-3 cursor-pointer relative overflow-hidden bg-white dark:bg-gray-800 shadow-[0_6px_18px_rgba(15,23,42,0.10)] dark:shadow-[0_6px_18px_rgba(0,0,0,0.3)]"
-            onClick={handleSearchFocus}
+            onClick={isControlledSearch ? undefined : handleSearchFocus}
           >
             <div
               className="absolute left-0 top-0 bottom-0 w-[2.5px] rounded-l-[12px]"
               style={{ background: `linear-gradient(180deg, ${brand.primary} 0%, ${brand.primaryDark} 100%)` }}
             />
             <Search className="h-[16px] w-[16px] ml-1.5 mr-2 flex-shrink-0" strokeWidth={2.3} style={{ color: header.searchIcon }} />
-            <div className="flex-1 overflow-hidden relative h-[20px]">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={placeholderIndex}
-                  initial={{ y: 12, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -12, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="absolute inset-0 whitespace-nowrap leading-[22px] text-[12.5px] font-medium text-slate-400 dark:text-slate-500"
-                >
-                  {placeholders?.[placeholderIndex] || "Search for food..."}
-                </motion.span>
-              </AnimatePresence>
-            </div>
+            {isControlledSearch ? (
+              <input
+                value={searchValue}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder={searchPlaceholder || placeholders?.[placeholderIndex] || "Search for food..."}
+                className="h-full w-full bg-transparent pr-1 text-[13px] font-medium text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
+              />
+            ) : (
+              <div className="flex-1 overflow-hidden relative h-[20px]">
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={placeholderIndex}
+                    initial={{ y: 12, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -12, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute inset-0 whitespace-nowrap leading-[22px] text-[12.5px] font-medium text-slate-400 dark:text-slate-500"
+                  >
+                    {placeholders?.[placeholderIndex] || "Search for food..."}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+            )}
           </div>
 
           {isFood && showVegMode ? (

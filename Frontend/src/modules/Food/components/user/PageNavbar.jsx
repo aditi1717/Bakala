@@ -1,11 +1,10 @@
 import { Link } from "react-router-dom"
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { ChevronDown, ShoppingCart, Wallet } from "lucide-react"
 import { Button } from "@food/components/ui/button"
 import { useLocation } from "@food/hooks/useLocation"
 import { useCart } from "@food/context/CartContext"
 import { useLocationSelector } from "./UserLayout"
-import { FaLocationDot } from "react-icons/fa6"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
 import quickSpicyLogo from "@food/assets/quicky-spicy-logo.webp"
 import BRAND_THEME from "@/config/brandTheme"
@@ -19,95 +18,18 @@ export default function PageNavbar({
 }) {
   const { navigation } = BRAND_THEME.tokens
   const { brand } = BRAND_THEME.colors
-  const { location, loading, requestLocation } = useLocation()
+  const { location, loading } = useLocation()
   const { getCartCount } = useCart()
   const { openLocationSelector } = useLocationSelector()
   const cartCount = getCartCount()
   const [logoUrl, setLogoUrl] = useState(null)
   const [companyName, setCompanyName] = useState(null)
-  const autoLocationAttemptedRef = useRef(false)
-  const requestLocationRef = useRef(requestLocation)
   const enableLocationDebugLogs = false
   const debugLog = (...args) => {
     if (enableLocationDebugLogs && import.meta.env.DEV) {
       debugLog(...args)
     }
   }
-
-  useEffect(() => {
-    requestLocationRef.current = requestLocation
-  }, [requestLocation])
-
-  // Auto-trigger location fetch once when location is missing/placeholder and permission is already granted.
-  useEffect(() => {
-    if (autoLocationAttemptedRef.current || loading || !requestLocationRef.current) return
-
-    // If we already have stored coordinates, do not auto-geocode again.
-    // We only update location when the user changes it manually.
-    try {
-      const storedRaw = localStorage.getItem("userLocation")
-      const stored = storedRaw ? JSON.parse(storedRaw) : null
-      const lat = Number(stored?.latitude)
-      const lng = Number(stored?.longitude)
-      const hasStoredCoords = Number.isFinite(lat) && Number.isFinite(lng)
-      if (hasStoredCoords) return
-    } catch {
-      // ignore parsing errors and continue to auto-fetch as fallback for first open
-    }
-
-    const hasMissingOrPlaceholderLocation =
-      !location ||
-      location.formattedAddress === "Select location" ||
-      location.city === "Current Location"
-
-    if (!hasMissingOrPlaceholderLocation) return
-    // Reserve a single background attempt to avoid repeated checks on re-renders.
-    autoLocationAttemptedRef.current = true
-
-    let cancelled = false
-    const timeoutId = setTimeout(async () => {
-      try {
-        let isGranted = false
-        if (navigator.permissions?.query) {
-          const result = await navigator.permissions.query({ name: 'geolocation' })
-          isGranted = result.state === 'granted'
-        }
-
-        if (!isGranted) {
-          debugLog("?? Geolocation permission not granted; waiting for user action")
-          return
-        }
-        const fetchedLocation = await requestLocationRef.current()
-        if (cancelled) return
-
-        if (fetchedLocation &&
-          fetchedLocation.formattedAddress !== "Select location" &&
-          fetchedLocation.city !== "Current Location") {
-          debugLog("? Location fetched successfully:", fetchedLocation)
-        } else {
-          debugLog("Location fetch returned placeholder, user may need to select manually")
-        }
-      } catch (err) {
-        if (!cancelled) {
-          debugLog("Location fetch failed:", err)
-        }
-      }
-    }, 1200)
-
-    return () => {
-      cancelled = true
-      clearTimeout(timeoutId)
-    }
-  }, [location, loading])
-
-  // Reset one-time auto-attempt if location becomes valid, so future invalid states can retry.
-  useEffect(() => {
-    if (location &&
-      location.formattedAddress !== "Select location" &&
-      location.city !== "Current Location") {
-      autoLocationAttemptedRef.current = false
-    }
-  }, [location])
 
   // Load business settings logo
   useEffect(() => {

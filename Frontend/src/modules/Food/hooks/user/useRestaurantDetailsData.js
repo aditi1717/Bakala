@@ -6,7 +6,7 @@ import { isModuleAuthenticated } from "@food/utils/auth";
  * High-performance hook for Restaurant Details page.
  * Unifies restaurant info, menu, and offers fetching into a single reactive flow.
  */
-export const useRestaurantDetailsData = ({ slug, zoneId, userLocation }) => {
+export const useRestaurantDetailsData = ({ slug, userLocation }) => {
   const [loading, setLoading] = useState(true);
   const [restaurant, setRestaurant] = useState(null);
   const [restaurantOffers, setRestaurantOffers] = useState([]);
@@ -65,7 +65,7 @@ export const useRestaurantDetailsData = ({ slug, zoneId, userLocation }) => {
     } finally {
       setLoading(false);
     }
-  }, [slug, zoneId]);
+  }, [slug]);
 
   useEffect(() => {
     fetchDetails();

@@ -4,12 +4,11 @@ const debugError = (...args) => {}
 
 // Export utility functions for deliveryman data
 export const exportDeliverymenToCSV = (deliverymen, filename = "deliverymen") => {
-  const headers = ["SI", "Name", "Contact", "Zone", "Total Orders", "Availability Status"]
+  const headers = ["SI", "Name", "Contact", "Total Orders", "Availability Status"]
   const rows = deliverymen.map((dm) => [
     dm.sl,
     dm.name,
     dm.phone,
-    dm.zone,
     dm.totalOrders,
     dm.status
   ])
@@ -31,13 +30,12 @@ export const exportDeliverymenToCSV = (deliverymen, filename = "deliverymen") =>
 }
 
 export const exportDeliverymenToExcel = (deliverymen, filename = "deliverymen") => {
-  const headers = ["SI", "Name", "Phone", "Email", "Zone", "Total Orders", "Status"]
+  const headers = ["SI", "Name", "Phone", "Email", "Total Orders", "Status"]
   const rows = deliverymen.map((dm) => [
     dm.sl,
     dm.name,
     dm.phone,
     dm.email,
-    dm.zone,
     dm.totalOrders,
     dm.status
   ])
@@ -95,14 +93,13 @@ export const exportDeliverymenToPDF = (deliverymen, filename = "deliverymen") =>
           dm.name || 'N/A',
           dm.phone || 'N/A',
           dm.email || 'N/A',
-          dm.zone || 'N/A',
           dm.totalOrders || 0,
           dm.status || 'N/A'
         ])
 
         // Add table using autoTable
         autoTable(doc, {
-          head: [["SI", "Name", "Phone", "Email", "Zone", "Total Orders", "Status"]],
+          head: [["SI", "Name", "Phone", "Email", "Total Orders", "Status"]],
           body: tableData,
           startY: 28,
           styles: {
@@ -122,9 +119,8 @@ export const exportDeliverymenToPDF = (deliverymen, filename = "deliverymen") =>
             1: { cellWidth: 35 }, // Name
             2: { cellWidth: 30 }, // Phone
             3: { cellWidth: 45 }, // Email
-            4: { cellWidth: 40 }, // Zone
-            5: { cellWidth: 25 }, // Total Orders
-            6: { cellWidth: 25 }, // Status
+            4: { cellWidth: 25 }, // Total Orders
+            5: { cellWidth: 25 }, // Status
           },
           margin: { top: 28, left: 14, right: 14 },
         })
@@ -318,8 +314,8 @@ const formatBonusForExport = (transaction) => {
   if (transaction.bonus) {
     // Remove all superscript/special characters and unwanted text
     let cleaned = transaction.bonus.toString()
-      .replace(/¹/g, '') // Remove superscript 1
-      .replace(/[¹²³45678?°]/g, '') // Remove all superscript numbers
+      .replace(/ï¿½/g, '') // Remove superscript 1
+      .replace(/[ï¿½ï¿½ï¿½45678?ï¿½]/g, '') // Remove all superscript numbers
       .replace(/[\u2070-\u207F\u2080-\u208F]/g, '') // Remove all superscript Unicode ranges
       .replace(/[^\d.-]/g, '') // Keep only digits, dots, and minus signs
       .trim()

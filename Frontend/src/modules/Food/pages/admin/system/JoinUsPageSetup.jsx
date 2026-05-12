@@ -8,9 +8,9 @@ const debugError = (...args) => {}
 const defaultFields = [
   "Restaurant Name", "Restaurant Logo", "Owner Last Name",
   "Vat/Tax", "Cuisine", "Phone Number",
-  "Delivery Address", "Zone", "Email",
-  "Min Delivery Time", "Latitude & Longitude", "Password",
-  "Max Delivery Time", "Map Location",
+  "Delivery Address", "Email",
+  "Min Delivery Time", "Password",
+  "Max Delivery Time",
   "Restaurant Cover", "Owner First Name"
 ]
 
@@ -333,4 +333,5 @@ export default function JoinUsPageSetup() {
     </div>
   )
 }
+
 

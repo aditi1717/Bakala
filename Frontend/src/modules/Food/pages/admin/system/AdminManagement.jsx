@@ -54,7 +54,6 @@ export default function AdminManagement() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [admins, setAdmins] = useState([]);
-  const [zones, setZones] = useState([]);
   const [error, setError] = useState("");
   const [editingAdminId, setEditingAdminId] = useState(null);
   const [form, setForm] = useState({
@@ -65,7 +64,6 @@ export default function AdminManagement() {
     adminType: "SUB_ADMIN",
     isActive: true,
     permissions: [],
-    zoneIds: [],
   });
   const [editForm, setEditForm] = useState({
     name: "",
@@ -75,7 +73,6 @@ export default function AdminManagement() {
     adminType: "SUB_ADMIN",
     isActive: true,
     permissions: [],
-    zoneIds: [],
   });
 
   const isSubAdminForm = form.adminType === "SUB_ADMIN";
@@ -84,18 +81,11 @@ export default function AdminManagement() {
     try {
       setLoading(true);
       setError("");
-      const [adminsRes, zonesRes] = await Promise.all([
-        adminAPI.getManagedAdmins(),
-        adminAPI.getZones({ limit: 500 }),
-      ]);
+      const adminsRes = await adminAPI.getManagedAdmins();
       const adminsList = Array.isArray(adminsRes?.data?.data?.admins)
         ? adminsRes.data.data.admins
         : [];
-      const zonesList = Array.isArray(zonesRes?.data?.data?.zones)
-        ? zonesRes.data.data.zones
-        : [];
       setAdmins(adminsList);
-      setZones(zonesList);
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || "Failed to load admin data");
     } finally {
@@ -111,12 +101,10 @@ export default function AdminManagement() {
     () => new Set(form.permissions.map((path) => normalizePath(path))),
     [form.permissions],
   );
-  const selectedZoneSet = useMemo(() => new Set(form.zoneIds), [form.zoneIds]);
   const selectedEditPermissionsSet = useMemo(
     () => new Set(editForm.permissions.map((path) => normalizePath(path))),
     [editForm.permissions],
   );
-  const selectedEditZoneSet = useMemo(() => new Set(editForm.zoneIds), [editForm.zoneIds]);
 
   const togglePermission = (path) => {
     const normalized = normalizePath(path);
@@ -127,16 +115,6 @@ export default function AdminManagement() {
         permissions: exists
           ? prev.permissions.filter((p) => p !== normalized)
           : [...prev.permissions, normalized],
-      };
-    });
-  };
-
-  const toggleZone = (zoneId) => {
-    setForm((prev) => {
-      const exists = prev.zoneIds.includes(zoneId);
-      return {
-        ...prev,
-        zoneIds: exists ? prev.zoneIds.filter((id) => id !== zoneId) : [...prev.zoneIds, zoneId],
       };
     });
   };
@@ -154,16 +132,6 @@ export default function AdminManagement() {
     });
   };
 
-  const toggleEditZone = (zoneId) => {
-    setEditForm((prev) => {
-      const exists = prev.zoneIds.includes(zoneId);
-      return {
-        ...prev,
-        zoneIds: exists ? prev.zoneIds.filter((id) => id !== zoneId) : [...prev.zoneIds, zoneId],
-      };
-    });
-  };
-
   const resetForm = () => {
     setForm({
       name: "",
@@ -173,7 +141,6 @@ export default function AdminManagement() {
       adminType: "SUB_ADMIN",
       isActive: true,
       permissions: [],
-      zoneIds: [],
     });
   };
 
@@ -191,7 +158,6 @@ export default function AdminManagement() {
         adminType: form.adminType,
         isActive: form.isActive,
         permissions: isSubAdminForm ? form.permissions : [],
-        zoneIds: isSubAdminForm ? form.zoneIds : [],
       };
       await adminAPI.createManagedAdmin(payload);
       resetForm();
@@ -215,9 +181,6 @@ export default function AdminManagement() {
   };
 
   const handleStartEdit = (admin) => {
-    const zoneIds = Array.isArray(admin?.zoneIds)
-      ? admin.zoneIds.map((z) => z?._id || z?.id).filter(Boolean)
-      : [];
     setEditingAdminId(admin?._id || null);
     setEditForm({
       name: admin?.name || "",
@@ -227,7 +190,6 @@ export default function AdminManagement() {
       adminType: admin?.adminType || "SUB_ADMIN",
       isActive: admin?.isActive !== false,
       permissions: Array.isArray(admin?.permissions) ? admin.permissions : [],
-      zoneIds,
     });
   };
 
@@ -241,7 +203,6 @@ export default function AdminManagement() {
       adminType: "SUB_ADMIN",
       isActive: true,
       permissions: [],
-      zoneIds: [],
     });
   };
 
@@ -258,7 +219,6 @@ export default function AdminManagement() {
         adminType: editForm.adminType,
         isActive: editForm.isActive,
         permissions: editForm.adminType === "SUB_ADMIN" ? editForm.permissions : [],
-        zoneIds: editForm.adminType === "SUB_ADMIN" ? editForm.zoneIds : [],
       };
       if (String(editForm.password || "").trim()) {
         payload.password = editForm.password;
@@ -294,7 +254,7 @@ export default function AdminManagement() {
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h1 className="text-xl font-semibold text-gray-900">Manage Admins</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Create super admin or sub admin accounts, assign sidebar access and zones.
+          Create super admin or sub admin accounts and assign sidebar access.
         </p>
       </div>
 
@@ -374,26 +334,6 @@ export default function AdminManagement() {
                       <span>{opt.label}</span>
                     </label>
                   ))}
-                </div>
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">Assigned Zones</h3>
-                <div className="max-h-44 overflow-auto border rounded-md p-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {zones.map((zone) => {
-                    const id = zone?._id || zone?.id;
-                    if (!id) return null;
-                    const label = zone?.name || zone?.zoneName || zone?.serviceLocation || id;
-                    return (
-                      <label key={id} className="flex items-start gap-2 text-sm text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={selectedZoneSet.has(id)}
-                          onChange={() => toggleZone(id)}
-                        />
-                        <span>{label}</span>
-                      </label>
-                    );
-                  })}
                 </div>
               </div>
             </>
@@ -479,26 +419,6 @@ export default function AdminManagement() {
                   ))}
                 </div>
               </div>
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">Assigned Zones</h3>
-                <div className="max-h-44 overflow-auto border rounded-md p-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {zones.map((zone) => {
-                    const id = zone?._id || zone?.id;
-                    if (!id) return null;
-                    const label = zone?.name || zone?.zoneName || zone?.serviceLocation || id;
-                    return (
-                      <label key={id} className="flex items-start gap-2 text-sm text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={selectedEditZoneSet.has(id)}
-                          onChange={() => toggleEditZone(id)}
-                        />
-                        <span>{label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
             </>
           ) : null}
 
@@ -527,7 +447,6 @@ export default function AdminManagement() {
                   <th className="py-2 pr-4">Email</th>
                   <th className="py-2 pr-4">Type</th>
                   <th className="py-2 pr-4">Permissions</th>
-                  <th className="py-2 pr-4">Zones</th>
                   <th className="py-2 pr-4">Status</th>
                   <th className="py-2">Action</th>
                 </tr>
@@ -535,7 +454,6 @@ export default function AdminManagement() {
               <tbody>
                 {admins.map((admin) => {
                   const isActive = admin?.isActive !== false;
-                  const zoneCount = Array.isArray(admin?.zoneIds) ? admin.zoneIds.length : 0;
                   const permissionCount = Array.isArray(admin?.permissions) ? admin.permissions.length : 0;
                   return (
                     <tr key={admin?._id} className="border-b last:border-b-0">
@@ -543,7 +461,6 @@ export default function AdminManagement() {
                       <td className="py-2 pr-4">{admin?.email || "-"}</td>
                       <td className="py-2 pr-4">{admin?.adminType || "SUPER_ADMIN"}</td>
                       <td className="py-2 pr-4">{permissionCount}</td>
-                      <td className="py-2 pr-4">{zoneCount}</td>
                       <td className="py-2 pr-4">{isActive ? "Active" : "Inactive"}</td>
                       <td className="py-2">
                         {isSuperAdmin ? (

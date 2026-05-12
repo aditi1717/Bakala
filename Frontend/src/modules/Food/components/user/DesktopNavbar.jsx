@@ -17,13 +17,7 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
-const UNDER_PRICE_DEFAULT_STORAGE_KEY = "food-under-price-default"
 const DEFAULT_UNDER_PRICE_LIMIT = 250
-const resolveUnderPriceLimit = (value, fallback = DEFAULT_UNDER_PRICE_LIMIT) => {
-    const parsed = Number(value)
-    if (!Number.isFinite(parsed) || parsed <= 0) return fallback
-    return Math.round(parsed)
-}
 
 export default function DesktopNavbar({ showLogo = true }) {
     const { navigation } = BRAND_THEME.tokens
@@ -41,16 +35,6 @@ export default function DesktopNavbar({ showLogo = true }) {
     const [hasScrolledPastBanner, setHasScrolledPastBanner] = useState(false)
     const navRef = useRef(null)
     const cartCount = getCartCount()
-    const routePriceMatch = location.pathname.match(/\/under-(\d+)$/)
-    const activeUnderPrice = routePriceMatch?.[1]
-    const defaultUnderPrice = resolveUnderPriceLimit(
-        activeUnderPrice ??
-        (typeof window !== "undefined"
-            ? window.localStorage.getItem(UNDER_PRICE_DEFAULT_STORAGE_KEY)
-            : null)
-    )
-
-
     // Show area if available, otherwise show city
     // Priority: area > city > "Select"
     const areaName = userLocation?.area && userLocation?.area.trim() ? userLocation.area.trim() : null
@@ -81,11 +65,18 @@ export default function DesktopNavbar({ showLogo = true }) {
         /^\/user\/under-\d+$/.test(location.pathname) ||
         /^\/food\/under-\d+$/.test(location.pathname) ||
         /^\/food\/user\/under-\d+$/.test(location.pathname)
+    const isGrocery =
+        location.pathname === "/food/user/grocery" ||
+        location.pathname === "/food/grocery" ||
+        location.pathname === "/grocery" ||
+        location.pathname === "/user/grocery"
     const isProfile = location.pathname.startsWith("/food/user/profile") || location.pathname.startsWith("/food/profile")
-    const isDelivery = !isUnder250 && !isProfile && !isQuick && (location.pathname === "/food/user" || location.pathname === "/food" || (location.pathname.startsWith("/food/user") && !location.pathname.includes("/under-") && !location.pathname.includes("/profile")))
+    const isDelivery = !isUnder250 && !isGrocery && !isProfile && !isQuick && (location.pathname === "/food/user" || location.pathname === "/food" || (location.pathname.startsWith("/food/user") && !location.pathname.includes("/under-") && !location.pathname.includes("/profile") && !location.pathname.includes("/grocery")))
     const isBannerRoute =
         location.pathname === "/food/user" ||
         location.pathname === "/food" ||
+        location.pathname === "/food/user/grocery" ||
+        location.pathname === "/food/grocery" ||
         location.pathname === "/food/user/under-price" ||
         location.pathname === "/food/under-price" ||
         location.pathname === "/under-price" ||
@@ -380,13 +371,33 @@ export default function DesktopNavbar({ showLogo = true }) {
 
                             {/* Under 250 Tab */}
                             <Link
+                                to="/food/user/grocery"
+                                className={`flex flex-col items-center gap-1 px-2 py-1 transition-colors relative group ${isGrocery
+                                    ? navigation.activeText
+                                    : navigation.inactiveText
+                                    }`}
+                            >
+                                <span className="text-sm font-bold tracking-wide uppercase">Grocery</span>
+                                {isGrocery && (
+                                    <motion.div
+                                        layoutId="navIndicator"
+                                        className={`absolute -bottom-3 left-0 right-0 h-0.5 ${navigation.indicator}`}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ duration: 0.3 }}
+                                    />
+                                )}
+                            </Link>
+
+                            {/* Under 250 Tab */}
+                            <Link
                                 to="/food/under-price"
                                 className={`flex flex-col items-center gap-1 px-2 py-1 transition-colors relative group ${isUnder250
                                     ? navigation.activeText
                                     : navigation.inactiveText
                                     }`}
                             >
-                                <span className="text-sm font-bold tracking-wide uppercase">Under {defaultUnderPrice}</span>
+                                <span className="text-sm font-bold tracking-wide uppercase">Under {DEFAULT_UNDER_PRICE_LIMIT}</span>
                                 {isUnder250 && (
                                     <motion.div
                                         layoutId="navIndicator"

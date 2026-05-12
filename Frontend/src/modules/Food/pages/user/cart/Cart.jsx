@@ -12,7 +12,6 @@ import { useProfile } from "@food/context/ProfileContext"
 import { useOrders } from "@food/context/OrdersContext"
 import QuickSharedCart from "@food/pages/user/cart/QuickSharedCart"
 import MixedSharedCart from "@food/pages/user/cart/MixedSharedCart"
-import { useZone } from "@food/hooks/useZone"
 import { useLocationSelector } from "@food/components/user/UserLayout"
 import { orderAPI, restaurantAPI, adminAPI, userAPI, API_ENDPOINTS } from "@food/api"
 import { API_BASE_URL } from "@food/api/config"
@@ -405,14 +404,6 @@ export default function Cart() {
     sanitizeRecipientPhone(recipientDetails.phone || "") ||
     sanitizeRecipientPhone(userProfile?.phone || "") ||
     ""
-  const selectedAddressCoordinates = defaultAddress?.location?.coordinates
-  const zoneLocation = selectedAddressCoordinates?.length === 2
-    ? {
-      latitude: selectedAddressCoordinates[1],
-      longitude: selectedAddressCoordinates[0]
-    }
-    : null
-  const { zoneId } = useZone(zoneLocation) // Prefer selected/saved address zone
   const defaultPayment = getDefaultPaymentMethod()
 
   useEffect(() => {
@@ -1813,8 +1804,6 @@ export default function Cart() {
         restaurantNote: restaurantNote || "",
         sendCutlery: sendCutlery !== false,
         paymentMethod: selectedPaymentMethod,
-        // `useZone()` can return `null`. Zod expects string/undefined, not null.
-        zoneId: zoneId || undefined,
       };
       // Log final order details (including paymentMethod for COD debugging)
       debugLog('?? FINAL: Sending order to backend with:', {
@@ -3419,3 +3408,7 @@ export default function Cart() {
     </div>
   )
 }
+
+
+
+

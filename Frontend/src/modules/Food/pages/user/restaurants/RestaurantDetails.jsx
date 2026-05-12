@@ -7,7 +7,6 @@ import { API_BASE_URL } from "@food/api/config"
 import { toast } from "sonner"
 import { useLocation } from "@food/hooks/useLocation"
 import BRAND_THEME from "@/config/brandTheme"
-import { useZone } from "@food/hooks/useZone"
 import {
   ArrowLeft,
   Search,
@@ -131,8 +130,7 @@ function RestaurantDetailsContent() {
   const targetDishId = useMemo(() => String(searchParams.get('dish') || '').trim(), [searchParams])
   const { addToCart, updateQuantity, removeFromCart, getCartItem, cart } = useCart()
   const { vegMode, addDishFavorite, removeDishFavorite, isDishFavorite, getDishFavorites, getFavorites, addFavorite, removeFavorite, isFavorite } = useProfile()
-  const { location: userLocation } = useLocation() // Get user's current location
-  const { zoneId, zone, loading: loadingZone, isOutOfService } = useZone(userLocation) // Get user's zone for zone-based filtering
+  const { location: userLocation } = useLocation()
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [highlightIndex, setHighlightIndex] = useState(0)
   const [quantities, setQuantities] = useState({})
@@ -294,7 +292,7 @@ function RestaurantDetailsContent() {
         return
       }
 
-      // Prevent re-fetching for the same slug. Mobile location/zone updates can
+      // Prevent re-fetching for the same slug. Mobile location updates can
       // trigger transient refetch failures that clear already-rendered content.
       if (fetchedRestaurantRef.current && fetchedSlugRef.current === slug && restaurant) {
         return
@@ -310,7 +308,7 @@ function RestaurantDetailsContent() {
         let apiRestaurant = null
 
         try {
-          // First, try to get restaurant directly by slug/ID (no zoneId needed)
+          // First, try to get restaurant directly by slug/ID.
           try {
             response = await restaurantAPI.getRestaurantById(slug)
             if (response?.data?.success && response?.data?.data) {
@@ -319,12 +317,9 @@ function RestaurantDetailsContent() {
             }
           } catch (directLookupError) {
             // If direct lookup fails, try searching by name.
-            // Fallback without zoneId so missing live location never blocks this page.
             debugLog('? Direct lookup failed, trying search by name...')
 
-              const searchVariants = zoneId
-                ? [{ limit: 20, page: 1, zoneId: zoneId, _ts: Date.now() }, { limit: 20, page: 1, _ts: Date.now() }]
-                : [{ limit: 20, page: 1, _ts: Date.now() }]
+              const searchVariants = [{ limit: 20, page: 1, _ts: Date.now() }]
 
               for (const searchParams of searchVariants) {
                 try {
@@ -367,7 +362,7 @@ function RestaurantDetailsContent() {
 
           const actualRestaurant = apiRestaurant?.restaurant || apiRestaurant
 
-          // Helper function to format address with zone and pin code
+          // Helper function to format address with area and pin code
           const formatRestaurantAddress = (locationObj) => {
             if (!locationObj) return "Location"
 
@@ -398,8 +393,7 @@ function RestaurantDetailsContent() {
               }
             }
 
-            // PRIORITY 2: Build address from location object components (with zone and pin code)
-            // This ensures we always show zone and pin code if available
+            // PRIORITY 2: Build address from location object components.
             const addressParts = []
 
             // Add addressLine1 if available
@@ -412,7 +406,7 @@ function RestaurantDetailsContent() {
               addressParts.push(locationObj.addressLine2.trim())
             }
 
-            // Add area (zone) if available
+            // Add area if available
             if (locationObj.area && locationObj.area.trim() !== "") {
               addressParts.push(locationObj.area.trim())
             }
@@ -598,9 +592,9 @@ function RestaurantDetailsContent() {
             restaurantOffers: {
               goldOffer: {
                 title: normalizedRestaurantOffers?.goldOffer?.title || "Gold exclusive offer",
-                description: apiRestaurant?.restaurantOffers?.goldOffer?.description || "Free delivery above ₹99",
+                description: apiRestaurant?.restaurantOffers?.goldOffer?.description || "Free delivery above ?99",
                 unlockText: normalizedRestaurantOffers?.goldOffer?.unlockText || "join Gold to unlock",
-                buttonText: apiRestaurant?.restaurantOffers?.goldOffer?.buttonText || "Add Gold - ₹1",
+                buttonText: apiRestaurant?.restaurantOffers?.goldOffer?.buttonText || "Add Gold - ?1",
               },
               coupons: Array.isArray(normalizedRestaurantOffers?.coupons)
                 ? normalizedRestaurantOffers.coupons
@@ -699,9 +693,7 @@ function RestaurantDetailsContent() {
           if (!restaurantIdForMenu) {
             debugWarn('? No restaurant ID available, searching for restaurant by name...')
             try {
-              const searchVariants = zoneId
-                ? [{ limit: 20, page: 1, zoneId: zoneId, _ts: Date.now() }, { limit: 20, page: 1, _ts: Date.now() }]
-                : [{ limit: 20, page: 1, _ts: Date.now() }]
+              const searchVariants = [{ limit: 20, page: 1, _ts: Date.now() }]
 
               for (const searchParams of searchVariants) {
                 const searchResponse = await restaurantAPI.getRestaurants(searchParams, { noCache: true })
@@ -1112,7 +1104,7 @@ function RestaurantDetailsContent() {
     }
 
     fetchRestaurant()
-  }, [slug, zoneId, restaurant])
+  }, [slug, restaurant])
 
   // Fetch public offers for this restaurant so they show on the page
   useEffect(() => {
@@ -1254,12 +1246,6 @@ function RestaurantDetailsContent() {
       toast.error("Please login to add items to cart")
       navigate('/user/auth/login', { state: { from: location.pathname } })
       return
-    }
-
-    // CRITICAL: Check if user is in service zone or restaurant is available
-    if (isOutOfService) {
-      toast.error('You are outside the service zone. Please select a location within the service area.');
-      return;
     }
 
     const availability = getRestaurantAvailabilityStatus(restaurant)
@@ -2174,7 +2160,7 @@ function RestaurantDetailsContent() {
 
   const availabilityStatus = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick))
   const isRestaurantOffline = !availabilityStatus.isOpen
-  const shouldShowGrayscale = isOutOfService || isRestaurantOffline
+  const shouldShowGrayscale = isRestaurantOffline
 
   return (
     <AnimatedPage
@@ -3139,7 +3125,7 @@ function RestaurantDetailsContent() {
                           )}
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                          {getDishFavorites().length} dishes � {getFavorites().length} restaurant
+                          {getDishFavorites().length} dishes ? {getFavorites().length} restaurant
                         </p>
                       </div>
                     </button>
@@ -3601,7 +3587,7 @@ function RestaurantDetailsContent() {
                             <Lock className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: BRAND_THEME.colors.brand.primary }} />
                             <div className="flex-1">
                               <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                                {restaurant.restaurantOffers.goldOffer?.description || "Free delivery above ₹99"}
+                                {restaurant.restaurantOffers.goldOffer?.description || "Free delivery above ?99"}
                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-400">
                                 {restaurant.restaurantOffers.goldOffer?.unlockText || "join Gold to unlock"}
@@ -3615,7 +3601,7 @@ function RestaurantDetailsContent() {
                               // Handle add gold
                             }}
                           >
-                            {restaurant.restaurantOffers.goldOffer?.buttonText || "Add Gold - ₹1"}
+                            {restaurant.restaurantOffers.goldOffer?.buttonText || "Add Gold - ?1"}
                           </Button>
                         </div>
                       </div>
@@ -3931,4 +3917,8 @@ export default function RestaurantDetails() {
     </RestaurantDetailsErrorBoundary>
   )
 }
+
+
+
+
 

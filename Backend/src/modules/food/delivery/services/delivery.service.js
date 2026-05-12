@@ -4,7 +4,6 @@ import { DeliverySupportTicket } from '../models/supportTicket.model.js';
 import { DeliveryBonusTransaction } from '../../admin/models/deliveryBonusTransaction.model.js';
 import { FoodPayoutSettlement } from '../../admin/models/foodPayoutSettlement.model.js';
 import { FoodEarningAddon } from '../../admin/models/earningAddon.model.js';
-import { FoodZone } from '../../admin/models/zone.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { sanitizeOrderForExternal } from '../../orders/services/order.helpers.js';
 import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
@@ -24,28 +23,9 @@ const queueDeliveryPartnerForReview = (partner) => {
     partner.rejectionReason = '';
 };
 
-const resolveActiveDeliveryZoneId = async (zoneId) => {
-    const rawZoneId = String(zoneId || '').trim();
-    if (!rawZoneId) return null;
-    if (!mongoose.Types.ObjectId.isValid(rawZoneId)) {
-        throw new ValidationError('Invalid zone');
-    }
-
-    const zone = await FoodZone.findOne({
-        _id: new mongoose.Types.ObjectId(rawZoneId),
-        isActive: { $ne: false }
-    }).select('_id').lean();
-
-    if (!zone) {
-        throw new ValidationError('Selected zone is not available');
-    }
-
-    return zone._id;
-};
-
 export const registerDeliveryPartner = async (payload, files) => {
     const { 
-        name, phone, email, countryCode, address, city, state, zoneId,
+        name, phone, email, countryCode, address, city, state,
         vehicleType, vehicleName, vehicleNumber, drivingLicenseNumber, panNumber, aadharNumber,
         fcmToken, platform 
     } = payload;
@@ -78,8 +58,6 @@ export const registerDeliveryPartner = async (payload, files) => {
         );
     }
 
-    const resolvedZoneId = await resolveActiveDeliveryZoneId(zoneId);
-
     const partner = await FoodDeliveryPartner.create({
         name,
         phone,
@@ -88,7 +66,6 @@ export const registerDeliveryPartner = async (payload, files) => {
         address,
         city,
         state,
-        zoneId: resolvedZoneId,
         vehicleType,
         vehicleName,
         vehicleNumber,
@@ -149,23 +126,16 @@ export const updateDeliveryPartnerProfile = async (userId, payload, files) => {
     }
 
     const {
-        name, countryCode, address, city, state, zoneId,
+        name, countryCode, address, city, state,
         vehicleType, vehicleName, vehicleNumber, drivingLicenseNumber, panNumber, aadharNumber,
         fcmToken, platform
     } = payload;
-    const previousZoneId = partner.zoneId ? String(partner.zoneId) : '';
-    let nextZoneId = previousZoneId;
 
     if (name) partner.name = name;
     if (countryCode !== undefined) partner.countryCode = countryCode;
     if (address !== undefined) partner.address = address;
     if (city !== undefined) partner.city = city;
     if (state !== undefined) partner.state = state;
-    if (zoneId !== undefined) {
-        const resolvedZoneId = await resolveActiveDeliveryZoneId(zoneId);
-        nextZoneId = resolvedZoneId ? String(resolvedZoneId) : '';
-        partner.zoneId = resolvedZoneId;
-    }
     if (vehicleType !== undefined) partner.vehicleType = vehicleType;
     if (vehicleName !== undefined) partner.vehicleName = vehicleName;
     if (vehicleNumber !== undefined) partner.vehicleNumber = vehicleNumber;
@@ -212,7 +182,6 @@ export const updateDeliveryPartnerProfile = async (userId, payload, files) => {
         address !== undefined ||
         city !== undefined ||
         state !== undefined ||
-        zoneId !== undefined ||
         vehicleType !== undefined ||
         vehicleName !== undefined ||
         vehicleNumber !== undefined ||
@@ -223,8 +192,7 @@ export const updateDeliveryPartnerProfile = async (userId, payload, files) => {
         updatedProfile = true;
     }
 
-    const zoneChanged = zoneId !== undefined && previousZoneId !== nextZoneId;
-    const requiresReapproval = zoneChanged || updatedProfile;
+    const requiresReapproval = updatedProfile;
     if (requiresReapproval) {
         queueDeliveryPartnerForReview(partner);
     }
@@ -261,15 +229,6 @@ export const updateDeliveryPartnerDetails = async (userId, payload) => {
         throw new ValidationError('Delivery partner not found');
     }
 
-    const previousZoneId = partner.zoneId ? String(partner.zoneId) : '';
-    let nextZoneId = previousZoneId;
-    let zoneChanged = false;
-    if (payload?.zoneId !== undefined) {
-        const resolvedZoneId = await resolveActiveDeliveryZoneId(payload.zoneId);
-        nextZoneId = resolvedZoneId ? String(resolvedZoneId) : '';
-        partner.zoneId = resolvedZoneId;
-        zoneChanged = previousZoneId !== nextZoneId;
-    }
     const vehicle = payload?.vehicle;
     if (vehicle && typeof vehicle === 'object') {
         if (vehicle.number !== undefined) {
@@ -290,14 +249,14 @@ export const updateDeliveryPartnerDetails = async (userId, payload) => {
         partner.profilePhoto = payload.profilePhoto ? String(payload.profilePhoto).trim() : '';
     }
 
-    if (zoneChanged || vehicle !== undefined || payload?.profilePhoto !== undefined) {
+    if (vehicle !== undefined || payload?.profilePhoto !== undefined) {
         queueDeliveryPartnerForReview(partner);
     }
 
     await partner.save();
     return {
         partner: partner.toObject(),
-        requiresReapproval: zoneChanged || vehicle !== undefined || payload?.profilePhoto !== undefined
+        requiresReapproval: vehicle !== undefined || payload?.profilePhoto !== undefined
     };
 };
 
@@ -632,7 +591,7 @@ export const updateDeliveryAvailability = async (userId, payload) => {
     if (!partner) {
         throw new ValidationError('Delivery partner not found');
     }
-    const { status, latitude, longitude } = payload || {};
+    const { status } = payload || {};
     let validStatus = 'offline';
     if (status === 'online' || status === true) validStatus = 'online';
     else if (status === 'offline' || status === false) validStatus = 'offline';
@@ -645,15 +604,6 @@ export const updateDeliveryAvailability = async (userId, payload) => {
     }
     
     partner.availabilityStatus = validStatus;
-    if (typeof latitude === 'number' && typeof longitude === 'number') {
-        partner.lastLocation = {
-            type: 'Point',
-            coordinates: [longitude, latitude]
-        };
-        partner.lastLat = latitude;
-        partner.lastLng = longitude;
-        partner.lastLocationAt = new Date();
-    }
     await partner.save();
     return { availabilityStatus: partner.availabilityStatus };
 };

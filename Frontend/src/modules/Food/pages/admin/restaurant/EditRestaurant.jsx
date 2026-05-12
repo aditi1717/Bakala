@@ -1,28 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { adminAPI } from "@food/api"
 import { Input } from "@food/components/ui/input"
 import { Button } from "@food/components/ui/button"
 import { Label } from "@food/components/ui/label"
-import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
 import { ArrowLeft, Loader2 } from "lucide-react"
 
 const debugError = (..._args) => {}
 
-const toNumberOrEmpty = (value) => {
-  const n = Number(value)
-  return Number.isFinite(n) ? n : ""
-}
-
-const isNearZero = (n) => Math.abs(Number(n) || 0) < 0.000001
-
 const normalizeRestaurantId = (r) => r?._id || r?.id || r?.restaurantId || ""
-
-const normalizeZoneId = (zoneId) => {
-  if (!zoneId) return ""
-  if (typeof zoneId === "string") return zoneId
-  return zoneId?._id || zoneId?.id || ""
-}
 
 const normalizeLocationFormFromRestaurant = (restaurant) => {
   const loc =
@@ -30,37 +16,19 @@ const normalizeLocationFormFromRestaurant = (restaurant) => {
     restaurant?.onboarding?.step1?.location ||
     {}
 
-  const lat =
-    toNumberOrEmpty(loc?.latitude ?? restaurant?.latitude)
-  const lng =
-    toNumberOrEmpty(loc?.longitude ?? restaurant?.longitude)
-
-  const hasValidCoords =
-    Number.isFinite(Number(lat)) &&
-    Number.isFinite(Number(lng)) &&
-    !isNearZero(lat) &&
-    !isNearZero(lng)
-
-  const formattedAddress =
-    loc?.formattedAddress ||
-    loc?.addressLine1 ||
-    restaurant?.formattedAddress ||
-    restaurant?.addressLine1 ||
-    restaurant?.address ||
-    ""
-
   return {
-    zoneId: normalizeZoneId(restaurant?.zoneId),
-    formattedAddress,
-    addressLine1: loc?.addressLine1 || restaurant?.addressLine1 || formattedAddress,
+    addressLine1:
+      loc?.addressLine1 ||
+      restaurant?.addressLine1 ||
+      restaurant?.formattedAddress ||
+      restaurant?.address ||
+      "",
     addressLine2: loc?.addressLine2 || restaurant?.addressLine2 || "",
     area: loc?.area || restaurant?.area || "",
     city: loc?.city || restaurant?.city || "",
     state: loc?.state || restaurant?.state || "",
     pincode: loc?.pincode || restaurant?.pincode || "",
     landmark: loc?.landmark || restaurant?.landmark || "",
-    latitude: hasValidCoords ? lat : "",
-    longitude: hasValidCoords ? lng : "",
   }
 }
 
@@ -88,40 +56,6 @@ const normalizeDetailsFormFromRestaurant = (restaurant) => {
   }
 }
 
-async function loadGooglePlaces() {
-  if (window.google?.maps?.places?.Autocomplete) return true
-  const apiKey = await getGoogleMapsApiKey()
-  if (!apiKey) return false
-
-  window.gm_authFailure = () => {}
-
-  const existing = document.getElementById("admin-google-maps-script")
-  if (existing) {
-    await new Promise((resolve, reject) => {
-      if (window.google?.maps?.places?.Autocomplete) {
-        resolve()
-        return
-      }
-      existing.addEventListener("load", resolve, { once: true })
-      existing.addEventListener("error", reject, { once: true })
-    })
-    return !!window.google?.maps?.places?.Autocomplete
-  }
-
-  await new Promise((resolve, reject) => {
-    const script = document.createElement("script")
-    script.id = "admin-google-maps-script"
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=weekly`
-    script.async = true
-    script.defer = true
-    script.onload = resolve
-    script.onerror = reject
-    document.head.appendChild(script)
-  })
-
-  return !!window.google?.maps?.places?.Autocomplete
-}
-
 export default function EditRestaurant() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -132,15 +66,9 @@ export default function EditRestaurant() {
   const [error, setError] = useState("")
 
   const [restaurant, setRestaurant] = useState(null)
-  const [zones, setZones] = useState([])
-  const [zonesLoading, setZonesLoading] = useState(false)
-
   const [detailsForm, setDetailsForm] = useState(() => normalizeDetailsFormFromRestaurant(null))
   const [locationForm, setLocationForm] = useState(() => normalizeLocationFormFromRestaurant(null))
-  const [locationError, setLocationError] = useState("")
-
-  const locationSearchInputRef = useRef(null)
-  const placesAutocompleteRef = useRef(null)
+  const [locationError] = useState("")
 
   const restaurantId = useMemo(() => {
     if (id) return id
@@ -180,115 +108,6 @@ export default function EditRestaurant() {
       mounted = false
     }
   }, [restaurantId])
-
-  useEffect(() => {
-    let mounted = true
-    setZonesLoading(true)
-    adminAPI
-      .getZones({ limit: 1000 })
-      .then((res) => {
-        const list =
-          res?.data?.data?.zones ||
-          res?.data?.data?.data?.zones ||
-          res?.data?.data ||
-          []
-        if (!mounted) return
-        setZones(Array.isArray(list) ? list : [])
-      })
-      .catch(() => {
-        if (!mounted) return
-        setZones([])
-      })
-      .finally(() => {
-        if (!mounted) return
-        setZonesLoading(false)
-      })
-
-    return () => {
-      mounted = false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!locationSearchInputRef.current) return
-    if (placesAutocompleteRef.current) return
-
-    let cancelled = false
-    const init = async () => {
-      setLocationError("")
-      const loaded = await loadGooglePlaces()
-      if (cancelled) return
-      if (!loaded || !window.google?.maps?.places?.Autocomplete) {
-        setLocationError("Unable to load Google Places Autocomplete.")
-        return
-      }
-
-      placesAutocompleteRef.current = new window.google.maps.places.Autocomplete(
-        locationSearchInputRef.current,
-        {
-          fields: ["formatted_address", "address_components", "geometry"],
-          // Omit `types: ["geocode"]` — that biases Autocomplete toward Geocoding API (geocode/json) traffic.
-          componentRestrictions: { country: "in" },
-        },
-      )
-
-      const parsePlace = (place) => {
-        const formattedAddress = place?.formatted_address || ""
-        const comps = Array.isArray(place?.address_components) ? place.address_components : []
-        const get = (types) =>
-          comps.find((c) => types.some((t) => c.types?.includes(t)))?.long_name || ""
-        const area =
-          get(["sublocality_level_1", "sublocality", "neighborhood"]) ||
-          get(["locality"])
-        const city =
-          get(["locality"]) ||
-          get(["administrative_area_level_2"])
-        const state = get(["administrative_area_level_1"])
-        const pincode = get(["postal_code"])
-        const lat = place?.geometry?.location?.lat?.()
-        const lng = place?.geometry?.location?.lng?.()
-
-        return {
-          formattedAddress,
-          area,
-          city,
-          state,
-          pincode,
-          latitude: Number.isFinite(lat) ? Number(lat.toFixed(6)) : "",
-          longitude: Number.isFinite(lng) ? Number(lng.toFixed(6)) : "",
-        }
-      }
-
-      placesAutocompleteRef.current.addListener("place_changed", () => {
-        const place = placesAutocompleteRef.current.getPlace()
-        const parsed = parsePlace(place)
-        setLocationForm((prev) => ({
-          ...prev,
-          formattedAddress: parsed.formattedAddress || prev.formattedAddress,
-          addressLine1: parsed.formattedAddress || prev.addressLine1,
-          area: parsed.area || prev.area,
-          city: parsed.city || prev.city,
-          state: parsed.state || prev.state,
-          pincode: parsed.pincode || prev.pincode,
-          latitude: parsed.latitude !== "" ? parsed.latitude : prev.latitude,
-          longitude: parsed.longitude !== "" ? parsed.longitude : prev.longitude,
-        }))
-      })
-    }
-
-    requestAnimationFrame(init)
-    return () => {
-      cancelled = true
-      placesAutocompleteRef.current = null
-    }
-  }, [])
-
-  const currentZoneLabel = useMemo(() => {
-    const zid = normalizeZoneId(locationForm.zoneId)
-    if (!zid) return ""
-    const z = zones.find((x) => normalizeZoneId(x?._id || x?.id) === zid)
-    return z?.name || z?.zoneName || ""
-  }, [locationForm.zoneId, zones])
 
   const handleSaveDetails = async () => {
     if (!restaurantId) return
@@ -335,28 +154,16 @@ export default function EditRestaurant() {
   const handleSaveLocation = async () => {
     if (!restaurantId) return
 
-    const latitude = Number(locationForm.latitude)
-    const longitude = Number(locationForm.longitude)
-
-    if (!locationForm.zoneId) {
-      alert("Please select a zone")
-      return
-    }
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !locationForm.formattedAddress) {
-      alert("Please select a location from dropdown")
+    if (!locationForm.addressLine1 || !locationForm.area || !locationForm.city || !locationForm.state || !locationForm.pincode) {
+      alert("Please fill all required address fields")
       return
     }
 
     try {
       setSavingLocation(true)
       const payload = {
-        zoneId: locationForm.zoneId,
-        latitude,
-        longitude,
-        coordinates: [longitude, latitude],
-        formattedAddress: locationForm.formattedAddress || "",
-        address: locationForm.formattedAddress || "",
-        addressLine1: locationForm.addressLine1 || locationForm.formattedAddress || "",
+        address: locationForm.addressLine1 || "",
+        addressLine1: locationForm.addressLine1 || "",
         addressLine2: locationForm.addressLine2 || "",
         area: locationForm.area || "",
         city: locationForm.city || "",
@@ -502,9 +309,6 @@ export default function EditRestaurant() {
               <div className="flex items-center justify-between gap-3 mb-4">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Location</h2>
-                  {currentZoneLabel ? (
-                    <p className="text-xs text-slate-500 mt-1">Current Zone: {currentZoneLabel}</p>
-                  ) : null}
                 </div>
                 <Button onClick={handleSaveLocation} disabled={savingLocation}>
                   {savingLocation ? (
@@ -526,58 +330,52 @@ export default function EditRestaurant() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <Label>Service Zone</Label>
-                  <select
-                    value={locationForm.zoneId || ""}
-                    onChange={(e) => setLocationForm((p) => ({ ...p, zoneId: e.target.value }))}
-                    className="mt-1 h-10 w-full rounded-md border border-input bg-white px-3 text-sm"
-                    disabled={zonesLoading}
-                  >
-                    <option value="">{zonesLoading ? "Loading zones..." : "Select a zone"}</option>
-                    {zones.map((z) => {
-                      const zid = normalizeZoneId(z?._id || z?.id)
-                      const label = z?.name || z?.zoneName || zid
-                      return (
-                        <option key={zid} value={zid}>
-                          {label}
-                        </option>
-                      )
-                    })}
-                  </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <Label>Search location</Label>
+                  <Label>Address Line 1</Label>
                   <Input
-                    ref={locationSearchInputRef}
-                    placeholder="Start typing your restaurant address..."
-                    className="mt-1 bg-white text-sm text-black! dark:text-white! placeholder:text-gray-500 dark:placeholder:text-gray-400 caret-black dark:caret-white"
-                    style={{ color: "#000", WebkitTextFillColor: "#000" }}
+                    value={locationForm.addressLine1}
+                    onChange={(e) => setLocationForm((p) => ({ ...p, addressLine1: e.target.value }))}
+                    className="mt-1"
                   />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Select a suggestion from the dropdown to fill address + coordinates.
-                  </p>
                 </div>
-
                 <div className="md:col-span-2">
-                  <Label>Formatted Address</Label>
-                  <Input value={locationForm.formattedAddress} readOnly className="mt-1 bg-slate-50" />
+                  <Label>Address Line 2</Label>
+                  <Input
+                    value={locationForm.addressLine2}
+                    onChange={(e) => setLocationForm((p) => ({ ...p, addressLine2: e.target.value }))}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>Area</Label>
-                  <Input value={locationForm.area} readOnly className="mt-1 bg-slate-50" />
+                  <Input
+                    value={locationForm.area}
+                    onChange={(e) => setLocationForm((p) => ({ ...p, area: e.target.value }))}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>City</Label>
-                  <Input value={locationForm.city} readOnly className="mt-1 bg-slate-50" />
+                  <Input
+                    value={locationForm.city}
+                    onChange={(e) => setLocationForm((p) => ({ ...p, city: e.target.value }))}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>State</Label>
-                  <Input value={locationForm.state} readOnly className="mt-1 bg-slate-50" />
+                  <Input
+                    value={locationForm.state}
+                    onChange={(e) => setLocationForm((p) => ({ ...p, state: e.target.value }))}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>Pincode</Label>
-                  <Input value={locationForm.pincode} readOnly className="mt-1 bg-slate-50" />
+                  <Input
+                    value={locationForm.pincode}
+                    onChange={(e) => setLocationForm((p) => ({ ...p, pincode: e.target.value }))}
+                    className="mt-1"
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <Label>Landmark</Label>
@@ -595,4 +393,3 @@ export default function EditRestaurant() {
     </div>
   )
 }
-

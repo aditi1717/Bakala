@@ -328,7 +328,6 @@ export default function JoinRequest() {
                       Contact
                     </th>
                     <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                      Zone
                     </th>
                     <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                       Vehicle Type
@@ -342,7 +341,7 @@ export default function JoinRequest() {
                 <tbody className="bg-white divide-y divide-slate-100">
                   {filteredRequests.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-20 text-center">
+                      <td colSpan={6} className="px-6 py-20 text-center">
                         <p className="text-sm text-slate-500">
                           {error ? "Error loading requests" : "No requests found"}
                         </p>
@@ -387,7 +386,6 @@ export default function JoinRequest() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-slate-700">{request.zone || "Unassigned"}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm text-slate-700 capitalize">{request.vehicle?.type || request.vehicleType}</span>
@@ -579,14 +577,7 @@ export default function JoinRequest() {
                       <label className="text-xs font-semibold text-slate-500 uppercase">Delivery ID</label>
                       <p className="text-sm font-medium text-slate-900 mt-1">{viewDetails.deliveryId || "N/A"}</p>
                     </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> Zone
-                      </label>
-                      <p className="text-sm text-slate-900 mt-1">
-                        {viewDetails.zone || viewDetails.zoneName || viewDetails.zoneDetails?.zoneName || viewDetails.zoneDetails?.name || viewDetails.zoneDetails?.serviceLocation || "Unassigned"}
-                      </p>
-                    </div>
+
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">Status</label>
                       <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${
@@ -666,14 +657,6 @@ export default function JoinRequest() {
                         <div>
                           <label className="text-xs font-semibold text-slate-500 uppercase">Zip Code</label>
                           <p className="text-sm text-slate-900 mt-1">{viewDetails.location.zipCode}</p>
-                        </div>
-                      )}
-                      {(viewDetails.location.latitude && viewDetails.location.longitude) && (
-                        <div className="col-span-2">
-                          <label className="text-xs font-semibold text-slate-500 uppercase">Coordinates</label>
-                          <p className="text-sm text-slate-900 mt-1">
-                            {viewDetails.location.latitude}, {viewDetails.location.longitude}
-                          </p>
                         </div>
                       )}
                     </div>

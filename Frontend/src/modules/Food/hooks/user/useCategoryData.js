@@ -4,7 +4,7 @@ import { foodImages } from "@food/constants/images";
 import { normalizeImageUrl } from "@food/utils/common";
 import BRAND_THEME from "@/config/brandTheme";
 
-export const useCategoryData = (zoneId) => {
+export const useCategoryData = () => {
   const homepageDefaults = BRAND_THEME.tokens.homepage.defaults;
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
@@ -15,7 +15,7 @@ export const useCategoryData = (zoneId) => {
   const fetchCategories = useCallback(async () => {
     try {
       setLoadingCategories(true);
-      const response = await adminAPI.getPublicCategories(zoneId ? { zoneId } : {});
+      const response = await adminAPI.getPublicCategories({});
       if (response.data?.success) {
         const cats = response.data.data.categories || [];
         const transformed = [
@@ -43,13 +43,12 @@ export const useCategoryData = (zoneId) => {
     } finally {
       setLoadingCategories(false);
     }
-  }, [homepageDefaults.allCategoryId, zoneId]);
+  }, [homepageDefaults.allCategoryId]);
 
   const fetchRestaurants = useCallback(async () => {
     try {
       setLoadingRestaurants(true);
-      const params = zoneId ? { zoneId } : {};
-      const response = await restaurantAPI.getRestaurants(params);
+      const response = await restaurantAPI.getRestaurants({});
       if (response.data?.success) {
         const raw = response.data.data.restaurants || [];
         const transformed = raw.map(r => ({
@@ -65,7 +64,7 @@ export const useCategoryData = (zoneId) => {
     } finally {
       setLoadingRestaurants(false);
     }
-  }, [zoneId]);
+  }, []);
 
   useEffect(() => {
     fetchCategories();

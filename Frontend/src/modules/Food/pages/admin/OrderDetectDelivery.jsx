@@ -277,8 +277,6 @@ const buildStatusHistory = (order) => {
 const transformOrder = (order, index) => {
   const user = order?.userId && typeof order.userId === "object" ? order.userId : null
   const restaurant = order?.restaurantId && typeof order.restaurantId === "object" ? order.restaurantId : null
-  const orderZone = order?.zoneId && typeof order.zoneId === "object" ? order.zoneId : null
-  const restaurantZone = restaurant?.zoneId && typeof restaurant.zoneId === "object" ? restaurant.zoneId : null
   const deliveryFromDispatch =
     order?.dispatch?.deliveryPartnerId && typeof order.dispatch.deliveryPartnerId === "object"
       ? order.dispatch.deliveryPartnerId
@@ -324,24 +322,6 @@ const transformOrder = (order, index) => {
     sl: index + 1,
     orderMongoId: order._id,
     orderId: order.orderId,
-    zoneId:
-      normalizeId(order?.zoneId?._id) ||
-      normalizeId(order?.zoneId) ||
-      normalizeId(restaurant?.zoneId?._id) ||
-      normalizeId(restaurant?.zoneId) ||
-      "",
-    zoneName:
-      order?.zoneName ||
-      order?.zone?.name ||
-      order?.zone?.zoneName ||
-      order?.zone?.serviceLocation ||
-      orderZone?.name ||
-      orderZone?.zoneName ||
-      orderZone?.serviceLocation ||
-      restaurantZone?.name ||
-      restaurantZone?.zoneName ||
-      restaurantZone?.serviceLocation ||
-      "N/A",
     userName: order.customerName || order.userName || user?.name || 'Unknown',
     userNumber: order.customerPhone || order.userNumber || user?.phone || order.deliveryAddress?.phone || 'N/A',
     restaurantName: order.restaurantName || order.restaurant || restaurant?.restaurantName || 'Unknown Restaurant',
@@ -368,7 +348,6 @@ export default function OrderDetectDelivery() {
   const [visibleColumns, setVisibleColumns] = useState({
     si: true,
     orderId: true,
-    zone: true,
     userInfo: true,
     restaurantName: true,
     deliveryBoy: true,
@@ -377,7 +356,6 @@ export default function OrderDetectDelivery() {
   })
 
   const [orders, setOrders] = useState([])
-  const [zones, setZones] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
@@ -421,23 +399,6 @@ export default function OrderDetectDelivery() {
   useEffect(() => {
     fetchOrders()
   }, [fetchOrders])
-
-  useEffect(() => {
-    const fetchZones = async () => {
-      try {
-        const response = await adminAPI.getZones({ page: 1, limit: 1000, isActive: true })
-        if (response?.data?.success && response?.data?.data?.zones) {
-          setZones(response.data.data.zones)
-        } else {
-          setZones([])
-        }
-      } catch (zoneError) {
-        debugWarn("Failed to load zones for order detect filter:", zoneError)
-        setZones([])
-      }
-    }
-    fetchZones()
-  }, [])
 
   useEffect(() => {
     if (!Array.isArray(orders) || orders.length === 0) return
@@ -549,7 +510,7 @@ export default function OrderDetectDelivery() {
   } = useGenericTableManagement(
     orders,
     "Order Detect Delivery",
-    ["orderId", "zoneName", "userName", "userNumber", "restaurantName", "deliveryBoyName", "status"]
+    ["orderId", "userName", "userNumber", "restaurantName", "deliveryBoyName", "status"]
   )
 
   // Statistics
@@ -569,28 +530,7 @@ export default function OrderDetectDelivery() {
     return { total, ordered, restaurantAccepted, rejected, readyForAssignment, deliveryBoyAssigned, assignmentAccepted, reachedPickup, orderIdAccepted, reachedDrop, delivered }
   }, [filteredData, orders.length])
 
-  const zoneNameById = useMemo(() => {
-    const map = new Map()
-    for (const zone of zones) {
-      const zid = normalizeId(zone?._id || zone?.id)
-      if (!zid) continue
-      const label =
-        zone?.name || zone?.zoneName || zone?.serviceLocation || ""
-      if (label) map.set(zid, label)
-    }
-    return map
-  }, [zones])
-
-  const tableOrders = useMemo(() => {
-    return filteredData.map((order) => {
-      if (order?.zoneName && order.zoneName !== "N/A") return order
-      const resolvedZoneName = zoneNameById.get(normalizeId(order?.zoneId))
-      return {
-        ...order,
-        zoneName: resolvedZoneName || "N/A",
-      }
-    })
-  }, [filteredData, zoneNameById])
+  const tableOrders = filteredData
 
   const handleOpenAssignDialog = (order) => {
     setSelectedOrderForAssignment(order)
@@ -633,7 +573,6 @@ export default function OrderDetectDelivery() {
     setVisibleColumns({
       si: true,
       orderId: true,
-      zone: true,
       userInfo: true,
       restaurantName: true,
       deliveryBoy: true,
@@ -684,41 +623,6 @@ export default function OrderDetectDelivery() {
         setSearchQuery={setSearchQuery}
         onExport={handleExport}
       />
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">
-              Zone Filter
-            </label>
-            <select
-              value={filters.zoneId || ""}
-              onChange={(e) => setFilters((prev) => ({ ...prev, zoneId: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
-            >
-              <option value="">All Zones</option>
-              {zones.map((zone) => {
-                const zoneId = String(zone?._id || zone?.id || "")
-                const zoneLabel = zone?.name || zone?.zoneName || zone?.serviceLocation || "Unnamed Zone"
-                return (
-                  <option key={zoneId} value={zoneId}>
-                    {zoneLabel}
-                  </option>
-                )
-              })}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={() => setFilters((prev) => ({ ...prev, zoneId: "" }))}
-              className="px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-all"
-            >
-              Clear Zone Filter
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -854,7 +758,6 @@ export default function OrderDetectDelivery() {
         columnsConfig={{
           si: "Serial Number",
           orderId: "Order ID",
-          zone: "Zone",
           userInfo: "User Name & Number",
           restaurantName: "Restaurant Name",
           deliveryBoy: "Delivery Boy Name & Number",
@@ -886,5 +789,6 @@ export default function OrderDetectDelivery() {
     </div>
   )
 }
+
 
 

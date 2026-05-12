@@ -24,7 +24,6 @@ const defaultFormData = {
   image: "",
   status: true,
   type: "",
-  zoneId: "global",
   foodTypeScope: "Both",
   visibilityStartHour: "",
   visibilityStartMinute: "",
@@ -89,23 +88,6 @@ const isCategoryEnabled = (category) => {
   return category?.status !== false && category?.isActive !== false
 }
 
-const zoneLabel = (zone, zones = []) => {
-  if (!zone || zone === "global") return "Global (all zones)"
-  
-  const zoneId = typeof zone === "string" ? zone : (zone?._id || zone?.id)
-  if (zoneId && Array.isArray(zones)) {
-    const found = zones.find(z => String(z?._id || z?.id) === String(zoneId))
-    if (found) return found.name || found.zoneName || found.serviceLocation || "Zone"
-  }
-
-  if (typeof zone === "string") {
-    const value = zone.trim()
-    if (/^[a-f0-9]{24}$/i.test(value)) return `Zone ID ${value.slice(-6)}`
-    return value
-  }
-  return zone?.name || zone?.zoneName || zone?.serviceLocation || "Zone"
-}
-
 export default function Category() {
   const [searchQuery, setSearchQuery] = useState("")
   const [categories, setCategories] = useState([])
@@ -113,8 +95,6 @@ export default function Category() {
   const [showPendingOnly, setShowPendingOnly] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
-  const [zones, setZones] = useState([])
-  const [zonesLoading, setZonesLoading] = useState(false)
   const [formData, setFormData] = useState(defaultFormData)
   const [selectedImageFile, setSelectedImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
@@ -129,31 +109,6 @@ export default function Category() {
       return
     }
     fetchCategories()
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    setZonesLoading(true)
-    adminAPI
-      .getZones({ limit: 1000 })
-      .then((res) => {
-        const list =
-          res?.data?.data?.zones ||
-          res?.data?.data?.data?.zones ||
-          res?.data?.data ||
-          []
-        if (!cancelled) setZones(Array.isArray(list) ? list : [])
-      })
-      .catch(() => {
-        if (!cancelled) setZones([])
-      })
-      .finally(() => {
-        if (!cancelled) setZonesLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
   }, [])
 
   useEffect(() => {
@@ -224,17 +179,12 @@ export default function Category() {
 
   const handleEdit = (category) => {
     setEditingCategory(category)
-    const zoneIdValue =
-      typeof category?.zoneId === "string"
-        ? category.zoneId
-        : category?.zoneId?._id || category?.zoneId?.id || "global"
 
     setFormData({
       name: category?.name || "",
       image: category?.image || "",
       status: isCategoryEnabled(category),
       type: category?.type || "",
-      zoneId: zoneIdValue || "global",
       foodTypeScope: category?.foodTypeScope || "Both",
       ...(() => {
         const start = parse24To12(category?.visibilityStartTime || "")
@@ -425,7 +375,6 @@ export default function Category() {
         type: String(formData.type || "").trim(),
         status: Boolean(formData.status),
         image: imageUrl || undefined,
-        zoneId: "global",
         foodTypeScope: formData.foodTypeScope,
         visibilityStartTime: startTime24,
         visibilityEndTime: endTime24,

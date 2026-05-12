@@ -1,6 +1,6 @@
 import { useSearchParams, Link, useNavigate, useLocation as useRouterLocation } from "react-router-dom";
 import React, { useRef, useEffect, useState, useMemo, useCallback, startTransition } from "react";
-import { Star, Clock, MapPin, Heart, Search, Tag, Flame, ShoppingBag, ShoppingCart, Mic, SlidersHorizontal, CheckCircle2, Bookmark, BadgePercent, X, ArrowDownUp, Timer, CalendarClock, ShieldCheck, IndianRupee, UtensilsCrossed, Leaf, AlertCircle, Loader2, Plus, Check, Share2 } from "lucide-react";
+import { Star, Clock, Heart, Search, Tag, Flame, ShoppingBag, ShoppingCart, Mic, SlidersHorizontal, CheckCircle2, Bookmark, BadgePercent, X, ArrowDownUp, Timer, CalendarClock, ShieldCheck, IndianRupee, UtensilsCrossed, Leaf, AlertCircle, Loader2, Plus, Check, Share2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Footer from "@food/components/user/Footer";
 import AddToCartButton from "@food/components/user/AddToCartButton";
@@ -19,7 +19,6 @@ import { Checkbox } from "@food/components/ui/checkbox";
 import { useSearchOverlay, useLocationSelector } from "@food/components/user/UserLayout";
 import PageNavbar from "@food/components/user/PageNavbar";
 import { useLocation } from "@food/hooks/useLocation";
-import { useZone } from "@food/hooks/useZone";
 import OptimizedImage from "@food/components/OptimizedImage";
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability";
 import { sortRestaurantsByAvailability } from "@food/utils/sortRestaurantsByAvailability";
@@ -61,7 +60,6 @@ export default function Home() {
   const { vegMode, setVegMode: setVegModeContext, getDefaultAddress, addFavorite, removeFavorite, isFavorite } = useProfile();
   const { addToCart, cart } = useCart();
   const { location } = useLocation();
-  const { zoneId, zoneStatus } = useZone(location);
   const routerLocation = useRouterLocation();
   
   const [showVegModePopup, setShowVegModePopup] = useState(false);
@@ -101,7 +99,7 @@ export default function Home() {
     categories: landingCategories,
     restaurants: restaurantsData,
     refreshRestaurants: fetchRestaurants
-  } = useFoodHomeData({ location, zoneId, zoneStatus, vegMode });
+  } = useFoodHomeData({ location, vegMode, listingType: "restaurant" });
 
   // Sync activeTab with URL
   useEffect(() => {
@@ -138,13 +136,11 @@ export default function Home() {
     if (loadingMoreRestaurants || loadingRestaurants || !hasMoreRestaurants) return;
 
     const nextPage = restaurantPage + 1;
-    const params = { page: nextPage, limit: 20 };
+    const params = { page: nextPage, limit: 20, isRestaurant: true };
     if (Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude)) {
       params.lat = location.latitude;
       params.lng = location.longitude;
     }
-    if (zoneId) params.zoneId = zoneId;
-
     const normalize = (r) => {
       let image = r.image;
       if (!image || typeof image !== "string") {
@@ -203,7 +199,6 @@ export default function Home() {
     location?.latitude,
     location?.longitude,
     restaurantPage,
-    zoneId,
   ]);
 
   const filteredRestaurants = useMemo(() => {
@@ -543,7 +538,7 @@ export default function Home() {
             {visibleRestaurants.map((r, i) => (
               (() => {
                 const availability = getRestaurantAvailabilityStatus(r, new Date(availabilityTick));
-                const isUnavailableNow = !availability.isOpen;
+                const isUnavailableNow = availability.state !== "open";
 
                 return (
                   <Link
@@ -562,9 +557,13 @@ export default function Home() {
                   />
                   <div className="absolute top-4 left-4 px-3 py-1 bg-white/90 backdrop-blur-md rounded-full text-xs font-bold shadow-sm">{r.offer || "Best Price"}</div>
                   <div className={`absolute bottom-4 left-4 px-3 py-1 rounded-full text-[11px] font-bold shadow-sm ${
-                    isUnavailableNow ? "bg-gray-500 text-white" : "bg-emerald-600 text-white"
+                    availability.state === "open"
+                      ? "bg-emerald-600 text-white"
+                      : availability.state === "off"
+                        ? "bg-rose-500 text-white"
+                        : "bg-gray-500 text-white"
                   }`}>
-                    {isUnavailableNow ? "Offline" : "Open now"}
+                    {availability.badgeLabel || "Closed"}
                   </div>
                   <div className="absolute bottom-4 right-4 px-3 py-1 bg-black/70 backdrop-blur-md rounded-full text-white text-xs font-bold">{r.rating} <Star className="w-3 h-3 inline-block fill-yellow-400 text-yellow-400" /></div>
                   <button
@@ -583,7 +582,16 @@ export default function Home() {
                   </div>
                   <p className="text-sm text-gray-500 mb-3 truncate">{r.cuisines?.join(", ") || "Multi-cuisine"}</p>
                   <div className="flex items-center pt-3 border-t border-gray-50">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600"><MapPin className="w-3.5 h-3.5 text-brand-500" />{r.distance || "1.2 km"}</div>
+                    <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      availability.state === "open"
+                        ? "bg-amber-50 text-amber-700"
+                        : availability.state === "off"
+                          ? "bg-rose-50 text-rose-700"
+                          : "bg-slate-100 text-slate-600"
+                    }`}>
+                      <Timer className="w-3.5 h-3.5" />
+                      {availability.detailLabel || "Closed"}
+                    </div>
                   </div>
                 </div>
                   </Link>

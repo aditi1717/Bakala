@@ -96,13 +96,6 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
       ? `Lat ${Number(customerLocation.lat).toFixed(5)}, Lng ${Number(customerLocation.lng).toFixed(5)}`
       : 'Location not available');
 
-  const mapsLink =
-    customerLocation?.lat != null && customerLocation?.lng != null
-      ? `https://www.google.com/maps?q=${encodeURIComponent(
-          `${customerLocation.lat},${customerLocation.lng}`,
-        )}`
-      : null;
-
   const getItemVariantLabel = (item = {}) => {
     const addons = Array.isArray(item?.addons)
       ? item.addons
@@ -201,17 +194,6 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
                 </div>
                 <p className="text-gray-950 font-extrabold text-xl leading-tight">Customer Location</p>
                 <p className="text-gray-500 text-sm font-medium line-clamp-2">{customerAddress}</p>
-                {mapsLink && (
-                  <a
-                    href={mapsLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex mt-2 text-[10px] font-bold uppercase tracking-widest hover:opacity-80 transition-opacity"
-                    style={{ color: BRAND_THEME.colors.brand.primary }}
-                  >
-                    Open in Google Maps
-                  </a>
-                )}
               </div>
             </div>
           </div>

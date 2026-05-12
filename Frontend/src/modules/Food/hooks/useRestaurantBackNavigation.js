@@ -65,7 +65,6 @@ const resolveRestaurantBackPath = ({ pathname, state }) => {
     normalizedPath === "/edit" ||
     normalizedPath === "/edit-owner" ||
     normalizedPath === "/edit-cuisines" ||
-    normalizedPath === "/edit-address" ||
     normalizedPath === "/phone" ||
     normalizedPath === "/manage-outlets" ||
     normalizedPath === "/update-bank-details" ||
@@ -73,8 +72,7 @@ const resolveRestaurantBackPath = ({ pathname, state }) => {
     normalizedPath === "/fssai/update" ||
     normalizedPath === "/outlet-info" ||
     normalizedPath === "/outlet-timings" ||
-    /^\/outlet-timings\/[^/]+$/.test(normalizedPath) ||
-    normalizedPath === "/zone-setup"
+    /^\/outlet-timings\/[^/]+$/.test(normalizedPath)
   ) {
     return explicitBackPath || "/food/restaurant/details"
   }

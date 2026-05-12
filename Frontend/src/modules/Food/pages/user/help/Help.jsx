@@ -178,7 +178,7 @@ const helpCategories = [
       },
       {
         question: "Do you deliver to my area?",
-        answer: "Enter your delivery address to see available restaurants in your area. We're constantly expanding our delivery zones."
+        answer: "Enter your delivery address to see available restaurants in your area. We're constantly expanding our delivery areas."
       }
     ]
   }

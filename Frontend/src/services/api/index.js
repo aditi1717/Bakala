@@ -324,12 +324,6 @@ export const adminAPI = {
     }),
   getDeliveryPartnerById: (id) =>
     apiClient.get(`/food/admin/delivery/${id}`, { contextModule: "admin" }),
-  updateDeliveryPartnerZone: (id, zoneId) =>
-    apiClient.patch(
-      `/food/admin/delivery/${String(id)}/zone`,
-      { zoneId: String(zoneId || "").trim() },
-      { contextModule: "admin" },
-    ),
   approveDeliveryPartner: (id) =>
     apiClient.patch(
       `/food/admin/delivery/${String(id)}/approve`,
@@ -570,12 +564,6 @@ export const adminAPI = {
     apiClient.post("/food/admin/restaurants", body ?? {}, {
       contextModule: "admin",
     }),
-  /** List delivery zones. Query: limit, page, isActive, search */
-  getZones: (params = {}) =>
-    apiClient.get("/food/admin/zones", {
-      params: { limit: 1000, ...params },
-      contextModule: "admin",
-    }),
   /** Restaurant report (admin). */
   getRestaurantReport: (params = {}) =>
     apiClient.get("/food/admin/reports/restaurants", {
@@ -597,21 +585,6 @@ export const adminAPI = {
       params,
       contextModule: "admin",
     }),
-  /** Get single zone by id */
-  getZoneById: (id) =>
-    apiClient.get(`/food/admin/zones/${id}`, { contextModule: "admin" }),
-  /** Create zone. Body: name, zoneName?, country?, unit?, coordinates, isActive? */
-  createZone: (body) =>
-    apiClient.post("/food/admin/zones", body ?? {}, { contextModule: "admin" }),
-  /** Update zone. Body: name?, zoneName?, country?, unit?, coordinates?, isActive? */
-  updateZone: (id, body) =>
-    apiClient.patch(`/food/admin/zones/${id}`, body ?? {}, {
-      contextModule: "admin",
-    }),
-  /** Delete zone */
-  deleteZone: (id) =>
-    apiClient.delete(`/food/admin/zones/${id}`, { contextModule: "admin" }),
-
   /** Feedback Experience (admin) */
   getFeedbackExperiences: (params = {}) =>
     apiClient.get(API_ENDPOINTS.ADMIN.FEEDBACK_EXPERIENCE, {
@@ -626,7 +599,7 @@ export const adminAPI = {
   /** Public env variables (safe subset). Used for runtime keys like Google Maps. */
   // getPublicEnvVariables removed: rely on import.meta.env instead.
 
-  /** Public categories (user app) - zone-aware */
+  /** Public categories (user app) */
   getPublicCategories: (params = {}, config = {}) =>
     apiClient.get("/food/restaurant/categories/public", {
       params: params ?? {},
@@ -1533,12 +1506,6 @@ const getPublicRestaurantsOnce = (params = {}, config = {}) => {
   const { noCache, ...axiosConfig } = config || {};
   const normalizedParams = { ...(params || {}) };
   const defaultLimit = 20;
-  if (!normalizedParams.zoneId && typeof window !== "undefined") {
-    const storedZoneId = window.localStorage?.getItem("userZoneId");
-    if (storedZoneId) {
-      normalizedParams.zoneId = storedZoneId;
-    }
-  }
   if (noCache) {
     return apiClient.get("/food/restaurant/restaurants", {
       params: { limit: defaultLimit, ...normalizedParams },
@@ -1874,17 +1841,11 @@ export const deliveryAPI = {
       params,
       contextModule: "delivery",
     }),
-  /** PATCH /food/delivery/availability - set online/offline (and optional lat/lng). */
+  /** PATCH /food/delivery/availability - set online/offline only. */
   updateOnlineStatus: (isOnline) =>
     apiClient.patch(
       "/food/delivery/availability",
       { status: isOnline ? "online" : "offline" },
-      { contextModule: "delivery" },
-    ),
-  updateLocation: (latitude, longitude, isOnline, extras = {}) =>
-    apiClient.patch(
-      "/food/delivery/availability",
-      { status: isOnline ? "online" : "offline", latitude, longitude, ...extras },
       { contextModule: "delivery" },
     ),
   /** Orders */
@@ -2161,12 +2122,6 @@ export const deliveryAPI = {
           },
         },
       })),
-  /** Zone discovery */
-  getZonesInRadius: (lat, lng, radiusKm = 10) =>
-    apiClient.get("/food/zones/nearby", {
-      params: { lat, lng, radius: radiusKm },
-      contextModule: "delivery",
-    }),
   /** Store Shop (Delivery Boy purchases from Admin store) */
   getStoreProducts: (params = {}) =>
     apiClient.get('/food/delivery/store/products', { params, contextModule: 'delivery' }),

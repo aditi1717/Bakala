@@ -21,14 +21,6 @@ const router = express.Router();
 // ----- Public Business Settings (No Admin Required) -----
 router.get('/business-settings/public', businessSettingsController.getBusinessSettings);
 
-const normalizeObjectIdList = (value) => {
-    if (!Array.isArray(value)) return [];
-    return value
-        .map((id) => (id ? String(id) : ''))
-        .map((id) => id.trim())
-        .filter(Boolean);
-};
-
 const requireAdmin = async (req, _res, next) => {
     try {
         const user = req.user;
@@ -37,7 +29,7 @@ const requireAdmin = async (req, _res, next) => {
         }
 
         const adminDoc = await FoodAdmin.findById(user.userId)
-            .select('_id role email name isActive adminType permissions zoneIds')
+            .select('_id role email name isActive adminType permissions')
             .lean();
 
         if (!adminDoc || adminDoc.isActive === false) {
@@ -46,14 +38,11 @@ const requireAdmin = async (req, _res, next) => {
 
         const adminType = String(adminDoc.adminType || 'SUPER_ADMIN').toUpperCase();
         const permissions = Array.isArray(adminDoc.permissions) ? adminDoc.permissions : [];
-        const zoneIds = normalizeObjectIdList(adminDoc.zoneIds);
-
         req.adminAuth = {
             id: String(adminDoc._id),
             role: 'ADMIN',
             adminType,
             permissions,
-            zoneIds,
             isSuperAdmin: adminType === 'SUPER_ADMIN',
             isSubAdmin: adminType === 'SUB_ADMIN',
         };
@@ -249,16 +238,8 @@ router.get('/delivery/support-tickets', adminController.getSupportTickets);
 router.patch('/delivery/support-tickets/:id', adminController.updateSupportTicket);
 router.get('/delivery/partners', adminController.getDeliveryPartners);
 router.get('/delivery/:id', adminController.getDeliveryPartnerById);
-router.patch('/delivery/:id/zone', adminController.updateDeliveryPartnerZone);
 router.patch('/delivery/:id/approve', adminController.approveDeliveryPartner);
 router.patch('/delivery/:id/reject', adminController.rejectDeliveryPartner);
-
-// ----- Zones -----
-router.get('/zones', adminController.getZones);
-router.get('/zones/:id', adminController.getZoneById);
-router.post('/zones', adminController.createZone);
-router.patch('/zones/:id', adminController.updateZone);
-router.delete('/zones/:id', adminController.deleteZone);
 
 // ----- Orders -----
 router.get('/orders', orderController.listOrdersAdminController);

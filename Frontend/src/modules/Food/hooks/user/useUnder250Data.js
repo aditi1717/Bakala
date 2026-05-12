@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { restaurantAPI } from "@food/api";
 import BRAND_THEME from "@/config/brandTheme";
 
-export const useUnder250Data = (zoneId) => {
+export const useUnder250Data = () => {
   const homepageDefaults = BRAND_THEME.tokens.homepage.defaults;
   const [restaurants, setRestaurants] = useState([]);
   const [categories, setCategories] = useState([
@@ -15,7 +15,7 @@ export const useUnder250Data = (zoneId) => {
     try {
       setLoading(true);
       const [restRes] = await Promise.all([
-        restaurantAPI.getRestaurantsUnder250(zoneId),
+        restaurantAPI.getRestaurantsUnder250(),
       ]);
 
       if (restRes.data?.success) setRestaurants(restRes.data.data.restaurants || []);
@@ -29,7 +29,7 @@ export const useUnder250Data = (zoneId) => {
     } finally {
       setLoading(false);
     }
-  }, [homepageDefaults.allCategoryId, zoneId]);
+  }, [homepageDefaults.allCategoryId]);
 
   useEffect(() => {
     fetchData();

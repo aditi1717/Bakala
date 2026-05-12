@@ -50,7 +50,6 @@ const getRestaurantRouteParam = (restaurant, fallbackIndex = 0) => {
 const FoodRestaurantCard = memo(function FoodRestaurantCard({
   restaurant,
   index,
-  isOutOfService,
   availabilityTick,
   isFavorite,
   onFavoriteToggle,
@@ -84,7 +83,7 @@ const FoodRestaurantCard = memo(function FoodRestaurantCard({
         <Link to={`/user/restaurants/${restaurantSlug}`} className="flex h-full">
           <Card
             className={`relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-[28px] border-0 border-background bg-white py-0 shadow-sm transition-all duration-500 hover:shadow-xl dark:border-gray-800 dark:bg-[#1a1a1a] ${
-              isOutOfService || !availability.isOpen ? "grayscale opacity-75" : ""
+              !availability.isOpen ? "grayscale opacity-75" : ""
             }`}
           >
             <div className="relative">
@@ -127,17 +126,25 @@ const FoodRestaurantCard = memo(function FoodRestaurantCard({
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-[10px] font-medium uppercase tracking-widest shadow-sm ${
-                          availability.isOpen ? "bg-emerald-500 text-white" : "bg-gray-400 text-white"
+                          availability.state === "open"
+                            ? "bg-emerald-500 text-white"
+                            : availability.state === "off"
+                              ? "bg-rose-500 text-white"
+                              : "bg-gray-400 text-white"
                         }`}
                       >
-                        {availability.isOpen ? "Open now" : "Offline"}
+                        {availability.badgeLabel || "Closed"}
                       </span>
-                      {availability.isOpen && availability.closingCountdownLabel && (
-                        <div className="flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                      <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium tracking-wide ${
+                        availability.state === "open"
+                          ? "border border-amber-100 bg-amber-50 text-amber-700"
+                          : availability.state === "off"
+                            ? "border border-rose-100 bg-rose-50 text-rose-700"
+                            : "border border-slate-200 bg-slate-100 text-slate-600"
+                      }`}>
                           <Timer className="h-3 w-3 flex-shrink-0" strokeWidth={2.5} />
-                          <span>{availability.closingCountdownLabel}</span>
+                          <span>{availability.detailLabel || "Closed"}</span>
                         </div>
-                      )}
                     </div>
                   </div>
                   <div
@@ -159,8 +166,6 @@ const FoodRestaurantCard = memo(function FoodRestaurantCard({
                 <div className="mb-2 flex items-center gap-1 text-sm text-gray-500 opacity-70 transition-opacity duration-300 group-hover:opacity-100 lg:mb-3 lg:text-base">
                   <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400 lg:h-5 lg:w-5" strokeWidth={1.5} />
                   <span className="font-medium text-gray-700 dark:text-gray-300">{restaurant.deliveryTime}</span>
-                  <span className="mx-1">|</span>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">{restaurant.distance}</span>
                 </div>
 
                 {restaurant.offer && (
@@ -199,7 +204,6 @@ function FoodHomeContent({
   isLoadingFilterResults,
   loadingRestaurants,
   visibleRestaurants,
-  isOutOfService,
   availabilityTick,
   isFavorite,
   onFavoriteToggle,
@@ -480,7 +484,6 @@ function FoodHomeContent({
                 key={restaurant?.id || restaurant?._id || restaurant?.slug || index}
                 restaurant={restaurant}
                 index={index}
-                isOutOfService={isOutOfService}
                 availabilityTick={availabilityTick}
                 isFavorite={isFavorite}
                 onFavoriteToggle={onFavoriteToggle}

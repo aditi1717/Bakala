@@ -61,7 +61,12 @@ export default function LandingPageManagement() {
   const under250BannersFileInputRef = useRef(null)
 
   // Settings
-  const [settings, setSettings] = useState({ exploreMoreHeading: "Explore More", recommendedRestaurantIds: [], defaultUnderPriceLimit: DEFAULT_PRICE_LIMIT, headerVideoUrl: "" })
+  const [settings, setSettings] = useState({
+    exploreMoreHeading: "Explore More",
+    recommendedRestaurantIds: [],
+    defaultUnderPriceLimit: DEFAULT_PRICE_LIMIT,
+    headerVideoUrl: "",
+  })
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [headerVideoUploading, setHeaderVideoUploading] = useState(false)
@@ -957,7 +962,12 @@ export default function LandingPageManagement() {
     } catch (err) {
       // Silently handle 401/404 errors - endpoints may not exist yet, use default settings
       if (err.response?.status === 401 || err.response?.status === 404) {
-        setSettings({ exploreMoreHeading: "Explore More", recommendedRestaurantIds: [], defaultUnderPriceLimit: DEFAULT_PRICE_LIMIT, headerVideoUrl: "" }) // Use default settings
+        setSettings({
+          exploreMoreHeading: "Explore More",
+          recommendedRestaurantIds: [],
+          defaultUnderPriceLimit: DEFAULT_PRICE_LIMIT,
+          headerVideoUrl: "",
+        }) // Use default settings
         setError(null) // Clear any previous error
       } else {
         // Filter out token-related errors

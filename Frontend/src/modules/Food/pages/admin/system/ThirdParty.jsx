@@ -69,17 +69,6 @@ const thirdPartyServices = [
   },
   {
     id: 6,
-    name: "Google Maps",
-    category: "Map Service",
-    description: "Google Maps API integration",
-    enabled: true,
-    configured: true,
-    fields: [
-      { key: "apiKey", label: "API Key", value: "AIzaSy...", type: "password" }
-    ]
-  },
-  {
-    id: 7,
     name: "AWS S3",
     category: "Storage Service",
     description: "Amazon S3 file storage",
@@ -308,4 +297,5 @@ export default function ThirdParty() {
     </div>
   )
 }
+
 

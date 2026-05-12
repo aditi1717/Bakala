@@ -83,6 +83,11 @@ const restaurantSchema = new mongoose.Schema(
       required: true,
       default: false,
     },
+    isRestaurant: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
     addressLine1: {
       type: String,
     },
@@ -194,12 +199,6 @@ const restaurantSchema = new mongoose.Schema(
     location: {
       type: geoPointSchema,
       default: undefined,
-    },
-    /** Optional service zone id (can be computed from location). */
-    zoneId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "FoodZone",
-      index: true,
     },
     businessModel: {
       type: String,

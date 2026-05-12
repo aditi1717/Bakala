@@ -70,17 +70,10 @@ export default function DeliverymanList() {
   const [editValues, setEditValues] = useState({ pocketBalance: "", cashInHand: "" })
   const [savingDeliveryId, setSavingDeliveryId] = useState(null)
   const [deletingDeliveryId, setDeletingDeliveryId] = useState(null)
-  const [zones, setZones] = useState([])
-  const [zonesLoading, setZonesLoading] = useState(false)
-  const [isZoneDialogOpen, setIsZoneDialogOpen] = useState(false)
-  const [selectedDeliveryForZone, setSelectedDeliveryForZone] = useState(null)
-  const [selectedZoneId, setSelectedZoneId] = useState("")
-  const [savingZoneForDeliveryId, setSavingZoneForDeliveryId] = useState(null)
   const [visibleColumns, setVisibleColumns] = useState({
     si: true,
     name: true,
     contact: true,
-    zone: true,
     vehicleType: true,
     totalOrders: true,
     availabilityStatus: true,
@@ -112,20 +105,6 @@ export default function DeliverymanList() {
     } while (currentPage <= totalPages)
 
     return allRows
-  }
-
-  const fetchZones = async () => {
-    try {
-      setZonesLoading(true)
-      const response = await adminAPI.getZones({ page: 1, limit: 1000 })
-      const list = response?.data?.data?.zones || []
-      setZones(Array.isArray(list) ? list : [])
-    } catch (err) {
-      debugError("Error fetching zones:", err)
-      setZones([])
-    } finally {
-      setZonesLoading(false)
-    }
   }
 
   // Fetch delivery partners from API
@@ -312,7 +291,6 @@ availableCashLimit: wallet?.availableCashLimit || 0,
   // Fetch on mount
   useEffect(() => {
     fetchDeliverymen()
-    fetchZones()
   }, [])
 
   // Debounced search effect
@@ -399,7 +377,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
       si: true,
       name: true,
       contact: true,
-      zone: true,
       vehicleType: true,
       totalOrders: true,
       availabilityStatus: true,
@@ -411,7 +388,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
     si: "Serial Number",
     name: "Name",
     contact: "Contact",
-    zone: "Zone",
     vehicleType: "Vehicle Type",
     totalOrders: "Total Orders",
     availabilityStatus: "Availability Status",
@@ -559,62 +535,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
     }
   }
 
-  const handleOpenZoneDialog = (deliveryman) => {
-    setSelectedDeliveryForZone(deliveryman)
-    setSelectedZoneId(String(deliveryman?.zoneId || ""))
-    setIsZoneDialogOpen(true)
-  }
-
-  const handleSaveZone = async () => {
-    const deliverymanId = String(selectedDeliveryForZone?._id || "")
-    if (!deliverymanId) return
-    if (!selectedZoneId) {
-      toast.error("Please select a zone")
-      return
-    }
-
-    try {
-      setSavingZoneForDeliveryId(deliverymanId)
-      const response = await adminAPI.updateDeliveryPartnerZone(deliverymanId, selectedZoneId)
-      const partner = response?.data?.data?.partner
-      if (!response?.data?.success || !partner) {
-        toast.error(response?.data?.message || "Failed to update zone")
-        return
-      }
-
-      const nextZoneId = String(partner?.zoneId?._id || partner?.zoneId || selectedZoneId)
-      const nextZoneLabel =
-        partner?.zoneId?.name ||
-        partner?.zoneId?.zoneName ||
-        partner?.zoneId?.serviceLocation ||
-        selectedDeliveryForZone?.zone ||
-        "N/A"
-
-      setDeliverymen((prev) =>
-        prev.map((item) =>
-          String(item._id) === deliverymanId
-            ? { ...item, zoneId: nextZoneId, zone: nextZoneLabel }
-            : item,
-        ),
-      )
-      setViewDetails((prev) =>
-        prev && String(prev._id) === deliverymanId
-          ? { ...prev, zoneId: nextZoneId, zone: nextZoneLabel }
-          : prev,
-      )
-
-      toast.success("Zone assigned successfully")
-      setIsZoneDialogOpen(false)
-      setSelectedDeliveryForZone(null)
-      setSelectedZoneId("")
-    } catch (err) {
-      debugError("Error updating delivery partner zone:", err)
-      toast.error(err?.response?.data?.message || "Failed to assign zone")
-    } finally {
-      setSavingZoneForDeliveryId(null)
-    }
-  }
-
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
@@ -710,11 +630,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                         <span>Contact</span>
                       </th>
                     )}
-                    {visibleColumns.zone && (
-                      <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                        <span>Zone</span>
-                      </th>
-                    )}
                     {visibleColumns.vehicleType && (
                       <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                         <span>Vehicle Type</span>
@@ -794,11 +709,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                             </div>
                           </td>
                         )}
-                        {visibleColumns.zone && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-slate-700">{dm.zone || "Unassigned"}</span>
-                          </td>
-                        )}
                         {visibleColumns.vehicleType && (
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-sm text-slate-700 capitalize">{dm.vehicle?.type || dm.vehicleType || "N/A"}</span>
@@ -827,13 +737,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                                 title="View Details"
                               >
                                 <Eye className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleOpenZoneDialog(dm)}
-                                className="p-1.5 rounded bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors"
-                                title="Assign Zone"
-                              >
-                                <MapPin className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => handleDelete(dm)}
@@ -906,14 +809,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">Delivery ID</label>
                       <p className="text-sm font-medium text-slate-900 mt-1">{viewDetails.deliveryId || "N/A"}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> Zone
-                      </label>
-                      <p className="text-sm text-slate-900 mt-1">
-                        {viewDetails.zone || viewDetails.zoneName || viewDetails.zoneDetails?.zoneName || viewDetails.zoneDetails?.name || viewDetails.zoneDetails?.serviceLocation || "Unassigned"}
-                      </p>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">Status</label>
@@ -1298,59 +1193,6 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isZoneDialogOpen} onOpenChange={setIsZoneDialogOpen}>
-        <DialogContent className="max-w-md bg-white p-0">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-200">
-            <DialogTitle className="text-lg font-semibold text-slate-900">Assign Zone</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-5 space-y-4">
-            <p className="text-sm text-slate-600">
-              {selectedDeliveryForZone?.name
-                ? `Select zone for ${selectedDeliveryForZone.name}.`
-                : "Select a zone for this delivery partner."}
-            </p>
-            <select
-              value={selectedZoneId}
-              onChange={(e) => setSelectedZoneId(e.target.value)}
-              disabled={zonesLoading || savingZoneForDeliveryId === String(selectedDeliveryForZone?._id || "")}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
-            >
-              <option value="">{zonesLoading ? "Loading zones..." : "Select zone"}</option>
-              {zones.map((zone) => {
-                const id = String(zone?._id || zone?.id || "")
-                if (!id) return null
-                const label = zone?.name || zone?.zoneName || zone?.serviceLocation || id
-                return (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                )
-              })}
-            </select>
-          </div>
-          <DialogFooter className="px-6 pb-6 pt-1">
-            <button
-              type="button"
-              onClick={() => {
-                setIsZoneDialogOpen(false)
-                setSelectedDeliveryForZone(null)
-                setSelectedZoneId("")
-              }}
-              className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveZone}
-              disabled={!selectedZoneId || savingZoneForDeliveryId === String(selectedDeliveryForZone?._id || "")}
-              className="px-4 py-2 rounded-lg bg-[#005128] text-sm font-medium text-white hover:bg-[#004020] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {savingZoneForDeliveryId === String(selectedDeliveryForZone?._id || "") ? "Saving..." : "Save Zone"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -33,29 +33,12 @@ export default function RestaurantReport() {
   const [restaurants, setRestaurants] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
-    zone: "All Zones",
     all: "All",
     time: "All Time",
     fromDate: "",
     toDate: "",
   })
-  const [zones, setZones] = useState([])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-
-  // Fetch zones for filter dropdown
-  useEffect(() => {
-    const fetchZones = async () => {
-      try {
-        const response = await adminAPI.getZones({ limit: 1000 })
-        if (response?.data?.success && response.data.data?.zones) {
-          setZones(response.data.data.zones)
-        }
-      } catch (error) {
-        debugError("Error fetching zones:", error)
-      }
-    }
-    fetchZones()
-  }, [])
 
   // Fetch restaurant report data
   useEffect(() => {
@@ -82,7 +65,6 @@ export default function RestaurantReport() {
         }
         
         const params = {
-          zone: filters.zone !== "All Zones" ? filters.zone : undefined,
           all: filters.all !== "All" ? filters.all : undefined,
           time: filters.time !== "All Time" ? filters.time : undefined,
           fromDate: filters.fromDate || undefined,
@@ -120,7 +102,6 @@ export default function RestaurantReport() {
 
   const handleReset = () => {
     setFilters({
-      zone: "All Zones",
       all: "All",
       time: "All Time",
       fromDate: "",
@@ -316,7 +297,6 @@ export default function RestaurantReport() {
   }
 
   const activeFiltersCount =
-    (filters.zone !== "All Zones" ? 1 : 0) +
     (filters.all !== "All" ? 1 : 0) +
     (filters.time !== "All Time" ? 1 : 0) +
     (filters.fromDate ? 1 : 0) +
@@ -371,24 +351,7 @@ export default function RestaurantReport() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Search Data</h3>
           <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 flex-1">
-              <div className="relative">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Zone
-                </label>
-                <select
-                  value={filters.zone}
-                  onChange={(e) => setFilters(prev => ({ ...prev, zone: e.target.value }))}
-                  className="w-full px-4 py-2.5 pr-8 text-sm rounded-lg border border-slate-300 bg-white text-slate-700 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
-                >
-                  <option value="All Zones">All Zones</option>
-                  {zones.map(zone => (
-                    <option key={zone._id} value={zone.name}>{zone.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 bottom-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
-              </div>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
               <div className="relative">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   All

@@ -6,8 +6,8 @@ import { sendResponse, sendError } from '../../../../utils/response.js';
  */
 export const searchController = async (req, res, next) => {
     try {
-        const { q, lat, lng, radiusKm, categoryId, minRating, maxDeliveryTime, isVeg, page, limit, zoneId } = req.query;
-        console.log(`[Search-Debug] q="${q}", catId="${categoryId}", zone="${zoneId}", coords=[${lat}, ${lng}]`);
+        const { q, lat, lng, radiusKm, categoryId, minRating, maxDeliveryTime, isVeg, page, limit } = req.query;
+        console.log(`[Search-Debug] q="${q}", catId="${categoryId}", coords=[${lat}, ${lng}]`);
 
         const results = await searchUnified({
             q,
@@ -19,8 +19,7 @@ export const searchController = async (req, res, next) => {
             maxDeliveryTime,
             isVeg,
             page: parseInt(page) || 1,
-            limit: parseInt(limit) || 20,
-            zoneId
+            limit: parseInt(limit) || 20
         });
 
         return sendResponse(res, 200, 'Search results fetched successfully', results.data);
@@ -34,8 +33,7 @@ export const searchController = async (req, res, next) => {
  */
 export const listAdminCategoriesController = async (req, res, next) => {
     try {
-        const { zoneId } = req.query;
-        const categories = await getAdminCategories({ zoneId });
+        const categories = await getAdminCategories();
         
         return sendResponse(res, 200, 'Admin categories fetched successfully', { categories });
     } catch (error) {

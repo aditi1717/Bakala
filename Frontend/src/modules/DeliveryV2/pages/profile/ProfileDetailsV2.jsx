@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, Loader2, Camera, Image as ImageIcon } from "lucide-react"
 import { toast } from "sonner"
-import { deliveryAPI, zoneAPI } from "@food/api"
+import { deliveryAPI } from "@food/api"
 import { clearModuleAuth } from "@food/utils/auth"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
 import { openCamera } from "@food/utils/imageUploadUtils"
@@ -39,9 +39,7 @@ export const ProfileDetailsV2 = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState("")
-  const [zones, setZones] = useState([])
   const [profile, setProfile] = useState(null)
-  const [zoneId, setZoneId] = useState("")
   const [form, setForm] = useState(emptyForm)
   const [editingBasic, setEditingBasic] = useState(false)
   const [editingVehicle, setEditingVehicle] = useState(false)
@@ -57,14 +55,8 @@ export const ProfileDetailsV2 = () => {
   const drivingPhotoUrl = profile?.documents?.drivingLicense?.document || null
   const upiQrUrl = profile?.documents?.bankDetails?.upiQrCode || null
 
-  const selectedZoneLabel = useMemo(() => {
-    const zone = zones.find((z) => String(z?._id || z?.id || "") === String(zoneId || ""))
-    return zone?.zoneName || zone?.name || zone?.serviceLocation || "Unassigned"
-  }, [zones, zoneId])
-
   const applyProfile = (p) => {
     setProfile(p)
-    setZoneId(String(p?.zone?._id || p?.zoneId || ""))
     setForm({
       name: p?.name || "",
       phone: p?.phone || "",
@@ -87,14 +79,9 @@ export const ProfileDetailsV2 = () => {
   }
 
   const refresh = async () => {
-    const [profileRes, zoneRes] = await Promise.all([
-      deliveryAPI.getProfile(),
-      zoneAPI.getPublicZones(),
-    ])
+    const profileRes = await deliveryAPI.getProfile()
     const p = profileRes?.data?.data?.profile
     if (!p) throw new Error("Failed to load profile")
-    const zoneList = zoneRes?.data?.data?.zones || zoneRes?.data?.zones || []
-    setZones(Array.isArray(zoneList) ? zoneList : [])
     applyProfile(p)
   }
 
@@ -235,31 +222,6 @@ export const ProfileDetailsV2 = () => {
     }
   }
 
-  const saveZoneOnly = async () => {
-    if (!zoneId) return toast.error("Please select a zone")
-    try {
-      setSaving(true)
-      const res = await deliveryAPI.updateProfileDetails({ zoneId })
-      const requiresReapproval =
-        res?.data?.data?.partner?.requiresReapproval ||
-        res?.data?.data?.requiresReapproval ||
-        false
-      if (requiresReapproval) {
-        clearModuleAuth("delivery")
-        localStorage.removeItem("app:isOnline")
-        toast.success("Zone changed. Sent for approval. Please login again after approval.")
-        navigate("/food/delivery/login", { replace: true })
-        return
-      }
-      await refresh()
-      toast.success("Zone updated")
-    } catch {
-      toast.error("Failed to update zone")
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const onPick = (ref) => ref.current?.click()
 
   if (loading) {
@@ -322,26 +284,6 @@ export const ProfileDetailsV2 = () => {
             <input disabled={!editingBasic} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="City" value={form.city} onChange={(e) => onInput("city", e.target.value)} />
             <input disabled={!editingBasic} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="State" value={form.state} onChange={(e) => onInput("state", e.target.value)} />
           </div>
-        </section>
-
-        <section className="bg-white rounded-2xl border border-amber-200 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Zone Edit (Group)</h2>
-            <span className="text-[10px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">Approval Required</span>
-          </div>
-          <p className="text-xs text-amber-700">If you change zone, profile will go for admin approval.</p>
-          <p className="text-xs text-slate-500">Current zone: {selectedZoneLabel}</p>
-          <select className={inputClass} value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
-            <option value="">Select zone</option>
-            {zones.map((z) => {
-              const id = String(z?._id || z?.id || "")
-              if (!id) return null
-              return <option key={id} value={id}>{z?.zoneName || z?.name || z?.serviceLocation}</option>
-            })}
-          </select>
-          <button onClick={saveZoneOnly} disabled={saving} className="w-full rounded-xl bg-amber-600 text-white py-3 text-sm font-semibold disabled:opacity-60">
-            {saving ? "Saving..." : "Update Zone"}
-          </button>
         </section>
 
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">

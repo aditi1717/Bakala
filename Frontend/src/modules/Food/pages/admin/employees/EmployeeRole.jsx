@@ -35,7 +35,6 @@ const modulePermissions = [
   { id: "customerWallet", label: "Customer Wallet" },
   { id: "food", label: "Food" },
   { id: "report", label: "Report" },
-  { id: "zone", label: "Zone" },
   { id: "cashback", label: "Cashback" },
 ]
 
@@ -545,4 +544,5 @@ export default function EmployeeRole() {
     </div>
   )
 }
+
 

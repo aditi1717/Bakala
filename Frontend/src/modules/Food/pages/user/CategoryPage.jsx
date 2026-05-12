@@ -19,7 +19,6 @@ import { restaurantAPI, adminAPI } from "@food/api"
 import { API_BASE_URL } from "@food/api/config"
 import { useProfile } from "@food/context/ProfileContext"
 import { useLocation } from "@food/hooks/useLocation"
-import { useZone } from "@food/hooks/useZone"
 import { useDelayedLoading } from "@food/hooks/useDelayedLoading"
 import { getMenuFromResponse } from "@food/utils/menuItems"
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
@@ -30,7 +29,7 @@ const filterOptions = [
   { id: 'under-30-mins', label: 'Under 30 mins' },
   { id: 'price-match', label: 'Price Match', hasIcon: true },
   { id: 'flat-50-off', label: 'Flat 50% OFF', hasIcon: true },
-  { id: 'under-250', label: 'Under ₹250' },
+  { id: 'under-250', label: 'Under ?250' },
   { id: 'rating-4-plus', label: 'Rating 4.0+' },
 ]
 
@@ -45,7 +44,6 @@ export default function CategoryPage() {
   const navigate = useNavigate()
   const { vegMode } = useProfile()
   const { location } = useLocation()
-  const { zoneId, isOutOfService } = useZone(location)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState(category?.toLowerCase() || 'all')
   const [activeFilters, setActiveFilters] = useState(new Set())
@@ -501,13 +499,6 @@ export default function CategoryPage() {
       })
     }
 
-    if (activeFilters.has('price-under-200')) {
-      nextRows = nextRows.filter((row) => {
-        const price = getComparablePrice(row)
-        return price != null && price <= 200
-      })
-    }
-
     if (activeFilters.has('under-250')) {
       nextRows = nextRows.filter((row) => {
         const price = getComparablePrice(row)
@@ -587,7 +578,7 @@ export default function CategoryPage() {
     const fetchCategories = async () => {
       try {
         setLoadingCategories(true)
-        const response = await adminAPI.getPublicCategories(zoneId ? { zoneId } : {})
+        const response = await adminAPI.getPublicCategories({})
 
         if (isCancelled) return;
 
@@ -645,7 +636,7 @@ export default function CategoryPage() {
     return () => {
       isCancelled = true;
     }
-  }, [zoneId])
+  }, [])
 
   // Helper function to check if menu has dishes matching category keywords
   const getCategoryKeywords = (categoryId) => {
@@ -833,8 +824,6 @@ export default function CategoryPage() {
     const fetchRestaurants = async () => {
       try {
         setLoadingRestaurants(true)
-        // IMPORTANT: Do NOT pass zoneId as a hard filter.
-        // UX is "show all restaurants", and we only style out-of-service state.
         const params = {}
         const response = await restaurantAPI.getRestaurants(params)
 
@@ -846,9 +835,9 @@ export default function CategoryPage() {
             if (!value) return false
 
             const defaultOffers = [
-              "Flat ₹50 OFF above ₹199",
+              "Flat ?50 OFF above ?199",
               "Flat 50% OFF",
-              "Flat ₹40 OFF above ₹149"
+              "Flat ?40 OFF above ?149"
             ]
             const defaultDeliveryTimes = ["25-30 mins", "20-25 mins", "30-35 mins"]
             const defaultDistances = ["1.2 km", "1 km", "0.8 km"]
@@ -1059,7 +1048,7 @@ export default function CategoryPage() {
     }
 
     fetchRestaurants()
-  }, [zoneId, isOutOfService])
+  }, [])
 
   // Update selected category when URL changes
   useEffect(() => {
@@ -1310,7 +1299,7 @@ export default function CategoryPage() {
   }
 
   // Check if should show grayscale (user out of service)
-  const shouldShowGrayscale = isOutOfService
+  const shouldShowGrayscale = false
   const isCategoryView = selectedCategory && selectedCategory !== 'all'
 
   return (
@@ -1457,7 +1446,7 @@ export default function CategoryPage() {
                 { id: 'distance-under-1km', label: 'Under 1km', icon: MapPin },
                 { id: 'distance-under-2km', label: 'Under 2km', icon: MapPin },
                 { id: 'flat-50-off', label: 'Flat 50% OFF' },
-                { id: 'under-250', label: 'Under ₹250' },
+                { id: 'under-250', label: 'Under ?250' },
               ].map((filter) => {
                 const Icon = filter.icon
                 const isActive = activeFilters.has(filter.id)
@@ -1658,8 +1647,8 @@ export default function CategoryPage() {
                           <div className="absolute top-3 left-3">
                             <div className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm md:text-base font-medium ${BRAND_THEME.tokens.homepage.home.restaurantCard.featuredDishBadge}`}>
                               {isCategoryView
-                                ? `₹${restaurant.categoryDishPrice || restaurant.featuredPrice || 0}`
-                                : `${restaurant.categoryDishName || restaurant.featuredDish} • ₹${restaurant.categoryDishPrice || restaurant.featuredPrice}`}
+                                ? `?${restaurant.categoryDishPrice || restaurant.featuredPrice || 0}`
+                                : `${restaurant.categoryDishName || restaurant.featuredDish} • ?${restaurant.categoryDishPrice || restaurant.featuredPrice}`}
                             </div>
                           </div>
                         )}
@@ -1986,22 +1975,13 @@ export default function CategoryPage() {
                         <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Dish Price</h3>
                         <div className="flex flex-col gap-3 md:gap-4">
                           <button
-                            onClick={() => toggleFilter('price-under-200')}
-                            className={`px-4 md:px-5 py-3 md:py-4 rounded-xl border text-left transition-colors ${activeFilters.has('price-under-200')
-                              ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-green-600'
-                              }`}
-                          >
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('price-under-200') ? 'text-[#EB590E]' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹200</span>
-                          </button>
-                          <button
                             onClick={() => toggleFilter('under-250')}
                             className={`px-4 md:px-5 py-3 md:py-4 rounded-xl border text-left transition-colors ${activeFilters.has('under-250')
                               ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
                               : 'border-gray-200 dark:border-gray-700 hover:border-green-600'
                               }`}
                           >
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('under-250') ? 'text-[#EB590E]' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹250</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('under-250') ? 'text-[#EB590E]' : 'text-gray-700 dark:text-gray-300'}`}>Under ?250</span>
                           </button>
                           <button
                             onClick={() => toggleFilter('price-under-500')}
@@ -2010,7 +1990,7 @@ export default function CategoryPage() {
                               : 'border-gray-200 dark:border-gray-700 hover:border-green-600'
                               }`}
                           >
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('price-under-500') ? 'text-[#EB590E]' : 'text-gray-700 dark:text-gray-300'}`}>Under ₹500</span>
+                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('price-under-500') ? 'text-[#EB590E]' : 'text-gray-700 dark:text-gray-300'}`}>Under ?500</span>
                           </button>
                         </div>
                       </div>
@@ -2110,4 +2090,8 @@ export default function CategoryPage() {
     </div>
   )
 }
+
+
+
+
 

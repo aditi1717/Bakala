@@ -40,10 +40,6 @@ const adminSchema = new mongoose.Schema(
             type: [String],
             default: []
         },
-        zoneIds: [{
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'FoodZone'
-        }],
         isActive: {
             type: Boolean,
             default: true

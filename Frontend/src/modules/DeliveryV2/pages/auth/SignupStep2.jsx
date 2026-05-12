@@ -323,7 +323,6 @@ export default function SignupStep2() {
     if (details.address) formData.append("address", details.address)
     if (details.city) formData.append("city", details.city)
     if (details.state) formData.append("state", details.state)
-    if (details.zoneId) formData.append("zoneId", details.zoneId)
     if (details.vehicleType) formData.append("vehicleType", details.vehicleType)
     if (details.vehicleName) formData.append("vehicleName", details.vehicleName)
     if (details.vehicleNumber) formData.append("vehicleNumber", details.vehicleNumber)

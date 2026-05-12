@@ -2,7 +2,6 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
-import { zoneAPI } from "@food/api"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
@@ -23,7 +22,6 @@ export default function SignupStep1() {
       address: "",
       city: "",
       state: "",
-      zoneId: "",
       vehicleType: "bike",
       vehicleName: "",
       vehicleNumber: "",
@@ -42,11 +40,6 @@ export default function SignupStep1() {
   })
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [zones, setZones] = useState([])
-  const [zonesLoading, setZonesLoading] = useState(false)
-
-  const getZoneLabel = (zone) =>
-    zone?.zoneName || zone?.name || zone?.serviceLocation || "Unnamed zone"
 
   const sanitizeLocationValue = (value) =>
     value.replace(/[^A-Za-z\s.-]/g, "").replace(/\s{2,}/g, " ")
@@ -94,35 +87,6 @@ export default function SignupStep1() {
   useEffect(() => {
     sessionStorage.setItem("deliverySignupDetails", JSON.stringify(formData))
   }, [formData])
-
-  useEffect(() => {
-    let isMounted = true
-
-    const fetchZones = async () => {
-      setZonesLoading(true)
-      try {
-        const response = await zoneAPI.getPublicZones()
-        const nextZones = response?.data?.data?.zones || response?.data?.zones || []
-        if (isMounted) {
-          setZones(Array.isArray(nextZones) ? nextZones : [])
-        }
-      } catch (error) {
-        debugError("Error fetching delivery zones:", error)
-        if (isMounted) {
-          setZones([])
-          toast.error("Unable to load delivery zones. Please try again.")
-        }
-      } finally {
-        if (isMounted) setZonesLoading(false)
-      }
-    }
-
-    fetchZones()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -200,10 +164,6 @@ export default function SignupStep1() {
       newErrors.state = "State can contain letters only"
     }
 
-    if (!formData.zoneId) {
-      newErrors.zoneId = "Zone is required"
-    }
-
     if (!formData.vehicleNumber.trim()) {
       newErrors.vehicleNumber = "Vehicle number is required"
     } else if (!/^[A-Z]{2}[0-9]{1,2}[A-Z]{1,2}[0-9]{4}$/.test(formData.vehicleNumber)) {
@@ -252,7 +212,6 @@ export default function SignupStep1() {
         address: formData.address.trim(),
         city: formData.city.trim(),
         state: formData.state.trim(),
-        zoneId: formData.zoneId,
         vehicleType: formData.vehicleType || "bike",
         vehicleName: formData.vehicleName?.trim() || "",
         vehicleNumber: formData.vehicleNumber.trim(),
@@ -380,33 +339,6 @@ export default function SignupStep1() {
               />
               {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
             </div>
-          </div>
-
-          {/* Delivery Zone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Delivery Zone <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="zoneId"
-              value={formData.zoneId}
-              onChange={handleChange}
-              disabled={zonesLoading}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#005128] bg-white ${errors.zoneId ? "border-red-500" : "border-gray-300"
-                } ${zonesLoading ? "opacity-70 cursor-not-allowed" : ""}`}
-            >
-              <option value="">{zonesLoading ? "Loading zones..." : "Select delivery zone"}</option>
-              {zones.map((zone) => {
-                const id = String(zone?._id || zone?.id || "")
-                if (!id) return null
-                return (
-                  <option key={id} value={id}>
-                    {getZoneLabel(zone)}
-                  </option>
-                )
-              })}
-            </select>
-            {errors.zoneId && <p className="text-red-500 text-sm mt-1">{errors.zoneId}</p>}
           </div>
 
           {/* Vehicle Type */}

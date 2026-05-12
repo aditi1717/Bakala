@@ -6,24 +6,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@food/components/ui/dialog"
-import { formatOrderAddressForMap, formatOrderAddressWithLabels } from "@food/utils/orderAddressFormatter"
+import { formatOrderAddressWithLabels } from "@food/utils/orderAddressFormatter"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
-
-const formatAddressForMap = (address) => {
-  return formatOrderAddressForMap(address)
-}
-
-const getGoogleMapsHref = (address) => {
-  if (address?.location?.coordinates && Array.isArray(address.location.coordinates) && address.location.coordinates.length === 2) {
-    const [lng, lat] = address.location.coordinates
-    return `https://www.google.com/maps?q=${lat},${lng}`
-  }
-  const query = encodeURIComponent(formatAddressForMap(address))
-  return query ? `https://www.google.com/maps/search/?api=1&query=${query}` : ""
-}
-
 
 const getStatusColor = (orderStatus) => {
   const colors = {
@@ -109,15 +95,6 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
         return { label, value }
       })
       .filter((segment) => segment.value)
-  }
-
-  // Get coordinates if available
-  const getCoordinates = (address) => {
-    if (address?.location?.coordinates && Array.isArray(address.location.coordinates) && address.location.coordinates.length === 2) {
-      const [lng, lat] = address.location.coordinates
-      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`
-    }
-    return null
   }
 
   const pickFirstText = (...values) => {
@@ -434,7 +411,6 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
               </h3>
               {(() => {
                 const deliveryAddress = order.address || order.deliveryAddress
-                const mapsHref = getGoogleMapsHref(deliveryAddress)
                 const formattedAddress = formatAddress(deliveryAddress)
                 const addressSegments = parseAddressSegments(formattedAddress)
                 return (
@@ -460,26 +436,10 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order }) {
                 ) : (
                   <p className="text-sm text-slate-900">{formattedAddress}</p>
                 )}
-                {getCoordinates(deliveryAddress) && (
-                  <p className="text-xs text-slate-500 mt-2">
-                    <span className="font-semibold text-indigo-700">Coordinates:</span> {getCoordinates(deliveryAddress)}
-                  </p>
-                )}
                 {deliveryAddress.label && (
                   <p className="text-xs text-slate-500">
                     <span className="font-semibold text-emerald-700">Label:</span> {deliveryAddress.label}
                   </p>
-                )}
-                {mapsHref && (
-                  <a
-                    href={mapsHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-xs font-semibold text-brand-600"
-                  >
-                    <MapPin className="w-3.5 h-3.5" />
-                    Open delivery route
-                  </a>
                 )}
               </div>
                 )

@@ -9,6 +9,7 @@ import ProtectedRoute from "@food/components/ProtectedRoute"
 // Home & Discovery
 const Home = lazy(() => import("../../pages/user/Home"))
 const Under250 = lazy(() => import("@food/pages/user/Under250"))
+const Grocery = lazy(() => import("@food/pages/user/Grocery"))
 const Categories = lazy(() => import("@food/pages/user/Categories"))
 const CategoryPage = lazy(() => import("@food/pages/user/CategoryPage"))
 const Restaurants = lazy(() => import("@food/pages/user/restaurants/Restaurants"))
@@ -90,6 +91,7 @@ export default function UserRouter() {
           {/* Home & Discovery */}
           <Route path="" element={<Home />} />
           <Route path="quick" element={<Home />} />
+          <Route path="grocery" element={<Grocery />} />
           <Route path="under-price" element={<Under250 />} />
           <Route path="under-250" element={<Navigate to="/food/under-price" replace />} />
           <Route path="under-:maxPrice" element={<Navigate to="/food/under-price" replace />} />

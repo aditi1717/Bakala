@@ -39,27 +39,9 @@ function formatCurrency(amount, options = {}) {
 
 export default function AdminHome() {
   const navigate = useNavigate()
-  const [selectedZone, setSelectedZone] = useState("all")
   const [selectedPeriod, setSelectedPeriod] = useState("overall")
   const [isLoading, setIsLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState(null)
-  const [zones, setZones] = useState([])
-
-  // Fetch zone list for filter
-  useEffect(() => {
-    const fetchZones = async () => {
-      try {
-        const response = await adminAPI.getZones({ page: 1, limit: 1000 })
-        const list = response?.data?.data?.zones || []
-        setZones(Array.isArray(list) ? list : [])
-      } catch (error) {
-        debugError("Error fetching zones:", error)
-        setZones([])
-      }
-    }
-
-    fetchZones()
-  }, [])
 
   // Fetch dashboard stats from backend when filters change
   useEffect(() => {
@@ -68,7 +50,6 @@ export default function AdminHome() {
         setIsLoading(true)
         const params = {
           period: selectedPeriod,
-          ...(selectedZone !== "all" ? { zoneId: selectedZone } : {}),
         }
         const response = await adminAPI.getDashboardStats(params)
         if (response.data?.success && response.data?.data) {
@@ -87,7 +68,7 @@ export default function AdminHome() {
     }
 
     fetchDashboardStats()
-  }, [selectedZone, selectedPeriod])
+  }, [selectedPeriod])
 
   // Get order stats from real data
   const getOrderStats = () => {
@@ -193,19 +174,6 @@ export default function AdminHome() {
 
           </div>
           <div className="flex flex-wrap gap-3">
-            <Select value={selectedZone} onValueChange={setSelectedZone}>
-              <SelectTrigger className="min-w-[160px] border-neutral-300 bg-white text-neutral-900">
-                <SelectValue placeholder="All zones" />
-              </SelectTrigger>
-              <SelectContent className="border-neutral-200 bg-white text-neutral-900">
-                <SelectItem value="all">All zones</SelectItem>
-                {zones.map((zone) => (
-                  <SelectItem key={zone._id} value={zone._id}>
-                    {zone.zoneName || zone.name || "Unnamed Zone"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
               <SelectTrigger className="min-w-[140px] border-neutral-300 bg-white text-neutral-900">
                 <SelectValue placeholder="Overall" />

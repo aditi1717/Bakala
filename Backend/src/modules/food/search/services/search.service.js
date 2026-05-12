@@ -1,7 +1,6 @@
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 import { FoodItem } from '../../admin/models/food.model.js';
 import { FoodCategory } from '../../admin/models/category.model.js';
-import { FoodZone } from '../../admin/models/zone.model.js';
 import mongoose from 'mongoose';
 import { isCategoryVisibleNow } from '../../shared/categoryWorkflow.js';
 
@@ -51,41 +50,6 @@ const isFoodVisibleNow = (food = {}, options = {}) => {
         return nowMinutes >= startMinutes && nowMinutes <= endMinutes;
     }
     return nowMinutes >= startMinutes || nowMinutes <= endMinutes;
-};
-
-const zoneToPolygon = (zoneDoc) => {
-    const coords = Array.isArray(zoneDoc?.coordinates) ? zoneDoc.coordinates : [];
-    if (coords.length < 3) return null;
-
-    const ring = coords
-        .map((coord) => [Number(coord.longitude), Number(coord.latitude)])
-        .filter((pair) => pair.every((value) => Number.isFinite(value)));
-
-    if (ring.length < 3) return null;
-
-    const first = ring[0];
-    const last = ring[ring.length - 1];
-    if (first[0] !== last[0] || first[1] !== last[1]) {
-        ring.push(first);
-    }
-
-    return { type: 'Polygon', coordinates: [ring] };
-};
-
-const buildZoneRestaurantConstraint = async (zoneIdRaw) => {
-    const trimmedZoneId = String(zoneIdRaw || '').trim();
-    if (!trimmedZoneId || !mongoose.Types.ObjectId.isValid(trimmedZoneId)) {
-        return null;
-    }
-
-    const zoneClauses = [{ zoneId: new mongoose.Types.ObjectId(trimmedZoneId) }];
-    const zoneDoc = await FoodZone.findOne({ _id: trimmedZoneId, isActive: true }).lean();
-    const polygon = zoneToPolygon(zoneDoc);
-    if (polygon) {
-        zoneClauses.push({ location: { $geoWithin: { $geometry: polygon } } });
-    }
-
-    return { $or: zoneClauses };
 };
 
 const APPROVED_FOOD_FILTER = {
@@ -150,8 +114,7 @@ export const searchUnified = async (query = {}, options = {}) => {
         maxDeliveryTime, 
         isVeg,
         page = 1,
-        limit = 20,
-        zoneId
+        limit = 20
     } = query;
 
     const skip = (page - 1) * limit;
@@ -161,12 +124,7 @@ export const searchUnified = async (query = {}, options = {}) => {
     // 1. Initial Filter (approved status and basic conditions)
     const restaurantFilter = { status: 'approved' };
     
-    console.log(`[Search-Service] Querying with term: "${term}", categoryId: "${categoryId}", zoneId: "${zoneId}"`);
-
-    const zoneConstraint = await buildZoneRestaurantConstraint(zoneId);
-    if (zoneConstraint) {
-        restaurantFilter.$and = [...(restaurantFilter.$and || []), zoneConstraint];
-    }
+    console.log(`[Search-Service] Querying with term: "${term}", categoryId: "${categoryId}"`);
 
     if (isVeg === 'true') {
         restaurantFilter.pureVegRestaurant = true;
@@ -297,7 +255,7 @@ export const searchUnified = async (query = {}, options = {}) => {
             }
         }
     } else {
-        // No search text -> List all restaurants matching filters (category/zone)
+        // No search text -> List all restaurants matching filters/category.
         const allMatching = await FoodRestaurant.find(restaurantFilter)
             .sort({ rating: -1, createdAt: -1 })
             .limit(limit * 2)
@@ -337,8 +295,7 @@ export const searchUnified = async (query = {}, options = {}) => {
             restaurants: results.slice(skip, skip + limit),
             total: results.length,
             page: parseInt(page),
-            limit: parseInt(limit),
-            zoneFiltered: !!(zoneId && mongoose.Types.ObjectId.isValid(zoneId))
+            limit: parseInt(limit)
         }
     };
 
@@ -358,14 +315,6 @@ export const getAdminCategories = async (query = {}) => {
             { restaurantId: { $eq: undefined } }
         ]
     };
-
-    if (query.zoneId && mongoose.Types.ObjectId.isValid(query.zoneId)) {
-        filter.$or = [
-            { zoneId: new mongoose.Types.ObjectId(query.zoneId) },
-            { zoneId: { $exists: false } },
-            { zoneId: null }
-        ];
-    }
 
     const categories = await FoodCategory.find(filter)
         .sort({ sortOrder: 1, name: 1 })

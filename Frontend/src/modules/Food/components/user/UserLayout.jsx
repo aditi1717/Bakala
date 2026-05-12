@@ -8,7 +8,6 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
-import SearchOverlay from "./SearchOverlay"
 import BottomNavigation from "./BottomNavigation"
 import DesktopNavbar from "./DesktopNavbar"
 import { useUserNotifications } from "../../hooks/useUserNotifications"
@@ -34,29 +33,23 @@ export function useSearchOverlay() {
 }
 
 function SearchOverlayProvider({ children }) {
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const navigate = useNavigate()
   const [searchValue, setSearchValue] = useState("")
 
-  const openSearch = () => {
-    setIsSearchOpen(true)
+  const openSearch = (initialQuery = "") => {
+    const path = initialQuery
+      ? `/food/user/search?q=${encodeURIComponent(initialQuery)}`
+      : "/food/user/search"
+    navigate(path)
   }
 
   const closeSearch = () => {
-    setIsSearchOpen(false)
     setSearchValue("")
   }
 
   return (
-    <SearchOverlayContext.Provider value={{ isSearchOpen, searchValue, setSearchValue, openSearch, closeSearch }}>
+    <SearchOverlayContext.Provider value={{ isSearchOpen: false, searchValue, setSearchValue, openSearch, closeSearch }}>
       {children}
-      {isSearchOpen && (
-        <SearchOverlay
-          isOpen={isSearchOpen}
-          onClose={closeSearch}
-          searchValue={searchValue}
-          onSearchChange={setSearchValue}
-        />
-      )}
     </SearchOverlayContext.Provider>
   )
 }
@@ -147,6 +140,8 @@ export default function UserLayout() {
 
   const showBottomNav = normalizedPath === "/" ||
     normalizedPath === "/user" ||
+    normalizedPath === "/grocery" ||
+    normalizedPath === "/user/grocery" ||
     normalizedPath === "/under-price" ||
     normalizedPath === "/user/under-price" ||
     normalizedPath === "/under-250" ||

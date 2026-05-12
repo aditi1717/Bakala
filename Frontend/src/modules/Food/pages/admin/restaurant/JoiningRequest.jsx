@@ -8,18 +8,9 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
-const getZoneLabel = (request) =>
-  request?.zoneId?.zoneName ||
-  request?.zoneId?.name ||
-  request?.zoneId?.serviceLocation ||
-  request?.zoneName ||
-  request?.zone ||
-  "—"
-
 const normalizeRequestRecord = (request, index) => ({
   ...request,
   sl: index + 1,
-  zone: getZoneLabel(request),
   businessModel: request?.businessModel || "",
   fullData: request?.fullData || request,
 })
@@ -50,7 +41,6 @@ export default function JoiningRequest() {
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [showFilterDialog, setShowFilterDialog] = useState(false)
   const [filters, setFilters] = useState({
-    zone: "",
     dateFrom: "",
     dateTo: ""
   })
@@ -102,12 +92,6 @@ export default function JoiningRequest() {
 
   const currentRequests = activeTab === "pending" ? pendingRequests : rejectedRequests
 
-  // Get unique zones for filter options
-  const filterOptions = useMemo(() => {
-    const zones = [...new Set(currentRequests.map(r => r.zone).filter(Boolean))]
-    return { zones }
-  }, [currentRequests])
-
   const filteredRequests = useMemo(() => {
     let filtered = currentRequests
 
@@ -119,11 +103,6 @@ export default function JoiningRequest() {
         request.ownerName?.toLowerCase().includes(query) ||
         request.ownerPhone?.includes(query)
       )
-    }
-
-    // Apply zone filter
-    if (filters.zone) {
-      filtered = filtered.filter(request => request.zone === filters.zone)
     }
 
     // Apply date range filter
@@ -148,13 +127,12 @@ export default function JoiningRequest() {
 
   const clearFilters = () => {
     setFilters({
-      zone: "",
       dateFrom: "",
       dateTo: ""
     })
   }
 
-  const hasActiveFilters = filters.zone || filters.dateFrom || filters.dateTo
+  const hasActiveFilters = filters.dateFrom || filters.dateTo
 
   const handleApprove = async (request) => {
     if (window.confirm(`Are you sure you want to approve "${request.restaurantName}" restaurant request?`)) {
@@ -349,7 +327,7 @@ export default function JoiningRequest() {
                 Filter
                 {hasActiveFilters && (
                   <span className="ml-1 px-1.5 py-0.5 bg-brand-600 text-white text-xs rounded-full">
-                    {[filters.zone, filters.dateFrom, filters.dateTo].filter(Boolean).length}
+                    {[filters.dateFrom, filters.dateTo].filter(Boolean).length}
                   </span>
                 )}
               </button>
@@ -381,12 +359,6 @@ export default function JoiningRequest() {
                   </th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
                     <div className="flex items-center gap-1">
-                      <span>Zone</span>
-                      
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
-                    <div className="flex items-center gap-1">
                       <span>Status</span>
                       
                     </div>
@@ -397,21 +369,21 @@ export default function JoiningRequest() {
               <tbody className="bg-white divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-20 text-center">
+                    <td colSpan={5} className="px-6 py-20 text-center">
                       <Loader2 className="w-8 h-8 animate-spin text-brand-600 mx-auto mb-3" />
                       <p className="text-lg font-semibold text-slate-700">Loading restaurant requests...</p>
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-20 text-center">
+                    <td colSpan={5} className="px-6 py-20 text-center">
                       <p className="text-lg font-semibold text-red-600 mb-1">Error: {error}</p>
                       <p className="text-sm text-slate-500">Failed to load restaurant requests. Please try again.</p>
                     </td>
                   </tr>
                 ) : filteredRequests.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-20 text-center">
+                    <td colSpan={5} className="px-6 py-20 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                         <p className="text-sm text-slate-500">No restaurant requests match your search</p>
@@ -460,7 +432,6 @@ export default function JoiningRequest() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-slate-700">{request.zone || "—"}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -535,28 +506,6 @@ export default function JoiningRequest() {
               </div>
 
               <div className="space-y-4">
-                {/* Zone Filter */}
-                {filterOptions.zones.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Zone
-                    </label>
-                    <select
-                      value={filters.zone}
-                      onChange={(e) => setFilters({ ...filters, zone: e.target.value })}
-                      className="w-full px-4 py-2.5 text-sm rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                    >
-                      <option value="">All Zones</option>
-                      {filterOptions.zones.map((zone) => (
-                        <option key={zone} value={zone}>{zone}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Business Model Filter */}
-                
-
                 {/* Date Range Filters */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -803,7 +752,7 @@ export default function JoiningRequest() {
                     <div>
                       <h4 className="text-lg font-semibold text-slate-900 mb-4">Location & Contact</h4>
                       <div className="space-y-3">
-                        {(hasAddress || r?.zone) && (
+                        {hasAddress && (
                           <div className="flex items-start gap-3">
                             <MapPin className="w-5 h-5 text-slate-400 mt-0.5 shrink-0" />
                             <div>
@@ -815,7 +764,7 @@ export default function JoiningRequest() {
                                     ? [r.location.addressLine1, r.location.addressLine2, r.location.area, r.location.city].filter(Boolean).join(", ")
                                     : r?.onboarding?.step1?.location
                                       ? [r.onboarding.step1.location.addressLine1, r.onboarding.step1.location.addressLine2, r.onboarding.step1.location.area, r.onboarding.step1.location.city].filter(Boolean).join(", ")
-                                      : r?.zone || "—"}
+                                      : "�"}
                               </p>
                             </div>
                           </div>
@@ -1250,6 +1199,9 @@ export default function JoiningRequest() {
     </div>
   )
 }
+
+
+
 
 
 

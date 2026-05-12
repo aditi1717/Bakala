@@ -9,12 +9,6 @@ const phoneSchema = z
 const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 const aadharRegex = /^[0-9]{12}$/;
 const drivingLicenseRegex = /^[A-Z]{2}[0-9]{2}[0-9]{4}[0-9]{7,8}$/;
-const objectIdRegex = /^[a-fA-F0-9]{24}$/;
-const optionalObjectIdSchema = z
-    .string()
-    .regex(objectIdRegex, 'Invalid zone')
-    .optional()
-    .or(z.literal(''));
 
 const deliveryRegisterSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -24,7 +18,6 @@ const deliveryRegisterSchema = z.object({
     address: z.string().optional(),
     city: z.string().optional(),
     state: z.string().optional(),
-    zoneId: optionalObjectIdSchema,
     vehicleType: z.string().optional(),
     vehicleName: z.string().optional(),
     vehicleNumber: z.string().optional(),
@@ -62,7 +55,6 @@ const deliveryProfileUpdateSchema = z.object({
     address: z.string().optional(),
     city: z.string().optional(),
     state: z.string().optional(),
-    zoneId: optionalObjectIdSchema,
     vehicleType: z.string().optional(),
     vehicleName: z.string().optional(),
     vehicleNumber: z.string().optional(),

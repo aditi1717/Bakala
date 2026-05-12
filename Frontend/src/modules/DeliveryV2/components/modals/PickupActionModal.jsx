@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   ChefHat, MapPin, Phone, 
-  ChevronDown, ChevronUp, Package, 
-  Navigation
+  ChevronDown, ChevronUp, Package
 } from 'lucide-react';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
 import { BRAND_THEME } from '@/config/brandTheme';
@@ -95,13 +94,6 @@ export const PickupActionModal = ({
                 <Phone className="w-4 h-4" />
               </button>
             )}
-            <button 
-              onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurantAddress)}`, '_blank')}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-lg"
-              style={{ backgroundColor: BRAND_THEME.colors.neutral.textPrimary }}
-            >
-              <Navigation className="w-4 h-4" />
-            </button>
           </div>
         </div>
 

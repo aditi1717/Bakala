@@ -33,12 +33,6 @@ const deliveryPartnerSchema = new mongoose.Schema(
         state: {
             type: String
         },
-        zoneId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'FoodZone',
-            default: null,
-            index: true
-        },
         vehicleType: {
             type: String
         },
@@ -99,13 +93,6 @@ const deliveryPartnerSchema = new mongoose.Schema(
             enum: ['online', 'offline'],
             default: 'offline'
         },
-        lastLocation: {
-            type: { type: String, enum: ['Point'] },
-            coordinates: { type: [Number] }
-        },
-        lastLat: { type: Number },
-        lastLng: { type: Number },
-        lastLocationAt: { type: Date },
         referralCode: { type: String, index: true },
         referredBy: {
             type: mongoose.Schema.Types.ObjectId,
@@ -128,9 +115,6 @@ const deliveryPartnerSchema = new mongoose.Schema(
         timestamps: true
     }
 );
-
-// Indices
-deliveryPartnerSchema.index({ lastLocation: '2dsphere' });
 
 export const FoodDeliveryPartner = mongoose.model('FoodDeliveryPartner', deliveryPartnerSchema);
 

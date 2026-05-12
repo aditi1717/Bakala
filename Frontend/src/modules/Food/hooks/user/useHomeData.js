@@ -3,7 +3,7 @@ import { restaurantAPI } from "@food/api";
 import { normalizeImageUrl, extractImages, calculateDistance, slugify } from "@food/utils/common";
 import BRAND_THEME from "@/config/brandTheme";
 
-export const useHomeData = (location, zoneId) => {
+export const useHomeData = (location) => {
   const homepageDefaults = BRAND_THEME.tokens.homepage.defaults;
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [landingCategories, setLandingCategories] = useState([]);
@@ -46,8 +46,7 @@ export const useHomeData = (location, zoneId) => {
       const params = {
         _ts: Date.now(),
         ...(filters.sortBy && { sortBy: filters.sortBy }),
-        ...(filters.cuisine && { cuisine: filters.cuisine }),
-        ...(zoneId && { zoneId })
+        ...(filters.cuisine && { cuisine: filters.cuisine })
       };
       const res = await restaurantAPI.getRestaurants(params);
       if (res.data?.success) {
@@ -82,7 +81,7 @@ export const useHomeData = (location, zoneId) => {
     } finally {
       setLoadingRestaurants(false);
     }
-  }, [location, zoneId]);
+  }, [location]);
 
   const fetchMenuMeta = useCallback(async () => {
     if (!restaurantsData.length) return;

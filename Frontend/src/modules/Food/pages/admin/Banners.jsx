@@ -30,7 +30,6 @@ export default function Banners() {
   const [banners, setBanners] = useState(emptyBanners)
   const [formData, setFormData] = useState({
     title: "",
-    zone: "",
     bannerType: "Restaurant wise",
     restaurant: "",
   })
@@ -49,11 +48,7 @@ export default function Banners() {
     let result = [...banners]
 
     if (bannerType !== "all") {
-      if (bannerType === "Restaurant wise") {
-        result = result.filter(banner => banner.bannerType === "Restaurant wise")
-      } else if (bannerType === "Zone wise") {
-        result = result.filter(banner => banner.bannerType === "Zone wise")
-      }
+      result = result.filter(banner => banner.bannerType === "Restaurant wise")
     }
 
     if (searchQuery.trim()) {
@@ -79,8 +74,7 @@ export default function Banners() {
   const handleReset = () => {
     setFormData({
       title: "",
-      zone: "",
-      bannerType: "Restaurant wise",
+    bannerType: "Restaurant wise",
       restaurant: "",
     })
   }
@@ -140,21 +134,6 @@ export default function Banners() {
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Zone <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.zone}
-                  onChange={(e) => handleInputChange("zone", e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
-                >
-                  <option value="">---Select---</option>
-                  <option value="asia">Asia</option>
-                  <option value="europe">Europe</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Banner Type <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -163,7 +142,6 @@ export default function Banners() {
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm"
                 >
                   <option value="Restaurant wise">Restaurant wise</option>
-                  <option value="Zone wise">Zone wise</option>
                 </select>
               </div>
 
@@ -233,7 +211,6 @@ export default function Banners() {
               >
                 <option value="all">All Banner</option>
                 <option value="Restaurant wise">Restaurant wise</option>
-                <option value="Zone wise">Zone wise</option>
               </select>
 
               <div className="relative flex-1 sm:flex-initial min-w-[200px]">
@@ -256,7 +233,6 @@ export default function Banners() {
                 <tr>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">SI</th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Banner Info</th>
-                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Zone</th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Banner Type</th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
@@ -282,9 +258,6 @@ export default function Banners() {
                         </div>
                         <span className="text-sm font-medium text-slate-900">{banner.title}</span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-slate-700">{banner.zone}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm text-slate-700">{banner.bannerType}</span>
@@ -331,4 +304,6 @@ export default function Banners() {
     </div>
   )
 }
+
+
 
