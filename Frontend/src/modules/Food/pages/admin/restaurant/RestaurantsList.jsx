@@ -1689,6 +1689,24 @@ export default function RestaurantsList() {
                 const coverImages = Array.isArray(r?.coverImages) ? r.coverImages.map(normalizeImageUrl).filter(Boolean) : []
                 const hasFlatAddress = r?.addressLine1 || r?.area || r?.city || r?.state || r?.pincode
                 const flatAddress = [r?.addressLine1, r?.addressLine2, r?.area, r?.city, r?.state, r?.pincode, r?.landmark].filter(Boolean).join(", ")
+                const locationAddressParts = [
+                  r?.location?.addressLine1,
+                  r?.location?.addressLine2,
+                  r?.location?.area,
+                  r?.location?.city,
+                  r?.location?.state,
+                  r?.location?.pincode || r?.location?.zipCode || r?.location?.postalCode,
+                  r?.location?.landmark,
+                ].filter(Boolean)
+                const locationAddressFromFields = locationAddressParts.join(", ")
+                const displayAddress = locationAddressFromFields || (r?.location ? formatLocationAddress(r.location, flatAddress || "N/A") : (flatAddress || "N/A"))
+                const normalizedMainAddress = String(displayAddress || "").trim().toLowerCase()
+                const normalizedFlatAddress = String(flatAddress || "").trim().toLowerCase()
+                const showRegistrationAddressBlock =
+                  hasFlatAddress &&
+                  !r?.onboarding?.step1?.location &&
+                  normalizedFlatAddress &&
+                  normalizedFlatAddress !== normalizedMainAddress
                 const menuImages = Array.isArray(r?.menuImages) ? r.menuImages.map(normalizeImageUrl).filter(Boolean) : []
                 const cuisinesList =
                   (Array.isArray(r?.cuisines) && r.cuisines.length ? r.cuisines : null) ||
@@ -1854,7 +1872,7 @@ export default function RestaurantsList() {
                             <div>
                               <p className="text-xs text-slate-500">Address</p>
                               <p className="text-sm font-medium text-slate-900">
-                                {r?.location ? formatLocationAddress(r.location, flatAddress || "N/A") : flatAddress}
+                                {displayAddress}
                               </p>
                             </div>
                           </div>
@@ -2274,7 +2292,7 @@ export default function RestaurantsList() {
                   )}
 
                   {/* Address at registration (flat) */}
-                  {hasFlatAddress && !r?.onboarding?.step1?.location && (
+                  {showRegistrationAddressBlock && (
                     <div className="pt-6 border-t border-slate-200">
                       <h4 className="text-lg font-semibold text-slate-900 mb-4">Address (at registration)</h4>
                       <p className="text-sm font-medium text-slate-900">{flatAddress}</p>
