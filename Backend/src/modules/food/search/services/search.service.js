@@ -98,6 +98,8 @@ const getMatchedFoodLabel = (food, regex, fallbackTerm = '') => {
     return food.name || fallbackTerm;
 };
 
+const isVegFood = (food = {}) => String(food?.foodType || '').trim().toLowerCase() === 'veg';
+
 /**
  * Unified Search Service
  * Searches for restaurants by name and also searches for food items, 
@@ -113,6 +115,7 @@ export const searchUnified = async (query = {}, options = {}) => {
         minRating, 
         maxDeliveryTime, 
         isVeg,
+        vegFoodOnly,
         isRestaurant,
         page = 1,
         limit = 20
@@ -134,7 +137,11 @@ export const searchUnified = async (query = {}, options = {}) => {
     
     console.log(`[Search-Service] Querying with term: "${term}", categoryId: "${categoryId}"`);
 
-    if (isVeg === 'true') {
+    const pureVegOnly = isVeg === 'true';
+    const vegFoodOnlyEnabled = vegFoodOnly === 'true';
+    const shouldSearchVegFoodOnly = pureVegOnly || vegFoodOnlyEnabled;
+
+    if (pureVegOnly) {
         restaurantFilter.pureVegRestaurant = true;
     }
 
@@ -171,7 +178,8 @@ export const searchUnified = async (query = {}, options = {}) => {
             $and: [
                 APPROVED_FOOD_FILTER,
                 { isAvailable: { $ne: false } },
-                { categoryId: new mongoose.Types.ObjectId(categoryId) }
+                { categoryId: new mongoose.Types.ObjectId(categoryId) },
+                ...(shouldSearchVegFoodOnly ? [{ foodType: 'Veg' }] : [])
             ]
         }).select('restaurantId').lean();
         
@@ -190,21 +198,23 @@ export const searchUnified = async (query = {}, options = {}) => {
     // 3. Search Matching
     if (regex) {
         // A. Search by Restaurant Name / Cuisine
-        const matchedRestaurants = await FoodRestaurant.find({
-            ...restaurantFilter,
-            $or: [
-                { restaurantName: { $regex: regex } },
-                { cuisines: { $regex: regex } }
-            ]
-        }).limit(limit * 2).lean();
+        if (!vegFoodOnlyEnabled) {
+            const matchedRestaurants = await FoodRestaurant.find({
+                ...restaurantFilter,
+                $or: [
+                    { restaurantName: { $regex: regex } },
+                    { cuisines: { $regex: regex } }
+                ]
+            }).limit(limit * 2).lean();
 
-        matchedRestaurants.forEach(r => {
-            restaurantIds.add(r._id.toString());
-            restaurantDetailsMap.set(r._id.toString(), { ...r, matchType: 'restaurant' });
-        });
+            matchedRestaurants.forEach(r => {
+                restaurantIds.add(r._id.toString());
+                restaurantDetailsMap.set(r._id.toString(), { ...r, matchType: 'restaurant' });
+            });
+        }
 
         // B. Search by Food Item Name
-        const matchedFoodsRaw = await FoodItem.find(buildFoodSearchFilter(regex, { isVeg }))
+        const matchedFoodsRaw = await FoodItem.find(buildFoodSearchFilter(regex, { isVeg: shouldSearchVegFoodOnly ? 'true' : isVeg }))
             .limit(limit * 2)
             .lean();
 
@@ -257,7 +267,9 @@ export const searchUnified = async (query = {}, options = {}) => {
                         matchType: 'food',
                         matchedDish: getMatchedFoodLabel(matchedFood, regex, term),
                         matchedDishImage: matchedFood?.image,
-                        matchedDishId: matchedFood?._id
+                        matchedDishId: matchedFood?._id,
+                        matchedDishFoodType: matchedFood?.foodType || 'Non-Veg',
+                        matchedDishIsVeg: isVegFood(matchedFood)
                     });
                 });
             }

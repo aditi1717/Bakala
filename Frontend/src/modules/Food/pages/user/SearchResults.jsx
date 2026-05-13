@@ -26,6 +26,7 @@ const filterOptions = [
   { id: 'rating-4-plus', label: 'Rating 4.0+' },
 ]
 const SEARCH_HISTORY_KEY = "user_recent_searches_v1"
+const HOME_VEG_MODE_OPTION_KEY = "food-home-veg-mode-option"
 
 // Mock data removed - using backend data only
 
@@ -33,6 +34,7 @@ export default function SearchResults() {
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get("q") || ""
   const navigate = useNavigate()
+  const { vegMode } = useProfile()
   const { location } = useLocation()
   const [searchQuery, setSearchQuery] = useState(query)
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -48,6 +50,11 @@ export default function SearchResults() {
   ])
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [categoryKeywords, setCategoryKeywords] = useState({})
+  const [vegModeOption, setVegModeOption] = useState(() => {
+    if (typeof window === "undefined") return "all"
+    const saved = window.localStorage.getItem(HOME_VEG_MODE_OPTION_KEY)
+    return saved === "pure-veg" ? "pure-veg" : "all"
+  })
   const showRestaurantSkeleton = useDelayedLoading(loadingRestaurants)
   const deferredQuery = useDeferredValue(query)
   const slugify = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
@@ -69,6 +76,28 @@ export default function SearchResults() {
       return 0
     })
   }
+
+  const isVegMenuItem = (item = {}) => {
+    if (item?.isVeg === true) return true
+    if (item?.isVeg === false) return false
+    const foodType = String(item?.foodType || item?.type || "").toLowerCase().trim()
+    return foodType === "veg" || foodType === "vegetarian"
+  }
+
+  const getMenuItems = (menu) => {
+    if (!menu || !Array.isArray(menu.sections)) return []
+    return menu.sections.flatMap((section) => {
+      const sectionItems = Array.isArray(section?.items) ? section.items : []
+      const subsectionItems = Array.isArray(section?.subsections)
+        ? section.subsections.flatMap((subsection) => Array.isArray(subsection?.items) ? subsection.items : [])
+        : []
+      return [...sectionItems, ...subsectionItems].filter((item) => item?.isAvailable !== false)
+    })
+  }
+
+  const hasVegMenuItem = (menu) => getMenuItems(menu).some(isVegMenuItem)
+  const isPureVegRestaurant = (restaurant) => restaurant?.pureVegRestaurant === true
+  const shouldRestrictToPureVeg = vegMode === true && vegModeOption === "pure-veg"
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -132,8 +161,24 @@ export default function SearchResults() {
     fetchCategories()
   }, [])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const syncVegModeOption = () => {
+      const saved = window.localStorage.getItem(HOME_VEG_MODE_OPTION_KEY)
+      setVegModeOption(saved === "pure-veg" ? "pure-veg" : "all")
+    }
+
+    syncVegModeOption()
+    window.addEventListener("storage", syncVegModeOption)
+    window.addEventListener("focus", syncVegModeOption)
+    return () => {
+      window.removeEventListener("storage", syncVegModeOption)
+      window.removeEventListener("focus", syncVegModeOption)
+    }
+  }, [])
+
   // Helper function to check if menu has dishes matching category keywords
-  const checkCategoryInMenu = (menu, categoryId) => {
+  const checkCategoryInMenu = (menu, categoryId, vegOnly = false) => {
     if (!menu || !menu.sections || !Array.isArray(menu.sections)) {
       return false
     }
@@ -156,6 +201,7 @@ export default function SearchResults() {
       if (section.items && Array.isArray(section.items)) {
         for (const item of section.items) {
           if (item?.isAvailable === false) continue
+          if (vegOnly && !isVegMenuItem(item)) continue
           // Check item name
           const itemNameLower = (item.name || '').toLowerCase()
           if (keywords.some(keyword => itemNameLower.includes(keyword))) {
@@ -174,7 +220,7 @@ export default function SearchResults() {
   }
 
   // Helper function to get featured dish for a category from menu
-  const getCategoryDishFromMenu = (menu, categoryId) => {
+  const getCategoryDishFromMenu = (menu, categoryId, vegOnly = false) => {
     if (!menu || !menu.sections || !Array.isArray(menu.sections)) {
       return null
     }
@@ -189,6 +235,7 @@ export default function SearchResults() {
       if (section.items && Array.isArray(section.items)) {
         for (const item of section.items) {
           if (item?.isAvailable === false) continue
+          if (vegOnly && !isVegMenuItem(item)) continue
           const itemNameLower = (item.name || '').toLowerCase()
           const itemCategoryLower = (item.category || '').toLowerCase()
 
@@ -366,12 +413,21 @@ export default function SearchResults() {
                       let featuredDish = restaurant.featuredDish
                       let featuredPrice = restaurant.featuredPrice
 
-                      if (!featuredDish || !featuredPrice) {
+                      if (vegMode === true || !featuredDish || !featuredPrice) {
                         for (const section of (menu.sections || [])) {
                           if (section.items && section.items.length > 0) {
-                            const firstItem = section.items[0]
+                            const firstItem = section.items.find((item) => item?.isAvailable !== false && (!vegMode || isVegMenuItem(item)))
+                            if (!firstItem) continue
                             if (!featuredDish) featuredDish = firstItem.name
+                            if (vegMode === true) featuredDish = firstItem.name
                             if (!featuredPrice) {
+                              const originalPrice = firstItem.originalPrice || firstItem.price || 0
+                              const discountPercent = firstItem.discountPercent || 0
+                              featuredPrice = discountPercent > 0
+                                ? Math.round(originalPrice * (1 - discountPercent / 100))
+                                : originalPrice
+                            }
+                            if (vegMode === true) {
                               const originalPrice = firstItem.originalPrice || firstItem.price || 0
                               const discountPercent = firstItem.discountPercent || 0
                               featuredPrice = discountPercent > 0
@@ -508,7 +564,7 @@ export default function SearchResults() {
     }
 
     fetchRestaurants()
-  }, [])
+  }, [vegMode])
 
   // Update search query when URL changes
   useEffect(() => {
@@ -594,15 +650,35 @@ export default function SearchResults() {
     const sourceData = restaurantsData.length > 0 ? restaurantsData : []
     let filtered = [...sourceData]
 
+    if (vegMode === true) {
+      filtered = filtered.filter((r) => !r.menu || hasVegMenuItem(r.menu))
+    }
+    if (shouldRestrictToPureVeg) {
+      filtered = filtered.filter(isPureVegRestaurant)
+    }
+
     // Filter by search query
     if (deferredQuery.trim()) {
       const lowerQuery = deferredQuery.toLowerCase()
-      filtered = filtered.filter(r =>
-        r.name?.toLowerCase().includes(lowerQuery) ||
-        r.cuisine?.toLowerCase().includes(lowerQuery) ||
-        r.featuredDish?.toLowerCase().includes(lowerQuery) ||
-        r.category === selectedCategory
-      )
+      filtered = filtered.filter(r => {
+        const baseMatch =
+          r.name?.toLowerCase().includes(lowerQuery) ||
+          r.cuisine?.toLowerCase().includes(lowerQuery) ||
+          r.featuredDish?.toLowerCase().includes(lowerQuery) ||
+          r.category === selectedCategory
+
+        if (vegMode !== true || !r.menu) return baseMatch
+
+        const menuMatch = getMenuItems(r.menu).some((item) => (
+          isVegMenuItem(item) &&
+          (
+            item.name?.toLowerCase().includes(lowerQuery) ||
+            item.category?.toLowerCase().includes(lowerQuery)
+          )
+        ))
+
+        return menuMatch || (baseMatch && hasVegMenuItem(r.menu))
+      })
     }
 
     // Filter by category - Dynamic filtering based on menu items
@@ -610,10 +686,10 @@ export default function SearchResults() {
       filtered = filtered.filter(r => {
         // If restaurant has menu data, check menu for category items
         if (r.menu) {
-          const hasCategoryItem = checkCategoryInMenu(r.menu, selectedCategory)
+          const hasCategoryItem = checkCategoryInMenu(r.menu, selectedCategory, vegMode === true)
           if (hasCategoryItem) {
             // Update featured dish for this category
-            const categoryDish = getCategoryDishFromMenu(r.menu, selectedCategory)
+            const categoryDish = getCategoryDishFromMenu(r.menu, selectedCategory, vegMode === true)
             if (categoryDish && !r.categoryFeaturedDish) {
               r.categoryFeaturedDish = categoryDish
             }
@@ -674,12 +750,19 @@ export default function SearchResults() {
     }
 
     return sortOpenRestaurantsFirst(uniqueRestaurants(filtered))
-  }, [deferredQuery, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories, availabilityTick])
+  }, [deferredQuery, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories, availabilityTick, vegMode, shouldRestrictToPureVeg])
 
   const filteredAllRestaurants = useMemo(() => {
     // Use ONLY backend data - no hardcoded fallback
     const sourceData = restaurantsData.length > 0 ? restaurantsData : []
     let filtered = [...sourceData]
+
+    if (vegMode === true) {
+      filtered = filtered.filter((r) => !r.menu || hasVegMenuItem(r.menu))
+    }
+    if (shouldRestrictToPureVeg) {
+      filtered = filtered.filter(isPureVegRestaurant)
+    }
 
     // Filter by search query - Search in name, cuisine, featured dish
     if (deferredQuery.trim()) {
@@ -695,6 +778,7 @@ export default function SearchResults() {
           for (const section of r.menu.sections) {
             if (section.items) {
               for (const item of section.items) {
+                if (vegMode === true && !isVegMenuItem(item)) continue
                 if (item.name?.toLowerCase().includes(lowerQuery) ||
                   item.category?.toLowerCase().includes(lowerQuery)) {
                   menuMatch = true
@@ -715,10 +799,10 @@ export default function SearchResults() {
       filtered = filtered.filter(r => {
         // If restaurant has menu data, check menu for category items
         if (r.menu) {
-          const hasCategoryItem = checkCategoryInMenu(r.menu, selectedCategory)
+          const hasCategoryItem = checkCategoryInMenu(r.menu, selectedCategory, vegMode === true)
           if (hasCategoryItem) {
             // Update featured dish for this category
-            const categoryDish = getCategoryDishFromMenu(r.menu, selectedCategory)
+            const categoryDish = getCategoryDishFromMenu(r.menu, selectedCategory, vegMode === true)
             if (categoryDish && !r.categoryFeaturedDish) {
               r.categoryFeaturedDish = categoryDish
             }
@@ -782,7 +866,7 @@ export default function SearchResults() {
     }
 
     return sortOpenRestaurantsFirst(uniqueRestaurants(filtered))
-  }, [deferredQuery, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories, availabilityTick])
+  }, [deferredQuery, selectedCategory, activeFilters, restaurantsData, categoryKeywords, loadingCategories, availabilityTick, vegMode, shouldRestrictToPureVeg])
 
   const recommendedIds = useMemo(
     () => new Set(filteredRecommended.slice(0, 6).map((restaurant) => restaurant.id)),
@@ -944,7 +1028,7 @@ export default function SearchResults() {
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 sm:gap-4 lg:gap-5">
               {filteredRecommended.slice(0, 6).map((restaurant) => {
                 const availability = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick))
-                const isRestaurantOffline = !availability.isOpen
+                const isRestaurantOffline = availability.state !== "open"
                 const isUnavailableNow = shouldShowGrayscale || isRestaurantOffline
                 return (
                   <Link
@@ -979,7 +1063,7 @@ export default function SearchResults() {
                           </div>
                         )}
                         <div className={`absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-white ${isRestaurantOffline ? 'bg-gray-700/90' : 'bg-emerald-600/90'}`}>
-                          {isRestaurantOffline ? "Offline" : "Open"}
+                          {availability.badgeLabel || (isRestaurantOffline ? "Closed" : "Open now")}
                         </div>
                       </div>
 
@@ -1023,7 +1107,7 @@ export default function SearchResults() {
               const restaurantSlug = restaurant.name.toLowerCase().replace(/\s+/g, "-")
               const isFavorite = favorites.has(restaurant.id)
               const availability = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick))
-              const isRestaurantOffline = !availability.isOpen
+              const isRestaurantOffline = availability.state !== "open"
               const isUnavailableNow = shouldShowGrayscale || isRestaurantOffline
 
               return (
@@ -1080,7 +1164,7 @@ export default function SearchResults() {
                         </div>
                       )}
                       <div className={`absolute bottom-3 left-3 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-sm ${isRestaurantOffline ? 'bg-gray-800/90' : 'bg-emerald-600/90'}`}>
-                        {isRestaurantOffline ? "Offline" : "Open now"}
+                        {availability.badgeLabel || (isRestaurantOffline ? "Closed" : "Open now")}
                       </div>
 
                       {/* Bookmark Icon - Top Right */}

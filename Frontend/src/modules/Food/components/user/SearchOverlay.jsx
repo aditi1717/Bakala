@@ -7,8 +7,10 @@ import { searchAPI } from "@/services/api"
 import BRAND_THEME from "@/config/brandTheme"
 import { useLocation as useGeoLocation } from "@food/hooks/useLocation"
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
+import { useProfile } from "@food/context/ProfileContext"
 
 const SEARCH_HISTORY_KEY = "user_recent_searches_v1"
+const HOME_VEG_MODE_OPTION_KEY = "food-home-veg-mode-option"
 
 export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchChange }) {
   const searchOverlayTheme = BRAND_THEME.tokens?.searchOverlay || {}
@@ -32,6 +34,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
   const navigate = useNavigate()
   const routeLocation = useLocation()
   const { location: userCoords } = useGeoLocation()
+  const { vegMode } = useProfile()
   const inputRef = useRef(null)
   const [filteredFoods, setFilteredFoods] = useState([])
   const [recentSuggestions, setRecentSuggestions] = useState([])
@@ -39,6 +42,26 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
   const searchRequestIdRef = useRef(0)
   const listingType = routeLocation.pathname.includes("/grocery") ? "grocery" : "restaurant"
   const isGrocery = listingType === "grocery"
+  const [vegModeOption, setVegModeOption] = useState(() => {
+    if (typeof window === "undefined") return "all"
+    const saved = window.localStorage.getItem(HOME_VEG_MODE_OPTION_KEY)
+    return saved === "pure-veg" ? "pure-veg" : "all"
+  })
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const syncVegModeOption = () => {
+      const saved = window.localStorage.getItem(HOME_VEG_MODE_OPTION_KEY)
+      setVegModeOption(saved === "pure-veg" ? "pure-veg" : "all")
+    }
+    syncVegModeOption()
+    window.addEventListener("storage", syncVegModeOption)
+    window.addEventListener("focus", syncVegModeOption)
+    return () => {
+      window.removeEventListener("storage", syncVegModeOption)
+      window.removeEventListener("focus", syncVegModeOption)
+    }
+  }, [])
 
   const buildSearchUrl = (term) => {
     const params = new URLSearchParams({ listingType })
@@ -111,6 +134,8 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
           lat: userCoords?.latitude,
           lng: userCoords?.longitude,
           isRestaurant: isGrocery ? false : true,
+          isVeg: vegMode && vegModeOption === "pure-veg" ? true : undefined,
+          vegFoodOnly: vegMode && vegModeOption !== "pure-veg" ? true : undefined,
         })
         const restaurants = res?.data?.data?.restaurants || []
         const normalizedFoods = restaurants
@@ -124,7 +149,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
               }
             }
 
-            if (item?.restaurantName) {
+            if (item?.restaurantName && !(vegMode && vegModeOption !== "pure-veg")) {
               return {
                 id: item?._id || `restaurant-${index}`,
                 name: String(item.restaurantName).trim(),
@@ -158,7 +183,7 @@ export default function SearchOverlay({ isOpen, onClose, searchValue, onSearchCh
     }, 250)
 
     return () => clearTimeout(timer)
-  }, [isGrocery, isOpen, searchValue, userCoords?.latitude, userCoords?.longitude])
+  }, [isGrocery, isOpen, searchValue, userCoords?.latitude, userCoords?.longitude, vegMode, vegModeOption])
 
   const saveRecentSearch = (term) => {
     const value = String(term || "").trim()

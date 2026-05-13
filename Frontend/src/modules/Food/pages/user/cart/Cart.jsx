@@ -2020,7 +2020,6 @@ export default function Cart() {
   }
 
   const handleGoToOrders = () => {
-    setShowOrderSuccess(false)
     navigate(`/food/orders/${encodeURIComponent(String(placedOrderId))}?confirmed=true`, { replace: true })
   }
 

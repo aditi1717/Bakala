@@ -9,6 +9,7 @@ import { Button } from "@food/components/ui/button"
 import { useLocationSelector, useSearchOverlay } from "@food/components/user/UserLayout"
 import { useLocation } from "@food/hooks/useLocation"
 import { useCart } from "@food/context/CartContext"
+import { useProfile } from "@food/context/ProfileContext"
 import offerImage from "@food/assets/offerimage.webp"
 import AddToCartAnimation from "@food/components/user/AddToCartAnimation"
 import OptimizedImage from "@food/components/OptimizedImage"
@@ -34,7 +35,14 @@ const debugError = (...args) => {}
 const RUPEE_SYMBOL = "\u20B9"
 const DEFAULT_UNDER_PRICE_LIMIT = 250
 const UNDER_250_FILTERS_STORAGE_KEY = "food-under-250-filters"
-const UNDER_250_VEG_MODE_KEY = "food-under-250-veg-mode"
+const HOME_VEG_MODE_OPTION_KEY = "food-home-veg-mode-option"
+const isTruthyFlag = (value) => value === true || value === "true" || value === 1 || value === "1"
+const isVegMenuItem = (item = {}) => {
+  if (item?.isVeg === true) return true
+  if (item?.isVeg === false) return false
+  const foodType = String(item?.foodType || "").toLowerCase()
+  return foodType.includes("veg") && !foodType.includes("non")
+}
 const readUnder250Filters = () => {
   if (typeof window === "undefined") {
     return {
@@ -79,6 +87,7 @@ export default function Under250() {
   const { openLocationSelector } = useLocationSelector()
   const { openSearch, setSearchValue } = useSearchOverlay()
   const { addToCart, updateQuantity, removeFromCart, getCartItem, cart } = useCart()
+  const { vegMode, setVegMode } = useProfile()
   const [activeCategory, setActiveCategory] = useState(initialFiltersRef.current.activeCategory)
   const [showSortPopup, setShowSortPopup] = useState(false)
   const [selectedSort, setSelectedSort] = useState(initialFiltersRef.current.selectedSort)
@@ -116,14 +125,13 @@ export default function Under250() {
   const touchEndYRef = useRef(0)
   const isBannerSwipingRef = useRef(false)
   const [placeholderIndex, setPlaceholderIndex] = useState(0)
-  const [vegMode, setVegMode] = useState(() => {
-    if (typeof window === "undefined") return false
-    return window.localStorage.getItem(UNDER_250_VEG_MODE_KEY) === "true"
-  })
-  const [prevVegMode, setPrevVegMode] = useState(vegMode)
   const [showVegModePopup, setShowVegModePopup] = useState(false)
   const [showSwitchOffPopup, setShowSwitchOffPopup] = useState(false)
-  const [vegModeOption, setVegModeOption] = useState("all")
+  const [vegModeOption, setVegModeOption] = useState(() => {
+    if (typeof window === "undefined") return "all"
+    const saved = window.localStorage.getItem(HOME_VEG_MODE_OPTION_KEY)
+    return saved === "pure-veg" ? "pure-veg" : "all"
+  })
   const isHandlingSwitchOff = useRef(false)
   const placeholders = useMemo(
     () => [
@@ -168,25 +176,39 @@ export default function Under250() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    window.localStorage.setItem(UNDER_250_VEG_MODE_KEY, vegMode ? "true" : "false")
-  }, [vegMode])
+    const syncVegModeOption = () => {
+      const saved = window.localStorage.getItem(HOME_VEG_MODE_OPTION_KEY)
+      setVegModeOption(saved === "pure-veg" ? "pure-veg" : "all")
+    }
+    syncVegModeOption()
+    window.addEventListener("storage", syncVegModeOption)
+    window.addEventListener("focus", syncVegModeOption)
+    return () => {
+      window.removeEventListener("storage", syncVegModeOption)
+      window.removeEventListener("focus", syncVegModeOption)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(HOME_VEG_MODE_OPTION_KEY, vegModeOption === "pure-veg" ? "pure-veg" : "all")
+  }, [vegModeOption])
 
   const handleVegModeChange = (newValue) => {
     if (isHandlingSwitchOff.current) return
 
-    if (newValue && !prevVegMode) {
+    if (newValue && !vegMode) {
       setShowVegModePopup(true)
       return
     }
 
-    if (!newValue && prevVegMode) {
+    if (!newValue && vegMode) {
       isHandlingSwitchOff.current = true
       setShowSwitchOffPopup(true)
       return
     }
 
     setVegMode(newValue)
-    setPrevVegMode(newValue)
   }
 
   // Helper function to parse delivery time (e.g., "12-15 mins" -> 12 or average)
@@ -226,8 +248,9 @@ export default function Under250() {
 
     if (vegMode) {
       filtered = filtered
+        .filter((restaurant) => vegModeOption !== "pure-veg" || isTruthyFlag(restaurant?.pureVegRestaurant))
         .map((restaurant) => {
-          const vegItems = (restaurant.menuItems || []).filter((item) => item?.isVeg)
+          const vegItems = (restaurant.menuItems || []).filter(isVegMenuItem)
           if (vegItems.length === 0) return null
           return { ...restaurant, menuItems: vegItems }
         })
@@ -313,7 +336,18 @@ export default function Under250() {
       if (aClosed !== bClosed) return aClosed - bClosed
       return 0
     })
-  }, [under250Restaurants, selectedSort, under30MinsFilter, activeCategory, categories, vegMode, availabilityTick])
+  }, [under250Restaurants, selectedSort, under30MinsFilter, activeCategory, categories, vegMode, vegModeOption, availabilityTick])
+
+  const visibleCategories = useMemo(() => {
+    if (!vegMode) return categories
+    return categories.filter((category) => category?.foodTypeScope === "Veg")
+  }, [categories, vegMode])
+
+  useEffect(() => {
+    if (!activeCategory) return
+    if (visibleCategories.some((category) => category.id === activeCategory)) return
+    setActiveCategory(null)
+  }, [activeCategory, visibleCategories])
 
   // Fetch under-price banner from public API
   useEffect(() => {
@@ -475,13 +509,11 @@ export default function Under250() {
                   isCategoryActiveForItem(item)
                 )
                 .map((item) => {
-                  const foodType = String(item?.foodType || "").toLowerCase()
-                  const isVeg = foodType.includes("veg") && !foodType.includes("non")
                   return {
                     ...item,
                     id: String(item?.id || item?._id || `${restaurantId}-${item?.name || "dish"}`),
                     price: Number(item?.price || 0),
-                    isVeg,
+                    isVeg: isVegMenuItem(item),
                     image:
                       item?.image ||
                       restaurant?.coverImages?.[0]?.url ||
@@ -525,6 +557,7 @@ export default function Under250() {
                 ...restaurant,
                 id: String(restaurantId),
                 restaurantId: String(restaurantId),
+                pureVegRestaurant: isTruthyFlag(restaurant?.pureVegRestaurant),
                 slug:
                   restaurant?.slug ||
                   String(restaurant?.restaurantName || restaurant?.name || "")
@@ -584,6 +617,7 @@ export default function Under250() {
               id: String(cat?.id || cat?._id || cat?.slug || `cat-${index}`),
               name,
               slug: String(cat?.slug || name.toLowerCase().replace(/\s+/g, "-")),
+              foodTypeScope: cat?.foodTypeScope || "Both",
               image:
                 cat?.imageUrl ||
                 cat?.image ||
@@ -1082,7 +1116,7 @@ export default function Under250() {
                 </span>
               </motion.div>
             </div>
-            {categories.map((category, index) => {
+            {visibleCategories.map((category, index) => {
               const isActive = activeCategory === category.id
               return (
                 <div key={category.id} className="flex-shrink-0 cursor-pointer" onClick={() => setActiveCategory(isActive ? null : category.id)}>
@@ -1786,7 +1820,6 @@ export default function Under250() {
               onClick={() => {
                 setShowVegModePopup(false)
                 setVegMode(false)
-                setPrevVegMode(false)
               }}
               className="fixed inset-0 bg-black/30 z-[9998] backdrop-blur-sm"
             />
@@ -1869,7 +1902,6 @@ export default function Under250() {
                 onClick={() => {
                   setShowVegModePopup(false)
                   setVegMode(true)
-                  setPrevVegMode(true)
                 }}
                 className={`w-full font-semibold py-2.5 rounded-xl transition-colors mb-2 text-sm ${BRAND_THEME.tokens.homepage.filters.primaryButton}`}
               >
@@ -1928,7 +1960,6 @@ export default function Under250() {
                       setShowSwitchOffPopup(false)
                       isHandlingSwitchOff.current = false
                       setVegMode(false)
-                      setPrevVegMode(false)
                     }}
                     className="w-full bg-transparent text-red-600 font-normal py-1 text-normal rounded-xl hover:bg-red-50 transition-colors text-base"
                   >

@@ -8,6 +8,12 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
+const ONBOARDING_VEHICLE_TYPE_OPTIONS = [
+  { value: "bike", label: "Bike" },
+  { value: "scooter", label: "Scooter" },
+  { value: "bicycle", label: "Bicycle" },
+  { value: "car", label: "Car" },
+]
 
 export default function JoinRequest() {
   const [activeTab, setActiveTab] = useState("pending")
@@ -209,7 +215,7 @@ export default function JoinRequest() {
   }
 
   const activeFiltersCount = Object.values(filters).filter(v => v).length
-  const vehicleTypes = [...new Set(requests.map(r => r.vehicle?.type || r.vehicleType))].filter(Boolean)
+  const vehicleTypes = ONBOARDING_VEHICLE_TYPE_OPTIONS
 
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
@@ -907,8 +913,8 @@ export default function JoinRequest() {
                 className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
               >
                 <option value="">All Vehicle Types</option>
-                {vehicleTypes.map(type => (
-                  <option key={type} value={type}>{type}</option>
+                {vehicleTypes.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
                 ))}
               </select>
             </div>

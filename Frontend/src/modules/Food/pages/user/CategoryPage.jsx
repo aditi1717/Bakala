@@ -36,6 +36,7 @@ const filterOptions = [
 // Mock data removed - using backend data only
 
 const CATEGORY_PAGE_FILTERS_STORAGE_KEY = "food-category-page-filters-v1"
+const HOME_VEG_MODE_OPTION_KEY = "food-home-veg-mode-option"
 
 
 
@@ -71,6 +72,11 @@ export default function CategoryPage() {
   const [approvedFoodsData, setApprovedFoodsData] = useState([])
   const [categoryKeywords, setCategoryKeywords] = useState({})
   const [availabilityTick, setAvailabilityTick] = useState(Date.now())
+  const [vegModeOption, setVegModeOption] = useState(() => {
+    if (typeof window === "undefined") return "all"
+    const saved = window.localStorage.getItem(HOME_VEG_MODE_OPTION_KEY)
+    return saved === "pure-veg" ? "pure-veg" : "all"
+  })
   const showCategorySkeleton = useDelayedLoading(loadingCategories)
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const BACKEND_ORIGIN = useMemo(() => API_BASE_URL.replace(/\/api\/?$/, ""), [])
@@ -105,6 +111,11 @@ export default function CategoryPage() {
       return true
     })
   }
+  const shouldRestrictToPureVeg = vegMode === true && vegModeOption === "pure-veg"
+  const visibleCategories = useMemo(() => {
+    if (!vegMode) return categories
+    return categories.filter((cat) => cat?.id === "all" || cat?.slug === "all" || cat?.foodTypeScope === "Veg")
+  }, [categories, vegMode])
 
   const toArray = (value) => {
     if (Array.isArray(value)) return value
@@ -190,6 +201,21 @@ export default function CategoryPage() {
       setAvailabilityTick(Date.now())
     }, 60000)
     return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const syncVegModeOption = () => {
+      const saved = window.localStorage.getItem(HOME_VEG_MODE_OPTION_KEY)
+      setVegModeOption(saved === "pure-veg" ? "pure-veg" : "all")
+    }
+    syncVegModeOption()
+    window.addEventListener("storage", syncVegModeOption)
+    window.addEventListener("focus", syncVegModeOption)
+    return () => {
+      window.removeEventListener("storage", syncVegModeOption)
+      window.removeEventListener("focus", syncVegModeOption)
+    }
   }, [])
 
   const buildFallbackMenuFromFoods = (foods, restaurant) => {
@@ -422,18 +448,6 @@ export default function CategoryPage() {
 
   const getComparableDeliveryTime = (row) => parseFirstNumber(row?.deliveryTime)
 
-  const getComparableDistance = (row) => {
-    const raw = String(row?.distance || "").trim().toLowerCase()
-    if (!raw) return null
-
-    const parsed = parseFirstNumber(raw)
-    if (parsed == null) return null
-    if (raw.includes("m") && !raw.includes("km")) {
-      return parsed / 1000
-    }
-    return parsed
-  }
-
   const getComparablePrice = (row) => {
     const raw = row?.categoryDishPrice ?? row?.featuredPrice ?? null
     const parsed = typeof raw === "number" ? raw : parseFirstNumber(raw)
@@ -482,20 +496,6 @@ export default function CategoryPage() {
       nextRows = nextRows.filter((row) => {
         const rating = getComparableRating(row)
         return rating != null && rating >= 4.5
-      })
-    }
-
-    if (activeFilters.has('distance-under-1km')) {
-      nextRows = nextRows.filter((row) => {
-        const distance = getComparableDistance(row)
-        return distance != null && distance <= 1
-      })
-    }
-
-    if (activeFilters.has('distance-under-2km')) {
-      nextRows = nextRows.filter((row) => {
-        const distance = getComparableDistance(row)
-        return distance != null && distance <= 2
       })
     }
 
@@ -600,6 +600,7 @@ export default function CategoryPage() {
               image: cat.image || foodImages[0],
               slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-'),
               type: cat.type,
+              foodTypeScope: cat.foodTypeScope || "Both",
             }))
           ]
 
@@ -1121,7 +1122,7 @@ export default function CategoryPage() {
       inline: "center",
       block: "nearest",
     })
-  }, [selectedCategory, categories])
+  }, [selectedCategory, visibleCategories])
 
   const toggleFilter = (filterId) => {
     setActiveFilters(prev => {
@@ -1187,6 +1188,10 @@ export default function CategoryPage() {
     const sourceData = restaurantsData.length > 0 ? restaurantsData : []
     let filtered = [...sourceData]
 
+    if (shouldRestrictToPureVeg) {
+      filtered = filtered.filter((r) => r?.pureVegRestaurant === true)
+    }
+
     // Filter by category - Dynamic filtering based on menu items
     if (selectedCategory && selectedCategory !== 'all') {
       const expandedDishes = []
@@ -1226,15 +1231,22 @@ export default function CategoryPage() {
         filtered = vegMode
           ? fallbackDishes.filter((dish) => dish.categoryDishFoodType === "Veg")
           : fallbackDishes
+        if (shouldRestrictToPureVeg) {
+          filtered = filtered.filter((dish) => dish?.pureVegRestaurant === true)
+        }
       }
     }
 
     return sortUnavailableToEnd(applyFiltersAndSorting(filtered))
-  }, [selectedCategory, activeFilters, deferredSearchQuery, restaurantsData, categoryKeywords, vegMode, approvedFoodsData, sortBy, availabilityTick])
+  }, [selectedCategory, activeFilters, deferredSearchQuery, restaurantsData, categoryKeywords, vegMode, approvedFoodsData, sortBy, availabilityTick, shouldRestrictToPureVeg])
 
   const filteredAllRestaurants = useMemo(() => {
     const sourceData = restaurantsData.length > 0 ? restaurantsData : []
     let filtered = [...sourceData]
+
+    if (shouldRestrictToPureVeg) {
+      filtered = filtered.filter((r) => r?.pureVegRestaurant === true)
+    }
 
     // Filter by category - Dynamic filtering based on menu items
     // If category is selected, expand restaurants into dish cards (one card per matching dish)
@@ -1276,11 +1288,14 @@ export default function CategoryPage() {
         filtered = vegMode
           ? fallbackDishes.filter((dish) => dish.categoryDishFoodType === "Veg")
           : fallbackDishes
+        if (shouldRestrictToPureVeg) {
+          filtered = filtered.filter((dish) => dish?.pureVegRestaurant === true)
+        }
       }
     }
 
     return sortUnavailableToEnd(applyFiltersAndSorting(filtered))
-  }, [selectedCategory, activeFilters, deferredSearchQuery, restaurantsData, categoryKeywords, vegMode, approvedFoodsData, sortBy, availabilityTick])
+  }, [selectedCategory, activeFilters, deferredSearchQuery, restaurantsData, categoryKeywords, vegMode, approvedFoodsData, sortBy, availabilityTick, shouldRestrictToPureVeg])
 
   const showRestaurantSkeleton = useDelayedLoading(
     isLoadingFilterResults || loadingRestaurants || (isEnrichingMenus && selectedCategory !== 'all' && filteredRecommended.length === 0),
@@ -1339,7 +1354,7 @@ export default function CategoryPage() {
             {showCategorySkeleton ? (
               <CategoryChipRowSkeleton className="py-3" />
             ) : (
-              categories && categories.length > 0 ? categories.map((cat) => {
+              visibleCategories && visibleCategories.length > 0 ? visibleCategories.map((cat) => {
                 const categorySlug = cat.slug || cat.id
                 const isSelected = selectedCategory === categorySlug || selectedCategory === cat.id
                 const isAllCategory = categorySlug === "all" || cat.id === "all"
@@ -1442,9 +1457,7 @@ export default function CategoryPage() {
                 msOverflowStyle: "none",
               }}
             >
-              {[
-                { id: 'distance-under-1km', label: 'Under 1km', icon: MapPin },
-                { id: 'distance-under-2km', label: 'Under 2km', icon: MapPin },
+              {[ 
                 { id: 'flat-50-off', label: 'Flat 50% OFF' },
                 { id: 'under-250', label: 'Under ?250' },
               ].map((filter) => {
@@ -1793,7 +1806,6 @@ export default function CategoryPage() {
                         { id: 'sort', label: 'Sort By', icon: ArrowDownUp },
                         { id: 'time', label: 'Time', icon: Timer },
                         { id: 'rating', label: 'Rating', icon: Star },
-                        { id: 'distance', label: 'Distance', icon: MapPin },
                         { id: 'price', label: 'Dish Price', icon: IndianRupee },
                         { id: 'offers', label: 'Offers', icon: BadgePercent },
                         { id: 'trust', label: 'Trust', icon: ShieldCheck },
@@ -1931,37 +1943,6 @@ export default function CategoryPage() {
                           >
                             <Star className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('rating-45-plus') ? 'text-[#EB590E] fill-[#EB590E]' : 'text-gray-400 dark:text-gray-500'}`} />
                             <span className={`text-sm md:text-base font-medium ${activeFilters.has('rating-45-plus') ? 'text-[#EB590E]' : 'text-gray-700 dark:text-gray-300'}`}>Rated 4.5+</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Distance Tab */}
-                      <div
-                        ref={el => filterSectionRefs.current['distance'] = el}
-                        data-section-id="distance"
-                        className="space-y-4 mb-8"
-                      >
-                        <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-4">Distance</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                          <button
-                            onClick={() => toggleFilter('distance-under-1km')}
-                            className={`flex flex-col items-center gap-2 p-4 md:p-5 rounded-xl border transition-colors ${activeFilters.has('distance-under-1km')
-                              ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-green-600'
-                              }`}
-                          >
-                            <MapPin className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('distance-under-1km') ? 'text-[#EB590E]' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('distance-under-1km') ? 'text-[#EB590E]' : 'text-gray-700 dark:text-gray-300'}`}>Under 1 km</span>
-                          </button>
-                          <button
-                            onClick={() => toggleFilter('distance-under-2km')}
-                            className={`flex flex-col items-center gap-2 p-4 md:p-5 rounded-xl border transition-colors ${activeFilters.has('distance-under-2km')
-                              ? 'border-green-600 bg-green-50 dark:bg-green-900/20'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-green-600'
-                              }`}
-                          >
-                            <MapPin className={`h-6 w-6 md:h-7 md:w-7 ${activeFilters.has('distance-under-2km') ? 'text-[#EB590E]' : 'text-gray-600 dark:text-gray-400'}`} strokeWidth={1.5} />
-                            <span className={`text-sm md:text-base font-medium ${activeFilters.has('distance-under-2km') ? 'text-[#EB590E]' : 'text-gray-700 dark:text-gray-300'}`}>Under 2 km</span>
                           </button>
                         </div>
                       </div>

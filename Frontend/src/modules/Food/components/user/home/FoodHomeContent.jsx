@@ -7,7 +7,6 @@ import {
   Bookmark,
   Clock,
   Flame,
-  MapPin,
   SlidersHorizontal,
   Star,
   Timer,
@@ -29,8 +28,6 @@ import BRAND_THEME from "@/config/brandTheme";
 const PRIMARY_FILTERS = [
   { id: "delivery-under-30", label: "Under 30 mins" },
   { id: "delivery-under-45", label: "Under 45 mins" },
-  { id: "distance-under-1km", label: "Under 1km", icon: MapPin },
-  { id: "distance-under-2km", label: "Under 2km", icon: MapPin },
 ];
 
 const getRestaurantRouteParam = (restaurant, fallbackIndex = 0) => {

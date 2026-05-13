@@ -24,6 +24,7 @@ const buildHomeRestaurantCacheKey = (params = {}) => {
     .sort(([a], [b]) => a.localeCompare(b));
   return JSON.stringify(entries);
 };
+const isTruthyFlag = (value) => value === true || value === "true" || value === 1 || value === "1";
 
 
 const calculateDistance = (lat1, lng1, lat2, lng2) => {
@@ -234,6 +235,7 @@ export const useFoodHomeData = ({ location, vegMode, listingType = "restaurant" 
             id: r.restaurantId || r._id,
             name: r.name || r.restaurantName || "Unknown Restaurant",
             image,
+            pureVegRestaurant: isTruthyFlag(r.pureVegRestaurant),
             distanceInKm,
             deliveryTime: r.deliveryTime || r.estimatedDeliveryTime || "25-30 min",
             featuredPrice: r.featuredPrice || 249,

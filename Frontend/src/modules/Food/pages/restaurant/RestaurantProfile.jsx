@@ -236,7 +236,7 @@ const RestaurantProfile = () => {
     } else if (section === "fssai") {
       if (kycInfo.fssaiNumber && !/^\d{14}$/.test(kycInfo.fssaiNumber)) return toast.error("FSSAI license number must be 14 digits")
     } else if (section === 'bank') {
-      if (!/^\d+$/.test(bankInfo.accountNumber)) return toast.error("Account number should only contain digits")
+      if (!/^\d{9,15}$/.test(bankInfo.accountNumber)) return toast.error("Account number must be 9 to 15 digits")
       const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/
       if (!ifscRegex.test(bankInfo.ifscCode)) return toast.error("Invalid IFSC code format (e.g., ABCD0123456)")
       if (!/^[a-zA-Z\s]*$/.test(bankInfo.accountHolderName)) return toast.error("Account holder name should only contain letters")
@@ -969,6 +969,7 @@ const RestaurantProfile = () => {
               <Input 
                 value={bankInfo.accountNumber} 
                 onChange={e => setBankInfo({...bankInfo, accountNumber: e.target.value.replace(/\D/g, "")})}
+                maxLength={15}
                 disabled={!editStates.bank}
                 className="rounded-xl bg-slate-50/50 font-mono tracking-wider"
                 placeholder="Bank Account Number"

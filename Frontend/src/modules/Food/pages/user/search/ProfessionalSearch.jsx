@@ -9,6 +9,11 @@ import { Input } from "@food/components/ui/input"
 import { useLocation as useGeoLocation } from "@food/hooks/useLocation"
 import { searchAPI } from "@/services/api"
 import { motion, AnimatePresence } from "framer-motion"
+import { useProfile } from "@food/context/ProfileContext"
+import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
+
+const HOME_VEG_MODE_OPTION_KEY = "food-home-veg-mode-option"
+const isTruthyFlag = (value) => value === true || value === "true" || value === 1 || value === "1"
 
 // Helper to resolve media URLs consistently
 const getMediaUrl = (url) => {
@@ -55,6 +60,7 @@ export default function ProfessionalSearch() {
   const isGrocery = listingType === "grocery"
   const navigate = useNavigate()
   const { location: userCoords } = useGeoLocation()
+  const { vegMode } = useProfile()
   const inputRef = useRef(null)
   const skipUrlSyncRef = useRef(false)
   
@@ -64,6 +70,42 @@ export default function ProfessionalSearch() {
   const [results, setResults] = useState({ restaurants: [], dishes: [] })
   const [loading, setLoading] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState(searchParams.get("cat") || null)
+  const [vegModeOption, setVegModeOption] = useState(() => {
+    if (typeof window === "undefined") return "all"
+    const saved = window.localStorage.getItem(HOME_VEG_MODE_OPTION_KEY)
+    return saved === "pure-veg" ? "pure-veg" : "all"
+  })
+
+  const isVegDish = (dish = {}) => {
+    if (isTruthyFlag(dish?.matchedDishIsVeg) || isTruthyFlag(dish?.isVeg)) return true
+    if (dish?.matchedDishIsVeg === false || dish?.matchedDishIsVeg === "false" || dish?.isVeg === false || dish?.isVeg === "false") return false
+    const foodType = String(dish?.matchedDishFoodType || dish?.foodType || dish?.type || "")
+      .toLowerCase()
+      .trim()
+    return foodType === "veg" || foodType === "vegetarian"
+  }
+
+  const applyVegModeFilters = useCallback(
+    (payload) => {
+      const sourceRestaurants = Array.isArray(payload?.restaurants) ? payload.restaurants : []
+      const sourceDishes = Array.isArray(payload?.dishes) ? payload.dishes : []
+      let restaurants = sourceRestaurants
+      let dishes = sourceDishes
+
+      if (vegMode === true) {
+        if (vegModeOption === "pure-veg") {
+          restaurants = restaurants.filter((r) => isTruthyFlag(r?.pureVegRestaurant))
+          dishes = dishes.filter((d) => isTruthyFlag(d?.pureVegRestaurant) && isVegDish(d))
+        } else {
+          restaurants = []
+          dishes = dishes.filter(isVegDish)
+        }
+      }
+
+      return { restaurants, dishes }
+    },
+    [vegMode, vegModeOption]
+  )
 
   useEffect(() => {
     if (skipUrlSyncRef.current) {
@@ -72,6 +114,21 @@ export default function ProfessionalSearch() {
     }
     setQuery((prev) => (prev === initialQuery ? prev : initialQuery))
   }, [initialQuery])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const syncVegModeOption = () => {
+      const saved = window.localStorage.getItem(HOME_VEG_MODE_OPTION_KEY)
+      setVegModeOption(saved === "pure-veg" ? "pure-veg" : "all")
+    }
+    syncVegModeOption()
+    window.addEventListener("storage", syncVegModeOption)
+    window.addEventListener("focus", syncVegModeOption)
+    return () => {
+      window.removeEventListener("storage", syncVegModeOption)
+      window.removeEventListener("focus", syncVegModeOption)
+    }
+  }, [])
 
   const performSearch = useCallback(async (searchTerm, catId) => {
     if (!searchTerm && !catId) {
@@ -87,22 +144,29 @@ export default function ProfessionalSearch() {
         lat: userCoords?.latitude,
         lng: userCoords?.longitude,
         isRestaurant: isGrocery ? false : true,
+        isVeg: vegMode && vegModeOption === "pure-veg" ? true : undefined,
+        vegFoodOnly: vegMode && vegModeOption !== "pure-veg" ? true : undefined,
       })
       
       if (res.data?.success) {
         // Grouping results into Restaurants and potential Dishes
         const all = res.data.data.restaurants || []
-        setResults({
+        const nextResults = {
           restaurants: all.filter(r => r.matchType === 'restaurant' || !r.matchType),
           dishes: all.filter(r => r.matchType === 'food')
-        })
+        }
+        setResults(applyVegModeFilters(nextResults))
       }
     } catch (err) {
       console.error("Search failed", err)
     } finally {
       setLoading(false)
     }
-  }, [userCoords, isGrocery])
+  }, [userCoords, isGrocery, vegMode, vegModeOption, applyVegModeFilters])
+
+  useEffect(() => {
+    setResults((prev) => applyVegModeFilters(prev))
+  }, [applyVegModeFilters])
 
   useEffect(() => {
     performSearch(debouncedQuery, selectedCategoryId)
@@ -188,7 +252,11 @@ export default function ProfessionalSearch() {
                 </div>
                 <div className="grid gap-4">
                   {results.dishes.map((r) => (
-                    <Link to={`/food/restaurants/${getRestaurantRouteId(r)}${r.matchedDishId ? `?dish=${r.matchedDishId}` : ''}`} key={r._id} className="flex gap-4 p-3 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-800 hover:shadow-md transition-shadow group">
+                    (() => {
+                      const availability = getRestaurantAvailabilityStatus(r, new Date())
+                      const isUnavailable = availability.state !== "open"
+                      return (
+                        <Link to={`/food/restaurants/${getRestaurantRouteId(r)}${r.matchedDishId ? `?dish=${r.matchedDishId}` : ''}`} key={r._id} className={`flex gap-4 p-3 bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-800 hover:shadow-md transition-shadow group ${isUnavailable ? "grayscale opacity-75" : ""}`}>
                        <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 relative">
                            <img 
                             src={getMediaUrl(r.matchedDishImage || r.profileImage || r.image || (Array.isArray(r.images) && r.images[0]))} 
@@ -216,8 +284,13 @@ export default function ProfessionalSearch() {
                              <span>•</span>
                              <span className="line-clamp-1">{r.cuisines?.slice(0, 2).join(", ")}</span>
                           </div>
+                          <div className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${isUnavailable ? "bg-slate-200 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"}`}>
+                            {availability.badgeLabel || (isUnavailable ? "Closed" : "Open now")}
+                          </div>
                        </div>
                     </Link>
+                      )
+                    })()
                   ))}
                 </div>
               </section>
@@ -232,7 +305,11 @@ export default function ProfessionalSearch() {
                 </div>
                 <div className="grid gap-6">
                   {results.restaurants.map((r) => (
-                    <Link to={`/food/restaurants/${getRestaurantRouteId(r)}`} key={r._id} className="block group">
+                    (() => {
+                      const availability = getRestaurantAvailabilityStatus(r, new Date())
+                      const isUnavailable = availability.state !== "open"
+                      return (
+                    <Link to={`/food/restaurants/${getRestaurantRouteId(r)}`} key={r._id} className={`block group ${isUnavailable ? "grayscale opacity-75" : ""}`}>
                       <div className="relative rounded-3xl overflow-hidden aspect-[16/9] mb-3 bg-slate-200">
                          <img 
                           src={getMediaUrl(r.profileImage || r.image || (Array.isArray(r.images) && r.images[0]))} 
@@ -256,6 +333,9 @@ export default function ProfessionalSearch() {
                               {r.offer.toUpperCase()}
                            </div>
                         )}
+                        <div className={`absolute top-4 right-4 text-[10px] font-semibold px-2 py-1 rounded-md ${isUnavailable ? "bg-slate-800/90 text-white" : "bg-emerald-600/90 text-white"}`}>
+                          {availability.badgeLabel || (isUnavailable ? "Closed" : "Open now")}
+                        </div>
                       </div>
                       <div className="flex items-center justify-between px-1">
                          <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-zinc-400 font-medium">
@@ -271,6 +351,8 @@ export default function ProfessionalSearch() {
                          </div>
                       </div>
                     </Link>
+                      )
+                    })()
                   ))}
                 </div>
               </section>

@@ -1460,9 +1460,19 @@ function RestaurantDetailsContent() {
         if (isRecommendedSection(section)) return null
 
         const sectionTitle = getSectionDisplayName(section)
-        const itemCount = Array.isArray(section?.items) ? section.items.length : 0
+        const visibleDirectItems = toRenderableArray(section?.items).filter((item) => {
+          if (item?.isAvailable === false) return false
+          return vegMode === true ? isItemVeg(item) : true
+        })
+        const itemCount = visibleDirectItems.length
         const subsectionCount = Array.isArray(section?.subsections)
-          ? section.subsections.reduce((sum, sub) => sum + (Array.isArray(sub?.items) ? sub.items.length : 0), 0)
+          ? section.subsections.reduce((sum, sub) => {
+            const visibleSubItems = toRenderableArray(sub?.items).filter((item) => {
+              if (item?.isAvailable === false) return false
+              return vegMode === true ? isItemVeg(item) : true
+            })
+            return sum + visibleSubItems.length
+          }, 0)
           : 0
         const totalCount = itemCount + subsectionCount
 
@@ -1477,7 +1487,7 @@ function RestaurantDetailsContent() {
         }
       })
       .filter(Boolean)
-  }, [restaurant?.menuSections])
+  }, [restaurant?.menuSections, vegMode])
 
   // Count active filters
   const getActiveFilterCount = () => {
@@ -1504,6 +1514,12 @@ function RestaurantDetailsContent() {
       debugWarn("Failed to persist restaurant filters:", error)
     }
   }, [filters, slug])
+
+  useEffect(() => {
+    if (vegMode === true && filters.vegNonVeg) {
+      setFilters((prev) => ({ ...prev, vegNonVeg: null }))
+    }
+  }, [vegMode, filters.vegNonVeg])
 
   useEffect(() => {
     if (selectedMenuCategory === "all") return
@@ -1800,17 +1816,17 @@ function RestaurantDetailsContent() {
       // VegMode filter - when vegMode is ON, show only Veg items
       // When vegMode is false/null/undefined, show all items (Veg and Non-Veg)
       if (vegMode === true) {
-        if (item.foodType !== "Veg") return false
+        if (!isItemVeg(item)) return false
       }
 
       // Veg/Non-veg filter (local filter override)
       if (filters.vegNonVeg === "veg") {
         // Show only veg items
-        if (item.foodType !== "Veg") return false
+        if (!isItemVeg(item)) return false
       }
       if (filters.vegNonVeg === "non-veg") {
         // Show only non-veg items
-        if (item.foodType !== "Non-Veg") return false
+        if (isItemVeg(item)) return false
       }
 
       if (filters.highlyReordered && !isRecommendedItem(item)) return false
@@ -2339,42 +2355,46 @@ function RestaurantDetailsContent() {
                   )}
                   <ChevronDown className="h-3 w-3" />
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 bg-white rounded-full ${filters.vegNonVeg === "veg" ? "border-green-600 bg-green-50 text-green-700 font-bold" : ""
-                    }`}
-                  onClick={() =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      vegNonVeg: prev.vegNonVeg === "veg" ? null : "veg",
-                    }))
-                  }
-                >
-                  <div className="h-3 w-3 rounded-full bg-green-500" />
-                  Veg
-                  {filters.vegNonVeg === "veg" && (
-                    <X className="h-3 w-3 text-gray-600" />
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 bg-white rounded-full ${filters.vegNonVeg === "non-veg" ? "border-red-600 bg-red-50 text-red-700 font-bold" : ""
-                    }`}
-                  onClick={() =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      vegNonVeg: prev.vegNonVeg === "non-veg" ? null : "non-veg",
-                    }))
-                  }
-                >
-                  <div className="h-3 w-3 rounded-full bg-red-600" />
-                  Non-veg
-                  {filters.vegNonVeg === "non-veg" && (
-                    <X className="h-3 w-3 text-gray-600" />
-                  )}
-                </Button>
+                {vegMode !== true && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 bg-white rounded-full ${filters.vegNonVeg === "veg" ? "border-green-600 bg-green-50 text-green-700 font-bold" : ""
+                        }`}
+                      onClick={() =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          vegNonVeg: prev.vegNonVeg === "veg" ? null : "veg",
+                        }))
+                      }
+                    >
+                      <div className="h-3 w-3 rounded-full bg-green-500" />
+                      Veg
+                      {filters.vegNonVeg === "veg" && (
+                        <X className="h-3 w-3 text-gray-600" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 bg-white rounded-full ${filters.vegNonVeg === "non-veg" ? "border-red-600 bg-red-50 text-red-700 font-bold" : ""
+                        }`}
+                      onClick={() =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          vegNonVeg: prev.vegNonVeg === "non-veg" ? null : "non-veg",
+                        }))
+                      }
+                    >
+                      <div className="h-3 w-3 rounded-full bg-red-600" />
+                      Non-veg
+                      {filters.vegNonVeg === "non-veg" && (
+                        <X className="h-3 w-3 text-gray-600" />
+                      )}
+                    </Button>
+                  </>
+                )}
               </div>
 
               {/* Inline restaurant offers just below filters */}
@@ -2960,41 +2980,43 @@ function RestaurantDetailsContent() {
                     </div>
 
                     {/* Veg/Non-veg preference */}
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Veg/Non-veg preference:</h3>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              vegNonVeg: prev.vegNonVeg === "veg" ? null : "veg",
-                            }))
-                          }
-                          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all flex-1 ${filters.vegNonVeg === "veg"
-                            ? "border-green-600 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
-                            }`}
-                        >
-                          <div className="h-4 w-4 rounded-full bg-green-600 dark:bg-green-500" />
-                          <span className="font-medium">Veg</span>
-                        </button>
-                        <button
-                          onClick={() =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              vegNonVeg: prev.vegNonVeg === "non-veg" ? null : "non-veg",
-                            }))
-                          }
-                          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all flex-1 ${filters.vegNonVeg === "non-veg"
-                          ? "border-red-600 dark:border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400"
-                            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
-                            }`}
-                        >
-                          <div className="h-4 w-4 rounded-full bg-red-600 dark:bg-red-500" />
-                          <span className="font-medium">Non-veg</span>
-                        </button>
+                    {vegMode !== true && (
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Veg/Non-veg preference:</h3>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() =>
+                              setFilters((prev) => ({
+                                ...prev,
+                                vegNonVeg: prev.vegNonVeg === "veg" ? null : "veg",
+                              }))
+                            }
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all flex-1 ${filters.vegNonVeg === "veg"
+                              ? "border-green-600 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
+                              }`}
+                          >
+                            <div className="h-4 w-4 rounded-full bg-green-600 dark:bg-green-500" />
+                            <span className="font-medium">Veg</span>
+                          </button>
+                          <button
+                            onClick={() =>
+                              setFilters((prev) => ({
+                                ...prev,
+                                vegNonVeg: prev.vegNonVeg === "non-veg" ? null : "non-veg",
+                              }))
+                            }
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all flex-1 ${filters.vegNonVeg === "non-veg"
+                            ? "border-red-600 dark:border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
+                              }`}
+                          >
+                            <div className="h-4 w-4 rounded-full bg-red-600 dark:bg-red-500" />
+                            <span className="font-medium">Non-veg</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Top picks */}
                     <div className="space-y-2">

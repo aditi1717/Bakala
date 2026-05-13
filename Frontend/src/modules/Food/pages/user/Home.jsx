@@ -37,6 +37,7 @@ const placeholders = [
 ];
 
 const HOME_VEG_MODE_OPTION_KEY = "food-home-veg-mode-option";
+const isTruthyFlag = (value) => value === true || value === "true" || value === 1 || value === "1";
 const getRestaurantRouteParam = (restaurant, fallbackIndex = 0) => {
   const slug = typeof restaurant?.slug === "string" ? restaurant.slug.trim() : "";
   if (slug && slug.toLowerCase() !== "undefined" && slug.toLowerCase() !== "null") return slug;
@@ -157,6 +158,7 @@ export default function Home() {
         id: r.restaurantId || r._id,
         name: r.name || r.restaurantName || "Unknown Restaurant",
         image,
+        pureVegRestaurant: isTruthyFlag(r.pureVegRestaurant),
         deliveryTime: r.deliveryTime || r.estimatedDeliveryTime || "25-30 min",
         featuredPrice: r.featuredPrice || 249,
         cuisines: Array.isArray(r.cuisines) ? r.cuisines : [],
@@ -206,7 +208,7 @@ export default function Home() {
     const sourceRestaurants = !vegMode
       ? pagedRestaurants
       : vegModeOption === "pure-veg"
-        ? pagedRestaurants.filter((r) => r.pureVegRestaurant)
+        ? pagedRestaurants.filter((r) => isTruthyFlag(r.pureVegRestaurant))
         : pagedRestaurants;
 
     return sortRestaurantsByAvailability(sourceRestaurants, now);
@@ -485,7 +487,7 @@ export default function Home() {
             <h2 className="text-sm font-semibold text-gray-500 tracking-widest uppercase mb-4">Recommended For You</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {recommendedRestaurants
-                .filter((r) => !vegMode || vegModeOption !== "pure-veg" || r.pureVegRestaurant)
+                .filter((r) => !vegMode || vegModeOption !== "pure-veg" || isTruthyFlag(r.pureVegRestaurant))
                 .slice(0, 4)
                 .map((r, i) => (
                 <Link key={i} to={`/food/restaurants/${r.slug || r.id || r._id}`} className="block rounded-[20px] overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow">

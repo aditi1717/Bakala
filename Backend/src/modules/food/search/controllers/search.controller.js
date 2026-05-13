@@ -6,7 +6,7 @@ import { sendResponse, sendError } from '../../../../utils/response.js';
  */
 export const searchController = async (req, res, next) => {
     try {
-        const { q, lat, lng, radiusKm, categoryId, minRating, maxDeliveryTime, isVeg, isRestaurant, page, limit } = req.query;
+        const { q, lat, lng, radiusKm, categoryId, minRating, maxDeliveryTime, isVeg, vegFoodOnly, isRestaurant, page, limit } = req.query;
         console.log(`[Search-Debug] q="${q}", catId="${categoryId}", isRestaurant="${isRestaurant}", coords=[${lat}, ${lng}]`);
 
         const results = await searchUnified({
@@ -18,6 +18,7 @@ export const searchController = async (req, res, next) => {
             minRating,
             maxDeliveryTime,
             isVeg,
+            vegFoodOnly,
             isRestaurant,
             page: parseInt(page) || 1,
             limit: parseInt(limit) || 20
