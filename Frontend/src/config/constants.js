@@ -1,5 +1,5 @@
 export const APP_CONFIG = {
-  NAME: 'AppZeto Master',
+  NAME: 'Bakalaa',
   VERSION: '1.0.0',
 };
 

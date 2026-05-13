@@ -194,7 +194,7 @@ export default function MasterLandingPage() {
 
       {/* Footer */}
       <footer className="py-12 mt-10 border-t border-gray-200/60 text-center text-gray-500 font-medium relative z-10 w-full bg-white/50 backdrop-blur-sm">
-        <p>&copy; 2026 AppZeto Master Product. All rights reserved.</p>
+        <p>&copy; 2026 Bakalaa Master Product. All rights reserved.</p>
       </footer>
     </div>
   )

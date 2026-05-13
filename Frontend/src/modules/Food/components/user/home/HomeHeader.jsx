@@ -285,7 +285,7 @@ export default function HomeHeader({
           }`}
         >
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-start gap-2 cursor-pointer flex-1 min-w-0" onClick={handleLocationClick}>
+            <div className="flex items-start gap-2 cursor-pointer flex-auto min-w-0" onClick={handleLocationClick}>
               {isFood ? (
                 <>
                   <div className="flex min-w-0 max-w-[190px] flex-col">
@@ -308,7 +308,7 @@ export default function HomeHeader({
               )}
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
               <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
                 <PopoverTrigger asChild>
                   <button
@@ -332,7 +332,7 @@ export default function HomeHeader({
                           </Badge>
                         )}
                       </h3>
-                      <Link to="/food/user/notifications" className="text-xs font-bold" style={{ color: BRAND_THEME.colors.brand.primary }}>
+                      <Link to="/food/notifications" onClick={() => setNotificationsOpen(false)} className="text-xs font-bold" style={{ color: BRAND_THEME.colors.brand.primary }}>
                         {mergedNotifications.length > 0 ? "View All" : ""}
                       </Link>
                     </div>

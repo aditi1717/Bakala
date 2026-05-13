@@ -2,7 +2,7 @@
   "name": "appzeto-backend",
   "version": "1.0.0",
   "type": "module",
-  "description": "AppZeto Master Product Backend",
+  "description": "Bakalaa Master Product Backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

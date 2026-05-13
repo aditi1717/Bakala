@@ -95,13 +95,13 @@ export const createInboxNotifications = async ({ notifications = [] } = {}) => {
         const update = {
             $set: {
                 ...payload,
-                ...readStateUpdate,
+                ...readStateUpdate
+            },
+            $setOnInsert: {
+                ...insertReadState,
                 dismissedAt: null
             }
         };
-        if (Object.keys(insertReadState).length > 0) {
-            update.$setOnInsert = insertReadState;
-        }
 
         return {
             updateOne: {
