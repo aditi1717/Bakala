@@ -4,6 +4,7 @@ import { ValidationError } from '../../../../core/auth/errors.js';
 import mongoose from 'mongoose';
 import { FoodOffer } from '../../admin/models/offer.model.js';
 import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
+import { FoodItem } from '../../admin/models/food.model.js';
 import { FoodRestaurantOutletTimings } from '../models/outletTimings.model.js';
 
 const normalizeName = (value) =>
@@ -1086,6 +1087,22 @@ export const listApprovedRestaurants = async (query = {}) => {
     const skip = (page - 1) * limit;
 
     const filter = { status: 'approved' };
+    const activeRestaurantIds = await FoodItem.distinct('restaurantId', {
+        $and: [
+            {
+                $or: [
+                    { approvalStatus: 'approved' },
+                    { approvalStatus: { $exists: false }, isApproved: { $ne: false } }
+                ]
+            },
+            { isAvailable: { $ne: false } },
+            { restaurantId: { $exists: true, $ne: null } }
+        ]
+    });
+    if (!Array.isArray(activeRestaurantIds) || activeRestaurantIds.length === 0) {
+        return { restaurants: [], total: 0, page, limit };
+    }
+    filter._id = { $in: activeRestaurantIds };
     if (query.isRestaurant !== undefined) {
         const normalized = String(query.isRestaurant).trim().toLowerCase();
         if (['true', '1', 'yes', 'on'].includes(normalized)) {

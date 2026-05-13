@@ -107,6 +107,7 @@ export default function RestaurantLogin() {
               onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
               placeholder="Enter 10-digit number"
               className="h-12 flex-1"
+              disabled={isLoading}
             />
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}

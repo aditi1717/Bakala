@@ -481,7 +481,10 @@ export default function AddressSelectorPage({ formOnly = false }) {
                 <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">City</Label>
                 <Input 
                   value={addressFormData.city} 
-                  onChange={e => setAddressFormData({...addressFormData, city: e.target.value})}
+                  onChange={e => {
+                    const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                    setAddressFormData({...addressFormData, city: val});
+                  }}
                   onFocus={() => scrollFieldIntoView("city")}
                   ref={(el) => { manualFieldRefs.current.city = el }}
                   className="h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111111]"
@@ -492,7 +495,10 @@ export default function AddressSelectorPage({ formOnly = false }) {
                 <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">State</Label>
                 <Input 
                   value={addressFormData.state} 
-                  onChange={e => setAddressFormData({...addressFormData, state: e.target.value})}
+                  onChange={e => {
+                    const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                    setAddressFormData({...addressFormData, state: val});
+                  }}
                   onFocus={() => scrollFieldIntoView("state")}
                   ref={(el) => { manualFieldRefs.current.state = el }}
                   className="h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111111]"
@@ -506,7 +512,14 @@ export default function AddressSelectorPage({ formOnly = false }) {
               <Input 
                 placeholder="Pincode" 
                 value={addressFormData.zipCode || ""} 
-                onChange={e => setAddressFormData({...addressFormData, zipCode: e.target.value})}
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  if (val.length <= 6) {
+                    setAddressFormData({...addressFormData, zipCode: val});
+                  }
+                }}
+                maxLength={6}
+                inputMode="numeric"
                 onFocus={() => scrollFieldIntoView("zipCode")}
                 ref={(el) => { manualFieldRefs.current.zipCode = el }}
                 className="h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111111]"

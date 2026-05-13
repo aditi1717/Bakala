@@ -195,9 +195,10 @@ export default function RestaurantSignup() {
                     placeholder="Restaurant name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full border-0 focus:outline-none focus:ring-0 text-base font-medium text-gray-900 placeholder-gray-400"
+                    className="w-full border-0 focus:outline-none focus:ring-0 text-base font-medium text-gray-900 placeholder-gray-400 disabled:opacity-50"
                     maxLength={50}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 {errors.name && (
@@ -242,6 +243,7 @@ export default function RestaurantSignup() {
                     className="flex-1 border-0 focus-visible:ring-0 focus-visible:outline-none text-base font-medium text-gray-900 placeholder-gray-400"
                     maxLength={15}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 {(errors.phone || apiError) && (

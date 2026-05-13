@@ -1018,9 +1018,29 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
   }
 
   const handleAddressFormChange = (e) => {
+    const { name, value } = e.target
+
+    // City and State should only accept alphabets and spaces
+    if (name === "city" || name === "state") {
+      if (value !== "" && !/^[a-zA-Z\s]*$/.test(value)) {
+        return
+      }
+    }
+
+    // ZipCode (Pincode) should only accept digits and be max 6 characters
+    if (name === "zipCode") {
+      const numericValue = value.replace(/\D/g, "")
+      if (numericValue.length > 6) return
+      setAddressFormData({
+        ...addressFormData,
+        [name]: numericValue,
+      })
+      return
+    }
+
     setAddressFormData({
       ...addressFormData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     })
   }
 
@@ -2496,6 +2516,8 @@ export default function LocationSelectorOverlay({ isOpen, onClose }) {
                 placeholder="Pincode (optional)"
                 value={addressFormData.zipCode || ""}
                 onChange={handleAddressFormChange}
+                maxLength={6}
+                inputMode="numeric"
                 className="bg-white dark:bg-[#1a1a1a] border-gray-200 dark:border-gray-700"
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">

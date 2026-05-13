@@ -531,7 +531,7 @@ export default function RestaurantOnboarding() {
       const stepParam = searchParams.get("step")
       if (stepParam) {
         const stepNum = parseInt(stepParam, 10)
-        if (stepNum >= 1 && stepNum <= 3) {
+        if (stepNum >= 1 && stepNum <= 4) {
           setStep(stepNum)
         }
       }
@@ -780,7 +780,7 @@ export default function RestaurantOnboarding() {
           if (!stepParam) {
             // If already registered/pending, stay on step 1 for editing
             if (data.status === "approved" || data.status === "pending") {
-               setStep(1)
+               setStep((prev) => (prev >= 1 && prev <= 4 ? prev : 1))
             } else {
                const stepToShow = determineStepToShow({ step1: data, step2: data, step3: data, step4: data })
                setStep(stepToShow)

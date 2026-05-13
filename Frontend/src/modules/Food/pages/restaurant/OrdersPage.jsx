@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Lenis from "lenis"
 import BottomNavOrders from "@food/components/restaurant/BottomNavOrders"
-import NewOrderNotification from "@food/components/restaurant/NewOrderNotification"
 import { useRestaurantNotifications } from "@food/hooks/useRestaurantNotifications"
 import { 
   Home,
@@ -76,15 +75,6 @@ export default function OrdersPage() {
 
   // Restaurant notifications hook
   const { newOrder, clearNewOrder, cancelledOrderId, cancelledOrderInfo, clearCancelledOrderId, isConnected } = useRestaurantNotifications()
-
-  const notificationOrder = newOrder
-    ? {
-        ...newOrder,
-        orderMongoId: newOrder.orderMongoId || newOrder._id || newOrder.id,
-        total: newOrder.total ?? newOrder.pricing?.total ?? 0,
-        customerAddress: newOrder.customerAddress || newOrder.deliveryAddress || newOrder.address,
-      }
-    : null
 
   // Real-time: dismiss notification if the shown order gets cancelled by user
   useEffect(() => {
@@ -509,14 +499,6 @@ export default function OrdersPage() {
       
       {/* Menu Overlay */}
 
-      {/* New Order Notification */}
-      <NewOrderNotification
-        order={notificationOrder}
-        onClose={clearNewOrder}
-        onViewOrder={(order) => {
-          navigate(`/restaurant/orders/${order.orderMongoId || order.orderId}`)
-        }}
-      />
     </div>
   )
 }

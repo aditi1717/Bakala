@@ -826,7 +826,7 @@ const RestaurantProfile = () => {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-hidden"
+                    className="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-hidden p-6 bg-slate-50/50 rounded-2xl border border-slate-100"
                   >
                     <div className="space-y-4">
                       <div className="space-y-2">
@@ -834,8 +834,9 @@ const RestaurantProfile = () => {
                         <Input 
                           value={kycInfo.gstNumber} 
                           onChange={e => setKycInfo({...kycInfo, gstNumber: e.target.value.toUpperCase().slice(0, 15)})}
+                          onFocus={(e) => e.target.scrollIntoView({ behavior: "smooth", block: "center" })}
                           disabled={!editStates.kyc}
-                          className="rounded-xl bg-slate-50/50"
+                          className="rounded-xl bg-white h-12 px-4 shadow-sm border-slate-200"
                           placeholder="22AAAAA0000A1Z5"
                         />
                       </div>
@@ -844,8 +845,9 @@ const RestaurantProfile = () => {
                         <Input 
                           value={kycInfo.gstLegalName} 
                           onChange={e => setKycInfo({...kycInfo, gstLegalName: e.target.value.replace(/[^a-zA-Z\s]/g, "")})}
+                          onFocus={(e) => e.target.scrollIntoView({ behavior: "smooth", block: "center" })}
                           disabled={!editStates.kyc}
-                          className="rounded-xl bg-slate-50/50"
+                          className="rounded-xl bg-white h-12 px-4 shadow-sm border-slate-200"
                           placeholder="Legal Business Name"
                         />
                       </div>
@@ -854,8 +856,9 @@ const RestaurantProfile = () => {
                         <Input 
                           value={kycInfo.gstAddress} 
                           onChange={e => setKycInfo({...kycInfo, gstAddress: e.target.value})}
+                          onFocus={(e) => e.target.scrollIntoView({ behavior: "smooth", block: "center" })}
                           disabled={!editStates.kyc}
-                          className="rounded-xl bg-slate-50/50"
+                          className="rounded-xl bg-white h-12 px-4 shadow-sm border-slate-200"
                         />
                       </div>
                     </div>
