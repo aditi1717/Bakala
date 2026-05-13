@@ -3492,10 +3492,9 @@ export async function assignDeliveryPartnerAdmin(
     .lean();
   if (!partner || partner.status !== "approved")
     throw new ValidationError("Delivery partner not available");
-  if (!partner.zoneId) {
-    throw new ValidationError("Delivery partner is not mapped to any zone");
-  }
-  if (String(partner.zoneId) !== String(order.zoneId || "")) {
+  const partnerZoneId = partner.zoneId ? String(partner.zoneId) : "";
+  const orderZoneId = order.zoneId ? String(order.zoneId) : "";
+  if (partnerZoneId && orderZoneId && partnerZoneId !== orderZoneId) {
     throw new ValidationError("Delivery partner does not belong to this order zone");
   }
 
