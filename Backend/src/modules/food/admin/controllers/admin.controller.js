@@ -1335,6 +1335,22 @@ export async function rejectDeliveryPartner(req, res, next) {
     }
 }
 
+export async function deleteDeliveryPartner(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: 'Invalid delivery partner id' });
+        }
+        const result = await adminService.deleteDeliveryPartner(id);
+        if (!result) {
+            return res.status(404).json({ success: false, message: 'Delivery partner not found' });
+        }
+        res.status(200).json({ success: true, message: 'Delivery partner deactivated successfully', data: result });
+    } catch (error) {
+        next(error);
+    }
+}
+
 
 export async function processRefund(req, res, next) {
     try {

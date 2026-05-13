@@ -7503,3 +7503,20 @@ export async function updateStoreOrderStatus(orderId, body = {}) {
     return updated;
 }
 
+export async function deleteDeliveryPartner(id) {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+    const updated = await FoodDeliveryPartner.findByIdAndUpdate(
+        id,
+        {
+            $set: {
+                status: 'rejected',
+                availabilityStatus: 'offline',
+                rejectionReason: 'Account deactivated by admin',
+                fcmTokens: [],
+                fcmTokenMobile: []
+            }
+        },
+        { new: true, runValidators: false }
+    ).lean();
+    return updated;
+}
