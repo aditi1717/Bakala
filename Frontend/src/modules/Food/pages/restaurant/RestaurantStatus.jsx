@@ -6,6 +6,7 @@ import { ArrowLeft, Settings, ChevronRight } from "lucide-react"
 import { Switch } from "@food/components/ui/switch"
 import { Card, CardContent } from "@food/components/ui/card"
 import { restaurantAPI } from "@food/api"
+import { registerWebPushForCurrentModule } from "@food/utils/firebaseMessaging"
 import {
   Dialog,
   DialogContent,
@@ -239,6 +240,9 @@ export default function RestaurantStatus() {
           window.dispatchEvent(new CustomEvent('restaurantStatusChanged', { 
             detail: { isOnline: restaurant.isAcceptingOrders } 
           }))
+          window.dispatchEvent(new CustomEvent('restaurantOnlineStatusChanged', { 
+            detail: { isOnline: restaurant.isAcceptingOrders } 
+          }))
         } else {
           setDeliveryStatus(false)
           try {
@@ -246,6 +250,9 @@ export default function RestaurantStatus() {
           } catch {}
           persistRestaurantOnlineStatus(false)
           window.dispatchEvent(new CustomEvent('restaurantStatusChanged', { 
+            detail: { isOnline: false } 
+          }))
+          window.dispatchEvent(new CustomEvent('restaurantOnlineStatusChanged', { 
             detail: { isOnline: false } 
           }))
         }
@@ -260,6 +267,9 @@ export default function RestaurantStatus() {
         } catch {}
         persistRestaurantOnlineStatus(false)
         window.dispatchEvent(new CustomEvent('restaurantStatusChanged', { 
+          detail: { isOnline: false } 
+        }))
+        window.dispatchEvent(new CustomEvent('restaurantOnlineStatusChanged', { 
           detail: { isOnline: false } 
         }))
       }
@@ -304,6 +314,12 @@ export default function RestaurantStatus() {
       window.dispatchEvent(new CustomEvent('restaurantStatusChanged', { 
         detail: { isOnline: checked } 
       }))
+      window.dispatchEvent(new CustomEvent('restaurantOnlineStatusChanged', { 
+        detail: { isOnline: checked } 
+      }))
+      if (checked) {
+        void registerWebPushForCurrentModule(window.location.pathname)
+      }
     } catch (error) {
       debugError("Error saving delivery status:", error)
     }

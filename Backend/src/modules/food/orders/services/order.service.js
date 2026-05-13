@@ -150,6 +150,16 @@ async function notifyAssignedDeliveryPartner(order) {
     order?.dispatch?.deliveryPartnerId;
   if (!assignedId) return { notified: false };
 
+  const assignedPartner = await FoodDeliveryPartner.findById(assignedId)
+    .select("status availabilityStatus")
+    .lean();
+  if (
+    String(assignedPartner?.status || "").toLowerCase() !== "approved" ||
+    String(assignedPartner?.availabilityStatus || "").toLowerCase() !== "online"
+  ) {
+    return { notified: false, skipped: true };
+  }
+
   const restaurant = await FoodRestaurant.findById(order.restaurantId)
     .select("restaurantName location addressLine1 area city state")
     .lean();
@@ -686,6 +696,16 @@ function canExposeOrderToRestaurant(orderLike) {
 async function notifyRestaurantNewOrder(orderDoc) {
   try {
     if (!orderDoc || !canExposeOrderToRestaurant(orderDoc)) return;
+
+    const restaurant = await FoodRestaurant.findById(orderDoc.restaurantId)
+      .select("status isAcceptingOrders")
+      .lean();
+    if (
+      String(restaurant?.status || "").toLowerCase() !== "approved" ||
+      restaurant?.isAcceptingOrders !== true
+    ) {
+      return;
+    }
 
     const io = getIO();
     if (io) {

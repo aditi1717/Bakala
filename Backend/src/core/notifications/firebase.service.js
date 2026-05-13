@@ -227,6 +227,39 @@ const readTokensFromDoc = (doc, platform) => {
     ]);
 };
 
+const isOrderServicePayload = (payload = {}) => {
+    const type = sanitizeString(payload?.data?.type).toLowerCase();
+    const title = sanitizeString(payload?.title || payload?.notification?.title).toLowerCase();
+    const body = sanitizeString(payload?.body || payload?.notification?.body).toLowerCase();
+
+    return (
+        ['new_order', 'order_ready', 'order_assigned', 'delivery_partner_notification_resent'].includes(type) ||
+        title.includes('new order') ||
+        title.includes('new delivery task') ||
+        body.includes('waiting for review') ||
+        body.includes('assigned to you')
+    );
+};
+
+const isOwnerEligibleForOrderService = (ownerType, ownerDoc = {}) => {
+    const normalizedOwnerType = sanitizeString(ownerType).toUpperCase();
+    if (normalizedOwnerType === 'RESTAURANT') {
+        return (
+            sanitizeString(ownerDoc?.status).toLowerCase() === 'approved' &&
+            ownerDoc?.isAcceptingOrders === true
+        );
+    }
+
+    if (normalizedOwnerType === 'DELIVERY_PARTNER') {
+        return (
+            sanitizeString(ownerDoc?.status).toLowerCase() === 'approved' &&
+            sanitizeString(ownerDoc?.availabilityStatus).toLowerCase() === 'online'
+        );
+    }
+
+    return true;
+};
+
 export const listOwnerTokens = async ({ ownerType, ownerId, platform }) => {
     if (!ownerType || !ownerId) return [];
     const model = getOwnerModel(ownerType);
@@ -255,6 +288,15 @@ export const upsertFirebaseDeviceToken = async ({ ownerType, ownerId, token, pla
     if (!doc) {
         console.error(`[FCM-DEBUG] upsert - Owner profile not found for id ${ownerId}`);
         throw new Error('Owner profile not found.');
+    }
+
+    if (
+        (sanitizeString(ownerType).toUpperCase() === 'RESTAURANT' ||
+            sanitizeString(ownerType).toUpperCase() === 'DELIVERY_PARTNER') &&
+        !isOwnerEligibleForOrderService(ownerType, doc)
+    ) {
+        console.log(`[FCM-DEBUG] upsert skipped: ${ownerType}:${ownerId} is not approved + online/accepting orders`);
+        return { success: true, skipped: true, reason: 'owner_not_eligible_for_order_service' };
     }
 
     const field = getTokenFieldForPlatform(normalizedPlatform);
@@ -372,7 +414,14 @@ export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, pla
         }
     }
 
-    const tokens = await listOwnerTokens({ ownerType, ownerId, platform });
+    const model = getOwnerModel(ownerType);
+    const ownerDoc = model ? await model.findById(ownerId).lean() : null;
+    if (isOrderServicePayload(enrichedPayload) && !isOwnerEligibleForOrderService(ownerType, ownerDoc)) {
+        logger.info(`FCM order-service push skipped for ${ownerType}:${ownerId} because owner is not approved + online/accepting orders`);
+        return { successCount: 0, failureCount: 0, results: [], skipped: true };
+    }
+
+    const tokens = readTokensFromDoc(ownerDoc, platform);
     if (!tokens.length) {
         return { successCount: 0, failureCount: 0, results: [] };
     }

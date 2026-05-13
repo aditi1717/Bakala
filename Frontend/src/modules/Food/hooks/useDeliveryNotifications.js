@@ -671,20 +671,24 @@ export const useDeliveryNotifications = () => {
     };
   }, []); // Note: This runs once on mount. To update dynamically, we'd need to listen to storage events
 
-  // Fetch delivery partner ID
+  // Fetch delivery partner ID only when the partner is approved and online.
   useEffect(() => {
-    const fallbackId = resolveDeliveryPartnerIdFromClient();
-    if (fallbackId) {
-      setDeliveryPartnerId(fallbackId);
-      debugLog('? Delivery Partner ID restored from local client auth:', fallbackId);
-    }
-
     const fetchDeliveryPartnerId = async () => {
       try {
         const response = await deliveryAPI.getMe();
         if (response.data?.success && response.data.data) {
           const deliveryPartner = response.data.data.user || response.data.data.deliveryPartner;
           if (deliveryPartner) {
+            const isEligible =
+              String(deliveryPartner?.status || '').toLowerCase() === 'approved' &&
+              String(deliveryPartner?.availabilityStatus || '').toLowerCase() === 'online';
+            if (!isEligible) {
+              setDeliveryPartnerId(null);
+              if (socketRef.current) {
+                socketRef.current.disconnect();
+              }
+              return;
+            }
             const id = deliveryPartner.id?.toString() || 
                       deliveryPartner._id?.toString() || 
                       deliveryPartner.deliveryId;
@@ -705,6 +709,24 @@ export const useDeliveryNotifications = () => {
       }
     };
     fetchDeliveryPartnerId();
+
+    const handleAvailabilityChanged = (event) => {
+      const isOnline = event?.detail?.isOnline === true;
+      if (!isOnline) {
+        stopActiveAlert();
+        setDeliveryPartnerId(null);
+        if (socketRef.current) {
+          socketRef.current.disconnect();
+        }
+        return;
+      }
+      fetchDeliveryPartnerId();
+    };
+
+    window.addEventListener('deliveryAvailabilityChanged', handleAvailabilityChanged);
+    return () => {
+      window.removeEventListener('deliveryAvailabilityChanged', handleAvailabilityChanged);
+    };
   }, []);
 
   // Socket connection effect (no backend when API_BASE_URL is empty)

@@ -369,13 +369,26 @@ export const useRestaurantNotifications = () => {
     return true;
   }, [restaurantId]);
 
-  // Get restaurant ID from API
+  // Get restaurant ID only when restaurant is approved and accepting orders.
   useEffect(() => {
     const fetchRestaurantId = async () => {
       try {
         const response = await restaurantAPI.getCurrentRestaurant();
         if (response.data?.success && response.data.data?.restaurant) {
           const restaurant = response.data.data.restaurant;
+          const isEligible =
+            String(restaurant?.status || '').toLowerCase() === 'approved' &&
+            restaurant?.isAcceptingOrders === true;
+          if (!isEligible) {
+            stopAlertLoop();
+            activeOrderRef.current = null;
+            setNewOrder(null);
+            setRestaurantId(null);
+            if (socketRef.current) {
+              socketRef.current.disconnect();
+            }
+            return;
+          }
           const id = restaurant._id?.toString() || restaurant.restaurantId;
           setRestaurantId(id);
         }
@@ -384,6 +397,26 @@ export const useRestaurantNotifications = () => {
       }
     };
     fetchRestaurantId();
+
+    const handleOnlineStatusChanged = (event) => {
+      const isOnline = event?.detail?.isOnline === true;
+      if (!isOnline) {
+        stopAlertLoop();
+        activeOrderRef.current = null;
+        setNewOrder(null);
+        setRestaurantId(null);
+        if (socketRef.current) {
+          socketRef.current.disconnect();
+        }
+        return;
+      }
+      fetchRestaurantId();
+    };
+
+    window.addEventListener('restaurantOnlineStatusChanged', handleOnlineStatusChanged);
+    return () => {
+      window.removeEventListener('restaurantOnlineStatusChanged', handleOnlineStatusChanged);
+    };
   }, []);
 
   // Reliability fallback:

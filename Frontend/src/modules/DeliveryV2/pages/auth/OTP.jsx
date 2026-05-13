@@ -193,30 +193,10 @@ export default function DeliveryOTP() {
         return
       }
 
-      // Try to get FCM token before verifying OTP
+      // Push registration is intentionally delayed until the approved partner goes online.
+      // Requesting a native FCM token before approval can start the background service banner.
       let fcmToken = null;
       let platform = "web";
-      try {
-        if (typeof window !== "undefined") {
-          if (window.flutter_inappwebview) {
-            platform = "mobile";
-            const handlerNames = ["getFcmToken", "getFCMToken", "getPushToken", "getFirebaseToken"];
-            for (const handlerName of handlerNames) {
-              try {
-                const t = await window.flutter_inappwebview.callHandler(handlerName, { module: "delivery" });
-                if (t && typeof t === "string" && t.length > 20) {
-                  fcmToken = t.trim();
-                  break;
-                }
-              } catch (e) {}
-            }
-          } else {
-            fcmToken = localStorage.getItem("fcm_web_registered_token_delivery") || null;
-          }
-        }
-      } catch (e) {
-        debugWarn("Failed to get FCM token during login", e);
-      }
 
       setDeviceToken(fcmToken);
       setActivePlatform(platform);
@@ -336,7 +316,8 @@ export default function DeliveryOTP() {
         return
       }
 
-      // Second call with name to auto-register and login
+      // Second call with name to auto-register and login. Push registration happens later
+      // only after approval + online status.
       const response = await deliveryAPI.verifyOTP(phone, verifiedOtp, purpose, trimmedName, deviceToken, activePlatform)
       const data = response?.data?.data || response?.data || {}
 

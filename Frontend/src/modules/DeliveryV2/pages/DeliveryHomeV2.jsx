@@ -8,6 +8,7 @@ import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import { BRAND_THEME } from '@/config/brandTheme';
 import { useNavigate } from 'react-router-dom';
+import { registerWebPushForCurrentModule } from '@food/utils/firebaseMessaging';
 
 // Components
 
@@ -1379,6 +1380,12 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
                     try {
                       await deliveryAPI.updateOnlineStatus(nextState);
                       setOnline(nextState);
+                      window.dispatchEvent(new CustomEvent('deliveryAvailabilityChanged', {
+                        detail: { isOnline: nextState }
+                      }));
+                      if (nextState) {
+                        void registerWebPushForCurrentModule(window.location.pathname);
+                      }
                     } catch (error) {
                       toast.error(error?.response?.data?.message || 'Failed to update availability status');
                     }

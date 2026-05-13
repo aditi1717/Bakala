@@ -286,8 +286,12 @@ export const verifyRestaurantOtpAndLogin = async (phone, otp, fcmToken, platform
     };
   }
 
-  // Update FCM token if provided
-  if (fcmToken) {
+  const canRegisterRestaurantPush =
+    String(restaurant.status || "").toLowerCase() === "approved" &&
+    restaurant.isAcceptingOrders === true;
+
+  // Update FCM token only when restaurant is approved and accepting orders.
+  if (fcmToken && canRegisterRestaurantPush) {
     let isModified = false;
     if (platform === "mobile") {
       if (!restaurant.fcmTokenMobile) restaurant.fcmTokenMobile = [];
@@ -372,9 +376,12 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
     return { needsRegistration: true, phone };
   }
 
-  // Update FCM token if provided - CRITICAL: do this BEFORE returning pendingApproval
-  // so we can notify them when approved.
-  if (fcmToken) {
+  const canRegisterDeliveryPush =
+    String(deliveryPartner.status || "").toLowerCase() === "approved" &&
+    String(deliveryPartner.availabilityStatus || "").toLowerCase() === "online";
+
+  // Update FCM token only when delivery partner is approved and online.
+  if (fcmToken && canRegisterDeliveryPush) {
     let isModified = false;
     if (platform === "mobile") {
       if (!deliveryPartner.fcmTokenMobile) deliveryPartner.fcmTokenMobile = [];
