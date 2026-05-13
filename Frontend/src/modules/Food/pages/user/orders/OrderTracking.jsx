@@ -1612,6 +1612,29 @@ export default function OrderTracking() {
                   Reason: {resolvedCancellationReason}
                 </p>
               )}
+              {isCancelledOrder && (() => {
+                const refund = order?.payment?.refund || {};
+                const pStatus = String(order?.payment?.status || "").toLowerCase();
+                const rStatus = String(refund.status || (pStatus === "refunded" ? "processed" : "")).toLowerCase();
+                if (!rStatus || rStatus === "none") return null;
+                
+                return (
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    <p className="text-xs font-medium text-gray-700">
+                      Refund Status: <span className={
+                        rStatus === 'processed' ? 'text-green-600 font-semibold' :
+                        rStatus === 'failed' ? 'text-red-600 font-semibold' : 'text-orange-600 font-semibold'
+                      }>{formatRefundStatusLabel(rStatus)}</span>
+                    </p>
+                    {Number(refund.amount || 0) > 0 && (
+                      <p className="text-[11px] text-gray-500 mt-0.5">Amount: ₹{Number(refund.amount).toFixed(2)}</p>
+                    )}
+                    {refund.refundId && (
+                      <p className="text-[11px] text-gray-500 mt-0.5">Refund ID: {refund.refundId}</p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </motion.div>

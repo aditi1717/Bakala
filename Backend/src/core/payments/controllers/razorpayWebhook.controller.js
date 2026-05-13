@@ -101,6 +101,32 @@ export const handleRazorpayWebhook = async (req, res) => {
 
             if (order) {
                 logger.info(`Webhook [refund.processed]: Synced Order ${order.orderId} (Refunded)`);
+                try {
+                    const title = 'Refund Processed Successful';
+                    const message = `Your refund of ₹${refundAmount} for Order #${order.orderId} has been processed successfully.`;
+                    const link = `/food/orders/${order._id}`;
+
+                    const { createInboxNotifications } = await import('../../notifications/notification.service.js');
+                    await createInboxNotifications({
+                        notifications: [{
+                            ownerType: 'USER',
+                            ownerId: order.userId,
+                            title,
+                            message,
+                            link,
+                            category: 'payment',
+                            source: 'WEBHOOK_REFUND'
+                        }]
+                    });
+
+                    const { notifyOwnerSafely } = await import('../../notifications/firebase.service.js');
+                    await notifyOwnerSafely(
+                        { ownerType: 'USER', ownerId: order.userId },
+                        { title, body: message, data: { link, type: 'refund_processed' } }
+                    );
+                } catch (notifErr) {
+                    logger.error(`Webhook Refund Notification Error (Order ${order.orderId}): ${notifErr.message}`);
+                }
             } else {
                 // ✅ ADDED: Log warn if order not found for refund
                 logger.warn(`Webhook [refund.processed]: Order not found or already refunded for RZ-Payment: ${rzPaymentId}`);
