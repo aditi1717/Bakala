@@ -123,6 +123,7 @@ export default function Notifications() {
       detail: item.message || "",
       source: "broadcast",
       read: item.read,
+      ticketId: item?.metadata?.ticketId || "",
       timeValue: item.createdAt ? new Date(item.createdAt).getTime() : 0,
       time: item.createdAt
         ? new Date(item.createdAt).toLocaleString("en-IN", {
@@ -134,8 +135,14 @@ export default function Notifications() {
           })
         : "N/A",
     }))
+    const remoteSupportTicketIds = new Set(
+      broadcastRows
+        .map((item) => item.ticketId)
+        .filter(Boolean)
+        .map((value) => `admin-${String(value)}`),
+    )
     const adminRows = (adminNotifications || [])
-      .filter((item) => item?.id && !dismissedIds.includes(item.id))
+      .filter((item) => item?.id && !dismissedIds.includes(item.id) && !remoteSupportTicketIds.has(String(item.id)))
       .map((item) => {
         const timestamp = item.createdAt || item.timestamp || Date.now()
         return {

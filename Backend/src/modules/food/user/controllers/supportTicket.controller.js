@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { FoodSupportTicket } from '../models/supportTicket.model.js';
+import { emitAdminSupportTicketCreated } from '../../shared/supportTicketAdminNotification.js';
 import { sendResponse, sendError } from '../../../../utils/response.js';
 
 export async function createSupportTicketController(req, res, next) {
@@ -57,6 +58,13 @@ export async function createSupportTicketController(req, res, next) {
             doc.restaurantId = new mongoose.Types.ObjectId(body.restaurantId);
         }
         const created = await FoodSupportTicket.create(doc);
+        emitAdminSupportTicketCreated({
+            source: 'user',
+            ticketId: created._id,
+            title: 'New User Support Ticket',
+            message: `A user raised a support ticket for ${issueType}.`,
+            createdAt: created.createdAt
+        });
         return sendResponse(res, 201, 'Ticket created', { ticket: created.toObject() });
     } catch (e) {
         next(e);

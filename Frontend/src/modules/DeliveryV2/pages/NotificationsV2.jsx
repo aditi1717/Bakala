@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Bell, Clock, Trash2 } from "lucide-react";
 import {
@@ -56,18 +56,22 @@ export default function NotificationsV2() {
     };
   }, []);
 
-  const mergedNotifications = [
-    ...(broadcastNotifications || []).map((item) => ({
-      ...item,
-      source: "broadcast",
-    })),
-    ...(notifications || []).map((item) => ({
-      ...item,
-      source: "local",
-    })),
-  ].sort(
-    (a, b) =>
-      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+  const mergedNotifications = useMemo(
+    () =>
+      [
+        ...(broadcastNotifications || []).map((item) => ({
+          ...item,
+          source: "broadcast",
+        })),
+        ...(notifications || []).map((item) => ({
+          ...item,
+          source: "local",
+        })),
+      ].sort(
+        (a, b) =>
+          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      ),
+    [broadcastNotifications, notifications]
   );
 
   const unreadCount = notifications.filter((item) => !item.read).length + broadcastUnreadCount;
@@ -85,6 +89,14 @@ export default function NotificationsV2() {
     );
     window.dispatchEvent(new CustomEvent("deliveryNotificationsUpdated"));
   };
+
+  useEffect(() => {
+    const unreadBroadcastIds = mergedNotifications
+      .filter((item) => item.source === "broadcast" && !item.read)
+      .map((item) => item.id)
+      .filter(Boolean);
+    unreadBroadcastIds.forEach((id) => markBroadcastAsRead(id));
+  }, [markBroadcastAsRead, mergedNotifications]);
 
   const handleDismissAll = () => {
     setNotifications([]);

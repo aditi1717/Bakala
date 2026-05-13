@@ -64,31 +64,49 @@ export const createInboxNotifications = async ({ notifications = [] } = {}) => {
             payload.broadcastId = new mongoose.Types.ObjectId(String(item.broadcastId));
         }
 
+        const supportTicketId = String(payload.metadata?.ticketId || '').trim();
+        const isSupportTicketNotification = payload.source === 'SUPPORT_TICKET' && supportTicketId;
+        const filter = payload.broadcastId
+            ? {
+                broadcastId: payload.broadcastId,
+                ownerType: payload.ownerType,
+                ownerId: payload.ownerId
+            }
+            : isSupportTicketNotification
+                ? {
+                    ownerType: payload.ownerType,
+                    ownerId: payload.ownerId,
+                    source: payload.source,
+                    'metadata.ticketId': supportTicketId
+                }
+                : {
+                    ownerType: payload.ownerType,
+                    ownerId: payload.ownerId,
+                    title: payload.title,
+                    message: payload.message,
+                    source: payload.source
+                };
+        const readStateUpdate = isSupportTicketNotification
+            ? { isRead: false, readAt: null }
+            : {};
+        const insertReadState = isSupportTicketNotification
+            ? {}
+            : { isRead: false, readAt: null };
+        const update = {
+            $set: {
+                ...payload,
+                ...readStateUpdate,
+                dismissedAt: null
+            }
+        };
+        if (Object.keys(insertReadState).length > 0) {
+            update.$setOnInsert = insertReadState;
+        }
+
         return {
             updateOne: {
-                filter: payload.broadcastId
-                    ? {
-                        broadcastId: payload.broadcastId,
-                        ownerType: payload.ownerType,
-                        ownerId: payload.ownerId
-                    }
-                    : {
-                        ownerType: payload.ownerType,
-                        ownerId: payload.ownerId,
-                        title: payload.title,
-                        message: payload.message,
-                        source: payload.source
-                    },
-                update: {
-                    $set: {
-                        ...payload,
-                        dismissedAt: null
-                    },
-                    $setOnInsert: {
-                        isRead: false,
-                        readAt: null
-                    }
-                },
+                filter,
+                update,
                 upsert: true
             }
         };

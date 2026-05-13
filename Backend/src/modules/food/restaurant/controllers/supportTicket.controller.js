@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { FoodRestaurantSupportTicket } from '../models/supportTicket.model.js';
+import { emitAdminSupportTicketCreated } from '../../shared/supportTicketAdminNotification.js';
 import { sendError, sendResponse } from '../../../../utils/response.js';
 
 const ALLOWED_CATEGORIES = ['orders', 'payments', 'menu', 'restaurant', 'technical', 'other'];
@@ -48,6 +49,13 @@ export const createRestaurantSupportTicketController = async (req, res, next) =>
             subject,
             description,
             orderRef
+        });
+        emitAdminSupportTicketCreated({
+            source: 'restaurant',
+            ticketId: created._id,
+            title: 'New Restaurant Support Ticket',
+            message: `A restaurant raised a support ticket for ${subject || issueType}.`,
+            createdAt: created.createdAt
         });
 
         return sendResponse(res, 201, 'Support ticket created successfully', {

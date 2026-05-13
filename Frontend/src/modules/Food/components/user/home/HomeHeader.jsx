@@ -87,6 +87,7 @@ export default function HomeHeader({
   onSearchSubmit,
   searchPlaceholder,
 }) {
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState(() => {
     if (typeof window === "undefined") return [];
     const saved = localStorage.getItem("food_user_notifications");
@@ -95,6 +96,7 @@ export default function HomeHeader({
   const {
     items: broadcastNotifications,
     unreadCount: broadcastUnreadCount,
+    markAsRead: markBroadcastAsRead,
     dismiss: dismissBroadcastNotification,
   } = useNotificationInbox("user", { limit: 20, pollMs: 30 * 1000 });
   const { getCartCount } = useCart();
@@ -155,9 +157,6 @@ export default function HomeHeader({
   const isControlledSearch = typeof searchValue === "string" && typeof onSearchChange === "function";
 
   const mergedNotifications = useMemo(() => {
-    const localItems = Array.isArray(notifications)
-      ? notifications.map((item) => ({ ...item, source: "local" }))
-      : [];
     const remoteItems = (broadcastNotifications || []).map((item) => ({
       ...item,
       id: item.id || item._id,
@@ -172,6 +171,17 @@ export default function HomeHeader({
           })
         : "Just now",
     }));
+    const remoteSupportTicketIds = new Set(
+      remoteItems
+        .map((item) => item?.metadata?.ticketId)
+        .filter(Boolean)
+        .map((value) => `admin-${String(value)}`),
+    );
+    const localItems = Array.isArray(notifications)
+      ? notifications
+          .filter((item) => !remoteSupportTicketIds.has(String(item?.id || "")))
+          .map((item) => ({ ...item, source: "local" }))
+      : [];
     return [...remoteItems, ...localItems].sort(
       (a, b) =>
         new Date(b.createdAt || b.timestamp || 0).getTime() -
@@ -180,8 +190,26 @@ export default function HomeHeader({
   }, [broadcastNotifications, notifications]);
 
   const unreadCount =
-    notifications.filter((item) => !item.read).length + broadcastUnreadCount;
+    mergedNotifications.filter((item) => !item.read).length;
   const cartCount = getCartCount();
+
+  useEffect(() => {
+    if (!notificationsOpen || unreadCount <= 0) return;
+
+    const unreadBroadcastIds = mergedNotifications
+      .filter((item) => item.source === "broadcast" && !item.read)
+      .map((item) => item.id)
+      .filter(Boolean);
+
+    unreadBroadcastIds.forEach((id) => markBroadcastAsRead(id));
+
+    setNotifications((prev) => {
+      const next = prev.map((item) => ({ ...item, read: true }));
+      localStorage.setItem("food_user_notifications", JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent("notificationsUpdated"));
+      return next;
+    });
+  }, [markBroadcastAsRead, mergedNotifications, notificationsOpen, unreadCount]);
 
   const removeNotification = (id, source) => {
     if (source === "broadcast") {
@@ -281,7 +309,7 @@ export default function HomeHeader({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              <Popover>
+              <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
                 <PopoverTrigger asChild>
                   <button
                     type="button"

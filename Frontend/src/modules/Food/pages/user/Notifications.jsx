@@ -122,10 +122,6 @@ export default function Notifications() {
   }, [])
   
   const mergedNotifications = useMemo(() => {
-    const localItems = (notificationsList || []).map((item) => ({
-      ...item,
-      source: "local",
-    }))
     const broadcastItems = (broadcastNotifications || []).map((item) => ({
       ...item,
       source: "broadcast",
@@ -143,6 +139,18 @@ export default function Notifications() {
       icon: "Bell",
       iconColor: BRAND_THEME.tokens.notifications.broadcastIcon,
     }))
+    const remoteSupportTicketIds = new Set(
+      broadcastItems
+        .map((item) => item?.metadata?.ticketId)
+        .filter(Boolean)
+        .map((value) => `admin-${String(value)}`),
+    )
+    const localItems = (notificationsList || [])
+      .filter((item) => !remoteSupportTicketIds.has(String(item?.id || "")))
+      .map((item) => ({
+        ...item,
+        source: "local",
+      }))
 
     return [...broadcastItems, ...localItems].sort(
       (a, b) =>
@@ -162,6 +170,19 @@ export default function Notifications() {
       prev.map(n => n.id === id ? { ...n, read: true } : n)
     )
   }
+
+  useEffect(() => {
+    const unreadBroadcastIds = mergedNotifications
+      .filter((item) => item.source === "broadcast" && !item.read)
+      .map((item) => item.id)
+      .filter(Boolean)
+    unreadBroadcastIds.forEach((id) => markBroadcastAsRead(id))
+
+    setNotificationsList((prev) => {
+      if (!prev.some((item) => !item.read)) return prev
+      return prev.map((item) => ({ ...item, read: true }))
+    })
+  }, [markBroadcastAsRead, mergedNotifications])
 
   const handleClearAll = () => {
     setNotificationsList([])

@@ -1,8 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import io from "socket.io-client";
 import { adminAPI } from "@food/api";
+import { API_BASE_URL } from "@food/api/config";
 
 const STORAGE_KEY = "admin_notifications_dismissed_v1";
+const SEEN_STORAGE_KEY = "admin_notifications_seen_v1";
 const UPDATE_EVENT = "adminNotificationsUpdated";
+
+const getAdminSocketToken = () => {
+  if (typeof localStorage === "undefined") return "";
+  return (
+    localStorage.getItem("auth_admin") ||
+    localStorage.getItem("admin_accessToken") ||
+    localStorage.getItem("token") ||
+    ""
+  );
+};
+
+const getAdminSocketUrl = () => {
+  if (typeof window === "undefined" || !API_BASE_URL) return "";
+  try {
+    return new URL(API_BASE_URL, window.location.origin).origin;
+  } catch {
+    return String(API_BASE_URL || "")
+      .replace(/\/api\/v\d+\/?$/i, "")
+      .replace(/\/api\/?$/i, "")
+      .replace(/\/+$/, "");
+  }
+};
 
 const safeParse = (value, fallback) => {
   try {
@@ -21,6 +46,17 @@ const getDismissedIds = () => {
 const saveDismissedIds = (ids) => {
   if (typeof localStorage === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.isArray(ids) ? ids : []));
+};
+
+const getSeenIds = () => {
+  if (typeof localStorage === "undefined") return [];
+  const parsed = safeParse(localStorage.getItem(SEEN_STORAGE_KEY) || "[]", []);
+  return Array.isArray(parsed) ? parsed : [];
+};
+
+const saveSeenIds = (ids) => {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(Array.isArray(ids) ? ids : []));
 };
 
 export const dispatchAdminNotificationsUpdated = () => {
@@ -195,6 +231,7 @@ const mapExpiredFssai = (response) => {
 export default function useAdminNotifications(options = {}) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(Boolean(options?.autoload !== false));
+  const socketRef = useRef(null);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -256,6 +293,37 @@ export default function useAdminNotifications(options = {}) {
   }, [loadNotifications]);
 
   useEffect(() => {
+    if (options?.autoload === false) return undefined;
+    const socketUrl = getAdminSocketUrl();
+    const token = getAdminSocketToken();
+    if (!socketUrl || !socketUrl.startsWith("http") || !token) return undefined;
+
+    const socket = io(socketUrl, {
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      auth: { token },
+      query: { token },
+    });
+    socketRef.current = socket;
+
+    const refreshAdminNotifications = () => {
+      loadNotifications();
+    };
+
+    socket.on("admin_support_ticket_created", refreshAdminNotifications);
+
+    return () => {
+      socket.off("admin_support_ticket_created", refreshAdminNotifications);
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [loadNotifications, options?.autoload]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       loadNotifications();
     }, 5 * 60 * 1000);
@@ -270,22 +338,36 @@ export default function useAdminNotifications(options = {}) {
     dispatchAdminNotificationsUpdated();
   }, []);
 
+  const markAllAsSeen = useCallback(() => {
+    const ids = items.map((item) => item.id).filter(Boolean);
+    if (!ids.length) return;
+    saveSeenIds([...new Set([...getSeenIds(), ...ids])]);
+    dispatchAdminNotificationsUpdated();
+  }, [items]);
+
   const clearAll = useCallback(() => {
     const ids = items.map((item) => item.id).filter(Boolean);
     saveDismissedIds([...new Set([...getDismissedIds(), ...ids])]);
+    saveSeenIds([...new Set([...getSeenIds(), ...ids])]);
     setItems([]);
     dispatchAdminNotificationsUpdated();
+  }, [items]);
+
+  const unreadCount = useMemo(() => {
+    const seen = new Set(getSeenIds());
+    return items.filter((item) => item?.id && !seen.has(item.id)).length;
   }, [items]);
 
   return useMemo(
     () => ({
       items,
       loading,
-      unreadCount: items.length,
+      unreadCount,
       refresh: loadNotifications,
       dismissOne,
       clearAll,
+      markAllAsSeen,
     }),
-    [clearAll, dismissOne, items, loadNotifications, loading]
+    [clearAll, dismissOne, items, loadNotifications, loading, markAllAsSeen, unreadCount]
   );
 }

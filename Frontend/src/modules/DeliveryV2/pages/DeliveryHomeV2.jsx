@@ -4,6 +4,7 @@ import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { useProximityCheck } from '@/modules/DeliveryV2/hooks/useProximityCheck';
 import { useOrderManager } from '@/modules/DeliveryV2/hooks/useOrderManager';
 import { useDeliveryNotifications } from '@food/hooks/useDeliveryNotifications';
+import useNotificationInbox from '@food/hooks/useNotificationInbox';
 import { deliveryAPI } from '@food/api';
 import { toast } from 'sonner';
 import { BRAND_THEME } from '@/config/brandTheme';
@@ -27,7 +28,7 @@ import {
   HelpCircle, AlertTriangle,
   Wallet, History, User as UserIcon, LayoutGrid,
   Plus, Minus, Navigation2, Target, Play, Clock,
-  Contact, Package, RefreshCcw
+  Bell, Contact, Package, RefreshCcw
 } from 'lucide-react';
 
 const INCOMING_ORDER_STORAGE_KEY = 'delivery_v2_incoming_order';
@@ -598,6 +599,11 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
   const { distanceToTarget } = useProximityCheck();
   const { acceptOrder, rejectOrder, resetTrip } = useOrderManager();
   const { newOrder, clearNewOrder, orderStatusUpdate, clearOrderStatusUpdate, isConnected: isSocketConnected, playNotificationSound } = useDeliveryNotifications();
+  const {
+    items: deliveryNotificationItems,
+    unreadCount: deliveryUnreadCount,
+    markAsRead: markDeliveryNotificationAsRead,
+  } = useNotificationInbox('delivery', { limit: 20, pollMs: 30 * 1000 });
   const companyName = useCompanyName();
 
   const [incomingOrder, setIncomingOrder] = useState(null);
@@ -1360,6 +1366,13 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
 
   const handleMapClick = () => {};
 
+  const handleNotificationsClick = () => {
+    deliveryNotificationItems
+      .filter((item) => !item.read)
+      .forEach((item) => markDeliveryNotificationAsRead(item.id));
+    navigate('/food/delivery/notifications');
+  };
+
   return (
     <div className="relative h-screen w-full bg-white text-gray-900 overflow-hidden flex flex-col">
       {/* ─── 1. TOP HEADER (Neat & Clean) ─── */}
@@ -1402,6 +1415,16 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
             </div>
             
             <div className="flex items-center gap-2">
+              <button
+                onClick={handleNotificationsClick}
+                className="relative w-[38px] h-[38px] rounded-full bg-amber-50 flex items-center justify-center text-amber-600 active:bg-amber-100 transition-colors border border-amber-100"
+                aria-label="Notifications"
+              >
+                <Bell className="w-[18px] h-[18px]" />
+                {deliveryUnreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 border border-white" />
+                )}
+              </button>
               <button onClick={() => navigate('/food/delivery/help/tickets')} className="w-[38px] h-[38px] rounded-full bg-red-50 flex items-center justify-center text-red-500 active:bg-red-100 transition-colors border border-red-100"><AlertTriangle className="w-[18px] h-[18px]" /></button>
               <button onClick={() => navigate('/food/delivery/help/id-card')} className="w-[38px] h-[38px] rounded-full bg-brand-50 flex items-center justify-center text-brand-600 active:bg-brand-100 transition-colors border border-brand-100"><Contact className="w-[18px] h-[18px]" /></button>
             </div>

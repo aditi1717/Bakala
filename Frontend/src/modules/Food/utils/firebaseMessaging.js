@@ -80,6 +80,17 @@ function sanitize(value) {
 }
 
 function getNotificationKey(payload = {}) {
+  const supportTicketId = payload?.data?.ticketId;
+  if (supportTicketId) {
+    return [
+      payload?.data?.type || "support_ticket_update",
+      supportTicketId,
+      payload?.data?.ticketStatus || "",
+      payload?.notification?.title || payload?.data?.title || "",
+      payload?.notification?.body || payload?.data?.body || "",
+    ].join("::");
+  }
+
   return (
     payload?.data?.notificationId ||
     payload?.data?.messageId ||

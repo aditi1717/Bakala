@@ -38,7 +38,11 @@ export default function RestaurantNavbar({
   const [loading, setLoading] = useState(true)
   const [companyName, setCompanyName] = useState("")
   const [logoUrl, setLogoUrl] = useState(null)
-  const { unreadCount } = useNotificationInbox("restaurant", { limit: 20, pollMs: 30 * 1000 })
+  const {
+    items: notificationItems,
+    unreadCount,
+    markAsRead: markNotificationAsRead,
+  } = useNotificationInbox("restaurant", { limit: 20, pollMs: 30 * 1000 })
 
   // Load business settings for branding
   useEffect(() => {
@@ -334,6 +338,9 @@ export default function RestaurantNavbar({
   }
 
   const handleNotificationsClick = () => {
+    notificationItems
+      .filter((item) => !item.read)
+      .forEach((item) => markNotificationAsRead(item.id))
     navigate("/restaurant/notifications")
   }
 

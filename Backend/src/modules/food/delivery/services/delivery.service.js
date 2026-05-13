@@ -6,6 +6,7 @@ import { FoodPayoutSettlement } from '../../admin/models/foodPayoutSettlement.mo
 import { FoodEarningAddon } from '../../admin/models/earningAddon.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { sanitizeOrderForExternal } from '../../orders/services/order.helpers.js';
+import { emitAdminSupportTicketCreated } from '../../shared/supportTicketAdminNotification.js';
 import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
@@ -455,6 +456,13 @@ export const createSupportTicket = async (deliveryPartnerId, payload) => {
         priority: ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium',
         status: 'open'
     });
+    emitAdminSupportTicketCreated({
+        source: 'delivery',
+        ticketId: ticket._id,
+        title: 'New Delivery Support Ticket',
+        message: `A delivery partner raised a support ticket for ${subject.trim()}.`,
+        createdAt: ticket.createdAt
+    });
     return ticket.toObject();
 };
 
@@ -494,6 +502,13 @@ export const createSupportTicketForPendingPartner = async (payload) => {
         category: 'verification_issue',
         priority: ['low', 'medium', 'high', 'urgent'].includes(priority) ? priority : 'medium',
         status: 'open'
+    });
+    emitAdminSupportTicketCreated({
+        source: 'delivery',
+        ticketId: ticket._id,
+        title: 'New Delivery Support Ticket',
+        message: `A delivery partner raised a support ticket for ${subject}.`,
+        createdAt: ticket.createdAt
     });
 
     return ticket.toObject();

@@ -11,6 +11,7 @@ const normalizeInboxItems = (rows = []) =>
     read: Boolean(item?.isRead),
     createdAt: item?.createdAt || item?.updatedAt || new Date().toISOString(),
     category: String(item?.category || "broadcast"),
+    metadata: item?.metadata && typeof item.metadata === "object" ? item.metadata : {},
   }));
 
 const REFRESH_EVENT = "foodNotificationInboxRefresh";

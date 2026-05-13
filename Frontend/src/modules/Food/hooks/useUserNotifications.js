@@ -42,6 +42,7 @@ const broadcastConnectionState = (connected) => {
 
 const storeUserAdminNotification = (payload = {}) => {
   if (typeof window === 'undefined') return;
+  if (payload?.type === 'support_ticket_update' || payload?.ticketId) return;
   const id = `admin-${payload?.ticketId || Date.now()}`;
   const item = {
     id,
@@ -205,10 +206,12 @@ export const useUserNotifications = () => {
     });
 
     socketRef.current.on('admin_notification', (payload) => {
-      toast.message(payload?.title || 'Notification', {
-        description: payload?.message || 'New broadcast notification received.',
-        duration: 8000,
-      });
+      if (payload?.type !== 'support_ticket_update' && !payload?.ticketId) {
+        toast.message(payload?.title || 'Notification', {
+          description: payload?.message || 'New broadcast notification received.',
+          duration: 8000,
+        });
+      }
       storeUserAdminNotification(payload);
       dispatchNotificationInboxRefresh();
     });

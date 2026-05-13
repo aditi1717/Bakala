@@ -17,14 +17,19 @@ const buildSupportNotificationPayload = ({ ownerType, ownerId, ticket, link }) =
             'support'
     ).trim();
     const responseText = String(ticket?.adminResponse || '').trim();
+    const issueSuffix = issueType ? ` about ${issueType}` : '';
     const title =
         ticketStatus === 'resolved'
             ? 'Support Ticket Resolved'
-            : 'Support Ticket Updated';
+            : responseText
+                ? 'Support Ticket Reply'
+                : 'Support Ticket Updated';
     const message =
         ticketStatus === 'resolved'
-            ? `Your support ticket (${issueType}) has been resolved.${responseText ? ` Response: ${responseText}` : ''}`
-            : `Your support ticket (${issueType}) was updated by admin.${responseText ? ` Response: ${responseText}` : ''}`;
+            ? `Your support ticket${issueSuffix} has been resolved.${responseText ? ` ${responseText}` : ''}`
+            : responseText
+                ? `We have responded to your support ticket${issueSuffix}. ${responseText}`
+                : `Your support ticket${issueSuffix} has been updated.`;
 
     return {
         ownerType,
@@ -91,6 +96,30 @@ const ensureSupportTicketInboxNotifications = async ({ ownerType, ownerId } = {}
                         ownerId: ownerIdString,
                         ticket,
                         link: '/food/restaurant/notifications',
+                    })
+                ),
+            });
+            return;
+        }
+
+        if (ownerType === 'DELIVERY_PARTNER') {
+            const { DeliverySupportTicket } = await import('../../modules/food/delivery/models/supportTicket.model.js');
+            const tickets = await DeliverySupportTicket.find({
+                deliveryPartnerId: ownerId,
+                adminResponse: { $exists: true, $ne: '' },
+            })
+                .sort({ updatedAt: -1 })
+                .limit(25)
+                .lean();
+
+            if (!tickets.length) return;
+            await createInboxNotifications({
+                notifications: tickets.map((ticket) =>
+                    buildSupportNotificationPayload({
+                        ownerType: 'DELIVERY_PARTNER',
+                        ownerId: ownerIdString,
+                        ticket,
+                        link: '/food/delivery/notifications',
                     })
                 ),
             });

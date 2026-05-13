@@ -61,7 +61,11 @@ export default function AdminNavbar({ onMenuClick }) {
   const [adminData, setAdminData] = useState(null);
   const [businessSettings, setBusinessSettings] = useState(() => getCachedSettings() || null);
   const searchInputRef = useRef(null);
-  const { items: adminNotifications } = useAdminNotifications();
+  const {
+    items: adminNotifications,
+    unreadCount: adminUnreadCount,
+    markAllAsSeen: markAdminNotificationsSeen,
+  } = useAdminNotifications();
 
   // Load business settings
   useEffect(() => {
@@ -259,8 +263,15 @@ export default function AdminNavbar({ onMenuClick }) {
     }
   };
 
-  const notificationCount = adminNotifications.length;
+  useEffect(() => {
+    if (notificationsOpen) {
+      markAdminNotificationsSeen();
+    }
+  }, [markAdminNotificationsSeen, notificationsOpen]);
+
+  const notificationCount = adminUnreadCount;
   const openNotificationsPage = () => {
+    markAdminNotificationsSeen();
     setNotificationsOpen(false);
     navigate("/admin/food/notifications");
   };

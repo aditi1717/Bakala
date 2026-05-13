@@ -1,10 +1,17 @@
+import { useEffect } from "react";
 import { Bell, Clock, Loader2, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import useAdminNotifications from "@food/hooks/useAdminNotifications";
 
 export default function AdminNotifications() {
   const navigate = useNavigate();
-  const { items, loading, clearAll, dismissOne } = useAdminNotifications();
+  const { items, loading, clearAll, dismissOne, markAllAsSeen } = useAdminNotifications();
+
+  useEffect(() => {
+    if (!loading && items.length > 0) {
+      markAllAsSeen();
+    }
+  }, [items.length, loading, markAllAsSeen]);
 
   return (
     <div className="p-6">

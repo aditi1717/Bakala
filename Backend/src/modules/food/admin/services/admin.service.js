@@ -2011,15 +2011,20 @@ export async function updateSupportTicket(id, body = {}) {
                 ).trim();
                 const shortTicketId = String(updated?._id || '').slice(-6).toUpperCase();
                 const responseText = String(updated?.adminResponse || '').trim();
+                const issueSuffix = issueType ? ` about ${issueType}` : '';
 
                 const title =
                     ticketStatus === 'resolved'
                         ? 'Support Ticket Resolved'
-                        : 'Support Ticket Updated';
+                        : responseText
+                            ? 'Support Ticket Reply'
+                            : 'Support Ticket Updated';
                 const message =
                     ticketStatus === 'resolved'
-                        ? `Your support ticket (${issueType}) has been resolved.${responseText ? ` Response: ${responseText}` : ''}`
-                        : `Your support ticket (${issueType}) was updated by admin.${responseText ? ` Response: ${responseText}` : ''}`;
+                        ? `Your support ticket${issueSuffix} has been resolved.${responseText ? ` ${responseText}` : ''}`
+                        : responseText
+                            ? `We have responded to your support ticket${issueSuffix}. ${responseText}`
+                            : `Your support ticket${issueSuffix} has been updated.`;
 
                 const buildLink = (ownerType) =>
                     ownerType === 'USER'
@@ -2053,6 +2058,7 @@ export async function updateSupportTicket(id, body = {}) {
                                 title,
                                 body: message,
                                 dataOnly: true,
+                                skipHighlighter: true,
                                 data: {
                                     type: 'support_ticket_update',
                                     ticketId: String(updated?._id || ''),
@@ -4491,7 +4497,89 @@ export async function updateDeliverySupportTicket(id, body = {}) {
         if (ticket.adminResponse) ticket.respondedAt = new Date();
     }
     await ticket.save();
-    return ticket.toObject();
+    const updated = ticket.toObject();
+
+    try {
+        const ownerId = updated?.deliveryPartnerId ? String(updated.deliveryPartnerId) : '';
+        if (ownerId && mongoose.Types.ObjectId.isValid(ownerId)) {
+            const { createInboxNotifications } = await import('../../../../core/notifications/notification.service.js');
+            const { notifyOwnerSafely } = await import('../../../../core/notifications/firebase.service.js');
+            const { getIO, rooms } = await import('../../../../config/socket.js');
+
+            const ticketStatus = String(updated?.status || '').toLowerCase();
+            const subject = String(updated?.subject || updated?.category || 'support').trim();
+            const responseText = String(updated?.adminResponse || '').trim();
+            const subjectSuffix = subject ? ` about ${subject}` : '';
+            const title =
+                ticketStatus === 'resolved' || ticketStatus === 'closed'
+                    ? 'Support Ticket Resolved'
+                    : responseText
+                        ? 'Support Ticket Reply'
+                        : 'Support Ticket Updated';
+            const message =
+                ticketStatus === 'resolved' || ticketStatus === 'closed'
+                    ? `Your support ticket${subjectSuffix} has been resolved.${responseText ? ` ${responseText}` : ''}`
+                    : responseText
+                        ? `We have responded to your support ticket${subjectSuffix}. ${responseText}`
+                        : `Your support ticket${subjectSuffix} has been updated.`;
+            const link = '/food/delivery/notifications';
+
+            await createInboxNotifications({
+                notifications: [{
+                    ownerType: 'DELIVERY_PARTNER',
+                    ownerId,
+                    title,
+                    message,
+                    link,
+                    category: 'support_ticket',
+                    source: 'SUPPORT_TICKET',
+                    metadata: {
+                        source: 'support_ticket',
+                        ticketId: String(updated?._id || ''),
+                        ticketShortId: String(updated?.ticketId || updated?._id || '').slice(-6).toUpperCase(),
+                        status: ticketStatus || null,
+                        issueType: subject,
+                    },
+                }],
+            });
+
+            await notifyOwnerSafely(
+                { ownerType: 'DELIVERY_PARTNER', ownerId },
+                {
+                    title,
+                    body: message,
+                    dataOnly: true,
+                    skipHighlighter: true,
+                    data: {
+                        type: 'support_ticket_update',
+                        ticketId: String(updated?._id || ''),
+                        ticketStatus: ticketStatus || '',
+                        link,
+                    },
+                },
+            );
+
+            try {
+                const io = getIO();
+                io.to(rooms.delivery(ownerId)).emit('admin_notification', {
+                    title,
+                    message,
+                    link,
+                    targetType: 'DELIVERY_PARTNER',
+                    type: 'support_ticket_update',
+                    ticketId: String(updated?._id || ''),
+                    ticketStatus: ticketStatus || '',
+                    createdAt: new Date().toISOString(),
+                });
+            } catch (socketError) {
+                console.error('Failed to emit delivery support ticket notification:', socketError);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to notify delivery support ticket owner:', error);
+    }
+
+    return updated;
 }
 
 // ----- Delivery partners (approved list) -----

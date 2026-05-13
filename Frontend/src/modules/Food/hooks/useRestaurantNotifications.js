@@ -10,6 +10,7 @@ const debugError = (...args) => {}
 
 const storeRestaurantAdminNotification = (payload = {}) => {
   if (typeof window === 'undefined') return;
+  if (payload?.type === 'support_ticket_update' || payload?.ticketId) return;
   const id = `admin-${payload?.ticketId || Date.now()}`;
   const item = {
     id,
