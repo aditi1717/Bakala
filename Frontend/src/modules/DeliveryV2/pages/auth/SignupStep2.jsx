@@ -16,6 +16,77 @@ const createEmptyUploadedDocs = () => ({
   drivingLicensePhoto: null
 })
 
+const DELIVERY_DOCS_DB_NAME = "DeliverySignupDocsDB"
+const DELIVERY_DOCS_STORE = "delivery_signup_files"
+const DELIVERY_DOCS_DB_VERSION = 1
+
+const openDeliveryDocsDB = () =>
+  new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB unavailable"))
+      return
+    }
+
+    const request = indexedDB.open(DELIVERY_DOCS_DB_NAME, DELIVERY_DOCS_DB_VERSION)
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result
+      if (!db.objectStoreNames.contains(DELIVERY_DOCS_STORE)) {
+        db.createObjectStore(DELIVERY_DOCS_STORE)
+      }
+    }
+
+    request.onsuccess = (event) => resolve(event.target.result)
+    request.onerror = () => reject(request.error || new Error("Failed to open IndexedDB"))
+  })
+
+const saveDeliveryDocFile = async (key, file) => {
+  if (!(file instanceof Blob)) return
+  const db = await openDeliveryDocsDB()
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(DELIVERY_DOCS_STORE, "readwrite")
+    const store = tx.objectStore(DELIVERY_DOCS_STORE)
+    store.put(file, key)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error || new Error("Failed to save file"))
+  })
+}
+
+const getDeliveryDocFile = async (key) => {
+  const db = await openDeliveryDocsDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DELIVERY_DOCS_STORE, "readonly")
+    const store = tx.objectStore(DELIVERY_DOCS_STORE)
+    const request = store.get(key)
+    request.onsuccess = () => resolve(request.result || null)
+    request.onerror = () => reject(request.error || new Error("Failed to read file"))
+  })
+}
+
+const deleteDeliveryDocFile = async (key) => {
+  const db = await openDeliveryDocsDB()
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(DELIVERY_DOCS_STORE, "readwrite")
+    const store = tx.objectStore(DELIVERY_DOCS_STORE)
+    store.delete(key)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error || new Error("Failed to delete file"))
+  })
+}
+
+const clearDeliveryDocFiles = async () => {
+  const db = await openDeliveryDocsDB()
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(DELIVERY_DOCS_STORE, "readwrite")
+    const store = tx.objectStore(DELIVERY_DOCS_STORE)
+    store.clear()
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error || new Error("Failed to clear files"))
+  })
+}
+
+const getDeliveryDocStorageKey = (docType) => `delivery-signup-doc-${docType}`
+
 const sanitizeUploadedDocValue = (value) => {
   if (!value) return null
 
@@ -194,6 +265,52 @@ export default function SignupStep2() {
     }
   }, [uploadedDocs])
 
+  useEffect(() => {
+    let cancelled = false
+
+    const restoreFilesFromIndexedDB = async () => {
+      const docTypes = Object.keys(createEmptyUploadedDocs())
+      for (const docType of docTypes) {
+        const current = uploadedDocs?.[docType]
+        const hasSessionImage =
+          (typeof current === "string" && current.startsWith("data:")) ||
+          (typeof current?.dataUrl === "string" && current.dataUrl.startsWith("data:"))
+        if (hasSessionImage) continue
+
+        try {
+          const storedBlob = await getDeliveryDocFile(getDeliveryDocStorageKey(docType))
+          if (!storedBlob || cancelled) continue
+          const fileName = current?.fileName || `${docType}.jpg`
+          const mimeType = current?.mimeType || storedBlob.type || "image/jpeg"
+          const restoredFile = storedBlob instanceof File
+            ? storedBlob
+            : new File([storedBlob], fileName, { type: mimeType })
+          const restoredDataUrl = await fileToDataUrl(restoredFile)
+          if (cancelled) return
+
+          setDocuments((prev) => ({ ...prev, [docType]: restoredFile }))
+          setUploadedDocs((prev) => ({
+            ...prev,
+            [docType]: {
+              dataUrl: restoredDataUrl,
+              url: restoredDataUrl,
+              fileName: restoredFile.name || fileName,
+              mimeType: restoredFile.type || mimeType,
+              size: restoredFile.size || 0,
+            },
+          }))
+        } catch (error) {
+          debugWarn("Failed restoring delivery doc from IndexedDB:", docType, error)
+        }
+      }
+    }
+
+    restoreFilesFromIndexedDB()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const previewUrlsRefs = useRef({});
 
   useEffect(() => {
@@ -240,6 +357,7 @@ export default function SignupStep2() {
     }
 
     try {
+      await saveDeliveryDocFile(getDeliveryDocStorageKey(docType), file)
       const dataUrl = await fileToDataUrl(file)
       setDocuments((prev) => ({ ...prev, [docType]: file }))
       setUploadedDocs((prev) => ({
@@ -283,6 +401,9 @@ export default function SignupStep2() {
       ...prev,
       [docType]: null
     }))
+    deleteDeliveryDocFile(getDeliveryDocStorageKey(docType)).catch((error) => {
+      debugWarn("Failed to delete delivery doc from IndexedDB:", docType, error)
+    })
   }
 
   const handleSubmit = async (e) => {
@@ -381,6 +502,9 @@ export default function SignupStep2() {
       if (response?.data?.success) {
         sessionStorage.removeItem("deliverySignupDetails")
         sessionStorage.removeItem("deliverySignupDocs")
+        clearDeliveryDocFiles().catch((error) => {
+          debugWarn("Failed to clear delivery signup docs from IndexedDB:", error)
+        })
         if (isCompleteProfile) {
           sessionStorage.removeItem("deliveryNeedsRegistration")
           toast.success("Registration successful. Please login with OTP.")

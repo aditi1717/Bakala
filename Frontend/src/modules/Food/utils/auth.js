@@ -160,6 +160,9 @@ export function clearModuleAuth(module) {
   if (module === "restaurant") {
     clearRestaurantSessionCache();
   }
+  if (module === "delivery") {
+    clearDeliverySessionCache();
+  }
   // Also clear any sessionStorage data
   sessionStorage.removeItem(`${module}AuthData`);
 }
@@ -191,6 +194,36 @@ export function clearRestaurantSessionCache() {
   ];
 
   keys.forEach((key) => localStorage.removeItem(key));
+}
+
+/**
+ * Clear delivery-local cached onboarding/session data to avoid stale draft restore.
+ */
+export function clearDeliverySessionCache() {
+  const localKeys = [
+    "app:isOnline",
+    "delivery_onboarding",
+    "delivery_onboarding_data",
+  ];
+
+  localKeys.forEach((key) => localStorage.removeItem(key));
+
+  const sessionKeys = [
+    "deliveryAuthData",
+    "deliverySignupDetails",
+    "deliverySignupDocs",
+    "deliveryNeedsRegistration",
+  ];
+
+  sessionKeys.forEach((key) => sessionStorage.removeItem(key));
+
+  if (typeof indexedDB !== "undefined") {
+    try {
+      indexedDB.deleteDatabase("DeliverySignupDocsDB");
+    } catch (error) {
+      console.warn("Failed to clear DeliverySignupDocsDB:", error);
+    }
+  }
 }
 
 export function setRestaurantPendingPhone(phone) {
