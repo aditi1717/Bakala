@@ -17,25 +17,36 @@ export const formatOrderAddressWithLabels = (address) => {
   const street = cleanText(address.street || address.addressLine2)
   const area = cleanText(address.additionalDetails || address.area)
   const landmark = cleanText(address.landmark)
-  const hasDistinctLandmark =
-    landmark && (!area || landmark.toLowerCase() !== area.toLowerCase())
   const city = cleanText(address.city)
   const state = cleanText(address.state)
   const zipCode = cleanText(address.zipCode || address.postalCode || address.pincode)
 
-  const labeledParts = [
-    label ? `Type: ${label}` : "",
-    building ? `Building: ${building}` : "",
-    floor ? `Floor/Flat: ${floor}` : "",
-    street ? `Street: ${street}` : "",
-    area ? `Area: ${area}` : "",
-    hasDistinctLandmark ? `Landmark: ${landmark}` : "",
-    city ? `City: ${city}` : "",
-    state ? `State: ${state}` : "",
-    zipCode ? `Pincode: ${zipCode}` : "",
-  ].filter(Boolean)
+  const parts = [
+    { label: "Type", value: label },
+    { label: "Building", value: building },
+    { label: "Floor/Flat", value: floor },
+    { label: "Street", value: street },
+    { label: "Area", value: area },
+    { label: "Landmark", value: landmark },
+    { label: "City", value: city },
+    { label: "State", value: state },
+    { label: "Pincode", value: zipCode },
+  ].filter(p => cleanText(p.value));
 
-  if (labeledParts.length > 0) return labeledParts.join(", ")
+  const uniqueLabeledParts = [];
+  parts.forEach(part => {
+    const value = cleanText(part.value);
+    const lowerValue = value.toLowerCase();
+    const isDuplicate = uniqueLabeledParts.some(p => {
+      const existingValue = cleanText(p.split(": ")[1]).toLowerCase();
+      return existingValue.includes(lowerValue) || lowerValue.includes(existingValue);
+    });
+    if (!isDuplicate) {
+      uniqueLabeledParts.push(`${part.label}: ${value}`);
+    }
+  });
+
+  if (uniqueLabeledParts.length > 0) return uniqueLabeledParts.join(", ")
 
   const formatted = cleanText(address.formattedAddress)
   if (formatted && !isCoordinateLikeText(formatted)) return formatted
@@ -54,17 +65,26 @@ export const formatOrderAddressForMap = (address) => {
   const formatted = cleanText(address.formattedAddress)
   if (formatted && !isCoordinateLikeText(formatted)) return formatted
 
-  return [
+  const parts = [
     address.buildingName || address.addressLine1,
     address.floor,
     address.street || address.addressLine2,
-    address.additionalDetails || address.area,
-    address.landmark,
+    area,
+    landmark,
     address.city,
     address.state,
     address.zipCode || address.postalCode || address.pincode,
-  ]
-    .map(cleanText)
-    .filter(Boolean)
-    .join(", ")
+  ].map(cleanText).filter(Boolean);
+
+  // De-duplicate parts: only add a part if it's not already contained in the previous parts
+  const uniqueParts = [];
+  parts.forEach(part => {
+    const lowerPart = part.toLowerCase();
+    const isDuplicate = uniqueParts.some(p => p.toLowerCase().includes(lowerPart) || lowerPart.includes(p.toLowerCase()));
+    if (!isDuplicate) {
+      uniqueParts.push(part);
+    }
+  });
+
+  return uniqueParts.join(", ");
 }

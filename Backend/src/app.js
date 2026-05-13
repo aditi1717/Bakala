@@ -16,6 +16,8 @@ const app = express();
 
 // Trust first proxy (essential for express-rate-limit if behind a proxy)
 app.set('trust proxy', 1);
+// Disable ETag generation so API clients don't receive 304 for authenticated JSON endpoints.
+app.set('etag', false);
 
 // Request ID tracing (before other middlewares so all logs can use it)
 app.use(requestIdMiddleware);

@@ -10,7 +10,7 @@ const userAddressSchema = new mongoose.Schema(
         },
         street: {
             type: String,
-            required: true,
+            default: '',
             trim: true
         },
         additionalDetails: {
@@ -56,8 +56,8 @@ const userAddressSchema = new mongoose.Schema(
         location: {
             type: {
                 type: String,
-                enum: ['Point'],
-                default: 'Point'
+                enum: ['Point']
+                // No default — location object won't be created unless explicitly provided
             },
             coordinates: {
                 // [lng, lat]
@@ -161,7 +161,25 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.index({ phone: 1 }, { unique: true });
-userSchema.index({ 'addresses.location': '2dsphere' });
+userSchema.index({ 'addresses.location': '2dsphere' }, { sparse: true });
+
+// Strip incomplete location objects before every save so the 2dsphere index
+// never receives a { type: 'Point' } document without valid coordinates.
+userSchema.pre('save', function () {
+    if (!Array.isArray(this.addresses)) return;
+    for (const addr of this.addresses) {
+        const loc = addr.location;
+        if (!loc) continue;
+        const coords = loc.coordinates;
+        const valid =
+            Array.isArray(coords) &&
+            coords.length === 2 &&
+            coords.every((n) => typeof n === 'number' && Number.isFinite(n));
+        if (!valid) {
+            addr.location = undefined;
+        }
+    }
+});
 
 export const FoodUser = mongoose.model('FoodUser', userSchema);
 

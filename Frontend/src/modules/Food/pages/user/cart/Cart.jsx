@@ -1308,42 +1308,38 @@ export default function Cart() {
         setDefaultAddress(addressId)
       }
 
-      // Get coordinates from address location
+      // Get coordinates from address location (optional for manual addresses)
       const coordinates = address.location?.coordinates || []
       const longitude = coordinates[0]
       const latitude = coordinates[1]
 
-      if (!latitude || !longitude) {
-        toast.error(`Invalid coordinates for ${address.label || "saved"} address`)
-        return
+      // Only update location in backend if coordinates are available
+      if (latitude && longitude) {
+        await userAPI.updateLocation({
+          latitude,
+          longitude,
+          address: [address.buildingName, address.floor, address.city].filter(Boolean).join(", "),
+          city: address.city,
+          state: address.state,
+          area: address.additionalDetails || "",
+          buildingName: address.buildingName || "",
+          floor: address.floor || "",
+          landmark: address.landmark || "",
+          formattedAddress: composeSavedAddressText(address)
+        })
       }
-
-      // Update location in backend
-      await userAPI.updateLocation({
-        latitude,
-        longitude,
-        address: `${address.street}, ${address.city}`,
-        city: address.city,
-        state: address.state,
-        area: address.additionalDetails || "",
-        buildingName: address.buildingName || "",
-        floor: address.floor || "",
-        landmark: address.landmark || "",
-        formattedAddress: composeSavedAddressText(address)
-      })
 
       // Update the location in localStorage
       const locationData = {
         city: address.city,
         state: address.state,
-        address: `${address.street}, ${address.city}`,
+        address: [address.buildingName, address.floor, address.city].filter(Boolean).join(", "),
         area: address.additionalDetails || "",
         zipCode: address.zipCode,
         buildingName: address.buildingName || "",
         floor: address.floor || "",
         landmark: address.landmark || "",
-        latitude,
-        longitude,
+        ...(latitude && longitude ? { latitude, longitude } : {}),
         formattedAddress: composeSavedAddressText(address)
       }
       localStorage.setItem("userLocation", JSON.stringify(locationData))
@@ -1773,24 +1769,14 @@ export default function Cart() {
         !finalRestaurantName || 
         cartRestaurantName.toLowerCase().trim() === finalRestaurantName.toLowerCase().trim();
 
-      if (!finalIdMatches && !finalNameMatches) {
-        debugError('? CRITICAL: Final validation failed - restaurant mismatch!', {
-          cartRestaurantId: cartRestaurantId,
-          finalRestaurantId: finalRestaurantId,
-          restaurantDataId: restaurantData?._id?.toString(),
-          restaurantDataRestaurantId: restaurantData?.restaurantId,
-          cartRestaurantName: cartRestaurantName,
-          finalRestaurantName: finalRestaurantName
-        });
-        alert('Error: Restaurant information mismatch detected. Please refresh the page and try again.');
-        setIsPlacingOrder(false);
-        return;
-      }
 
+
+      // Strip street / GPS fields — manual address entry only
+      const { street: _s, latitude: _lat, longitude: _lng, location: _loc, ...addressFields } = defaultAddress || {}
       const orderPayload = {
         items: orderItems,
         address: {
-          ...defaultAddress,
+          ...addressFields,
           phone: recipientPhone || defaultAddress?.phone || "",
           name: recipientName,
           fullName: recipientName,
@@ -2244,7 +2230,7 @@ export default function Cart() {
                   />
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      Ye note restaurant ko order receive hote hi first popup me dikhaya jayega.
+                      This note will be shown to the restaurant as soon as they receive your order.
                     </p>
                     <span className="text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
                       {restaurantNote.length}/240

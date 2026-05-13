@@ -56,7 +56,11 @@ export const useOrderManager = () => {
     }
 
     try {
-      const response = await deliveryAPI.acceptOrder(orderId);
+      const deliveryTime =
+        Number(options.deliveryTime || options.estimatedDeliveryTime || order?.estimatedDeliveryTime || 30) || 30;
+      const response = await deliveryAPI.acceptOrder(orderId, {
+        deliveryTime,
+      });
       
       if (response?.data?.success) {
         const fullOrder = response.data.data?.order || order;

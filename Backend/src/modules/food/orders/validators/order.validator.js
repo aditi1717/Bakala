@@ -11,14 +11,15 @@ const orderItemSchema = z.object({
     quantity: z.number().int().min(1),
     isVeg: z.boolean().optional().default(true),
     image: z.string().optional(),
-    notes: z.string().optional()
+    notes: z.string().optional(),
+    preparationTime: z.string().optional()
 });
 
 const addressSchema = z.object({
     label: z.enum(['Home', 'Office', 'Other']).optional(),
     name: z.string().optional(),
     fullName: z.string().optional(),
-    street: z.string().min(1, 'Street required'),
+    street: z.string().optional(),
     additionalDetails: z.string().optional(),
     buildingName: z.string().optional(),
     floor: z.string().optional(),
@@ -159,7 +160,10 @@ export function validateOrderStatusDto(body) {
             'cancelled_by_restaurant',
             'cancelled_by_admin'
         ]),
-        reason: z.string().optional()
+        reason: z.string().optional(),
+        preparationTime: z.coerce.number().int().min(1).max(180).optional(),
+        prepTime: z.coerce.number().int().min(1).max(180).optional(),
+        prepTimeMins: z.coerce.number().int().min(1).max(180).optional()
     });
     const result = schema.safeParse(body);
     if (!result.success) {

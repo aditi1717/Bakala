@@ -2195,54 +2195,38 @@ export async function getDeliveryCommissionRules() {
 
 function validateCommissionRuleSet(rules) {
     const active = (rules || []).filter((r) => r && r.status !== false);
-    if (!active.length) {
-        throw new ValidationError('A base slab with minDistance = 0 is required');
-    }
-    const baseRules = active.filter((r) => Number(r.minDistance || 0) === 0);
-    if (baseRules.length !== 1) {
-        throw new ValidationError('A base slab with minDistance = 0 is required');
-    }
-    const sorted = [...active].sort((a, b) => Number(a.minDistance || 0) - Number(b.minDistance || 0));
-    for (let i = 0; i < sorted.length; i += 1) {
-        const current = sorted[i];
-        const min = Number(current.minDistance || 0);
-        const max = current.maxDistance == null ? null : Number(current.maxDistance);
-        if (max != null && max <= min) {
-            throw new ValidationError('maxDistance must be greater than minDistance');
-        }
-        if (i > 0) {
-            const prev = sorted[i - 1];
-            const prevMin = Number(prev.minDistance || 0);
-            const prevMax = prev.maxDistance == null ? null : Number(prev.maxDistance);
-            const effectivePrevMax = prevMax == null ? Infinity : prevMax;
-            if (min < effectivePrevMax) {
-                throw new ValidationError('Distance slabs must not overlap');
-            }
-            if (min === prevMin) {
-                throw new ValidationError('Distance slabs must not share the same minDistance');
-            }
-        }
+    if (active.length > 1) {
+        throw new ValidationError('Only one base payout setting is allowed');
     }
 }
 
 export async function createDeliveryCommissionRule(body) {
     const existing = await FoodDeliveryCommissionRule.find({}).lean();
-    const candidate = [
-        ...existing,
-        {
-            minDistance: body.minDistance,
-            maxDistance: body.maxDistance ?? null,
-            commissionPerKm: body.commissionPerKm,
-            basePayout: body.basePayout,
-            status: body.status ?? true
-        }
-    ];
-    validateCommissionRuleSet(candidate);
+    const existingRule = existing[0];
+    if (existingRule?._id) {
+        const updated = await FoodDeliveryCommissionRule.findByIdAndUpdate(
+            existingRule._id,
+            {
+                $set: {
+                    name: body.name || 'Base payout',
+                    minDistance: 0,
+                    maxDistance: null,
+                    commissionPerKm: 0,
+                    basePayout: body.basePayout,
+                    status: body.status ?? true
+                }
+            },
+            { new: true }
+        ).lean();
+        await FoodDeliveryCommissionRule.deleteMany({ _id: { $ne: existingRule._id } });
+        return updated;
+    }
+
     const created = await FoodDeliveryCommissionRule.create({
         name: body.name || '',
-        minDistance: body.minDistance,
-        maxDistance: body.maxDistance ?? null,
-        commissionPerKm: body.commissionPerKm,
+        minDistance: 0,
+        maxDistance: null,
+        commissionPerKm: 0,
         basePayout: body.basePayout,
         status: body.status ?? true
     });
@@ -2251,33 +2235,22 @@ export async function createDeliveryCommissionRule(body) {
 
 export async function updateDeliveryCommissionRule(id, body) {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
-    const existing = await FoodDeliveryCommissionRule.find({}).lean();
-    const candidate = existing.map((r) =>
-        String(r._id) === String(id)
-            ? {
-                ...r,
-                minDistance: body.minDistance,
-                maxDistance: body.maxDistance ?? null,
-                commissionPerKm: body.commissionPerKm,
-                basePayout: body.basePayout,
-                status: r.status !== false
-            }
-            : r
-    );
-    validateCommissionRuleSet(candidate);
     const updated = await FoodDeliveryCommissionRule.findByIdAndUpdate(
         id,
         {
             $set: {
-                name: body.name || '',
-                minDistance: body.minDistance,
-                maxDistance: body.maxDistance ?? null,
-                commissionPerKm: body.commissionPerKm,
+                name: body.name || 'Base payout',
+                minDistance: 0,
+                maxDistance: null,
+                commissionPerKm: 0,
                 basePayout: body.basePayout
             }
         },
         { new: true }
     ).lean();
+    if (updated?._id) {
+        await FoodDeliveryCommissionRule.deleteMany({ _id: { $ne: updated._id } });
+    }
     return updated;
 }
 

@@ -45,6 +45,38 @@ const debugLog = (...args) => console.log('[OrderTracking]', ...args)
 const debugWarn = (...args) => console.warn('[OrderTracking]', ...args)
 const debugError = (...args) => console.error('[OrderTracking]', ...args)
 
+const formatRefundStatusLabel = (status) => {
+  const normalized = String(status || "").toLowerCase()
+  if (normalized === "processed") return "Refunded"
+  if (normalized === "failed") return "Refund failed"
+  if (normalized === "pending") return "Refund processing"
+  return "Refund status"
+}
+
+const buildCancelSuccessMessage = (responseOrder, fallbackOrder, fallbackMessage) => {
+  const payment = responseOrder?.payment || fallbackOrder?.payment || {}
+  const refund = payment?.refund || {}
+  const paymentMethod = String(payment?.method || responseOrder?.paymentMethod || fallbackOrder?.paymentMethod || "").toLowerCase()
+  const paymentStatus = String(payment?.status || "").toLowerCase()
+  const refundStatus = String(refund?.status || "").toLowerCase()
+  const refundAmount = Number(refund?.amount || responseOrder?.pricing?.total || responseOrder?.totalAmount || fallbackOrder?.totalAmount || 0)
+  const amountText = refundAmount > 0 ? ` of \u20B9${refundAmount.toFixed(2)}` : ""
+
+  if (paymentMethod === "cash" || paymentMethod === "cod") {
+    return "Order cancelled successfully. No refund required as payment was not made."
+  }
+  if (paymentMethod === "razorpay") {
+    if (refundStatus === "processed" || paymentStatus === "refunded") {
+      return `Order cancelled successfully. Refund${amountText} has been processed.`
+    }
+    if (refundStatus === "failed") {
+      return "Order cancelled successfully, but automatic refund failed. Support will review it."
+    }
+    return `Order cancelled successfully. Refund${amountText} is being processed.`
+  }
+
+  return fallbackMessage || "Order cancelled successfully."
+}
 
 // Section item component
 const SectionItem = ({ icon: Icon, iconNode, title, subtitle, onClick, showArrow = true, rightContent }) => (
@@ -215,6 +247,50 @@ const getDueAmountFromOrder = (apiOrder, previousOrder = null) => {
   return previousDue !== null && previousDue > 0 ? previousDue : 0
 }
 
+const parsePreparationMinutes = (value) => {
+  if (value == null) return null
+  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? Math.round(value) : null
+  const matches = String(value).match(/\d+(?:\.\d+)?/g)
+  if (!matches?.length) return null
+  const numbers = matches.map(Number).filter((num) => Number.isFinite(num) && num > 0)
+  return numbers.length ? Math.round(Math.max(...numbers)) : null
+}
+
+const resolveOrderPreparationMinutes = (orderLike, fallback = null) => {
+  const direct =
+    parsePreparationMinutes(orderLike?.estimatedPreparationTime) ||
+    parsePreparationMinutes(orderLike?.preparationTime) ||
+    null
+  if (direct) return direct
+
+  const itemTimes = (Array.isArray(orderLike?.items) ? orderLike.items : [])
+    .map((item) => parsePreparationMinutes(item?.preparationTime))
+    .filter((minutes) => Number.isFinite(minutes) && minutes > 0)
+  if (itemTimes.length) return Math.max(...itemTimes)
+
+  return (
+    parsePreparationMinutes(orderLike?.initialEstimatedPreparationTime) ||
+    parsePreparationMinutes(orderLike?.restaurantEstimatedDeliveryTimeMinutes) ||
+    parsePreparationMinutes(orderLike?.restaurantEstimatedDeliveryTime) ||
+    parsePreparationMinutes(fallback)
+  )
+}
+
+const getTimestampMs = (value) => {
+  if (!value) return null
+  const time = new Date(value).getTime()
+  return Number.isFinite(time) ? time : null
+}
+
+const getRemainingMinutes = (totalMinutes, startAt, nowMs = Date.now()) => {
+  const total = parsePreparationMinutes(totalMinutes)
+  if (!total) return null
+  const startMs = getTimestampMs(startAt)
+  if (!startMs) return total
+  const elapsed = Math.max(0, Math.floor((nowMs - startMs) / 60000))
+  return Math.max(0, total - elapsed)
+}
+
 const transformOrderForTracking = (apiOrder, previousOrder = null, explicitRestaurantCoords = null, explicitRestaurantAddress = null) => {
   const restaurantCoords = explicitRestaurantCoords || getRestaurantCoordsFromOrder(apiOrder, previousOrder?.restaurantLocation?.coordinates)
   const restaurantAddress = getRestaurantAddressFromOrder(apiOrder, previousOrder, explicitRestaurantAddress)
@@ -246,6 +322,16 @@ const transformOrderForTracking = (apiOrder, previousOrder = null, explicitResta
       '',
     restaurantAddress,
     restaurantId: apiOrder?.restaurantId || previousOrder?.restaurantId || null,
+    restaurantEstimatedDeliveryTime:
+      apiOrder?.restaurantId?.estimatedDeliveryTime ||
+      apiOrder?.restaurant?.estimatedDeliveryTime ||
+      previousOrder?.restaurantEstimatedDeliveryTime ||
+      "",
+    restaurantEstimatedDeliveryTimeMinutes:
+      apiOrder?.restaurantId?.estimatedDeliveryTimeMinutes ??
+      apiOrder?.restaurant?.estimatedDeliveryTimeMinutes ??
+      previousOrder?.restaurantEstimatedDeliveryTimeMinutes ??
+      null,
     userId: apiOrder?.userId || previousOrder?.userId || null,
     userName:
       apiOrder?.userName ||
@@ -305,6 +391,22 @@ const transformOrderForTracking = (apiOrder, previousOrder = null, explicitResta
     dispatch: apiOrder?.dispatch || previousOrder?.dispatch || null,
     assignmentInfo: apiOrder?.assignmentInfo || previousOrder?.assignmentInfo || null,
     tracking: apiOrder?.tracking || previousOrder?.tracking || {},
+    initialEstimatedPreparationTime:
+      apiOrder?.initialEstimatedPreparationTime ??
+      previousOrder?.initialEstimatedPreparationTime ??
+      null,
+    estimatedPreparationTime:
+      apiOrder?.estimatedPreparationTime ??
+      previousOrder?.estimatedPreparationTime ??
+      null,
+    initialEstimatedDeliveryTime:
+      apiOrder?.initialEstimatedDeliveryTime ??
+      previousOrder?.initialEstimatedDeliveryTime ??
+      null,
+    estimatedDeliveryTime:
+      apiOrder?.estimatedDeliveryTime ??
+      previousOrder?.estimatedDeliveryTime ??
+      null,
     deliveryState: apiOrder?.deliveryState || previousOrder?.deliveryState || null,
     createdAt: apiOrder?.createdAt || previousOrder?.createdAt || null,
     totalAmount: apiOrder?.pricing?.total || apiOrder?.totalAmount || previousOrder?.totalAmount || 0,
@@ -491,6 +593,7 @@ export default function OrderTracking() {
 
   const [orderStatus, setOrderStatus] = useState('placed')
   const [estimatedTime, setEstimatedTime] = useState(29)
+  const [timeTick, setTimeTick] = useState(Date.now())
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
@@ -974,11 +1077,21 @@ export default function OrderTracking() {
     const ui = mapOrderToTrackingUiStatus(order)
     terminalPollStopRef.current = ui === 'delivered' || ui === 'cancelled'
   }, [order])
-  // Countdown timer
+
   useEffect(() => {
-    const timer = setInterval(() => {
-      setEstimatedTime((prev) => Math.max(0, prev - 1))
-    }, 60000)
+    if (!order) return
+    const minutes = resolveOrderPreparationMinutes(order, estimatedTime)
+    if (minutes) setEstimatedTime(minutes)
+  }, [
+    order?.estimatedPreparationTime,
+    order?.initialEstimatedPreparationTime,
+    order?.restaurantEstimatedDeliveryTimeMinutes,
+    order?.restaurantEstimatedDeliveryTime,
+    order?.items,
+  ])
+
+  useEffect(() => {
+    const timer = setInterval(() => setTimeTick(Date.now()), 60000)
     return () => clearInterval(timer)
   }, [])
 
@@ -1025,6 +1138,33 @@ export default function OrderTracking() {
           deliveryState: payload.deliveryState,
         });
         setOrderStatus(next);
+        if (
+          payload.estimatedPreparationTime ||
+          payload.initialEstimatedPreparationTime ||
+          payload.estimatedDeliveryTime ||
+          payload.initialEstimatedDeliveryTime
+        ) {
+          setOrder((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  estimatedPreparationTime:
+                    payload.estimatedPreparationTime ?? prev.estimatedPreparationTime,
+                  initialEstimatedPreparationTime:
+                    payload.initialEstimatedPreparationTime ?? prev.initialEstimatedPreparationTime,
+                  estimatedDeliveryTime:
+                    payload.estimatedDeliveryTime ?? prev.estimatedDeliveryTime,
+                  initialEstimatedDeliveryTime:
+                    payload.initialEstimatedDeliveryTime ?? prev.initialEstimatedDeliveryTime,
+                  dispatch: payload.dispatchStatus
+                    ? { ...(prev.dispatch || {}), status: payload.dispatchStatus, acceptedAt: prev.dispatch?.acceptedAt || new Date().toISOString() }
+                    : prev.dispatch,
+                  status: payload.orderStatus || status || prev.status,
+                  orderStatus: payload.orderStatus || status || prev.orderStatus,
+                }
+              : prev,
+          )
+        }
 
         // Pull latest order state without refresh spam on bursty socket events.
         const now = Date.now();
@@ -1086,8 +1226,11 @@ export default function OrderTracking() {
         lookupIdsRef.current[0] || normalizeLookupId(orderId)
       const response = await orderAPI.cancelOrder(cancelLookupId, { reason: cancellationReason.trim() });
       if (response.data?.success) {
+        const cancelledOrder = response.data?.data?.order || null;
         const cancelledOrderKeys = [
           cancelLookupId,
+          cancelledOrder?._id,
+          cancelledOrder?.orderId,
           order?._id,
           order?.mongoId,
           order?.orderId,
@@ -1104,15 +1247,15 @@ export default function OrderTracking() {
           };
         }
 
-        const paymentMethod = order?.payment?.method || order?.paymentMethod;
-        const successMessage = response.data?.message ||
-          (paymentMethod === 'cash' || paymentMethod === 'cod'
-            ? 'Order cancelled successfully. No refund required as payment was not made.'
-            : 'Order cancelled successfully. Refund will be processed after admin approval.');
+        const successMessage = buildCancelSuccessMessage(cancelledOrder, order, response.data?.message);
         toast.dismiss("order-placement-success");
         toast.success(successMessage, { id: "order-cancel-success" });
         setShowCancelDialog(false);
         setCancellationReason("");
+        if (cancelledOrder) {
+          setOrder((prev) => transformOrderForTracking(cancelledOrder, prev));
+          setOrderStatus("cancelled");
+        }
         // Refresh order data
         await refreshOrderData({ force: true });
       } else {
@@ -1219,22 +1362,50 @@ export default function OrderTracking() {
     )
   }
 
+  const riderAcceptedForTiming =
+    order?.dispatch?.status === "accepted" ||
+    order?.assignmentInfo?.status === "accepted" ||
+    Boolean(order?.dispatch?.acceptedAt) ||
+    Boolean(order?.deliveryState?.acceptedAt)
+  const preparationBaseMinutes = resolveOrderPreparationMinutes(order, estimatedTime)
+  const preparationMinutes = orderStatus === "placed"
+    ? preparationBaseMinutes
+    : getRemainingMinutes(
+        preparationBaseMinutes,
+        order?.tracking?.preparing?.timestamp || order?.updatedAt || order?.createdAt,
+        timeTick,
+      )
+  const deliveryBaseMinutes =
+    parsePreparationMinutes(order?.estimatedDeliveryTime) ||
+    parsePreparationMinutes(order?.initialEstimatedDeliveryTime) ||
+    30
+  const deliveryMinutes = getRemainingMinutes(
+    deliveryBaseMinutes,
+    order?.dispatch?.acceptedAt || order?.deliveryState?.acceptedAt,
+    timeTick,
+  )
+  const activeTimingMinutes = riderAcceptedForTiming ? deliveryMinutes : preparationMinutes
+  const activeTimingText = activeTimingMinutes != null ? `${activeTimingMinutes} mins` : null
   const statusConfig = {
     placed: {
       title: "Order Placed",
-      subtitle: "Waiting for restaurant to accept",
+      subtitle: activeTimingText
+        ? `Estimated delivery in ${activeTimingText}`
+        : "Your order is being confirmed",
       color: BRAND_THEME.colors.brand.primary,
       iconType: 'food'
     },
     confirmed: {
       title: "Order Confirmed",
-      subtitle: "Restaurant has accepted your order",
+      subtitle: activeTimingText
+        ? `Estimated delivery in ${activeTimingText}`
+        : "Restaurant has accepted your order",
       color: BRAND_THEME.colors.brand.primary,
       iconType: 'food'
     },
     preparing: {
       title: "Food is being prepared",
-      subtitle: typeof estimatedTime === 'number' ? `Arriving in ${estimatedTime} mins` : "Cooking your meal",
+      subtitle: activeTimingText ? `Estimated delivery in ${activeTimingText}` : "Cooking your meal",
       color: BRAND_THEME.colors.brand.primary,
       iconType: 'food'
     },
@@ -1246,8 +1417,8 @@ export default function OrderTracking() {
     },
     assigned: {
       title: "Rider is arriving",
-      subtitle: typeof estimatedTime === 'number'
-        ? `Rider is arriving in ${estimatedTime} mins`
+      subtitle: activeTimingText
+        ? `Estimated delivery in ${activeTimingText}`
         : "A delivery partner is arriving at the restaurant",
       color: BRAND_THEME.colors.brand.primary,
       iconType: 'rider'
@@ -1266,13 +1437,13 @@ export default function OrderTracking() {
     },
     on_way: {
       title: "Picked Up",
-      subtitle: typeof estimatedTime === 'number' ? `Arriving in ${estimatedTime} mins` : "Rider picked your order and is on the way",
+      subtitle: activeTimingText ? `Estimated delivery in ${activeTimingText}` : "Rider picked your order and is on the way",
       color: BRAND_THEME.colors.brand.primary,
       iconType: 'rider'
     },
     at_drop: {
       title: "Picked Up",
-      subtitle: typeof estimatedTime === 'number' ? `Arriving in ${estimatedTime} mins` : "Rider picked your order and is on the way",
+      subtitle: activeTimingText ? `Estimated delivery in ${activeTimingText}` : "Rider picked your order and is on the way",
       color: BRAND_THEME.colors.brand.primary,
       iconType: 'rider'
     },
@@ -1319,10 +1490,7 @@ export default function OrderTracking() {
         }
       : currentStatus
   const isRiderAcceptedForUi =
-    order?.dispatch?.status === "accepted" ||
-    order?.assignmentInfo?.status === "accepted" ||
-    Boolean(order?.dispatch?.acceptedAt) ||
-    Boolean(order?.deliveryState?.acceptedAt)
+    riderAcceptedForTiming
   const isDeliveredOrder =
     orderStatus === "delivered" ||
     order?.status === "delivered" ||
@@ -1941,6 +2109,33 @@ export default function OrderTracking() {
                 <span className="text-sm font-bold text-gray-900 uppercase tracking-wide">
                   {order.paymentMethod}
                 </span>
+              </div>
+            )}
+
+            {(order?.payment?.status === "refunded" || order?.payment?.refund?.status) && (
+              <div className={`rounded-xl p-4 border ${
+                order?.payment?.refund?.status === "failed"
+                  ? "bg-red-50 border-red-100 text-red-700"
+                  : "bg-emerald-50 border-emerald-100 text-emerald-700"
+              }`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4" />
+                    <span className="text-sm font-bold">
+                      {formatRefundStatusLabel(order?.payment?.refund?.status || order?.payment?.status)}
+                    </span>
+                  </div>
+                  {Number(order?.payment?.refund?.amount || 0) > 0 && (
+                    <span className="text-sm font-bold">
+                      {"\u20B9"}{Number(order.payment.refund.amount).toFixed(2)}
+                    </span>
+                  )}
+                </div>
+                {order?.payment?.refund?.refundId && (
+                  <p className="mt-2 text-xs opacity-80 break-all">
+                    Refund ID: {order.payment.refund.refundId}
+                  </p>
+                )}
               </div>
             )}
           </div>

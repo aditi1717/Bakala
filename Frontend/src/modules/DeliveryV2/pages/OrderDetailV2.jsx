@@ -440,6 +440,7 @@ const OrderDetailV2 = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState('');
+  const [deliveryTime, setDeliveryTime] = useState(30);
 
   const syncStoreWithOrder = useCallback((nextOrder) => {
     if (!nextOrder) return;
@@ -456,6 +457,7 @@ const OrderDetailV2 = () => {
     }
 
     setOrder(hydratedOrder);
+    setDeliveryTime(Number(hydratedOrder?.estimatedDeliveryTime || hydratedOrder?.initialEstimatedDeliveryTime || 30) || 30);
     const status = String(hydratedOrder?.status || hydratedOrder?.orderStatus || '').toLowerCase();
     if (!['cancelled', 'delivered', 'completed'].includes(status) || getDispatchStatus(hydratedOrder) === 'accepted') {
       syncStoreWithOrder(hydratedOrder);
@@ -606,11 +608,13 @@ const OrderDetailV2 = () => {
   const handleAccept = useCallback(() => runAction(
     'accept',
     async () => {
-      const response = await deliveryAPI.acceptOrder(orderId);
+      const response = await deliveryAPI.acceptOrder(orderId, {
+        deliveryTime: Number(deliveryTime || 30),
+      });
       const nextOrder = response?.data?.data?.order || order;
       syncStoreWithOrder(nextOrder);
     },
-  ), [order, orderId, runAction, syncStoreWithOrder]);
+  ), [deliveryTime, order, orderId, runAction, syncStoreWithOrder]);
 
   const handlePassTask = useCallback(() => {
     const passedOrderId = getOrderIdentity(order) || String(orderId || '').trim();
@@ -804,6 +808,33 @@ const OrderDetailV2 = () => {
         <section className="space-y-2">
           {canAccept && !isPassedTaskFlow && (
             <>
+              <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Delivery time</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">User tracking par yahi time dikhega</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryTime((prev) => Math.max(1, Number(prev || 30) - 1))}
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-lg font-black text-slate-700"
+                    >
+                      -
+                    </button>
+                    <span className="min-w-[74px] rounded-xl bg-[#E8F3EE] px-3 py-2 text-center text-sm font-black text-[#005128]">
+                      {Number(deliveryTime || 30)} mins
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryTime((prev) => Number(prev || 30) + 1)}
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-lg font-black text-slate-700"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-1 gap-2">
                 <ActionButton busy={busyAction === 'accept'} onClick={handleAccept}>
                   Accept Order
@@ -819,6 +850,13 @@ const OrderDetailV2 = () => {
               </button>
             </>
           )}
+
+          {!canAccept && !isPassedTaskFlow && order?.estimatedDeliveryTime ? (
+            <div className="rounded-2xl border border-[#005128]/10 bg-[#E8F3EE] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#005128]">Delivery time</p>
+              <p className="mt-1 text-lg font-black text-slate-950">{Number(order.estimatedDeliveryTime || 30)} mins</p>
+            </div>
+          ) : null}
 
           {isAcceptedFlow && !isPassedTaskFlow && (
             <div className="rounded-2xl border border-slate-200 bg-white p-3">

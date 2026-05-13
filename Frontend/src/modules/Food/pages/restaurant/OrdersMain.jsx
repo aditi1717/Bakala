@@ -28,7 +28,7 @@ import RestaurantNavbar from "@food/components/restaurant/RestaurantNavbar";
 import notificationSound from "@food/assets/audio/alert.mp3";
 import { restaurantAPI } from "@food/api";
 import { useRestaurantNotifications } from "@food/hooks/useRestaurantNotifications";
-import { formatOrderAddressWithLabels } from "@food/utils/orderAddressFormatter";
+import { formatOrderAddressForMap } from "@food/utils/orderAddressFormatter";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import BRAND_THEME from "@/config/brandTheme";
@@ -137,6 +137,15 @@ const resolveCustomerName = (order = {}) =>
     order?.userId?.phone,
     "Guest",
   );
+
+const resolveDeliveryAddressForPopup = (order = {}) => {
+  const addressText = formatOrderAddressForMap(
+    order?.customerAddress || order?.deliveryAddress || order?.address || null,
+  );
+  return addressText
+    ? addressText
+    : "Delivery address not available";
+};
 
 const transformOrderForList = (order) => ({
   orderId: order.orderId || order._id,
@@ -2787,9 +2796,11 @@ export default function OrdersMain() {
 
                   {/* Customer info */}
                   <div className="mb-4">
-                    <h4 className="text-sm font-semibold text-gray-900">
-                      {(popupOrder || newOrder)?.items?.[0]?.name ||
-                        "New Order"}
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      Delivery address
+                    </p>
+                    <h4 className="mt-1 line-clamp-2 text-xs font-medium leading-4 text-gray-700">
+                      {resolveDeliveryAddressForPopup(popupOrder || newOrder)}
                     </h4>
                     <p className="text-xs text-gray-500 mt-1">
                       {(popupOrder || newOrder)?.createdAt

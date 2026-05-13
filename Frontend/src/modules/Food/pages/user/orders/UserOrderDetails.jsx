@@ -11,6 +11,7 @@ import {
   CreditCard,
   Calendar,
   MapPin,
+  RefreshCw,
   RotateCcw,
   FileText,
 } from "lucide-react"
@@ -24,6 +25,14 @@ import BRAND_THEME from "@/config/brandTheme"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
+const formatRefundStatusLabel = (status) => {
+  const normalized = String(status || "").toLowerCase()
+  if (normalized === "processed") return "Refunded"
+  if (normalized === "failed") return "Refund failed"
+  if (normalized === "pending") return "Refund processing"
+  return "Refund status"
+}
+
 const getNormalizedFoodType = (item = {}) =>
   String(item?.foodType || item?.type || item?.category || "")
     .trim()
@@ -189,6 +198,8 @@ export default function UserOrderDetails() {
 
   const items = Array.isArray(order.items) ? order.items : []
   const pricing = order.pricing || {}
+  const refund = order.payment?.refund || {}
+  const hasRefundInfo = order.payment?.status === "refunded" || Boolean(refund.status && refund.status !== "none")
   const sendsCutlery = order.sendCutlery !== false
 
   const userName = order.userName || ""
@@ -613,6 +624,33 @@ export default function UserOrderDetails() {
               </p>
             </div>
           </div>
+
+          {hasRefundInfo && (
+            <div className={`flex gap-3 rounded-lg p-3 border ${
+              refund.status === "failed"
+                ? "bg-red-50 border-red-100 text-red-700"
+                : "bg-emerald-50 border-emerald-100 text-emerald-700"
+            }`}>
+              <div className="mt-0.5">
+                <RefreshCw className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="font-semibold text-sm">
+                  {formatRefundStatusLabel(refund.status || order.payment?.status)}
+                </h4>
+                {Number(refund.amount || 0) > 0 && (
+                  <p className="text-xs mt-0.5">
+                    Amount: ₹{Number(refund.amount).toFixed(2)}
+                  </p>
+                )}
+                {refund.refundId && (
+                  <p className="text-xs mt-0.5 break-all opacity-80">
+                    Refund ID: {refund.refundId}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Date */}
           <div className="flex gap-3">

@@ -13,6 +13,7 @@ import { BRAND_THEME } from '@/config/brandTheme';
 export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
   const { riderLocation } = useDeliveryStore();
   const [timeLeft, setTimeLeft] = useState(30);
+  const [deliveryTime, setDeliveryTime] = useState(30);
 
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -260,11 +261,39 @@ export const NewOrderModal = ({ order, onAccept, onReject, onMinimize }) => {
              </div>
           </div>
 
+          <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Delivery time</p>
+                <p className="text-xs font-bold text-gray-900">Shown to user after accept</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryTime((prev) => Math.max(1, Number(prev || 30) - 1))}
+                  className="h-8 w-8 rounded-full bg-white text-gray-700 font-black shadow-sm"
+                >
+                  -
+                </button>
+                <span className="min-w-[68px] rounded-xl bg-white px-2.5 py-1.5 text-center text-xs font-black text-gray-950 shadow-sm">
+                  {Number(deliveryTime || 30)} mins
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDeliveryTime((prev) => Number(prev || 30) + 1)}
+                  className="h-8 w-8 rounded-full bg-white text-gray-700 font-black shadow-sm"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Action Area */}
           <div className="space-y-4">
             <ActionSlider 
               label="Slide to Accept" 
-              onConfirm={() => onAccept(order)} 
+              onConfirm={() => onAccept(order, Number(deliveryTime || 30))} 
               containerStyle={{ backgroundColor: BRAND_THEME.colors.brand.primarySoft }}
               style={{ background: BRAND_THEME.gradients.primary }}
               successLabel="Order Accepted"

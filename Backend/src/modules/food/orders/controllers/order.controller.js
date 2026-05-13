@@ -107,7 +107,20 @@ export async function cancelOrderController(req, res, next) {
         const orderId = req.params.orderId;
         const dto = validateCancelOrderDto(req.body);
         const order = await orderService.cancelOrder(orderId, userId, dto.reason);
-        return sendResponse(res, 200, 'Order cancelled', { order });
+        const refundStatus = String(order?.payment?.refund?.status || '').toLowerCase();
+        const paymentMethod = String(order?.payment?.method || '').toLowerCase();
+        const paymentStatus = String(order?.payment?.status || '').toLowerCase();
+        let message = 'Order cancelled';
+        if (paymentMethod === 'razorpay') {
+            if (refundStatus === 'processed' || paymentStatus === 'refunded') {
+                message = 'Order cancelled. Refund processed successfully.';
+            } else if (refundStatus === 'failed') {
+                message = 'Order cancelled, but automatic refund failed. Support will review it.';
+            } else {
+                message = 'Order cancelled. Refund is being processed.';
+            }
+        }
+        return sendResponse(res, 200, message, { order });
     } catch (err) {
         next(err);
     }
@@ -187,7 +200,8 @@ export async function updateOrderStatusRestaurantController(req, res, next) {
             orderId,
             restaurantId,
             dto.orderStatus,
-            dto.reason
+            dto.reason,
+            dto.preparationTime ?? dto.prepTime ?? dto.prepTimeMins
         );
         return sendResponse(res, 200, 'Order status updated', { order });
     } catch (err) {
@@ -209,7 +223,11 @@ export async function acceptOrderDeliveryController(req, res, next) {
     try {
         const deliveryPartnerId = req.user?.userId;
         const orderId = req.params.orderId;
-        const order = await orderService.acceptOrderDelivery(orderId, deliveryPartnerId);
+        const deliveryTime =
+            req.body?.deliveryTime ??
+            req.body?.estimatedDeliveryTime ??
+            req.body?.deliveryTimeMins;
+        const order = await orderService.acceptOrderDelivery(orderId, deliveryPartnerId, deliveryTime);
         return sendResponse(res, 200, 'Order accepted', { order });
     } catch (err) {
         next(err);

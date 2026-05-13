@@ -11,7 +11,8 @@ const orderItemSchema = new mongoose.Schema(
         quantity: { type: Number, required: true, min: 1 },
         isVeg: { type: Boolean, default: true },
         image: { type: String, default: '' },
-        notes: { type: String, default: '' }
+        notes: { type: String, default: '' },
+        preparationTime: { type: String, default: '', trim: true }
     },
     { _id: false }
 );
@@ -19,7 +20,7 @@ const orderItemSchema = new mongoose.Schema(
 const deliveryAddressSchema = new mongoose.Schema(
     {
         label: { type: String, enum: ['Home', 'Office', 'Other'], default: 'Home' },
-        street: { type: String, required: true, trim: true },
+        street: { type: String, default: '', trim: true },
         additionalDetails: { type: String, default: '', trim: true },
         buildingName: { type: String, default: '', trim: true },
         floor: { type: String, default: '', trim: true },
@@ -33,7 +34,7 @@ const deliveryAddressSchema = new mongoose.Schema(
         name: { type: String, default: '', trim: true },
         fullName: { type: String, default: '', trim: true },
         location: {
-            type: { type: String, enum: ['Point'], default: 'Point' },
+            type: { type: String, enum: ['Point'] },
             coordinates: { type: [Number], default: undefined }
         }
     },
@@ -192,6 +193,15 @@ const deliveryVerificationSchema = new mongoose.Schema(
     { _id: false }
 );
 
+const orderTrackingSchema = new mongoose.Schema(
+    {
+        preparing: {
+            timestamp: { type: Date, default: null }
+        }
+    },
+    { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
     {
         orderType: {
@@ -296,6 +306,14 @@ const orderSchema = new mongoose.Schema(
         note: { type: String, default: '', trim: true },
         restaurantNote: { type: String, default: '', trim: true },
         sendCutlery: { type: Boolean, default: true },
+        initialEstimatedPreparationTime: { type: Number, default: null, min: 0 },
+        estimatedPreparationTime: { type: Number, default: null, min: 0 },
+        initialEstimatedDeliveryTime: { type: Number, default: null, min: 0 },
+        estimatedDeliveryTime: { type: Number, default: null, min: 0 },
+        tracking: {
+            type: orderTrackingSchema,
+            default: () => ({})
+        },
         deliveryFleet: { type: String, default: 'standard', trim: true },
         scheduledAt: { type: Date, default: null },
         /** Stores the coupon (FoodOffer) ID applied at order creation so usage can be reversed on cancellation */
@@ -320,7 +338,7 @@ const orderSchema = new mongoose.Schema(
     }
 );
 
-orderSchema.index({ 'deliveryAddress.location': '2dsphere' });
+orderSchema.index({ 'deliveryAddress.location': '2dsphere' }, { sparse: true });
 orderSchema.index({ lastRiderLocation: '2dsphere' });
 orderSchema.index({ orderType: 1, sessionId: 1, createdAt: -1 });
 orderSchema.index({ userId: 1, createdAt: -1 });

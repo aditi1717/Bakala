@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { ArrowLeft, Search, MoreVertical, ChevronRight, Star, RotateCcw, AlertCircle, Loader2, Clock, X, Share2, MessageCircle, Send, Copy, Mail, MessagesSquare, Link2 } from "lucide-react"
+import { ArrowLeft, Search, MoreVertical, ChevronRight, Star, RotateCcw, AlertCircle, Loader2, X, Share2, MessageCircle, Send, Copy, Mail, MessagesSquare, Link2 } from "lucide-react"
 import { orderAPI } from "@food/api"
 import { useCart } from "@food/context/CartContext"
 import { toast } from "sonner"
@@ -67,7 +67,6 @@ export default function Orders() {
   const [restaurantFeedbackText, setRestaurantFeedbackText] = useState("")
   const [deliveryFeedbackText, setDeliveryFeedbackText] = useState("")
   const [submittingRating, setSubmittingRating] = useState(false)
-  const [countdowns, setCountdowns] = useState({})
   // Track orders that have shown rating popup - persist in localStorage
   const [shownRatingForOrders, setShownRatingForOrders] = useState(() => {
     try {
@@ -86,44 +85,6 @@ export default function Orders() {
       debugError('Error saving shownRatingForOrders to localStorage:', error)
     }
   }, [shownRatingForOrders])
-
-  // Calculate countdown for an order
-  const calculateCountdown = (order) => {
-    if (!order || 
-        order.status === 'delivered' || 
-        String(order.status).toLowerCase().includes('cancel')) {
-      return null
-    }
-
-    const createdAt = new Date(order.createdAt)
-    const now = new Date()
-    const elapsedMinutes = Math.floor((now - createdAt) / (1000 * 60))
-
-    // Get max ETA (use eta.max if available, otherwise estimatedDeliveryTime)
-    const maxETA = order.eta?.max || order.estimatedDeliveryTime || 30
-    const remainingMinutes = Math.max(0, maxETA - elapsedMinutes)
-
-    return remainingMinutes > 0 ? remainingMinutes : null
-  }
-
-  // Update countdowns for all active orders
-  useEffect(() => {
-    const updateCountdowns = () => {
-      const newCountdowns = {}
-      orders.forEach(order => {
-        const remaining = calculateCountdown(order)
-        if (remaining !== null) {
-          newCountdowns[order.id] = remaining
-        }
-      })
-      setCountdowns(newCountdowns)
-    }
-
-    updateCountdowns()
-    const interval = setInterval(updateCountdowns, 10000) // Update every 10 seconds for better UX
-
-    return () => clearInterval(interval)
-  }, [orders])
 
   // Get order status text
   const getOrderStatus = (order) => {
@@ -1170,13 +1131,6 @@ Order again from this restaurant in the ${companyName} app.`
                   ) : (
                     <div>
                       <p className="text-xs text-gray-500">{order.status === 'preparing' ? 'Preparing' : order.status === 'outForDelivery' ? 'Out for delivery' : order.status === 'confirmed' ? 'Order confirmed' : ''}</p>
-                      {/* Countdown Timer */}
-                      {countdowns[order.id] && countdowns[order.id] > 0 && (
-                        <div className="flex items-center gap-1 mt-1 text-xs font-medium" style={{ color: BRAND_THEME.tokens.orders.primaryText }}>
-                          <Clock size={12} />
-                          <span>{countdowns[order.id]} min{countdowns[order.id] !== 1 ? 's' : ''} remaining</span>
-                        </div>
-                      )}
                     </div>
                   )}
 

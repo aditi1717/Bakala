@@ -87,9 +87,7 @@ const buildLocationPayloadFromAddress = (address) => {
 
   return {
     label: address.label || "Home",
-    latitude: Number.isFinite(latitude) ? latitude : undefined,
-    longitude: Number.isFinite(longitude) ? longitude : undefined,
-    street,
+    street: "",
     area,
     buildingName,
     floor,
@@ -98,7 +96,7 @@ const buildLocationPayloadFromAddress = (address) => {
     state,
     zipCode,
     postalCode: zipCode,
-    address: [street, city].filter(Boolean).join(", ") || formattedAddress,
+    address: [buildingName, floor, landmark, city].filter(Boolean).join(", ") || formattedAddress,
     formattedAddress,
   }
 }
@@ -125,7 +123,6 @@ export default function AddressSelectorPage({ formOnly = false }) {
   const [showAddressForm, setShowAddressForm] = useState(false)
   const [editingAddressId, setEditingAddressId] = useState(null)
   const [addressFormData, setAddressFormData] = useState({
-    street: "",
     buildingName: "",
     floor: "",
     landmark: "",
@@ -222,7 +219,6 @@ export default function AddressSelectorPage({ formOnly = false }) {
     }
     setEditingAddressId(null)
     setAddressFormData({
-      street: "",
       buildingName: "",
       floor: "",
       landmark: "",
@@ -245,7 +241,6 @@ export default function AddressSelectorPage({ formOnly = false }) {
     const id = getAddressId(address)
     setEditingAddressId(id || null)
     setAddressFormData({
-      street: String(address.street || "").trim(),
       buildingName: String(address.buildingName || "").trim(),
       floor: String(address.floor || "").trim(),
       landmark: String(address.landmark || "").trim(),
@@ -365,7 +360,13 @@ export default function AddressSelectorPage({ formOnly = false }) {
     setLoadingAddress(true)
     try {
       const payload = {
-        ...addressFormData,
+        buildingName: addressFormData.buildingName,
+        floor: addressFormData.floor,
+        landmark: addressFormData.landmark,
+        city: addressFormData.city,
+        state: addressFormData.state,
+        zipCode: addressFormData.zipCode,
+        additionalDetails: addressFormData.additionalDetails,
         label: addressFormData.label === "Work" ? "Office" : addressFormData.label,
         formattedAddress: composeAddressText(addressFormData),
         address: composeAddressText(addressFormData),

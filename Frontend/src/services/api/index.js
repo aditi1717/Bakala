@@ -1312,8 +1312,11 @@ export const adminAPI = {
    * UI expects this to move order into "preparing" bucket.
    * Backend supports PATCH /food/restaurant/orders/:orderId/status with { orderStatus }.
    */
-  acceptOrder: (orderId, _prepTimeMins = null) =>
-    restaurantAPI.updateOrderStatus(orderId, { orderStatus: "preparing" }),
+  acceptOrder: (orderId, prepTimeMins = null) =>
+    restaurantAPI.updateOrderStatus(orderId, {
+      orderStatus: "preparing",
+      ...(prepTimeMins ? { preparationTime: Number(prepTimeMins) } : {}),
+    }),
   /**
    * Reject/cancel order by restaurant.
    * Backend orderStatus enum: cancelled_by_restaurant.
@@ -1332,11 +1335,45 @@ export const adminAPI = {
    * Get a single order by id for restaurant screens.
    * Prefer direct endpoint; fallback to list+filter for backward compatibility.
    */
-  getOrderById: async (orderId) => {
-    return await apiClient.get(`/food/restaurant/orders/${String(orderId)}`, {
-      contextModule: "restaurant",
-    });
-  },
+  getOrderById: (() => {
+    // Collapse duplicate detail requests (StrictMode/double-mount/rapid re-renders).
+    let inFlight = null;
+    let inFlightKey = "";
+    let cache = null;
+    let cacheKey = "";
+    let cacheAt = 0;
+    const CACHE_MS = 1200;
+
+    return async (orderId) => {
+      const key = String(orderId || "").trim();
+      if (!key) return Promise.reject(new Error("orderId is required"));
+
+      const now = Date.now();
+      if (cache && cacheKey === key && now - cacheAt < CACHE_MS) {
+        return cache;
+      }
+
+      if (inFlight && inFlightKey === key) return inFlight;
+
+      inFlightKey = key;
+      inFlight = apiClient
+        .get(`/food/restaurant/orders/${key}`, {
+          contextModule: "restaurant",
+        })
+        .then((res) => {
+          cache = res;
+          cacheKey = key;
+          cacheAt = Date.now();
+          return res;
+        })
+        .finally(() => {
+          inFlight = null;
+          inFlightKey = "";
+        });
+
+      return inFlight;
+    };
+  })(),
   /** Add-ons (restaurant) - approval handled by admin */
   getAddons: (params = {}) =>
     apiClient.get("/food/restaurant/addons", {

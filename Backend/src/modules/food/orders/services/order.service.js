@@ -553,32 +553,45 @@ async function getRiderEarning(distanceKm) {
   const rules = await getActiveCommissionRules();
   if (!rules.length) return 0;
 
-  const sorted = [...rules].sort(
-    (a, b) => (a.minDistance || 0) - (b.minDistance || 0),
-  );
-  const baseRule = sorted.find((r) => Number(r.minDistance || 0) === 0) || null;
+  const baseRule = rules.find((r) => r.status !== false) || null;
   if (!baseRule) return 0;
 
-  const d = Number(distanceKm);
-  if (!Number.isFinite(d) || d <= 0) return Math.round(Number(baseRule.basePayout || 0));
-
-  let earning = Number(baseRule.basePayout || 0);
-
-  for (const r of sorted) {
-    const perKm = Number(r.commissionPerKm || 0);
-    if (!Number.isFinite(perKm) || perKm <= 0) continue;
-    const min = Number(r.minDistance || 0);
-    const max = r.maxDistance == null ? null : Number(r.maxDistance);
-    if (d <= min) continue;
-    const upper = max == null ? d : Math.min(d, max);
-    const kmInSlab = Math.max(0, upper - min);
-    if (kmInSlab > 0) {
-      earning += kmInSlab * perKm;
-    }
-  }
-
+  const earning = Number(baseRule.basePayout || 0);
   if (!Number.isFinite(earning) || earning <= 0) return 0;
   return Math.round(earning);
+}
+
+function parsePreparationMinutes(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? Math.round(value) : null;
+  }
+
+  const text = String(value).trim();
+  if (!text) return null;
+  const matches = text.match(/\d+(?:\.\d+)?/g);
+  if (!matches?.length) return null;
+
+  const numbers = matches
+    .map((match) => Number(match))
+    .filter((num) => Number.isFinite(num) && num > 0);
+  if (!numbers.length) return null;
+
+  return Math.round(Math.max(...numbers));
+}
+
+function resolveInitialPreparationTime(items = [], restaurant = null) {
+  const itemMinutes = (Array.isArray(items) ? items : [])
+    .map((item) => parsePreparationMinutes(item?.preparationTime))
+    .filter((minutes) => Number.isFinite(minutes) && minutes > 0);
+
+  if (itemMinutes.length > 0) return Math.max(...itemMinutes);
+
+  return (
+    parsePreparationMinutes(restaurant?.estimatedDeliveryTimeMinutes) ||
+    parsePreparationMinutes(restaurant?.estimatedDeliveryTime) ||
+    11
+  );
 }
 
 /** Append-only food_order_payments row; never blocks main flow on failure */
@@ -1154,24 +1167,10 @@ export async function createOrder(userId, dto) {
     qr: {},
   };
 
-  let distanceKm = null;
-  if (
-    orderType === "food" &&
-    restaurant?.location?.coordinates?.length === 2 &&
-    dto.address?.location?.coordinates?.length === 2
-  ) {
-    const [rLng, rLat] = restaurant.location.coordinates;
-    const [dLng, dLat] = dto.address.location.coordinates;
-    const d = haversineKm(rLat, rLng, dLat, dLng);
-    distanceKm = Number.isFinite(d) ? d : null;
-  } else {
-    console.warn(
-      `Food order ${orderId}: distance not available, rider earning set to 0`,
-    );
-  }
-
   const riderEarning =
-    orderType === "food" ? await getRiderEarning(distanceKm) : 0;
+    orderType === "food" ? await getRiderEarning() : 0;
+  const initialEstimatedPreparationTime =
+    orderType === "food" ? resolveInitialPreparationTime(dto.items, restaurant) : null;
   
   // Calculate restaurant commission from subtotal
   const { commissionAmount: restaurantCommission } =
@@ -1224,6 +1223,8 @@ export async function createOrder(userId, dto) {
     note: dto.note || "",
     restaurantNote: dto.restaurantNote || "",
     sendCutlery: dto.sendCutlery !== false,
+    initialEstimatedPreparationTime,
+    estimatedPreparationTime: initialEstimatedPreparationTime,
     deliveryFleet: orderType === "food" ? dto.deliveryFleet || "standard" : "quick",
     scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
     riderEarning,
@@ -1448,7 +1449,7 @@ export async function getOrderById(
   const order = await FoodOrder.findOne(identity)
     .populate(
       "restaurantId",
-      "restaurantName name phone ownerPhone primaryContactNumber contactNumber mobile profileImage area city location addressLine1 address rating totalRatings",
+      "restaurantName name phone ownerPhone primaryContactNumber contactNumber mobile profileImage area city location addressLine1 address rating totalRatings estimatedDeliveryTime estimatedDeliveryTimeMinutes",
     )
     .populate("dispatch.deliveryPartnerId", "name phone rating totalRatings")
     .populate("userId", "name phone email")
@@ -1812,6 +1813,7 @@ export async function updateOrderStatusRestaurant(
   restaurantId,
   orderStatus,
   reason = "",
+  preparationTimeMins = null,
 ) {
   let order = await FoodOrder.findOne({
     _id: new mongoose.Types.ObjectId(orderId),
@@ -1820,6 +1822,23 @@ export async function updateOrderStatusRestaurant(
   if (!order) throw new NotFoundError("Order not found");
   const from = order.orderStatus;
   order.orderStatus = orderStatus;
+  const resolvedPreparationTime = parsePreparationMinutes(preparationTimeMins);
+  if (orderStatus === "preparing") {
+    const fallbackPreparationTime =
+      parsePreparationMinutes(order.estimatedPreparationTime) ||
+      parsePreparationMinutes(order.initialEstimatedPreparationTime) ||
+      11;
+    order.estimatedPreparationTime = resolvedPreparationTime || fallbackPreparationTime;
+    order.tracking = {
+      ...(order.tracking?.toObject ? order.tracking.toObject() : order.tracking || {}),
+      preparing: {
+        ...(order.tracking?.preparing?.toObject
+          ? order.tracking.preparing.toObject()
+          : order.tracking?.preparing || {}),
+        timestamp: order.tracking?.preparing?.timestamp || new Date(),
+      },
+    };
+  }
   const trimmedReason =
     typeof reason === "string" ? reason.trim() : "";
   const cancellationNote =
@@ -1898,6 +1917,8 @@ export async function updateOrderStatusRestaurant(
           orderMongoId: order._id?.toString?.(),
           orderId: order.orderId,
           orderStatus: order.orderStatus,
+          estimatedPreparationTime: order.estimatedPreparationTime,
+          initialEstimatedPreparationTime: order.initialEstimatedPreparationTime,
           title: title,
           message: body,
         };
@@ -2320,7 +2341,7 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
   return buildPaginatedResult({ docs, total, page, limit });
 }
 
-export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
+export async function acceptOrderDelivery(orderId, deliveryPartnerId, deliveryTimeMins = null) {
   const partnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
   const identity = buildOrderIdentityFilter(orderId);
   if (!identity) throw new ValidationError("Order id required");
@@ -2360,6 +2381,12 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
   order.dispatch.status = "accepted";
   if (!order.dispatch.assignedAt) order.dispatch.assignedAt = new Date();
   order.dispatch.acceptedAt = new Date();
+  const resolvedDeliveryTime =
+    parsePreparationMinutes(deliveryTimeMins) ||
+    parsePreparationMinutes(order.estimatedDeliveryTime) ||
+    30;
+  order.initialEstimatedDeliveryTime = resolvedDeliveryTime;
+  order.estimatedDeliveryTime = resolvedDeliveryTime;
   pushStatusHistory(order, {
     byRole: "DELIVERY_PARTNER",
     byId: deliveryPartnerId,
@@ -2414,24 +2441,32 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
         orderMongoId: order._id?.toString?.(),
         orderId: order.orderId,
         dispatchStatus: order.dispatch?.status,
+        estimatedDeliveryTime: order.estimatedDeliveryTime,
+        initialEstimatedDeliveryTime: order.initialEstimatedDeliveryTime,
       });
       io.to(rooms.restaurant(order.restaurantId)).emit("order_status_update", {
         orderMongoId: order._id?.toString?.(),
         orderId: order.orderId,
         orderStatus: order.orderStatus,
         dispatchStatus: order.dispatch?.status,
+        estimatedDeliveryTime: order.estimatedDeliveryTime,
+        initialEstimatedDeliveryTime: order.initialEstimatedDeliveryTime,
       });
       io.to(rooms.user(order.userId)).emit("order_status_update", {
         orderMongoId: order._id?.toString?.(),
         orderId: order.orderId,
         orderStatus: order.orderStatus,
         dispatchStatus: order.dispatch?.status,
+        estimatedDeliveryTime: order.estimatedDeliveryTime,
+        initialEstimatedDeliveryTime: order.initialEstimatedDeliveryTime,
       });
       io.to(rooms.admin()).emit("order_status_update", {
         orderMongoId: order._id?.toString?.(),
         orderId: order.orderId,
         orderStatus: order.orderStatus,
         dispatchStatus: order.dispatch?.status,
+        estimatedDeliveryTime: order.estimatedDeliveryTime,
+        initialEstimatedDeliveryTime: order.initialEstimatedDeliveryTime,
       });
     }
     await notifyOwnersSafely(
@@ -2448,6 +2483,8 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
           orderId: order.orderId,
           orderMongoId: order._id?.toString?.() || "",
           dispatchStatus: order.dispatch?.status,
+          estimatedDeliveryTime: String(order.estimatedDeliveryTime || ""),
+          initialEstimatedDeliveryTime: String(order.initialEstimatedDeliveryTime || ""),
           link: "/food/user/orders",
         },
       },
@@ -2460,6 +2497,8 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
     deliveryPartnerId,
     dispatchStatus: order.dispatch?.status,
     orderStatus: order.orderStatus,
+    estimatedDeliveryTime: order.estimatedDeliveryTime,
+    initialEstimatedDeliveryTime: order.initialEstimatedDeliveryTime,
   });
 
   // Return full populated order so delivery app has restaurant coords for route polyline
