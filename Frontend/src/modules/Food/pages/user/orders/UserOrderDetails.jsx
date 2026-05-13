@@ -199,7 +199,8 @@ export default function UserOrderDetails() {
   const items = Array.isArray(order.items) ? order.items : []
   const pricing = order.pricing || {}
   const refund = order.payment?.refund || {}
-  const hasRefundInfo = order.payment?.status === "refunded" || Boolean(refund.status && refund.status !== "none")
+  const isCancelledOrder = order.status === "cancelled" || String(order.status).startsWith("cancelled")
+  const hasRefundInfo = (isCancelledOrder || order.payment?.status === "refunded") && Boolean(refund.status && refund.status !== "none")
   const sendsCutlery = order.sendCutlery !== false
 
   const userName = order.userName || ""

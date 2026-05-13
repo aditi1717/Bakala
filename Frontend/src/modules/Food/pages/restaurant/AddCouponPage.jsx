@@ -8,6 +8,7 @@ import BottomNavOrders from "@food/components/restaurant/BottomNavOrders"
 import useRestaurantBackNavigation from "@food/hooks/useRestaurantBackNavigation"
 import { restaurantAPI } from "@food/api"
 import BRAND_THEME from "@/config/brandTheme"
+import { toast } from "sonner"
 
 const discountTypes = [
   { value: "percentage", label: "Percentage (%)" },
@@ -92,7 +93,13 @@ export default function AddCouponPage(props) {
   }, [])
 
   const updateField = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }))
+    setForm((prev) => {
+      const next = { ...prev, [key]: value }
+      if (key === "customerScope" && value === "first-time") {
+        next.perUserLimit = "1"
+      }
+      return next
+    })
     setError("")
     setSuccess("")
   }
@@ -112,7 +119,7 @@ export default function AddCouponPage(props) {
     if (!isFirstTimeOnly) {
       if (form.perUserLimit === "") return "Per user limit is required"
       if (Number(form.perUserLimit) <= 0) return "Per user limit must be greater than 0"
-      if (Number(form.usageLimit) <= Number(form.perUserLimit)) return "Total usage limit must be greater than per-user limit"
+      if (Number(form.usageLimit) < Number(form.perUserLimit)) return "Total usage limit cannot be less than per-user limit"
     }
     if (form.startDate && form.endDate && new Date(form.endDate) < new Date(form.startDate)) {
       return "End date must be equal to or after start date"
@@ -134,7 +141,7 @@ export default function AddCouponPage(props) {
       restaurantScope: "selected",
       minOrderValue: form.minOrderValue === "" ? undefined : Number(form.minOrderValue),
       maxDiscount: form.discountType === "percentage" ? maxDiscountNum : undefined,
-      usageLimit: Number(form.usageLimit),
+      usageLimit: form.usageLimit === "" ? undefined : Number(form.usageLimit),
       perUserLimit: form.customerScope === "first-time" ? 1 : Number(form.perUserLimit),
       startDate: form.startDate || undefined,
       endDate: form.endDate || undefined,
@@ -146,6 +153,7 @@ export default function AddCouponPage(props) {
     const validationError = validate()
     if (validationError) {
       setError(validationError)
+      toast.error(validationError)
       return
     }
 
@@ -161,7 +169,9 @@ export default function AddCouponPage(props) {
       }
       navigate("/restaurant/coupon")
     } catch (err) {
-      setError(err?.response?.data?.message || "Unable to save coupon")
+      const msg = err?.response?.data?.message || err?.response?.data?.error || "Unable to save coupon"
+      setError(msg)
+      toast.error(msg)
     } finally {
       setSaving(false)
     }
@@ -382,4 +392,3 @@ export default function AddCouponPage(props) {
     </div>
   )
 }
-

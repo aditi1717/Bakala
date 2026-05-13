@@ -257,23 +257,29 @@ const parsePreparationMinutes = (value) => {
 }
 
 const resolveOrderPreparationMinutes = (orderLike, fallback = null) => {
+  // Priority 1: Specifically set time for this order (set by restaurant after acceptance)
   const direct =
     parsePreparationMinutes(orderLike?.estimatedPreparationTime) ||
     parsePreparationMinutes(orderLike?.preparationTime) ||
     null
   if (direct) return direct
 
+  // Priority 2: Restaurant's general estimated delivery time (matches what is shown on the Restaurant Card)
+  const restaurantDefault = 
+    parsePreparationMinutes(orderLike?.restaurantEstimatedDeliveryTimeMinutes) ||
+    parsePreparationMinutes(orderLike?.restaurantEstimatedDeliveryTime) ||
+    parsePreparationMinutes(orderLike?.initialEstimatedPreparationTime) ||
+    null
+  if (restaurantDefault) return restaurantDefault
+
+  // Priority 3: Fallback to maximum item preparation time if no restaurant default is found
   const itemTimes = (Array.isArray(orderLike?.items) ? orderLike.items : [])
     .map((item) => parsePreparationMinutes(item?.preparationTime))
     .filter((minutes) => Number.isFinite(minutes) && minutes > 0)
   if (itemTimes.length) return Math.max(...itemTimes)
 
-  return (
-    parsePreparationMinutes(orderLike?.initialEstimatedPreparationTime) ||
-    parsePreparationMinutes(orderLike?.restaurantEstimatedDeliveryTimeMinutes) ||
-    parsePreparationMinutes(orderLike?.restaurantEstimatedDeliveryTime) ||
-    parsePreparationMinutes(fallback)
-  )
+  // Priority 4: Final fallback provided to the function
+  return parsePreparationMinutes(fallback)
 }
 
 const getTimestampMs = (value) => {
@@ -2112,7 +2118,7 @@ export default function OrderTracking() {
               </div>
             )}
 
-            {(order?.payment?.status === "refunded" || order?.payment?.refund?.status) && (
+            {(orderStatus === "cancelled" || order?.payment?.status === "refunded") && (order?.payment?.refund?.status && order?.payment?.refund?.status !== "none") && (
               <div className={`rounded-xl p-4 border ${
                 order?.payment?.refund?.status === "failed"
                   ? "bg-red-50 border-red-100 text-red-700"

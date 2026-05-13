@@ -13,6 +13,30 @@ import {
 } from 'lucide-react';
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
 
+const parsePreparationMinutes = (value) => {
+  if (value == null) return null;
+  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? Math.round(value) : null;
+  const matches = String(value).match(/\d+(?:\.\d+)?/g);
+  if (!matches?.length) return null;
+  const numbers = matches.map(Number).filter((num) => Number.isFinite(num) && num > 0);
+  return numbers.length ? Math.round(Math.max(...numbers)) : null;
+};
+
+const getTimestampMs = (value) => {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+};
+
+const getRemainingMinutes = (totalMinutes, startAt, nowMs = Date.now()) => {
+  const total = parsePreparationMinutes(totalMinutes);
+  if (!total) return null;
+  const startMs = getTimestampMs(startAt);
+  if (!startMs) return total;
+  const elapsed = Math.max(0, Math.floor((nowMs - startMs) / 60000));
+  return Math.max(0, total - elapsed);
+};
+
 const INCOMING_ORDER_STORAGE_KEY = 'delivery_v2_incoming_order';
 const ORDER_FOCUS_STORAGE_KEY = 'delivery_v2_order_focus';
 const INCOMING_ORDER_TTL_MS = 2 * 60 * 1000;
@@ -441,6 +465,12 @@ const OrderDetailV2 = () => {
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState('');
   const [deliveryTime, setDeliveryTime] = useState(30);
+  const [timeTick, setTimeTick] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTimeTick(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const syncStoreWithOrder = useCallback((nextOrder) => {
     if (!nextOrder) return;
@@ -811,8 +841,8 @@ const OrderDetailV2 = () => {
               <div className="rounded-2xl border border-slate-200 bg-white p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Delivery time</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">User tracking par yahi time dikhega</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Delivery ETA</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">Visible to Customer</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -851,12 +881,52 @@ const OrderDetailV2 = () => {
             </>
           )}
 
-          {!canAccept && !isPassedTaskFlow && order?.estimatedDeliveryTime ? (
-            <div className="rounded-2xl border border-[#005128]/10 bg-[#E8F3EE] p-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#005128]">Delivery time</p>
-              <p className="mt-1 text-lg font-black text-slate-950">{Number(order.estimatedDeliveryTime || 30)} mins</p>
+          {(order?.estimatedPreparationTime || order?.estimatedDeliveryTime) && !isClosedOrder && !isPassedTaskFlow && !canAccept && (
+            <div className="rounded-2xl border border-[#005128]/10 bg-[#E8F3EE] px-4 py-3">
+              <div className="space-y-2">
+                {order?.estimatedPreparationTime && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#005128]/60">Order Status</span>
+                    <span className="text-xs font-black text-[#005128]">
+                      {(() => {
+                        const status = String(order?.orderStatus || order?.status || '').toLowerCase();
+                        if (['ready_for_pickup', 'picked_up', 'delivering', 'reached_drop', 'delivered', 'completed'].includes(status)) {
+                          return <span className="text-emerald-600">Food is Ready</span>;
+                        }
+                        const base = parsePreparationMinutes(order.estimatedPreparationTime);
+                        const remaining = getRemainingMinutes(
+                          base,
+                          order?.tracking?.preparing?.timestamp || order?.createdAt,
+                          timeTick
+                        );
+                        if (remaining != null && remaining <= 0) {
+                          return <span className="text-amber-600">Ready Soon</span>;
+                        }
+                        return `Prep: ${remaining ?? base}m`;
+                      })()}
+                    </span>
+                  </div>
+                )}
+
+                {order?.estimatedDeliveryTime && (
+                  <div className="flex items-center justify-between pt-2 border-t border-[#005128]/5">
+                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#005128]/60">Delivery Estimated Time</span>
+                    <span className="text-xs font-black text-[#005128]">
+                      {(() => {
+                        const base = parsePreparationMinutes(order.estimatedDeliveryTime) || 30;
+                        const remaining = getRemainingMinutes(
+                          base,
+                          order.dispatch?.acceptedAt || order.tracking?.accepted?.timestamp,
+                          timeTick
+                        );
+                        return `${remaining ?? base} mins`;
+                      })()}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-          ) : null}
+          )}
 
           {isAcceptedFlow && !isPassedTaskFlow && (
             <div className="rounded-2xl border border-slate-200 bg-white p-3">

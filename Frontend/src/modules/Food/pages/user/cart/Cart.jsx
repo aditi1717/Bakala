@@ -883,12 +883,12 @@ export default function Cart() {
       }
 
       debugLog(`[CART-COUPONS] Total unique coupons found: ${allCoupons.length}`, allCoupons)
-      setAvailableCoupons(allCoupons)
+      setAvailableCoupons(allCoupons.filter(c => !(c.customerGroup === "first-time" && userOrderCount > 0)))
       setLoadingCoupons(false)
     }
 
     fetchCouponsForCartItems()
-  }, [cart, restaurantId])
+  }, [cart, restaurantId, userOrderCount])
 
   // Calculate pricing from backend whenever cart, address, or coupon changes
   useEffect(() => {
@@ -1021,7 +1021,7 @@ export default function Cart() {
   useEffect(() => {
     const fetchOrderCount = async () => {
       try {
-        const response = await userAPI.getOrders({ page: 1, limit: 1 })
+        const response = await orderAPI.getOrders({ page: 1, limit: 1 })
         if (response?.data?.success) {
           const totalOrders = response?.data?.data?.pagination?.total || 0
           setUserOrderCount(totalOrders)
@@ -1356,7 +1356,7 @@ export default function Cart() {
   }
 
   const handleApplyCoupon = async (coupon) => {
-    if (coupon?.customerGroup === "new" && userOrderCount > 0) {
+    if (coupon?.customerGroup === "first-time" && userOrderCount > 0) {
       toast.error("This coupon is only for first-time users")
       return
     }
@@ -1424,7 +1424,7 @@ export default function Cart() {
     )
 
     // If we know this is first-time only and user already ordered, block early.
-    if (matchedCoupon?.customerGroup === "new" && userOrderCount > 0) {
+    if (matchedCoupon?.customerGroup === "first-time" && userOrderCount > 0) {
       toast.error("This coupon is only for first-time users")
       return
     }
@@ -2404,7 +2404,7 @@ export default function Cart() {
                               <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-tight mb-0.5">
                                 {availableCoupons[0].discountDisplay || `Save ${RUPEE_SYMBOL}${availableCoupons[0].discount}`} with '{availableCoupons[0].code}'
                               </p>
-                            {availableCoupons[0].customerGroup === "new" ? (
+                            {availableCoupons[0].customerGroup === "first-time" ? (
                               <p className="text-[11px] mb-1" style={{ color: BRAND_THEME.colors.brand.primary }}>First-time users only</p>
                             ) : subtotal < availableCoupons[0].minOrder ? (
                               <p className="text-xs font-medium mb-1" style={{ color: BRAND_THEME.colors.brand.primaryDark }}>Add items worth {RUPEE_SYMBOL}{(availableCoupons[0].minOrder - subtotal).toFixed(0)} more to unlock</p>
@@ -2425,7 +2425,7 @@ export default function Cart() {
                           className="border rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed ml-2 shadow-sm"
                           style={{ borderColor: BRAND_THEME.colors.brand.primary, color: BRAND_THEME.colors.brand.primary }}
                           onClick={() => handleApplyCoupon(availableCoupons[0])}
-                          disabled={subtotal < availableCoupons[0].minOrder || (availableCoupons[0].customerGroup === "new" && userOrderCount > 0)}
+                          disabled={subtotal < availableCoupons[0].minOrder || (availableCoupons[0].customerGroup === "first-time" && userOrderCount > 0)}
                         >
                           APPLY
                         </button>
@@ -2466,7 +2466,7 @@ export default function Cart() {
                                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-tight mb-0.5">
                                   {coupon.discountDisplay || `Save ${RUPEE_SYMBOL}${coupon.discount}`} with '{coupon.code}'
                                 </p>
-                                {coupon.customerGroup === "new" ? (
+                                {coupon.customerGroup === "first-time" ? (
                                   <p className="text-[11px] mb-1" style={{ color: BRAND_THEME.colors.brand.primary }}>First-time users only</p>
                                 ) : subtotal < coupon.minOrder ? (
                                   <p className="text-xs font-medium mb-1 line-clamp-1" style={{ color: BRAND_THEME.colors.brand.primaryDark }}>Add items worth {RUPEE_SYMBOL}{(coupon.minOrder - subtotal).toFixed(0)} more to unlock</p>
@@ -2478,7 +2478,7 @@ export default function Cart() {
                             <button
                               className="border border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-400 rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed ml-2"
                               onClick={() => handleApplyCoupon(coupon)}
-                              disabled={subtotal < coupon.minOrder || (coupon.customerGroup === "new" && userOrderCount > 0)}
+                              disabled={subtotal < coupon.minOrder || (coupon.customerGroup === "first-time" && userOrderCount > 0)}
                             >
                               APPLY
                             </button>

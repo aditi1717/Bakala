@@ -606,11 +606,12 @@ function showForegroundNotification(payload = {}) {
     }
   }
 
-  // Still show in-app toast for immediate context if we are in focus.
-  // Delivery app requested: do not show foreground toast popups.
+  // In-app toasts: do not show them for delivery or restaurant modules.
+  // These modules have their own dedicated UI (dashboards/modals) for real-time updates.
   const currentModule = normalizeModuleFromPath();
   if (
     currentModule !== "delivery" &&
+    currentModule !== "restaurant" &&
     !(currentModule === "user" && isOrderRelatedNotification) &&
     typeof document !== "undefined" &&
     document.visibilityState === "visible"

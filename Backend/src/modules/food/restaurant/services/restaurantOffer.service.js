@@ -63,8 +63,8 @@ const normalizeCouponPayload = (body = {}) => {
         throw new ValidationError('Per user limit must be greater than 0');
     }
 
-    if (usageLimit <= perUserLimit) {
-        throw new ValidationError('Total usage limit must be greater than per-user limit');
+    if (usageLimit < perUserLimit) {
+        throw new ValidationError('Total usage limit cannot be less than per-user limit');
     }
 
     const startDate = body.startDate ? normalizeCouponStartDate(body.startDate) : null;

@@ -522,7 +522,7 @@ function OrdersTabV2({
                     orderDisplayId={getOrderDisplayId(currentActiveOrder)}
                     itemLine={getOrderItemSummary(currentActiveOrder)}
                     subtitle="Open detail page to continue status updates."
-                    amount={`Rs ${Number(currentActiveOrder?.riderEarning || currentActiveOrder?.deliveryEarning || 0).toFixed(2)}`}
+                    amount={`₹${Number(currentActiveOrder?.riderEarning || currentActiveOrder?.deliveryEarning || 0).toFixed(2)}`}
                     statusLabel={getOrderProgressLabel(currentActiveOrder)}
                     statusTone="emerald"
                     actionText="Open Detail"
@@ -536,7 +536,7 @@ function OrdersTabV2({
                     orderDisplayId={getOrderDisplayId(order)}
                     itemLine={getOrderItemSummary(order)}
                     subtitle="Open detail page to continue status updates."
-                    amount={`Rs ${Number(order?.riderEarning || order?.deliveryEarning || 0).toFixed(2)}`}
+                    amount={`₹${Number(order?.riderEarning || order?.deliveryEarning || 0).toFixed(2)}`}
                     statusLabel={getOrderProgressLabel(order)}
                     statusTone="emerald"
                     actionText="Open Detail"
@@ -576,7 +576,7 @@ function OrdersTabV2({
           ) : (
             <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-6 text-center shadow-sm">
               <p className="text-sm font-bold text-slate-950">No delivered or cancelled orders today</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Sirf aaj ke delivered aur cancelled orders yahan show honge.</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Only delivered and cancelled orders from today will be shown here.</p>
             </div>
           )}
         </div>
@@ -1490,12 +1490,6 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
 
       </div>
 
-
-
-
-
-
-
       {/* ─── 3. BOTTOM NAV (Clean & Uniform) ─── */}
       <div className="bg-white border-t border-gray-100 flex justify-between items-center z-[200] safe-bottom shadow-sm">
         <button onClick={() => navigate('/food/delivery/orders')} className={`flex flex-col items-center justify-center gap-1 pt-3 pb-2 transition-all flex-1 ${currentTab === 'orders' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'}`}>
@@ -1515,7 +1509,3 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
     </div>
   );
 }
-
-
-
-
