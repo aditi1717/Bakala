@@ -73,6 +73,16 @@ export default function SearchResults() {
       const aClosed = getRestaurantAvailabilityStatus(a, now).isOpen ? 0 : 1
       const bClosed = getRestaurantAvailabilityStatus(b, now).isOpen ? 0 : 1
       if (aClosed !== bClosed) return aClosed - bClosed
+      const aOrder = Number(a?.listingOrder)
+      const bOrder = Number(b?.listingOrder)
+      const aValidOrder = Number.isFinite(aOrder) && aOrder > 0 ? aOrder : null
+      const bValidOrder = Number.isFinite(bOrder) && bOrder > 0 ? bOrder : null
+      const aUnnumbered = aValidOrder === null ? 1 : 0
+      const bUnnumbered = bValidOrder === null ? 1 : 0
+      if (aUnnumbered !== bUnnumbered) return aUnnumbered - bUnnumbered
+      if (aValidOrder !== null && bValidOrder !== null && aValidOrder !== bValidOrder) {
+        return aValidOrder - bValidOrder
+      }
       return 0
     })
   }

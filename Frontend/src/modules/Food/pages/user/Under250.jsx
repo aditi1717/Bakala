@@ -28,6 +28,7 @@ import {
   hasFoodVariants,
 } from "@food/utils/foodVariants"
 import { calculateDistance, formatDistance } from "@food/utils/common"
+import { sortRestaurantsByAvailability } from "@food/utils/sortRestaurantsByAvailability"
 import BRAND_THEME from "@/config/brandTheme"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
@@ -329,13 +330,7 @@ export default function Under250() {
       // No additional sorting needed
     }
 
-    const now = new Date(availabilityTick)
-    return [...filtered].sort((a, b) => {
-      const aClosed = getRestaurantAvailabilityStatus(a, now).isOpen ? 0 : 1
-      const bClosed = getRestaurantAvailabilityStatus(b, now).isOpen ? 0 : 1
-      if (aClosed !== bClosed) return aClosed - bClosed
-      return 0
-    })
+    return sortRestaurantsByAvailability(filtered, new Date(availabilityTick))
   }, [under250Restaurants, selectedSort, under30MinsFilter, activeCategory, categories, vegMode, vegModeOption, availabilityTick])
 
   const visibleCategories = useMemo(() => {

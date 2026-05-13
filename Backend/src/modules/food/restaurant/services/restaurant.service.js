@@ -1184,6 +1184,7 @@ export const listApprovedRestaurants = async (query = {}) => {
         featuredPrice: 1,
         rating: 1,
         totalRatings: 1,
+        listingOrder: 1,
         isAcceptingOrders: 1,
         status: 1,
         pureVegRestaurant: 1,
@@ -1255,12 +1256,36 @@ export const listApprovedRestaurants = async (query = {}) => {
     })();
 
     const [restaurantsRaw, total] = await Promise.all([
-        FoodRestaurant.find(filter)
-            .select(Object.keys(projection).join(' '))
-            .sort(sort)
-            .skip(skip)
-            .limit(limit)
-            .lean(),
+        sortBy
+            ? FoodRestaurant.find(filter)
+                .select(Object.keys(projection).join(' '))
+                .sort(sort)
+                .skip(skip)
+                .limit(limit)
+                .lean()
+            : FoodRestaurant.aggregate([
+                { $match: filter },
+                {
+                    $addFields: {
+                        isClosedForListing: { $cond: [{ $eq: ['$isAcceptingOrders', false] }, 1, 0] },
+                        hasListingOrder: { $cond: [{ $gt: ['$listingOrder', 0] }, 1, 0] },
+                        listingOrderForSort: {
+                            $cond: [{ $gt: ['$listingOrder', 0] }, '$listingOrder', 999999999]
+                        }
+                    }
+                },
+                {
+                    $sort: {
+                        isClosedForListing: 1,
+                        hasListingOrder: -1,
+                        listingOrderForSort: 1,
+                        createdAt: -1
+                    }
+                },
+                { $project: projection },
+                { $skip: skip },
+                { $limit: limit }
+            ]),
         FoodRestaurant.countDocuments(filter)
     ]);
 
@@ -1272,6 +1297,9 @@ export const listApprovedRestaurants = async (query = {}) => {
         name: r.restaurantName || '',
         rating: normalizeRatingValue(r.rating),
         totalRatings: normalizeTotalRatingsValue(r.totalRatings),
+        listingOrder: Number.isFinite(Number(r.listingOrder)) && Number(r.listingOrder) > 0
+            ? Number(r.listingOrder)
+            : null,
         isRestaurant: r.isRestaurant !== false,
         profileImage: r.profileImage ? { url: r.profileImage } : null,
         coverImages: Array.isArray(r.coverImages) ? r.coverImages : [],

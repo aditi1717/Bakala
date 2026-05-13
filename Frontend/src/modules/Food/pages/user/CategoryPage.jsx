@@ -567,7 +567,18 @@ export default function CategoryPage() {
     return [...rows].sort((left, right) => {
       const leftClosed = getRestaurantAvailabilityStatus(left, now).isOpen ? 0 : 1
       const rightClosed = getRestaurantAvailabilityStatus(right, now).isOpen ? 0 : 1
-      return leftClosed - rightClosed
+      if (leftClosed !== rightClosed) return leftClosed - rightClosed
+      const leftOrder = Number(left?.listingOrder)
+      const rightOrder = Number(right?.listingOrder)
+      const leftValidOrder = Number.isFinite(leftOrder) && leftOrder > 0 ? leftOrder : null
+      const rightValidOrder = Number.isFinite(rightOrder) && rightOrder > 0 ? rightOrder : null
+      const leftUnnumbered = leftValidOrder === null ? 1 : 0
+      const rightUnnumbered = rightValidOrder === null ? 1 : 0
+      if (leftUnnumbered !== rightUnnumbered) return leftUnnumbered - rightUnnumbered
+      if (leftValidOrder !== null && rightValidOrder !== null && leftValidOrder !== rightValidOrder) {
+        return leftValidOrder - rightValidOrder
+      }
+      return 0
     })
   }
 
@@ -917,6 +928,7 @@ export default function CategoryPage() {
                 isActive: restaurant.isActive,
                 isAcceptingOrders: restaurant.isAcceptingOrders,
                 isOnline: restaurant.isOnline,
+                listingOrder: restaurant.listingOrder ?? null,
                 availabilityStatus: restaurant.availabilityStatus || restaurant.availability?.status || restaurant.status,
                 availability: restaurant.availability || null,
                 outletTimings: restaurant.outletTimings || null,

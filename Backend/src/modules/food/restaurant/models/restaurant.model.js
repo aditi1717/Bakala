@@ -83,6 +83,12 @@ const restaurantSchema = new mongoose.Schema(
       required: true,
       default: false,
     },
+    listingOrder: {
+      type: Number,
+      default: null,
+      min: 0,
+      index: true,
+    },
     isRestaurant: {
       type: Boolean,
       default: true,

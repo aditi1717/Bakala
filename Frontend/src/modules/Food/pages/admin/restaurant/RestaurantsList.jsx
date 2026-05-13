@@ -5,6 +5,7 @@ import { adminAPI, restaurantAPI, uploadAPI } from "@food/api"
 import { clearModuleAuth } from "@food/utils/auth"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@food/components/ui/dropdown-menu"
 import { exportRestaurantsToPDF } from "@food/components/admin/restaurants/restaurantsExportUtils"
+import { toast } from "sonner"
 
 // Import icons from Dashboard-icons
 import locationIcon from "@food/assets/Dashboard-icons/image1.webp"
@@ -256,6 +257,8 @@ export default function RestaurantsList() {
   const [banning, setBanning] = useState(false)
   const [deleteConfirmDialog, setDeleteConfirmDialog] = useState(null) // { restaurant }
   const [deleting, setDeleting] = useState(false)
+  const [savingAllListingOrders, setSavingAllListingOrders] = useState(false)
+  const [initialListingOrderById, setInitialListingOrderById] = useState({})
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" })
   const [isEditingDetails, setIsEditingDetails] = useState(false)
   const [savingDetails, setSavingDetails] = useState(false)
@@ -365,12 +368,27 @@ export default function RestaurantsList() {
             ownerPhone: restaurant.ownerPhone || restaurant.phone || "N/A",
             approvalStatus: normalizeApprovalStatus(restaurant),
             isActive: restaurant.isActive !== false,
+            isAcceptingOrders: restaurant.isAcceptingOrders !== false,
             isRestaurant: restaurant.isRestaurant !== false,
             rating: restaurant.ratings?.average || restaurant.rating || 0,
+            listingOrder: Number.isFinite(Number(restaurant.listingOrder)) && Number(restaurant.listingOrder) > 0
+              ? Number(restaurant.listingOrder)
+              : null,
             logo: getPrimaryRestaurantImage(restaurant, PLACEHOLDER_40),
             originalData: restaurant,
           }))
-          if (!cancelled) setRestaurants(mappedRestaurants)
+          if (!cancelled) {
+            setRestaurants(mappedRestaurants)
+            const initialMap = mappedRestaurants.reduce((acc, item) => {
+              const key = String(item._id || item.id || "")
+              if (!key) return acc
+              acc[key] = Number.isFinite(Number(item.listingOrder)) && Number(item.listingOrder) > 0
+                ? Number(item.listingOrder)
+                : null
+              return acc
+            }, {})
+            setInitialListingOrderById(initialMap)
+          }
         } else {
           if (!cancelled) setRestaurants([])
         }
@@ -470,6 +488,22 @@ export default function RestaurantsList() {
         if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
+    } else {
+      result.sort((a, b) => {
+        const aClosed = a.isAcceptingOrders === false || a.isActive !== true ? 1 : 0
+        const bClosed = b.isAcceptingOrders === false || b.isActive !== true ? 1 : 0
+        if (aClosed !== bClosed) return aClosed - bClosed
+
+        const aHasOrder = Number.isFinite(Number(a.listingOrder)) && Number(a.listingOrder) > 0 ? 1 : 0
+        const bHasOrder = Number.isFinite(Number(b.listingOrder)) && Number(b.listingOrder) > 0 ? 1 : 0
+        if (aHasOrder !== bHasOrder) return bHasOrder - aHasOrder
+        if (aHasOrder === 1 && bHasOrder === 1) {
+          const aOrder = Number(a.listingOrder)
+          const bOrder = Number(b.listingOrder)
+          if (aOrder !== bOrder) return aOrder - bOrder
+        }
+        return 0
+      })
     }
 
     return result
@@ -1098,6 +1132,133 @@ export default function RestaurantsList() {
     setDeleteConfirmDialog(null)
   }
 
+  const getRestaurantKey = (restaurant) => String(restaurant?._id || restaurant?.id || "")
+
+  const handleListingOrderChange = (restaurant, rawValue) => {
+    const restaurantId = restaurant._id || restaurant.id
+    if (!restaurantId) return
+    const digitsOnly = String(rawValue || "").replace(/[^\d]/g, "")
+    const parsedValue = digitsOnly === "" ? null : Number(digitsOnly)
+    const nextValue = Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : null
+    setRestaurants((prev) =>
+      prev.map((item) =>
+        item._id === restaurantId || item.id === restaurantId
+          ? { ...item, listingOrder: Number.isFinite(nextValue) ? nextValue : null }
+          : item,
+      ),
+    )
+  }
+
+  const hasDuplicateListingOrders = (list) => {
+    const seen = new Set()
+    for (const item of list) {
+      const raw = item?.listingOrder
+      if (raw === null || raw === undefined || raw === "") continue
+      const value = Number(raw)
+      if (!Number.isFinite(value) || value <= 0) continue
+      const key = String(Math.floor(value))
+      if (seen.has(key)) return true
+      seen.add(key)
+    }
+    return false
+  }
+
+  const dirtyListingOrderCount = useMemo(() => {
+    return restaurants.reduce((count, restaurant) => {
+      const key = getRestaurantKey(restaurant)
+      if (!key) return count
+      const current = Number.isFinite(Number(restaurant.listingOrder)) && Number(restaurant.listingOrder) > 0 ? Math.floor(Number(restaurant.listingOrder)) : null
+      const initial = Number.isFinite(Number(initialListingOrderById[key])) && Number(initialListingOrderById[key]) > 0 ? Math.floor(Number(initialListingOrderById[key])) : null
+      return current !== initial ? count + 1 : count
+    }, 0)
+  }, [restaurants, initialListingOrderById])
+
+  const handleSaveAllListingOrders = async () => {
+    if (dirtyListingOrderCount === 0) {
+      toast.info("No numbering changes to save")
+      return
+    }
+    const invalid = restaurants.find((item) => {
+      const value = item?.listingOrder
+      if (value === null || value === undefined || value === "") return false
+      const numeric = Number(value)
+      return !Number.isFinite(numeric) || numeric < 0
+    })
+    if (invalid) {
+      toast.error("Numbering must be 0 or more")
+      return
+    }
+    if (hasDuplicateListingOrders(restaurants)) {
+      toast.error("Duplicate numbering is not allowed")
+      return
+    }
+
+    const changedRows = restaurants.filter((restaurant) => {
+      const key = getRestaurantKey(restaurant)
+      if (!key) return false
+      const current = Number.isFinite(Number(restaurant.listingOrder)) && Number(restaurant.listingOrder) > 0 ? Math.floor(Number(restaurant.listingOrder)) : null
+      const initial = Number.isFinite(Number(initialListingOrderById[key])) && Number(initialListingOrderById[key]) > 0 ? Math.floor(Number(initialListingOrderById[key])) : null
+      return current !== initial
+    })
+
+    try {
+      setSavingAllListingOrders(true)
+      const results = await Promise.all(
+        changedRows.map(async (restaurant) => {
+          const restaurantId = restaurant._id || restaurant.id
+          const orderValue = Number.isFinite(Number(restaurant.listingOrder)) && Number(restaurant.listingOrder) > 0
+            ? Math.floor(Number(restaurant.listingOrder))
+            : null
+          const response = await adminAPI.updateRestaurant(restaurantId, { listingOrder: orderValue })
+          return {
+            restaurantId: String(restaurantId),
+            updated: response?.data?.data?.restaurant || null,
+            listingOrder: orderValue,
+          }
+        }),
+      )
+
+      const updatedMap = results.reduce((acc, row) => {
+        acc[row.restaurantId] = {
+          updated: row.updated,
+          listingOrder: row.listingOrder,
+        }
+        return acc
+      }, {})
+
+      setRestaurants((prev) =>
+        prev.map((item) => {
+          const key = String(item._id || item.id || "")
+          const hit = updatedMap[key]
+          if (!hit) return item
+          return {
+            ...item,
+            listingOrder: hit.listingOrder,
+            originalData: {
+              ...(item.originalData || {}),
+              ...(hit.updated || {}),
+              listingOrder: hit.listingOrder,
+            },
+          }
+        }),
+      )
+
+      setInitialListingOrderById((prev) => {
+        const next = { ...prev }
+        results.forEach((row) => {
+          next[row.restaurantId] = row.listingOrder
+        })
+        return next
+      })
+      toast.success("Numbering saved successfully")
+    } catch (err) {
+      debugError("Error saving numbering:", err)
+      toast.error(err?.response?.data?.message || "Failed to save numbering")
+    } finally {
+      setSavingAllListingOrders(false)
+    }
+  }
+
   // Handle export functionality
   const handleExport = () => {
     const dataToExport = filteredRestaurants.length > 0 ? filteredRestaurants : restaurants
@@ -1166,6 +1327,14 @@ export default function RestaurantsList() {
             <h2 className="text-xl font-bold text-slate-900">Restaurants List</h2>
 
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSaveAllListingOrders}
+                disabled={savingAllListingOrders || dirtyListingOrderCount === 0}
+                className="px-4 py-2.5 text-sm font-medium rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {savingAllListingOrders ? "Saving..." : `Save Numbering${dirtyListingOrderCount > 0 ? ` (${dirtyListingOrderCount})` : ""}`}
+              </button>
               <button
                 onClick={() => navigate("/admin/food/restaurants/add")}
                 className="px-4 py-2.5 text-sm font-medium rounded-lg bg-brand-600 hover:bg-brand-700 text-white flex items-center gap-2 transition-all"
@@ -1257,6 +1426,11 @@ export default function RestaurantsList() {
                         <span>isRestaurant</span>
                       </div>
                     </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                      <div className="flex items-center gap-1">
+                        <span>Numbering</span>
+                      </div>
+                    </th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
@@ -1264,7 +1438,7 @@ export default function RestaurantsList() {
                 <tbody className="bg-white divide-y divide-slate-100">
                   {filteredRestaurants.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-20 text-center">
+                      <td colSpan={8} className="px-6 py-20 text-center">
                         <div className="flex flex-col items-center justify-center">
                           <p className="text-lg font-semibold text-slate-700 mb-1">No Data Found</p>
                           <p className="text-sm text-slate-500">No restaurants match your search</p>
@@ -1352,6 +1526,23 @@ export default function RestaurantsList() {
                               }`} />
                             </span>
                           </button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={Number.isFinite(Number(restaurant.listingOrder)) && Number(restaurant.listingOrder) > 0 ? Number(restaurant.listingOrder) : ""}
+                              onChange={(e) => handleListingOrderChange(restaurant, e.target.value)}
+                              onBlur={() => {
+                                if (hasDuplicateListingOrders(restaurants)) {
+                                  toast.error("Duplicate numbering is not allowed")
+                                }
+                              }}
+                              className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-2">

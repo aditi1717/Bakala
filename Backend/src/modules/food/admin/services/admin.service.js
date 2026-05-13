@@ -539,11 +539,26 @@ export async function getRestaurants(query, adminScope = {}) {
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
-            .select('restaurantName location area city profileImage coverImages menuImages status ownerName ownerPhone isRestaurant')
+            .select('restaurantName location area city profileImage coverImages menuImages status ownerName ownerPhone isRestaurant isAcceptingOrders listingOrder createdAt')
             .lean(),
         FoodRestaurant.countDocuments(filter)
     ]);
-    return { restaurants, total, page, limit };
+    const sortedRestaurants = [...restaurants].sort((a, b) => {
+        const aClosed = a?.isAcceptingOrders === false ? 1 : 0;
+        const bClosed = b?.isAcceptingOrders === false ? 1 : 0;
+        if (aClosed !== bClosed) return aClosed - bClosed;
+
+        const aHasOrder = Number.isFinite(Number(a?.listingOrder)) && Number(a.listingOrder) > 0 ? 1 : 0;
+        const bHasOrder = Number.isFinite(Number(b?.listingOrder)) && Number(b.listingOrder) > 0 ? 1 : 0;
+        if (aHasOrder !== bHasOrder) return bHasOrder - aHasOrder;
+        if (aHasOrder === 1 && bHasOrder === 1) {
+            const aOrder = Math.floor(Number(a.listingOrder));
+            const bOrder = Math.floor(Number(b.listingOrder));
+            if (aOrder !== bOrder) return aOrder - bOrder;
+        }
+        return new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime();
+    });
+    return { restaurants: sortedRestaurants, total, page, limit };
 }
 
 const CANCELLED_ORDER_STATUSES = ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'cancelled_by_user_unavailable'];
@@ -2978,6 +2993,17 @@ export async function updateRestaurantById(id, body = {}, adminScope = {}) {
     // Featured Info
     if (body.featuredDish !== undefined) doc.featuredDish = toStr(body.featuredDish);
     if (body.featuredPrice !== undefined) doc.featuredPrice = toFinite(body.featuredPrice);
+    if (body.listingOrder !== undefined) {
+        if (body.listingOrder === null || body.listingOrder === '') {
+            doc.listingOrder = null;
+        } else {
+            const listingOrder = Number(body.listingOrder);
+            if (!Number.isFinite(listingOrder) || listingOrder < 0) {
+                throw new ValidationError('listingOrder must be a non-negative number');
+            }
+            doc.listingOrder = Math.floor(listingOrder);
+        }
+    }
 
     // Images
     const getUrl = (v) => (v && typeof v === 'object' ? v.url : v);

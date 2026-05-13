@@ -12,6 +12,7 @@ import { useProfile } from "@food/context/ProfileContext"
 import { restaurantAPI } from "@food/api"
 import { API_BASE_URL } from "@food/api/config"
 import { useDelayedLoading } from "@food/hooks/useDelayedLoading"
+import { sortRestaurantsByAvailability } from "@food/utils/sortRestaurantsByAvailability"
 
 const BACKEND_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "")
 
@@ -70,11 +71,13 @@ export default function Restaurants() {
             ? restaurant.cuisines[0]
             : "Multi-cuisine"
           return {
+            ...restaurant,
             id: restaurant?._id || restaurant?.restaurantId || slug,
             slug,
             name: restaurant?.name || "Unknown Restaurant",
             cuisine,
             rating: Number(restaurant?.rating || 0) || 4.5,
+            listingOrder: restaurant?.listingOrder ?? null,
             deliveryTime: restaurant?.estimatedDeliveryTime || (restaurant?.estimatedDeliveryTimeMinutes ? `${restaurant.estimatedDeliveryTimeMinutes} mins` : "25-30 mins"),
             distance: restaurant?.distance ? (typeof restaurant.distance === 'number' ? `${restaurant.distance.toFixed(1)} km` : restaurant.distance) : "1.2 km",
             priceRange: restaurant?.priceRange || "$$",
@@ -82,7 +85,7 @@ export default function Restaurants() {
           }
         })
 
-        setRestaurants(transformed)
+        setRestaurants(sortRestaurantsByAvailability(transformed))
       } catch (error) {
         if (!cancelled) {
           setRestaurants([])
