@@ -157,7 +157,6 @@ export default function Under250() {
     { id: null, label: 'Relevance' },
     { id: 'rating-high', label: 'Rating: High to Low' },
     { id: 'delivery-time-low', label: 'Estimated Time: Low to High' },
-    { id: 'distance-low', label: 'Distance: Low to High' },
   ]
 
   const handleClearAll = () => {
@@ -228,20 +227,6 @@ export default function Under250() {
     return 999
   }
 
-  // Helper function to parse distance (e.g., "0.4 km" -> 0.4)
-  const parseDistance = (distance) => {
-    if (typeof distance === "number" && Number.isFinite(distance)) return distance
-    if (!distance) return 999 // Default high value for sorting
-    const value = String(distance)
-    const match = value.match(/(\d+\.?\d*)/)
-    if (match) {
-      const numericValue = parseFloat(match[1])
-      return value.toLowerCase().includes("m") && !value.toLowerCase().includes("km")
-        ? numericValue / 1000
-        : numericValue
-    }
-    return 999
-  }
 
   // Sort and filter restaurants based on selected sort and filters
   const sortedAndFilteredRestaurants = useMemo(() => {
@@ -307,18 +292,6 @@ export default function Under250() {
         const timeB = parseDeliveryTime(b.deliveryTime)
         if (timeA !== timeB) {
           return timeA - timeB
-        }
-        if ((b.rating || 0) !== (a.rating || 0)) {
-          return (b.rating || 0) - (a.rating || 0)
-        }
-        return (a.originalIndex || 0) - (b.originalIndex || 0)
-      })
-    } else if (selectedSort === 'distance-low') {
-      filtered.sort((a, b) => {
-        const distA = Number.isFinite(a.distanceInKm) ? a.distanceInKm : parseDistance(a.distance)
-        const distB = Number.isFinite(b.distanceInKm) ? b.distanceInKm : parseDistance(b.distance)
-        if (distA !== distB) {
-          return distA - distB
         }
         if ((b.rating || 0) !== (a.rating || 0)) {
           return (b.rating || 0) - (a.rating || 0)

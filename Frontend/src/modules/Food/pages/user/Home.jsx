@@ -735,6 +735,7 @@ export default function Home() {
           </>
         )}
       </AnimatePresence>
+      <OrderTrackingCard />
     </div>
   );
 }

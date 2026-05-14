@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@food/components/ui/select"
-import { supportAPI } from "@food/api"
+import { supportAPI, orderAPI } from "@food/api"
 import BRAND_THEME from "@/config/brandTheme"
 
 const COMPLAINT_TYPE_OPTIONS = [
@@ -54,6 +54,7 @@ export default function SubmitComplaint() {
   const routeOrderId = String(orderId || "").trim()
   const [form, setForm] = useState({ subject: "", description: "", orderId: routeOrderId })
   const [existingTicket, setExistingTicket] = useState(null)
+  const [orderDetails, setOrderDetails] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
@@ -65,7 +66,7 @@ export default function SubmitComplaint() {
   useEffect(() => {
     let isMounted = true
 
-    const loadExistingTicket = async () => {
+    const loadData = async () => {
       if (!routeOrderId) {
         setLoading(false)
         return
@@ -73,6 +74,19 @@ export default function SubmitComplaint() {
 
       try {
         setLoading(true)
+        
+        // 1. Fetch Order Details to get displayOrderId
+        try {
+          const orderRes = await orderAPI.getOrderDetails(routeOrderId)
+          const orderData = orderRes?.data?.data?.order || orderRes?.data?.order || orderRes?.data?.data
+          if (isMounted && orderData) {
+            setOrderDetails(orderData)
+          }
+        } catch (orderErr) {
+          console.error("Failed to fetch order details:", orderErr)
+        }
+
+        // 2. Fetch Existing Tickets
         const response = await supportAPI.getMyTickets({ limit: 50, page: 1 })
         const tickets = response?.data?.data?.tickets || response?.data?.tickets || []
         const found = tickets.find((ticket) => {
@@ -97,7 +111,7 @@ export default function SubmitComplaint() {
       }
     }
 
-    loadExistingTicket()
+    loadData()
     return () => {
       isMounted = false
     }
@@ -106,7 +120,7 @@ export default function SubmitComplaint() {
   const isReadOnly = Boolean(existingTicket)
   const displayOrderId = existingTicket
     ? getTicketDisplayOrderId(existingTicket, routeOrderId)
-    : getShortOrderId(routeOrderId)
+    : orderDetails?.orderId || getShortOrderId(routeOrderId)
   const isValid = useMemo(() => {
     const hasValidType = COMPLAINT_TYPE_OPTIONS.some((option) => option.value === form.subject)
     return routeOrderId && hasValidType && form.description.trim().length >= 10
