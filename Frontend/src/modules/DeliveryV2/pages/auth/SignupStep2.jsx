@@ -371,7 +371,6 @@ export default function SignupStep2() {
     }
 
     try {
-      await saveDeliveryDocFile(getDeliveryDocStorageKey(docType), file)
       const dataUrl = await fileToDataUrl(file)
       setDocuments((prev) => ({ ...prev, [docType]: file }))
       setUploadedDocs((prev) => ({
@@ -384,6 +383,9 @@ export default function SignupStep2() {
           size: file.size
         }
       }))
+      saveDeliveryDocFile(getDeliveryDocStorageKey(docType), file).catch((error) => {
+        debugWarn("Failed to cache delivery doc in IndexedDB:", docType, error)
+      })
       toast.success(`${docType.replace(/([A-Z])/g, " $1").trim()} selected`)
     } catch (err) {
       debugError("Failed to process selected file:", err)
@@ -475,14 +477,18 @@ export default function SignupStep2() {
     // Push registration is delayed until admin approval + online status.
     // This avoids starting the native delivery service notification during onboarding.
 
-    const isCompleteProfile = sessionStorage.getItem("deliveryNeedsRegistration") === "true"
+    const explicitNeedsRegistration = sessionStorage.getItem("deliveryNeedsRegistration") === "true"
+    const hasDeliveryToken =
+      typeof window !== "undefined" &&
+      Boolean(localStorage.getItem("delivery_accessToken"))
+    const shouldRegister = explicitNeedsRegistration || !hasDeliveryToken
 
     setIsSubmitting(true)
 
     try {
       // New number (OTP ke baad pehli baar): DB me abhi partner nahi hai,
       // is case me register hi call karna hai (no auth token needed).
-      const response = isCompleteProfile
+      const response = shouldRegister
         ? await deliveryAPI.register(formData)
         : await deliveryAPI.completeProfile(formData)
 
@@ -492,7 +498,7 @@ export default function SignupStep2() {
         clearDeliveryDocFiles().catch((error) => {
           debugWarn("Failed to clear delivery signup docs from IndexedDB:", error)
         })
-        if (isCompleteProfile) {
+        if (shouldRegister) {
           sessionStorage.removeItem("deliveryNeedsRegistration")
           toast.success("Registration successful. Please login with OTP.")
           setTimeout(() => navigate("/food/delivery/login", { replace: true }), 1500)
