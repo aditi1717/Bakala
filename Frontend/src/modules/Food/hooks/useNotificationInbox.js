@@ -9,7 +9,7 @@ const normalizeInboxItems = (rows = []) =>
     message: String(item?.message || "").trim(),
     link: String(item?.link || "").trim(),
     read: Boolean(item?.isRead),
-    createdAt: item?.createdAt || item?.updatedAt || new Date().toISOString(),
+    createdAt: item?.updatedAt || item?.createdAt || new Date().toISOString(),
     category: String(item?.category || "broadcast"),
     metadata: item?.metadata && typeof item.metadata === "object" ? item.metadata : {},
   }));

@@ -5,6 +5,9 @@ import mongoose from 'mongoose';
 import { FoodOffer } from '../../admin/models/offer.model.js';
 import { FoodOfferUsage } from '../../admin/models/offerUsage.model.js';
 import { FoodItem } from '../../admin/models/food.model.js';
+import { FoodCategory } from '../../admin/models/category.model.js';
+import { getFoodDisplayPrice, serializeFoodVariants } from '../../admin/services/foodVariant.service.js';
+import { isCategoryVisibleNow } from '../../shared/categoryWorkflow.js';
 import { FoodRestaurantOutletTimings } from '../models/outletTimings.model.js';
 
 const normalizeName = (value) =>
@@ -1312,6 +1315,174 @@ export const listApprovedRestaurants = async (query = {}) => {
 
     const restaurantsWithTimings = await attachOutletTimingsToRestaurants(restaurants);
     return { restaurants: restaurantsWithTimings, total, page, limit };
+};
+
+export const listRestaurantsUnderPrice = async (query = {}) => {
+    const rawPrice = Number(query.maxPrice ?? query.priceLimit ?? 250);
+    const maxPrice = Number.isFinite(rawPrice) && rawPrice > 0 ? Math.min(rawPrice, 5000) : 250;
+    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 120, 1), 300);
+    const foodMatch = {
+        restaurantId: { $exists: true, $ne: null },
+        price: { $lte: maxPrice },
+        isAvailable: { $ne: false },
+        $or: [
+            { approvalStatus: 'approved' },
+            { approvalStatus: { $exists: false }, isApproved: { $ne: false } }
+        ]
+    };
+
+    const restaurantCandidates = await FoodItem.aggregate([
+        { $match: foodMatch },
+        {
+            $group: {
+                _id: '$restaurantId',
+                latestFoodAt: { $max: '$createdAt' }
+            }
+        },
+        { $sort: { latestFoodAt: -1 } },
+        { $limit: limit * 3 }
+    ]);
+
+    const candidateRestaurantIds = restaurantCandidates
+        .map((item) => item?._id)
+        .filter(Boolean);
+
+    if (!candidateRestaurantIds.length) {
+        return { restaurants: [], total: 0, maxPrice };
+    }
+
+    const projection = 'restaurantName area city cuisines profileImage coverImages menuImages estimatedDeliveryTime estimatedDeliveryTimeMinutes rating totalRatings listingOrder isAcceptingOrders status availability isOnline pureVegRestaurant isRestaurant createdAt location openingTime closingTime openDays';
+    const restaurantsRaw = await FoodRestaurant.find({
+        _id: { $in: candidateRestaurantIds },
+        status: 'approved'
+    })
+        .select(projection)
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+
+    if (!restaurantsRaw.length) {
+        return { restaurants: [], total: 0, maxPrice };
+    }
+
+    const approvedRestaurantIds = restaurantsRaw.map((restaurant) => restaurant._id);
+    const foods = await FoodItem.find({
+        ...foodMatch,
+        restaurantId: { $in: approvedRestaurantIds }
+    })
+        .select('restaurantId categoryId categoryName name description price variants image foodType isAvailable approvalStatus preparationTime availabilityTimeStart availabilityTimeEnd createdAt updatedAt')
+        .sort({ createdAt: -1 })
+        .lean();
+
+    if (!foods.length) {
+        return { restaurants: [], total: 0, maxPrice };
+    }
+
+    const categoryIds = Array.from(
+        new Set(
+            foods
+                .map((food) => (food?.categoryId ? String(food.categoryId) : ''))
+                .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        )
+    );
+    const categoryDocs = categoryIds.length
+        ? await FoodCategory.find({ _id: { $in: categoryIds } })
+            .select('name image foodTypeScope approvalStatus isApproved isActive status sortOrder visibilityStartTime visibilityEndTime')
+            .lean()
+        : [];
+    const categoryMap = new Map(categoryDocs.map((category) => [String(category._id), category]));
+
+    const foodsByRestaurantId = new Map();
+    for (const food of foods) {
+        const categoryId = food?.categoryId ? String(food.categoryId) : '';
+        const category = categoryId ? categoryMap.get(categoryId) : null;
+        if (categoryId) {
+            const categoryStatus = String(category?.approvalStatus || '').toLowerCase();
+            if (!category || category?.isActive === false || category?.status === false) continue;
+            if (categoryStatus === 'rejected' || categoryStatus === 'inactive' || categoryStatus === 'disabled') continue;
+            if (!isCategoryVisibleNow(category, { timezone: 'Asia/Kolkata' })) continue;
+        }
+
+        const restaurantId = String(food.restaurantId || '');
+        if (!restaurantId) continue;
+        const categoryName = String(category?.name || food?.categoryName || 'Menu').trim() || 'Menu';
+        const serialized = {
+            id: String(food._id),
+            _id: food._id,
+            categoryId: categoryId || null,
+            categoryName,
+            category: categoryName,
+            sectionName: categoryName,
+            name: food.name,
+            description: food.description || '',
+            price: getFoodDisplayPrice(food),
+            variants: serializeFoodVariants(food.variants),
+            variations: serializeFoodVariants(food.variants),
+            image: food.image || '',
+            foodType: food.foodType || 'Non-Veg',
+            isVeg: String(food.foodType || '').toLowerCase() === 'veg',
+            isAvailable: food.isAvailable !== false,
+            approvalStatus: food.approvalStatus || 'approved',
+            preparationTime: food.preparationTime || '',
+            availabilityTimeStart: food.availabilityTimeStart || '',
+            availabilityTimeEnd: food.availabilityTimeEnd || '',
+            categoryStatus: category?.approvalStatus || 'approved',
+            categoryApprovalStatus: category?.approvalStatus || 'approved',
+            isCategoryActive: category ? category.isActive !== false : true,
+            categoryIsActive: category ? category.isActive !== false : true,
+            categoryDetails: category
+                ? {
+                    _id: category._id,
+                    id: category._id,
+                    name: category.name,
+                    image: category.image || '',
+                    foodTypeScope: category.foodTypeScope || 'Both',
+                    approvalStatus: category.approvalStatus || 'approved',
+                    isActive: category.isActive !== false,
+                    status: category.isActive !== false
+                }
+                : null,
+            createdAt: food.createdAt,
+            updatedAt: food.updatedAt
+        };
+
+        if (Number(serialized.price || 0) > maxPrice) continue;
+        if (!foodsByRestaurantId.has(restaurantId)) foodsByRestaurantId.set(restaurantId, []);
+        foodsByRestaurantId.get(restaurantId).push(serialized);
+    }
+
+    const restaurants = restaurantsRaw
+        .map((restaurant, index) => {
+            const restaurantId = String(restaurant._id);
+            const menuItems = foodsByRestaurantId.get(restaurantId) || [];
+            if (!menuItems.length) return null;
+
+            return {
+                ...restaurant,
+                restaurantId: restaurant._id,
+                id: restaurant._id,
+                name: restaurant.restaurantName || '',
+                slug: normalizeName(restaurant.restaurantName || '').replace(/\s+/g, '-'),
+                rating: normalizeRatingValue(restaurant.rating),
+                totalRatings: normalizeTotalRatingsValue(restaurant.totalRatings),
+                listingOrder: Number.isFinite(Number(restaurant.listingOrder)) && Number(restaurant.listingOrder) > 0
+                    ? Number(restaurant.listingOrder)
+                    : null,
+                isRestaurant: restaurant.isRestaurant !== false,
+                profileImage: restaurant.profileImage ? { url: restaurant.profileImage } : null,
+                coverImages: Array.isArray(restaurant.coverImages) ? restaurant.coverImages : [],
+                menuImages: Array.isArray(restaurant.menuImages) ? restaurant.menuImages : [],
+                openingTime: restaurant.openingTime || null,
+                closingTime: restaurant.closingTime || null,
+                openDays: Array.isArray(restaurant.openDays) ? restaurant.openDays : [],
+                originalIndex: index,
+                menuItems
+            };
+        })
+        .filter(Boolean);
+
+    const restaurantsWithTimings = await attachOutletTimingsToRestaurants(restaurants);
+    return { restaurants: restaurantsWithTimings, total: restaurantsWithTimings.length, maxPrice };
 };
 
 export const getApprovedRestaurantByIdOrSlug = async (idOrSlug) => {

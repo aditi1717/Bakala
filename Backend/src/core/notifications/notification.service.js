@@ -87,7 +87,7 @@ export const createInboxNotifications = async ({ notifications = [] } = {}) => {
                     source: payload.source
                 };
         const readStateUpdate = isSupportTicketNotification
-            ? { isRead: false, readAt: null }
+            ? { isRead: false, readAt: null, dismissedAt: null }
             : {};
         const insertReadState = isSupportTicketNotification
             ? {}
@@ -139,7 +139,7 @@ export const getInboxNotifications = async ({ ownerType, ownerId, page = 1, limi
 
     const [items, total, unreadCount] = await Promise.all([
         FoodNotification.find(filter)
-            .sort({ createdAt: -1 })
+            .sort({ updatedAt: -1, createdAt: -1 })
             .skip(skip)
             .limit(meta.limit)
             .lean(),

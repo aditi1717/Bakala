@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
+import { toast } from 'sonner';
 import { API_BASE_URL } from '@food/api/config';
 import { restaurantAPI } from '@food/api';
 import alertSound from '@food/assets/audio/alert.mp3';
@@ -10,7 +11,6 @@ const debugError = (...args) => {}
 
 const storeRestaurantAdminNotification = (payload = {}) => {
   if (typeof window === 'undefined') return;
-  if (payload?.type === 'support_ticket_update' || payload?.ticketId) return;
   const id = `admin-${payload?.ticketId || Date.now()}`;
   const item = {
     id,
@@ -965,6 +965,10 @@ export const useRestaurantNotifications = () => {
 
     socketRef.current.on('admin_notification', (payload) => {
       debugLog('?? Admin broadcast received:', payload);
+      toast.message(payload?.title || 'Notification', {
+        description: payload?.message || 'New notification received.',
+        duration: 8000,
+      });
       storeRestaurantAdminNotification(payload);
       dispatchNotificationInboxRefresh();
     });

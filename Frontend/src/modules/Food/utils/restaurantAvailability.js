@@ -268,9 +268,12 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
   const previousDayName = getPreviousDayName(dayName)
   const previousDayTiming = previousDayName ? getTodayTiming(restaurant, previousDayName) : null
 
+  const todayTimingEntries = Array.isArray(todayTiming) ? todayTiming : [todayTiming].filter(Boolean)
+  const hasTodayTiming = todayTimingEntries.length > 0
+
   // Legacy openDays can get stale; enforce only when no explicit outlet timing exists for today.
   const openDays = Array.isArray(restaurant.openDays) ? restaurant.openDays : []
-  if (!todayTiming && openDays.length > 0) {
+  if (!hasTodayTiming && openDays.length > 0) {
     const normalizedOpenDays = new Set(openDays.map((day) => normalizeDay(day)).filter(Boolean))
     if (normalizedOpenDays.size > 0 && !normalizedOpenDays.has(dayName)) {
       const display = getDisplayStatus({ isOpen: false, reason: "closed-day" })
@@ -287,7 +290,8 @@ export const getRestaurantAvailabilityStatus = (restaurant, now = new Date(), op
     }
   }
 
-  if (todayTiming?.isOpen === false) {
+  const isTodayMarkedClosed = hasTodayTiming && todayTimingEntries.every((entry) => entry?.isOpen === false)
+  if (isTodayMarkedClosed) {
     const prevSlots = extractDaySlots(previousDayTiming)
     const nowMinutes = now.getHours() * 60 + now.getMinutes()
     const activeFromPreviousDay = prevSlots.find((slot) =>

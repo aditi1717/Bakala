@@ -3,6 +3,7 @@ import { FoodItem } from '../../admin/models/food.model.js';
 import { FoodCategory } from '../../admin/models/category.model.js';
 import mongoose from 'mongoose';
 import { isCategoryVisibleNow } from '../../shared/categoryWorkflow.js';
+import { FoodRestaurantOutletTimings } from '../../restaurant/models/outletTimings.model.js';
 
 const parse12HourTimeToMinutes = (value) => {
     const text = String(value || '').trim();
@@ -99,6 +100,34 @@ const getMatchedFoodLabel = (food, regex, fallbackTerm = '') => {
 };
 
 const isVegFood = (food = {}) => String(food?.foodType || '').trim().toLowerCase() === 'veg';
+
+const attachOutletTimingsToRestaurants = async (restaurants = []) => {
+    if (!Array.isArray(restaurants) || restaurants.length === 0) return restaurants;
+
+    const restaurantIds = restaurants
+        .map((restaurant) => String(restaurant?._id || restaurant?.id || restaurant?.restaurantId || ''))
+        .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+    if (!restaurantIds.length) return restaurants;
+
+    const timingDocs = await FoodRestaurantOutletTimings.find({
+        restaurantId: { $in: restaurantIds.map((id) => new mongoose.Types.ObjectId(id)) }
+    })
+        .select('restaurantId timings')
+        .lean();
+
+    const timingMap = new Map(
+        timingDocs.map((doc) => [String(doc.restaurantId), { timings: Array.isArray(doc.timings) ? doc.timings : [] }])
+    );
+
+    return restaurants.map((restaurant) => {
+        const restaurantId = String(restaurant?._id || restaurant?.id || restaurant?.restaurantId || '');
+        return {
+            ...restaurant,
+            outletTimings: timingMap.get(restaurantId) || restaurant.outletTimings || null
+        };
+    });
+};
 
 /**
  * Unified Search Service
@@ -288,7 +317,7 @@ export const searchUnified = async (query = {}, options = {}) => {
     }
 
     // 4. Final Result Formatting
-    let results = Array.from(restaurantDetailsMap.values());
+    let results = await attachOutletTimingsToRestaurants(Array.from(restaurantDetailsMap.values()));
 
     // Simple distance sorting if lat/lng are provided
     if (lat && lng && results.length > 0) {

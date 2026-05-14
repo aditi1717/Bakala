@@ -1,6 +1,7 @@
 import {
     registerRestaurant,
     listApprovedRestaurants,
+    listRestaurantsUnderPrice,
     getApprovedRestaurantByIdOrSlug,
     getCurrentRestaurantProfile,
     updateRestaurantProfile,
@@ -29,6 +30,15 @@ export const listApprovedRestaurantsController = async (req, res, next) => {
     try {
         const data = await listApprovedRestaurants(req.query);
         return sendResponse(res, 200, 'Restaurants fetched successfully', data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const listRestaurantsUnderPriceController = async (req, res, next) => {
+    try {
+        const data = await listRestaurantsUnderPrice(req.query || {});
+        return sendResponse(res, 200, 'Restaurants under price fetched successfully', data);
     } catch (error) {
         next(error);
     }

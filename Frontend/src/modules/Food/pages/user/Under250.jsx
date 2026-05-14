@@ -17,7 +17,6 @@ import FoodHeroHeaderShell from "@food/components/user/home/FoodHeroHeaderShell"
 import api from "@food/api"
 import { restaurantAPI, adminAPI } from "@food/api"
 import { isModuleAuthenticated } from "@food/utils/auth"
-import { flattenMenuItems, getMenuFromResponse } from "@food/utils/menuItems"
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
 import {
   buildCartLineId,
@@ -37,6 +36,9 @@ const RUPEE_SYMBOL = "\u20B9"
 const DEFAULT_UNDER_PRICE_LIMIT = 250
 const UNDER_250_FILTERS_STORAGE_KEY = "food-under-250-filters"
 const HOME_VEG_MODE_OPTION_KEY = "food-home-veg-mode-option"
+const INITIAL_RESTAURANT_RENDER_COUNT = 4
+const RESTAURANT_RENDER_BATCH_SIZE = 3
+const RESTAURANT_RENDER_BATCH_DELAY_MS = 140
 const isTruthyFlag = (value) => value === true || value === "true" || value === 1 || value === "1"
 const isVegMenuItem = (item = {}) => {
   if (item?.isVeg === true) return true
@@ -219,6 +221,30 @@ export default function Under250() {
 
     return sortRestaurantsByAvailability(filtered, new Date(availabilityTick))
   }, [under250Restaurants, activeCategory, categories, vegMode, vegModeOption, availabilityTick])
+  const [visibleRestaurantCount, setVisibleRestaurantCount] = useState(INITIAL_RESTAURANT_RENDER_COUNT)
+  const displayedRestaurants = useMemo(
+    () => sortedAndFilteredRestaurants.slice(0, visibleRestaurantCount),
+    [sortedAndFilteredRestaurants, visibleRestaurantCount],
+  )
+
+  useEffect(() => {
+    setVisibleRestaurantCount(
+      Math.min(INITIAL_RESTAURANT_RENDER_COUNT, Math.max(sortedAndFilteredRestaurants.length, 0)),
+    )
+  }, [sortedAndFilteredRestaurants])
+
+  useEffect(() => {
+    if (loadingRestaurants) return undefined
+    if (visibleRestaurantCount >= sortedAndFilteredRestaurants.length) return undefined
+
+    const timeoutId = window.setTimeout(() => {
+      setVisibleRestaurantCount((count) =>
+        Math.min(count + RESTAURANT_RENDER_BATCH_SIZE, sortedAndFilteredRestaurants.length),
+      )
+    }, RESTAURANT_RENDER_BATCH_DELAY_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [loadingRestaurants, sortedAndFilteredRestaurants.length, visibleRestaurantCount])
 
   const visibleCategories = useMemo(() => {
     if (!vegMode) return categories
@@ -368,99 +394,89 @@ export default function Under250() {
     const fetchRestaurantsUnder250 = async () => {
       try {
         setLoadingRestaurants(true)
-        const response = await restaurantAPI.getRestaurants({})
+        const response = await restaurantAPI.getRestaurantsUnderPrice({ maxPrice, limit: 120 })
         const restaurantsRaw = Array.isArray(response?.data?.data?.restaurants)
           ? response.data.data.restaurants
           : []
         const userLat = Number(location?.latitude)
         const userLng = Number(location?.longitude)
 
-        const restaurantsWithUnder250Dishes = await Promise.all(
-          restaurantsRaw.map(async (restaurant, index) => {
-            const restaurantId = restaurant?.restaurantId || restaurant?._id
-            if (!restaurantId) return null
+        const restaurantsWithUnder250Dishes = restaurantsRaw.map((restaurant, index) => {
+          const restaurantId = restaurant?.restaurantId || restaurant?._id || restaurant?.id
+          if (!restaurantId) return null
 
-            try {
-              const menuResponse = await restaurantAPI.getMenuByRestaurantId(restaurantId)
-              const menu = getMenuFromResponse(menuResponse)
-              const menuItems = flattenMenuItems(menu)
-                .filter((item) =>
-                  Number(item?.price || 0) <= maxPrice &&
-                  item?.isAvailable !== false &&
-                  String(item?.approvalStatus || "approved").toLowerCase() !== "rejected" &&
-                  isCategoryActiveForItem(item)
-                )
-                .map((item) => {
-                  return {
-                    ...item,
-                    id: String(item?.id || item?._id || `${restaurantId}-${item?.name || "dish"}`),
-                    price: Number(item?.price || 0),
-                    isVeg: isVegMenuItem(item),
-                    image:
-                      item?.image ||
-                      restaurant?.coverImages?.[0]?.url ||
-                      restaurant?.coverImages?.[0] ||
-                      restaurant?.menuImages?.[0]?.url ||
-                      restaurant?.menuImages?.[0] ||
-                      restaurant?.profileImage?.url ||
-                      "",
-                  }
-                })
+          const menuItems = (Array.isArray(restaurant?.menuItems) ? restaurant.menuItems : [])
+            .filter((item) =>
+              Number(item?.price || 0) <= maxPrice &&
+              item?.isAvailable !== false &&
+              String(item?.approvalStatus || "approved").toLowerCase() !== "rejected" &&
+              isCategoryActiveForItem(item)
+            )
+            .map((item) => ({
+              ...item,
+              id: String(item?.id || item?._id || `${restaurantId}-${item?.name || "dish"}`),
+              price: Number(item?.price || 0),
+              isVeg: isVegMenuItem(item),
+              image:
+                item?.image ||
+                restaurant?.coverImages?.[0]?.url ||
+                restaurant?.coverImages?.[0] ||
+                restaurant?.menuImages?.[0]?.url ||
+                restaurant?.menuImages?.[0] ||
+                restaurant?.profileImage?.url ||
+                "",
+            }))
 
-              if (menuItems.length === 0) return null
+          if (menuItems.length === 0) return null
 
-              const deliveryMinutes =
-                Number(restaurant?.estimatedDeliveryTimeMinutes) ||
-                Number(restaurant?.estimatedDeliveryTime) ||
-                null
-              const restaurantLocation = restaurant?.location
-              const restaurantLat = Number(
-                restaurantLocation?.latitude ??
-                (Array.isArray(restaurantLocation?.coordinates) ? restaurantLocation.coordinates[1] : null)
-              )
-              const restaurantLng = Number(
-                restaurantLocation?.longitude ??
-                (Array.isArray(restaurantLocation?.coordinates) ? restaurantLocation.coordinates[0] : null)
-              )
-              const distanceInKm = (
-                Number.isFinite(userLat) &&
-                Number.isFinite(userLng) &&
-                Number.isFinite(restaurantLat) &&
-                Number.isFinite(restaurantLng)
-              )
-                ? calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
-                : null
-              const fallbackDistance =
-                typeof restaurant?.distance === "number"
-                  ? formatDistance(restaurant.distance)
-                  : (restaurant?.distance || "")
+          const deliveryMinutes =
+            Number(restaurant?.estimatedDeliveryTimeMinutes) ||
+            Number(restaurant?.estimatedDeliveryTime) ||
+            null
+          const restaurantLocation = restaurant?.location
+          const restaurantLat = Number(
+            restaurantLocation?.latitude ??
+            (Array.isArray(restaurantLocation?.coordinates) ? restaurantLocation.coordinates[1] : null)
+          )
+          const restaurantLng = Number(
+            restaurantLocation?.longitude ??
+            (Array.isArray(restaurantLocation?.coordinates) ? restaurantLocation.coordinates[0] : null)
+          )
+          const distanceInKm = (
+            Number.isFinite(userLat) &&
+            Number.isFinite(userLng) &&
+            Number.isFinite(restaurantLat) &&
+            Number.isFinite(restaurantLng)
+          )
+            ? calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
+            : null
+          const fallbackDistance =
+            typeof restaurant?.distance === "number"
+              ? formatDistance(restaurant.distance)
+              : (restaurant?.distance || "")
 
-              return {
-                ...restaurant,
-                id: String(restaurantId),
-                restaurantId: String(restaurantId),
-                pureVegRestaurant: isTruthyFlag(restaurant?.pureVegRestaurant),
-                slug:
-                  restaurant?.slug ||
-                  String(restaurant?.restaurantName || restaurant?.name || "")
-                    .toLowerCase()
-                    .replace(/\s+/g, "-"),
-                name: restaurant?.restaurantName || restaurant?.name || "Restaurant",
-                rating: Number(restaurant?.rating || 0),
-                totalRatings: Number(restaurant?.totalRatings || restaurant?.ratingCount || 0),
-                deliveryTime:
-                  restaurant?.estimatedDeliveryTime ||
-                  (deliveryMinutes ? `${deliveryMinutes} mins` : "30 mins"),
-                distance: distanceInKm !== null ? formatDistance(distanceInKm) : fallbackDistance,
-                distanceInKm,
-                originalIndex: index,
-                menuItems,
-              }
-            } catch {
-              return null
-            }
-          })
-        )
+          return {
+            ...restaurant,
+            id: String(restaurantId),
+            restaurantId: String(restaurantId),
+            pureVegRestaurant: isTruthyFlag(restaurant?.pureVegRestaurant),
+            slug:
+              restaurant?.slug ||
+              String(restaurant?.restaurantName || restaurant?.name || "")
+                .toLowerCase()
+                .replace(/\s+/g, "-"),
+            name: restaurant?.restaurantName || restaurant?.name || "Restaurant",
+            rating: Number(restaurant?.rating || 0),
+            totalRatings: Number(restaurant?.totalRatings || restaurant?.ratingCount || 0),
+            deliveryTime:
+              restaurant?.estimatedDeliveryTime ||
+              (deliveryMinutes ? `${deliveryMinutes} mins` : "30 mins"),
+            distance: distanceInKm !== null ? formatDistance(distanceInKm) : fallbackDistance,
+            distanceInKm,
+            originalIndex: index,
+            menuItems,
+          }
+        })
 
         setUnder250Restaurants(restaurantsWithUnder250Dishes.filter(Boolean))
       } catch (error) {
@@ -1041,7 +1057,8 @@ export default function Under250() {
             </div>
           </div>
         ) : (
-          sortedAndFilteredRestaurants.map((restaurant) => {
+          <>
+            {displayedRestaurants.map((restaurant) => {
             const restaurantSlug = restaurant.slug || restaurant.name.toLowerCase().replace(/\s+/g, "-")
             const availability = getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick))
             const isRestaurantOffline = !availability.isOpen
@@ -1230,7 +1247,14 @@ export default function Under250() {
                 )}
               </section>
             )
-          }))}
+          })}
+            {visibleRestaurantCount < sortedAndFilteredRestaurants.length && (
+              <div className="flex justify-center py-6 text-sm font-medium text-gray-500 dark:text-gray-400">
+                Loading more restaurants...
+              </div>
+            )}
+          </>
+        )}
       </div>
 
 

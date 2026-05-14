@@ -3,6 +3,7 @@ import { upload } from '../../../../middleware/upload.js';
 import {
     registerRestaurantController,
     listApprovedRestaurantsController,
+    listRestaurantsUnderPriceController,
     getApprovedRestaurantController,
     listPublicOffersController,
     getCurrentRestaurantController,
@@ -76,6 +77,7 @@ router.post('/register', uploadFields, registerRestaurantController);
 
 // Public: approved restaurants list (for user app)
 router.get('/restaurants', cacheResponse(300, 'restaurants'), listApprovedRestaurantsController);
+router.get('/restaurants/under-price', listRestaurantsUnderPriceController);
 router.get('/restaurants/:id', cacheResponse(600, 'restaurant_detail'), getApprovedRestaurantController);
 router.get('/restaurants/:id/menu', cacheResponse(600, 'restaurant_menu'), getPublicRestaurantMenuController);
 router.get('/restaurants/:id/outlet-timings', cacheResponse(600, 'restaurant_timings'), getOutletTimingsByRestaurantIdController);

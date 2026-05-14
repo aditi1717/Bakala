@@ -1423,6 +1423,12 @@ export const adminAPI = {
   /** Public: list approved restaurants for user app */
   getRestaurants: (params = {}, config = {}) =>
     getPublicRestaurantsOnce(params, config),
+  /** Public: restaurants with menu items under a price limit. */
+  getRestaurantsUnderPrice: (params = {}, config = {}) =>
+    apiClient.get("/food/restaurant/restaurants/under-price", {
+      params,
+      ...config,
+    }),
   /** Public: get single approved restaurant by id or slug */
   getRestaurantById: (id, config = {}) =>
     apiClient.get(`/food/restaurant/restaurants/${String(id)}`, { ...config }),
