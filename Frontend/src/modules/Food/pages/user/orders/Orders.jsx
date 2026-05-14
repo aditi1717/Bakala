@@ -815,6 +815,11 @@ Order again from this restaurant in the ${companyName} app.`
               order.paymentMethod === 'cod' ||
               order.paymentMethod === 'wallet'
 
+            const isCod = order.payment?.method === 'cash' ||
+              order.payment?.method === 'cod' ||
+              order.paymentMethod === 'cash' ||
+              order.paymentMethod === 'cod'
+
             // Payment failed only for online payments (razorpay) that actually failed
             // Don't show payment failed for COD/wallet or cancelled orders
             const isCancelled = order.status === 'cancelled' || order.status === 'restaurant_cancelled'
@@ -1085,15 +1090,18 @@ Order again from this restaurant in the ${companyName} app.`
                 {/* Card Footer: Actions */}
                 <div className="px-4 py-3 flex items-center justify-between">
                   {/* Left Side: Rating or Error */}
-                  {isRestaurantCancelled ? (
+                  {isCancelled ? (
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <div className="bg-red-100 p-1 rounded-full">
                           <AlertCircle className="w-4 h-4 text-red-500" />
                         </div>
-                        <span className="text-xs font-semibold text-red-500">Restaurant Cancelled</span>
+                        <span className="text-xs font-semibold text-red-500">
+                          {isRestaurantCancelled ? "Restaurant Cancelled" : 
+                           isAdminCancelled ? "Cancelled by Admin" : 
+                           isUserCancelled ? "Cancelled by You" : "Cancelled"}
+                        </span>
                       </div>
-                      <p className="text-xs text-gray-600 ml-7">Refund will be processed in 24-48 hours</p>
                     </div>
                   ) : paymentFailed ? (
                     <div className="flex items-center gap-2">

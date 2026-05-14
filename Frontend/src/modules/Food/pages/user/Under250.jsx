@@ -90,10 +90,6 @@ export default function Under250() {
   const { addToCart, updateQuantity, removeFromCart, getCartItem, cart } = useCart()
   const { vegMode, setVegMode } = useProfile()
   const [activeCategory, setActiveCategory] = useState(initialFiltersRef.current.activeCategory)
-  const [showSortPopup, setShowSortPopup] = useState(false)
-  const [selectedSort, setSelectedSort] = useState(initialFiltersRef.current.selectedSort)
-  const [draftSelectedSort, setDraftSelectedSort] = useState(initialFiltersRef.current.selectedSort)
-  const [under30MinsFilter, setUnder30MinsFilter] = useState(initialFiltersRef.current.under30MinsFilter)
   const [showItemDetail, setShowItemDetail] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
   const [selectedVariantId, setSelectedVariantId] = useState("")
@@ -153,27 +149,6 @@ export default function Under250() {
     return () => window.clearInterval(intervalId)
   }, [])
 
-  const sortOptions = [
-    { id: null, label: 'Relevance' },
-    { id: 'rating-high', label: 'Rating: High to Low' },
-    { id: 'delivery-time-low', label: 'Estimated Time: Low to High' },
-  ]
-
-  const handleClearAll = () => {
-    setSelectedSort(null)
-    setDraftSelectedSort(null)
-    setUnder30MinsFilter(false)
-    setActiveCategory(null)
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(UNDER_250_FILTERS_STORAGE_KEY)
-    }
-  }
-
-  const handleApply = () => {
-    setSelectedSort(draftSelectedSort)
-    setShowSortPopup(false)
-  }
-
   useEffect(() => {
     if (typeof window === "undefined") return
     const syncVegModeOption = () => {
@@ -210,23 +185,6 @@ export default function Under250() {
 
     setVegMode(newValue)
   }
-
-  // Helper function to parse delivery time (e.g., "12-15 mins" -> 12 or average)
-  const parseDeliveryTime = (deliveryTime) => {
-    if (typeof deliveryTime === "number" && Number.isFinite(deliveryTime)) return deliveryTime
-    if (!deliveryTime) return 999 // Default high value for sorting
-    const value = String(deliveryTime)
-    const rangeMatch = value.match(/(\d+)\s*-\s*(\d+)/)
-    if (rangeMatch) {
-      return (parseInt(rangeMatch[1]) + parseInt(rangeMatch[2])) / 2 // Average
-    }
-    const match = value.match(/(\d+\.?\d*)/)
-    if (match) {
-      return parseFloat(match[1])
-    }
-    return 999
-  }
-
 
   // Sort and filter restaurants based on selected sort and filters
   const sortedAndFilteredRestaurants = useMemo(() => {
@@ -267,44 +225,8 @@ export default function Under250() {
       }
     }
 
-    // Apply "Under 30 mins" filter
-    if (under30MinsFilter) {
-      filtered = filtered.filter(restaurant => {
-        const deliveryTime = parseDeliveryTime(restaurant.deliveryTime)
-        return deliveryTime <= 30
-      })
-    }
-
-    // Apply sorting
-    if (selectedSort === 'rating-high') {
-      filtered.sort((a, b) => {
-        const ratingA = a.rating || 0
-        const ratingB = b.rating || 0
-        if (ratingB !== ratingA) {
-          return ratingB - ratingA
-        }
-        // Secondary sort by number of dishes
-        return (b.menuItems?.length || 0) - (a.menuItems?.length || 0)
-      })
-    } else if (selectedSort === 'delivery-time-low') {
-      filtered.sort((a, b) => {
-        const timeA = parseDeliveryTime(a.deliveryTime)
-        const timeB = parseDeliveryTime(b.deliveryTime)
-        if (timeA !== timeB) {
-          return timeA - timeB
-        }
-        if ((b.rating || 0) !== (a.rating || 0)) {
-          return (b.rating || 0) - (a.rating || 0)
-        }
-        return (a.originalIndex || 0) - (b.originalIndex || 0)
-      })
-    } else {
-      // Default: Relevance (keep original order from backend - already sorted by rating)
-      // No additional sorting needed
-    }
-
     return sortRestaurantsByAvailability(filtered, new Date(availabilityTick))
-  }, [under250Restaurants, selectedSort, under30MinsFilter, activeCategory, categories, vegMode, vegModeOption, availabilityTick])
+  }, [under250Restaurants, activeCategory, categories, vegMode, vegModeOption, availabilityTick])
 
   const visibleCategories = useMemo(() => {
     if (!vegMode) return categories
@@ -679,7 +601,7 @@ export default function Under250() {
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    if (!selectedSort && !activeCategory && !under30MinsFilter) {
+    if (!activeCategory) {
       window.localStorage.removeItem(UNDER_250_FILTERS_STORAGE_KEY)
       return
     }
@@ -687,12 +609,10 @@ export default function Under250() {
     window.localStorage.setItem(
       UNDER_250_FILTERS_STORAGE_KEY,
       JSON.stringify({
-        selectedSort,
         activeCategory,
-        under30MinsFilter,
       })
     )
-  }, [selectedSort, activeCategory, under30MinsFilter])
+  }, [activeCategory])
 
   // Scroll detection for view cart button positioning
   useEffect(() => {
@@ -1118,33 +1038,6 @@ export default function Under250() {
           </div>
         </section>
 
-        <section className="py-2 sm:py-3 md:py-4">
-          <div className="flex items-center gap-2 md:gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowSortPopup(true)}
-              className="h-8 sm:h-9 md:h-10 px-3 sm:px-4 md:px-5 rounded-md flex items-center gap-2 whitespace-nowrap flex-shrink-0 font-medium transition-all bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm md:text-base"
-            >
-              <ArrowDownUp className="h-4 w-4 md:h-5 md:w-5 rotate-90" />
-              <span className="text-sm md:text-base font-medium">
-                {selectedSort ? sortOptions.find(opt => opt.id === selectedSort)?.label : 'Sort'}
-              </span>
-              <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setUnder30MinsFilter(!under30MinsFilter)}
-              className={`h-8 sm:h-9 md:h-10 px-3 sm:px-4 md:px-5 rounded-md flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 font-medium transition-all text-sm md:text-base ${under30MinsFilter
-                ? 'text-white'
-                : 'bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300'
-                }`}
-              style={under30MinsFilter ? { background: BRAND_THEME.gradients.primary, borderColor: BRAND_THEME.colors.brand.primary } : undefined}
-            >
-              <Timer className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" />
-              <span className="text-xs sm:text-sm md:text-base font-medium">Under 30 mins</span>
-            </Button>
-          </div>
-        </section>
 
 
         {/* Restaurant Menu Sections */}
@@ -1353,92 +1246,6 @@ export default function Under250() {
           }))}
       </div>
 
-      {/* Sort Popup - Bottom Sheet */}
-      <AnimatePresence>
-        {showSortPopup && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setShowSortPopup(false)}
-              className="fixed inset-0 bg-black/50 z-100"
-            />
-
-            {/* Bottom Sheet */}
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 30
-              }}
-              className="fixed bottom-0 left-0 right-0 md:left-1/2 md:right-auto md:-translate-x-1/2 md:max-w-lg lg:max-w-2xl bg-white dark:bg-[#1a1a1a] rounded-t-3xl shadow-2xl z-[110] max-h-[60vh] md:max-h-[80vh] overflow-hidden flex flex-col"
-            >
-              {/* Drag Handle */}
-              <div className="flex justify-center pt-3 pb-2">
-                <div className="w-12 h-1 bg-gray-300 rounded-full" />
-              </div>
-
-              {/* Header */}
-              <div className="flex items-center justify-between px-4 md:px-6 py-4 md:py-5 border-b dark:border-gray-800">
-                <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">Sort By</h2>
-                <button
-                  onClick={handleClearAll}
-                  className="font-medium text-sm md:text-base"
-                  style={{ color: BRAND_THEME.colors.brand.primary }}
-                >
-                  Clear all
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
-                <div className="flex flex-col gap-3 md:gap-4">
-                  {sortOptions.map((option) => (
-                    <button
-                      key={option.id || 'relevance'}
-                      onClick={() => setDraftSelectedSort(option.id)}
-                      className={`px-4 md:px-5 lg:px-6 py-3 md:py-4 rounded-xl border text-left transition-colors ${draftSelectedSort === option.id
-                        ? ''
-                        : 'border-gray-200 dark:border-gray-800'
-                        }`}
-                      style={draftSelectedSort === option.id
-                        ? { borderColor: BRAND_THEME.colors.brand.primary, backgroundColor: `${BRAND_THEME.colors.brand.primary}14` }
-                        : { borderColor: BRAND_THEME.colors.brand.primary }}
-                    >
-                      <span className={`text-sm md:text-base lg:text-lg font-medium ${draftSelectedSort === option.id ? '' : 'text-gray-700 dark:text-gray-300'}`} style={draftSelectedSort === option.id ? { color: BRAND_THEME.colors.brand.primary } : undefined}>
-                        {option.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center gap-4 md:gap-6 px-4 md:px-6 py-4 md:py-5 border-t dark:border-gray-800 bg-white dark:bg-[#1a1a1a]">
-                <button
-                  onClick={() => setShowSortPopup(false)}
-                  className="flex-1 py-3 md:py-4 text-center font-semibold text-gray-700 dark:text-gray-300 text-sm md:text-base"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={handleApply}
-                  className="flex-1 py-3 md:py-4 font-semibold rounded-xl transition-colors text-sm md:text-base text-white"
-                  style={{ background: BRAND_THEME.gradients.primary }}
-                >
-                  Apply
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* Item Detail Popup */}
       <AnimatePresence>
