@@ -1059,13 +1059,21 @@ export default function Inventory() {
         return Number.isFinite(fromId) ? fromId : 0
       }
       const sortedAddons = [...data].sort((a, b) => getAddonCreatedMs(b) - getAddonCreatedMs(a))
-      const snapshot = sortedAddons
-        .map((addon) => `${String(addon.id || addon._id || "")}:${String(addon.approvalStatus || "").toLowerCase()}`)
+      
+      // Normalize data to ensure every addon has an 'id' and 'images' is an array
+      const normalizedAddons = sortedAddons.map(addon => ({
+        ...addon,
+        id: addon.id || addon._id,
+        images: Array.isArray(addon.images) ? addon.images : (addon.image ? [addon.image] : [])
+      }))
+      
+      const snapshot = normalizedAddons
+        .map((addon) => `${String(addon.id || "")}:${String(addon.approvalStatus || "").toLowerCase()}`)
         .sort()
         .join("|")
       const previousSnapshot = addonApprovalSnapshotRef.current
 
-      setAddons(sortedAddons)
+      setAddons(normalizedAddons)
 
       if (hasLoadedAddonsOnceRef.current && silent && previousSnapshot && previousSnapshot !== snapshot) {
         toast.success("Add-ons updated: approval status changed")

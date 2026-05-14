@@ -1116,7 +1116,7 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                             </a>
                           </div>
                         </div>
-                      )}}
+                      )}
                     </div>
                   </div>
                 )}

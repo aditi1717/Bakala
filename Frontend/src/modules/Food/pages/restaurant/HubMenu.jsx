@@ -431,7 +431,15 @@ export default function HubMenu() {
         return Number.isFinite(fromId) ? fromId : 0
       }
       const sortedAddons = [...data].sort((a, b) => getAddonCreatedMs(b) - getAddonCreatedMs(a))
-      setAddons(sortedAddons)
+      
+      // Normalize data to ensure every addon has an 'id' and 'images' is an array
+      const normalizedAddons = sortedAddons.map(addon => ({
+        ...addon,
+        id: addon.id || addon._id,
+        images: Array.isArray(addon.images) ? addon.images : (addon.image ? [addon.image] : [])
+      }))
+      
+      setAddons(normalizedAddons)
     } catch (error) {
       debugError('Error fetching add-ons:', error)
       toast.error('Failed to load add-ons')
@@ -645,7 +653,18 @@ export default function HubMenu() {
     setAddonName(addon.name || "")
     setAddonDescription(addon.description || "")
     setAddonPrice(addon.price?.toString() || "")
-    setAddonImages(addon.images && addon.images.length > 0 ? addon.images : (addon.image ? [addon.image] : []))
+    
+    // Ensure addonImages is always an array
+    let images = []
+    if (Array.isArray(addon.images)) {
+      images = addon.images
+    } else if (typeof addon.images === 'string' && addon.images.trim()) {
+      images = [addon.images]
+    } else if (addon.image) {
+      images = [addon.image]
+    }
+    
+    setAddonImages(images)
     setAddonImageFiles(new Map())
     setIsAddAddonModalOpen(true)
   }
@@ -2369,7 +2388,7 @@ export default function HubMenu() {
                   </label>
                   
                   {/* Image Preview Grid */}
-                  {addonImages.length > 0 && (
+                  {Array.isArray(addonImages) && addonImages.length > 0 && (
                     <div className="grid grid-cols-3 gap-3 mb-3">
                       {addonImages.map((img, index) => (
                         <div key={index} className="relative group">
