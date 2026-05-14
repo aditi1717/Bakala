@@ -176,6 +176,10 @@ export const updateDeliveryPartnerProfile = async (userId, payload, files) => {
         partner.drivingLicensePhoto = await uploadImageBuffer(files.drivingLicensePhoto[0].buffer, 'food/delivery/license');
         updatedProfile = true;
     }
+    if (files?.upiQrCode?.[0]) {
+        partner.upiQrCode = await uploadImageBuffer(files.upiQrCode[0].buffer, 'food/delivery/upi');
+        updatedProfile = true;
+    }
 
     if (
         name !== undefined ||

@@ -838,6 +838,32 @@ export default function JoinRequest() {
                           <p className="text-sm text-slate-900 mt-1">{viewDetails.documents.bankDetails.bankName}</p>
                         </div>
                       )}
+                      {(viewDetails.upiId || viewDetails.documents.bankDetails.upiId) && (
+                        <div>
+                          <label className="text-xs font-semibold text-slate-500 uppercase">UPI ID</label>
+                          <p className="text-sm text-slate-900 mt-1">{viewDetails.upiId || viewDetails.documents.bankDetails.upiId}</p>
+                        </div>
+                      )}
+                      {(viewDetails.upiQrCode || viewDetails.documents.bankDetails.upiQrCode) && (
+                        <div className="col-span-2 mt-2">
+                          <label className="text-xs font-semibold text-slate-500 uppercase">UPI QR Code</label>
+                          <div className="mt-2">
+                            <img 
+                              src={viewDetails.upiQrCode?.url || viewDetails.upiQrCode || viewDetails.documents.bankDetails.upiQrCode?.url || viewDetails.documents.bankDetails.upiQrCode} 
+                              alt="UPI QR Code"
+                              className="w-48 h-48 rounded-lg object-contain border border-slate-200 bg-slate-50"
+                            />
+                            <a 
+                              href={viewDetails.upiQrCode?.url || viewDetails.upiQrCode || viewDetails.documents.bankDetails.upiQrCode?.url || viewDetails.documents.bankDetails.upiQrCode} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-sm text-[#005128] hover:text-brand-700 mt-2"
+                            >
+                              <ExternalLink className="w-3 h-3" /> View Full QR
+                            </a>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

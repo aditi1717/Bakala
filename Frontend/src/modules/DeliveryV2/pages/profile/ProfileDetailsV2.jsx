@@ -46,14 +46,21 @@ export const ProfileDetailsV2 = () => {
   const [editingDocuments, setEditingDocuments] = useState(false)
   const [editingBank, setEditingBank] = useState(false)
 
-  const profileImageUrl = profile?.profileImage?.url || profile?.profilePhoto || null
+  const profileImageUrl = profile?.profileImage?.url || profile?.profilePhoto || (typeof profile?.profileImage === "string" ? profile.profileImage : null)
   const aadharNumber = profile?.documents?.aadhar?.number || profile?.aadharNumber || "Not added"
   const panNumber = profile?.documents?.pan?.number || profile?.panNumber || "Not added"
   const drivingNumber = profile?.documents?.drivingLicense?.number || profile?.drivingLicenseNumber || "Not added"
-  const aadharPhotoUrl = profile?.documents?.aadhar?.document || null
-  const panPhotoUrl = profile?.documents?.pan?.document || null
-  const drivingPhotoUrl = profile?.documents?.drivingLicense?.document || null
-  const upiQrUrl = profile?.documents?.bankDetails?.upiQrCode || null
+  
+  const aadharPhotoUrl = profile?.documents?.aadhar?.document?.url || profile?.documents?.aadhar?.document || profile?.aadharPhoto?.url || profile?.aadharPhoto || null
+  const panPhotoUrl = profile?.documents?.pan?.document?.url || profile?.documents?.pan?.document || profile?.panPhoto?.url || profile?.panPhoto || null
+  const drivingPhotoUrl = profile?.documents?.drivingLicense?.document?.url || profile?.documents?.drivingLicense?.document || profile?.drivingLicensePhoto?.url || profile?.drivingLicensePhoto || null
+  
+  // Checking multiple possible backend response paths for the QR code
+  const upiQrUrl = 
+    profile?.documents?.bankDetails?.upiQrCode?.url || profile?.documents?.bankDetails?.upiQrCode || 
+    profile?.bankDetails?.upiQrCode?.url || profile?.bankDetails?.upiQrCode || 
+    profile?.upiQrCode?.url || profile?.upiQrCode || 
+    null
 
   const applyProfile = (p) => {
     setProfile(p)
@@ -84,6 +91,11 @@ export const ProfileDetailsV2 = () => {
     if (!p) throw new Error("Failed to load profile")
     applyProfile(p)
   }
+
+  useEffect(() => {
+    const isBridge = typeof window !== "undefined" && window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === "function";
+    console.log("[Bridge Check] Flutter bridge detected:", isBridge);
+  }, []);
 
   useEffect(() => {
     let mounted = true
@@ -134,7 +146,16 @@ export const ProfileDetailsV2 = () => {
       fd.append(field, file)
       const response = await deliveryAPI.updateProfileMultipart(fd)
       if (handleReapprovalRedirect(response)) return
-      await refresh()
+      
+      const updatedProfile = response?.data?.data?.partner || response?.data?.data?.profile;
+      // Only apply if it looks like a complete profile (has name and phone)
+      if (updatedProfile && updatedProfile.name && updatedProfile.phone) {
+        applyProfile(updatedProfile)
+      } else {
+        // Otherwise, do a full refresh to get the complete state
+        await refresh()
+      }
+      
       toast.success("Updated")
     } catch {
       toast.error("Upload failed")
@@ -184,6 +205,23 @@ export const ProfileDetailsV2 = () => {
   }
 
   const saveBankDetails = async () => {
+    // Validation
+    const { accountHolderName, accountNumber, ifscCode, bankName, upiId, panNumber } = form;
+
+    // Validation - Only check for presence of all required fields
+    const isComplete = 
+      accountHolderName?.trim() && 
+      accountNumber?.trim() && 
+      ifscCode?.trim() && 
+      bankName?.trim() && 
+      panNumber?.trim() && 
+      upiId?.trim() &&
+      upiQrUrl;
+
+    if (!isComplete) {
+      return toast.error("All bank details and UPI QR are mandatory before saving");
+    }
+
     try {
       setSaving(true)
       const bankFd = new FormData()
@@ -197,6 +235,7 @@ export const ProfileDetailsV2 = () => {
       if (handleReapprovalRedirect(response)) return
       await refresh()
       toast.success("Bank details updated")
+      setEditingBank(false)
     } catch {
       toast.error("Failed to update bank details")
     } finally {
@@ -413,33 +452,95 @@ export const ProfileDetailsV2 = () => {
               onClick={async () => {
                 if (!editingBank) return setEditingBank(true)
                 await saveBankDetails()
-                setEditingBank(false)
               }}
-              disabled={saving || !!uploading}
-              className="text-xs font-semibold text-[#005128] disabled:opacity-50"
+              disabled={saving || !!uploading || (editingBank && !(
+                form.accountHolderName?.trim() && 
+                form.accountNumber?.trim() && 
+                form.ifscCode?.trim() && 
+                form.bankName?.trim() && 
+                form.panNumber?.trim() && 
+                form.upiId?.trim() &&
+                upiQrUrl
+              ))}
+              className="text-xs font-semibold text-[#005128] disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {editingBank ? "Save" : "Edit"}
             </button>
           </div>
-          <input disabled={!editingBank} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Account Holder Name" value={form.accountHolderName} onChange={(e) => onInput("accountHolderName", e.target.value)} />
-          <input disabled={!editingBank} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Account Number" value={form.accountNumber} onChange={(e) => onInput("accountNumber", e.target.value.replace(/\D/g, ""))} />
+          <input 
+            disabled={!editingBank} 
+            className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} 
+            placeholder="Account Holder Name" 
+            value={form.accountHolderName} 
+            onChange={(e) => onInput("accountHolderName", e.target.value.replace(/[^A-Za-z\s]/g, ""))} 
+          />
+          <input 
+            disabled={!editingBank} 
+            className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} 
+            placeholder="Account Number" 
+            value={form.accountNumber} 
+            onChange={(e) => onInput("accountNumber", e.target.value.replace(/\D/g, "").slice(0, 18))} 
+          />
           <div className="grid grid-cols-2 gap-2">
-            <input disabled={!editingBank} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="IFSC Code" value={form.ifscCode} onChange={(e) => onInput("ifscCode", e.target.value.toUpperCase())} />
-            <input disabled={!editingBank} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="Bank Name" value={form.bankName} onChange={(e) => onInput("bankName", e.target.value)} />
+            <input 
+              disabled={!editingBank} 
+              className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} 
+              placeholder="IFSC Code" 
+              value={form.ifscCode} 
+              onChange={(e) => onInput("ifscCode", e.target.value.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 11))} 
+            />
+            <input 
+              disabled={!editingBank} 
+              className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} 
+              placeholder="Bank Name" 
+              value={form.bankName} 
+              onChange={(e) => onInput("bankName", e.target.value.replace(/[^A-Za-z\s]/g, ""))} 
+            />
           </div>
-          <input disabled={!editingBank} className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} placeholder="UPI ID" value={form.upiId} onChange={(e) => onInput("upiId", e.target.value)} />
+          <input 
+            disabled={!editingBank} 
+            className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`} 
+            placeholder="UPI ID" 
+            value={form.upiId} 
+            onChange={(e) => onInput("upiId", e.target.value)} 
+          />
 
-          <div className="flex gap-2">
-            <button disabled={!editingBank} onClick={() => openCamera({ onSelectFile: (f) => uploadSingleFile("upiQrCode", f), fileNamePrefix: "upi-qr" })} className="flex-1 rounded-xl border py-2 text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"><Camera className="w-3.5 h-3.5" /> QR Camera</button>
-            <button disabled={!editingBank} onClick={() => onPick(upiQrInputRef)} className="flex-1 rounded-xl border py-2 text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"><ImageIcon className="w-3.5 h-3.5" /> QR Gallery</button>
-          </div>
-          <div className="rounded-xl border border-slate-200 p-2">
-            <p className="text-[10px] font-semibold text-slate-500 mb-1">Existing UPI QR</p>
-            {upiQrUrl ? (
-              <img src={upiQrUrl} alt="UPI QR" className="w-28 h-28 object-cover rounded-lg" />
-            ) : (
-              <div className="w-28 h-28 rounded-lg bg-slate-100 text-[10px] text-slate-400 flex items-center justify-center">No QR</div>
-            )}
+          <div className="space-y-2 pt-1">
+            <p className="text-xs font-semibold text-slate-700">UPI QR Code</p>
+            <div className="flex gap-2">
+              <button 
+                disabled={!editingBank} 
+                onClick={() => openCamera({ onSelectFile: (f) => uploadSingleFile("upiQrCode", f), fileNamePrefix: "upi-qr" })} 
+                className="flex-1 rounded-xl border py-2 text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
+              >
+                <Camera className="w-3.5 h-3.5" /> QR Camera
+              </button>
+              <button 
+                disabled={!editingBank} 
+                onClick={() => onPick(upiQrInputRef)} 
+                className="flex-1 rounded-xl border py-2 text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
+              >
+                <ImageIcon className="w-3.5 h-3.5" /> QR Gallery
+              </button>
+            </div>
+            
+            {uploading === "upiQrCode" ? (
+              <div className="w-full h-32 rounded-xl bg-slate-50 border border-dashed border-slate-200 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="w-6 h-6 animate-spin text-[#005128]" />
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Uploading QR Code...</span>
+              </div>
+            ) : upiQrUrl ? (
+              <div className="relative group">
+                <img 
+                  src={upiQrUrl} 
+                  alt="UPI QR" 
+                  className="w-full h-48 object-contain rounded-xl border border-slate-200 bg-white p-2" 
+                />
+                <div className="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded-md border border-slate-200 text-[9px] font-bold text-slate-600 shadow-sm">
+                  CURRENT QR
+                </div>
+              </div>
+            ) : null}
           </div>
           <input ref={upiQrInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => uploadSingleFile("upiQrCode", e.target.files?.[0])} />
         </section>

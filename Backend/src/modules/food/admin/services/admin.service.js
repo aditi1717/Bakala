@@ -5287,7 +5287,7 @@ export async function approveDeliveryPartner(id) {
         await notifyOwnerSafely(
             { ownerType: 'DELIVERY_PARTNER', ownerId: partner._id },
             {
-                title: 'Welcome Aboard! ðŸš²',
+                title: 'Welcome Aboard!',
                 body: `Your delivery partner application has been approved. You can now go online and start earning!`,
                 image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
                 data: {

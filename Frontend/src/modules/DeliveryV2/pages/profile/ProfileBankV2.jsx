@@ -41,10 +41,23 @@ export const ProfileBankV2 = () => {
   }, []);
 
   const handleSave = async () => {
-     if (!form.accountNumber || !form.ifscCode) return toast.error("Missing mandatory fields");
-     if (!/^\d{9,18}$/.test(String(form.accountNumber || "").trim())) {
-        return toast.error("Invalid Account Number (9-18 digits)");
-     }
+     const { accountHolderName, accountNumber, ifscCode, bankName, panNumber } = form;
+
+     if (!accountHolderName?.trim()) return toast.error("Account holder name is required");
+     if (!/^[A-Za-z\s]+$/.test(accountHolderName)) return toast.error("Account holder name should contain only alphabets");
+
+     if (!accountNumber?.trim()) return toast.error("Account number is required");
+     if (!/^\d{9,18}$/.test(accountNumber)) return toast.error("Account number should be 9-18 digits");
+
+     if (!ifscCode?.trim()) return toast.error("IFSC code is required");
+     if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode.toUpperCase())) return toast.error("Invalid IFSC code format (e.g. SBIN0012345)");
+
+     if (!bankName?.trim()) return toast.error("Bank name is required");
+     if (!/^[A-Za-z\s]+$/.test(bankName)) return toast.error("Bank name should contain only alphabets");
+
+     if (!panNumber?.trim()) return toast.error("PAN number is required");
+     if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panNumber.toUpperCase())) return toast.error("Invalid PAN number format");
+
      setIsSaving(true);
      try {
         const formData = new FormData();
@@ -91,11 +104,17 @@ export const ProfileBankV2 = () => {
                          type="text"
                          value={form[key]}
                          onChange={(e) => {
-                           let value = e.target.value;
-                           if (key === "accountNumber") {
-                             value = value.replace(/\D/g, "").slice(0, 18);
-                           }
-                           setForm({ ...form, [key]: value });
+                            let value = e.target.value;
+                            if (key === "accountNumber") {
+                              value = value.replace(/\D/g, "").slice(0, 18);
+                            } else if (key === "accountHolderName" || key === "bankName") {
+                              value = value.replace(/[^A-Za-z\s]/g, "");
+                            } else if (key === "ifscCode") {
+                              value = value.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 11);
+                            } else if (key === "panNumber") {
+                               value = value.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 10);
+                            }
+                            setForm({ ...form, [key]: value });
                          }}
                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-950 focus:ring-2 focus:ring-orange-500/20"
                       />
@@ -120,3 +139,5 @@ export const ProfileBankV2 = () => {
     </div>
   );
 };
+
+export default ProfileBankV2;
