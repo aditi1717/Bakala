@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Bell, Clock, Trash2 } from "lucide-react";
+import { ArrowLeft, Bell, Clock, Trash2, X } from "lucide-react";
+import { deliveryAPI } from "@food/api";
 import {
   getDeliveryNotifications,
   saveDeliveryNotifications,
@@ -29,8 +30,10 @@ const normalizeNotifications = (items = []) =>
     createdAt: item?.createdAt || item?.timestamp || Date.now(),
   }));
 
+
 export default function NotificationsV2() {
   const navigate = useNavigate();
+  const [showAll, setShowAll] = useState(false);
   const [notifications, setNotifications] = useState(() =>
     normalizeNotifications(getDeliveryNotifications())
   );
@@ -74,7 +77,8 @@ export default function NotificationsV2() {
     [broadcastNotifications, notifications]
   );
 
-  const unreadCount = notifications.filter((item) => !item.read).length + broadcastUnreadCount;
+  const unreadCount = mergedNotifications.filter((item) => !item.read).length;
+  const visibleNotifications = showAll ? mergedNotifications : mergedNotifications.slice(0, 5);
 
   const handleMarkAsRead = (id, source = "local") => {
     if (source === "broadcast") {
@@ -102,6 +106,20 @@ export default function NotificationsV2() {
     setNotifications([]);
     saveDeliveryNotifications([]);
     dismissAllBroadcastNotifications();
+    window.dispatchEvent(new CustomEvent("deliveryNotificationsUpdated"));
+  };
+
+  const handleDismissOne = (id, source = "local") => {
+    if (!id) return;
+    if (source === "broadcast") {
+      dismissBroadcastNotification(id);
+      return;
+    }
+    setNotifications((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      saveDeliveryNotifications(next);
+      return next;
+    });
     window.dispatchEvent(new CustomEvent("deliveryNotificationsUpdated"));
   };
 
@@ -143,7 +161,7 @@ export default function NotificationsV2() {
           <div className="text-center text-sm text-gray-600 py-12">No notifications</div>
         ) : (
           <div className="space-y-2">
-            {mergedNotifications.map((item) => (
+            {visibleNotifications.map((item) => (
               <div
                 key={item.id}
                 onClick={() => handleMarkAsRead(item.id, item.source)}
@@ -159,8 +177,28 @@ export default function NotificationsV2() {
                     {toTimeLabel(item.createdAt)}
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDismissOne(item.id, item.source);
+                  }}
+                  className="shrink-0 p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                  aria-label="Dismiss notification"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             ))}
+            {mergedNotifications.length > 5 && (
+              <button
+                type="button"
+                onClick={() => setShowAll((prev) => !prev)}
+                className="w-full rounded-lg border border-gray-200 py-2 text-sm font-medium text-[#EB590E] hover:bg-orange-50"
+              >
+                {showAll ? "Show less" : "View all"}
+              </button>
+            )}
           </div>
         )}
       </div>
