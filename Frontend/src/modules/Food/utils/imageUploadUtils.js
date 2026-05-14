@@ -96,6 +96,20 @@ export const convertBase64ToFile = (
   }
 }
 
+const getLowerFileExtension = (fileName = "") => {
+  const normalized = String(fileName || "").trim().toLowerCase()
+  if (!normalized.includes(".")) return ""
+  return normalized.slice(normalized.lastIndexOf("."))
+}
+
+const isSupportedImageSelection = (fileLike) => {
+  if (!(fileLike instanceof File || fileLike instanceof Blob)) return false
+  const mimeType = String(fileLike.type || "").toLowerCase()
+  if (mimeType.startsWith("image/")) return true
+  const extension = getLowerFileExtension(fileLike?.name || "")
+  return [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"].includes(extension)
+}
+
 /**
  * Standard browser camera fallback
  */
@@ -159,7 +173,7 @@ export const openCamera = async ({ onSelectFile, fileNamePrefix = "camera-photo"
       selectedFile = result.file
     }
 
-    if (!selectedFile || !String(selectedFile.type || "").startsWith("image/")) {
+    if (!selectedFile || !isSupportedImageSelection(selectedFile)) {
       toast.error("Failed to capture image")
       return
     }

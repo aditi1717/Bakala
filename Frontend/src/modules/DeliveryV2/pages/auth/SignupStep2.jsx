@@ -153,6 +153,20 @@ const dataUrlToFile = (dataUrl, fileName = "document.jpg") => {
   return new File([bytes], fileName, { type: mimeType })
 }
 
+const getLowerFileExtension = (fileName = "") => {
+  const normalized = String(fileName || "").trim().toLowerCase()
+  if (!normalized.includes(".")) return ""
+  return normalized.slice(normalized.lastIndexOf("."))
+}
+
+const isSupportedImageFile = (file) => {
+  if (!(file instanceof File || file instanceof Blob)) return false
+  const mimeType = String(file.type || "").toLowerCase()
+  if (mimeType.startsWith("image/")) return true
+  const extension = getLowerFileExtension(file?.name || "")
+  return [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"].includes(extension)
+}
+
 const getFriendlyRegistrationError = (error) => {
   const rawMessage =
     error?.response?.data?.message ||
@@ -347,7 +361,7 @@ export default function SignupStep2() {
   const handleFileSelect = async (docType, file) => {
     if (!file) return
 
-    if (!file.type.startsWith("image/")) {
+    if (!isSupportedImageFile(file)) {
       toast.error("Please select an image file")
       return
     }
