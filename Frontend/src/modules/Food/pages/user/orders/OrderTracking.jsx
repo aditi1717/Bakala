@@ -1607,11 +1607,7 @@ export default function OrderTracking() {
             <div className="flex-1">
               <p className="font-semibold text-gray-900 leading-tight">{cancelledStatusCopy.title}</p>
               <p className="text-sm text-gray-500 mt-1 leading-snug">{cancelledStatusCopy.subtitle}</p>
-              {isCancelledOrder && resolvedCancellationReason && (
-                <p className="text-xs text-red-600 mt-1 leading-snug">
-                  Reason: {resolvedCancellationReason}
-                </p>
-              )}
+
               {isCancelledOrder && (() => {
                 const refund = order?.payment?.refund || {};
                 const pStatus = String(order?.payment?.status || "").toLowerCase();

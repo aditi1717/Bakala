@@ -170,7 +170,8 @@ const transformOrderForList = (order) => ({
   preparingTimestamp: order.tracking?.preparing?.timestamp
     ? new Date(order.tracking.preparing.timestamp)
     : new Date(order.createdAt || Date.now()),
-  initialETA: order.estimatedDeliveryTime || 30,
+  initialETA:
+    order.estimatedPreparationTime || order.estimatedDeliveryTime || 30,
   sortTimestamp: new Date(order.createdAt || Date.now()).getTime(),
 });
 
@@ -3844,7 +3845,8 @@ function PreparingOrders({
           );
 
           const transformedOrders = preparingOrders.map((order) => {
-            const initialETA = order.estimatedDeliveryTime || 30; // in minutes
+            const initialETA =
+              order.estimatedPreparationTime || order.estimatedDeliveryTime || 30; // in minutes
             const preparingTimestamp = order.tracking?.preparing?.timestamp
               ? new Date(order.tracking.preparing.timestamp)
               : new Date(order.createdAt); // Fallback to createdAt if preparing timestamp not available
