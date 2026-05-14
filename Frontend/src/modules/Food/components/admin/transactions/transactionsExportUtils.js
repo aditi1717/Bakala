@@ -60,7 +60,7 @@ export const exportTransactionsToExcel = (transactions, headers, filename = "tra
     </html>
   `;
 
-  const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel" });
+  const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel;charset=utf-8" });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
   link.setAttribute("href", url);
@@ -68,8 +68,12 @@ export const exportTransactionsToExcel = (transactions, headers, filename = "tra
   link.style.visibility = "hidden";
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  
+  // Use timeout to ensure the browser has started the download before cleanup
+  setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 100);
 };
 
 export const exportTransactionsToPDF = async (transactions, headers, filename = "transactions", title = "Transaction Report") => {

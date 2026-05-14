@@ -189,8 +189,12 @@ export const exportToExcel = (orders, filename = "orders") => {
   link.style.visibility = "hidden"
   document.body.appendChild(link)
   link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  
+  // Use timeout to ensure the browser has started the download before cleanup
+  setTimeout(() => {
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }, 100)
 }
 
 export const exportToPDF = async (orders, filename = "orders") => {

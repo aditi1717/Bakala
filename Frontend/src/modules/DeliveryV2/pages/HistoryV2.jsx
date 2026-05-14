@@ -302,8 +302,12 @@ export const HistoryV2 = () => {
     link.download = `delivery-history-${stamp}.xls`;
     document.body.appendChild(link);
     link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    
+    // Use timeout to ensure the browser has started the download before cleanup
+    setTimeout(() => {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }, 100);
     toast.success('Excel sheet downloaded');
   };
 
