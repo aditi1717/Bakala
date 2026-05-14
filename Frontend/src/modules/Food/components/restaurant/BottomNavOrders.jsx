@@ -50,7 +50,7 @@ const isExploreContextPath = (pathname = "", state) => {
   )
 }
 
-export default function BottomNavOrders() {
+export default function BottomNavOrders({ isStatic = false }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { pathname, state } = location
@@ -58,16 +58,32 @@ export default function BottomNavOrders() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.visualViewport) return undefined
+    if (typeof window === "undefined") return undefined
+    
+    // Fallback if visualViewport is not supported
+    if (!window.visualViewport) {
+      const handleResize = () => {
+        // Simple detection: if height is significantly less than width (landscape) 
+        // or less than some threshold of screen height
+        const isLikelyKeyboard = window.innerHeight < window.screen.height * 0.6
+        setIsKeyboardVisible(isLikelyKeyboard)
+      }
+      window.addEventListener("resize", handleResize)
+      return () => window.removeEventListener("resize", handleResize)
+    }
+
     const update = () => {
       const vv = window.visualViewport
       const inset = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)))
-      // Detection based on inset or significant height reduction
-      setIsKeyboardVisible(inset > 80 || vv.height < window.innerHeight * 0.8)
+      // Reliable detection: inset (keyboard area) or vv height compared to screen height
+      const isLikelyKeyboard = inset > 80 || vv.height < window.screen.height * 0.7
+      setIsKeyboardVisible(isLikelyKeyboard)
     }
+
     window.visualViewport.addEventListener("resize", update)
     window.visualViewport.addEventListener("scroll", update)
     update()
+
     return () => {
       window.visualViewport.removeEventListener("resize", update)
       window.visualViewport.removeEventListener("scroll", update)
@@ -83,7 +99,8 @@ export default function BottomNavOrders() {
   const tabs = useMemo(() => getOrdersTabs(basePath), [basePath])
 
   const isInternalPage = pathname.includes("/create-offers")
-  if (isInternalPage || isKeyboardVisible) {
+  // Hide fixed navbar when keyboard is visible
+  if (!isStatic && (isInternalPage || isKeyboardVisible)) {
     return null
   }
 
@@ -101,7 +118,7 @@ export default function BottomNavOrders() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[60] px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className={`${isStatic ? "relative mt-10 mb-6" : "fixed bottom-0 left-0 right-0"} z-[60] px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]`}>
       <div className="mx-auto flex w-full max-w-md items-end gap-2">
         <div className="flex-1 min-w-0">
           <div

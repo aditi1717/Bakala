@@ -2439,24 +2439,6 @@ export default function Cart() {
                     {/* Show All Coupons List */}
                     {showCoupons && !displayedAppliedCoupon && availableCoupons.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-dashed border-gray-200 dark:border-gray-800 space-y-4">
-                        {/* Input for manual code */}
-                        <div className="flex flex-col sm:flex-row gap-2 mb-4">
-                          <input
-                            type="text"
-                            value={manualCouponCode}
-                            onChange={(e) => setManualCouponCode(e.target.value.toUpperCase())}
-                            placeholder="Enter coupon code"
-                            className="flex-1 h-9 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0a0a0a] px-3 text-sm text-gray-800 dark:text-gray-200 focus:outline-none"
-                            style={{ borderColor: `${BRAND_THEME.colors.brand.primary}33`, outlineColor: BRAND_THEME.colors.brand.primary }}
-                          />
-                          <button
-                            className="bg-white dark:bg-[#1a1a1a] border rounded px-4 h-9 text-xs font-semibold uppercase hover:bg-brand-50 dark:hover:bg-brand-900/10"
-                            style={{ borderColor: BRAND_THEME.colors.brand.primary, color: BRAND_THEME.colors.brand.primary }}
-                            onClick={handleApplyCouponCode}
-                          >
-                            APPLY
-                          </button>
-                        </div>
                         {availableCoupons.slice(1).map((coupon) => (
                           <div key={coupon.code} className="flex items-start justify-between">
                             <div className="flex items-start gap-3 flex-1">

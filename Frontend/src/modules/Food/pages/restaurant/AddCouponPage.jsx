@@ -188,7 +188,7 @@ export default function AddCouponPage(props) {
 
   return (
     <div
-      className="min-h-screen pb-24 md:pb-10"
+      className="min-h-screen pb-10"
       style={{ backgroundColor: BRAND_THEME.tokens.app.sectionAltBackground || "#F8FAFC" }}
     >
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40 flex items-center gap-3">
@@ -388,7 +388,7 @@ export default function AddCouponPage(props) {
         </p>
       </div>
 
-      <BottomNavOrders />
+      <BottomNavOrders isStatic />
     </div>
   )
 }

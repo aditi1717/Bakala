@@ -11,9 +11,11 @@ import ViewOrderDetectDeliveryDialog from "@food/components/admin/orders/ViewOrd
 import AssignDeliveryPartnerDialog from "@food/components/admin/orders/AssignDeliveryPartnerDialog"
 import SettingsDialog from "@food/components/admin/orders/SettingsDialog"
 import { useGenericTableManagement } from "@food/components/admin/orders/useGenericTableManagement"
+
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
+
 const normalizeId = (value) => {
   if (!value) return ""
   if (typeof value === "string") return value.trim()
@@ -227,9 +229,7 @@ const buildStatusHistory = (order) => {
   }
 
   // Reached Drop - must come before Ordered Delivered
-  // Check multiple conditions to ensure we catch it even if order is already delivered
   if (deliveryState?.reachedDropAt) {
-    // First priority: use reachedDropAt timestamp if available
     history.push({
       status: "Reached Drop",
       timestamp: formatTimestamp(deliveryState.reachedDropAt)
@@ -239,15 +239,11 @@ const buildStatusHistory = (order) => {
     deliveryState?.currentPhase === 'at_drop' ||
     deliveryState?.status === 'en_route_to_delivery'
   ) {
-    // Second priority: check if currently at delivery phase
     history.push({
       status: "Reached Drop",
       timestamp: formatTimestamp(order.updatedAt) || "N/A"
     })
   } else if (status === 'delivered' && deliveryPartnerName) {
-    // Third priority: if order is delivered and delivery boy was assigned,
-    // it means reached drop must have happened (can't deliver without reaching drop)
-    // Only add if not already added above
     const hasReachedDrop = history.some(h => h.status === "Reached Drop")
     if (!hasReachedDrop) {
       history.push({
@@ -333,13 +329,11 @@ const transformOrder = (order, index) => {
     orderTime: timeStr,
     dispatchStatus: order?.dispatch?.status || "unassigned",
     rawOrderStatus: order?.orderStatus || order?.status || "",
-    // Keep assign/reassign action visible for admin across order states.
     canAssign: true,
     canResend:
       isAssignmentEligibleStatus(order?.orderStatus || order?.status) &&
       String(order?.dispatch?.status || "").toLowerCase() === "assigned" &&
       Boolean(order?.dispatch?.deliveryPartnerId),
-    // Keep original order data for detail view
     originalOrder: order
   }
 }
@@ -367,11 +361,7 @@ export default function OrderDetectDelivery() {
     try {
       if (!silent) setIsLoading(true)
       setError(null)
-      const params = {
-        page: 1,
-        limit: 1000,
-      }
-
+      const params = { page: 1, limit: 1000 }
       const response = await adminAPI.getOrders(params)
 
       if (response.data?.success && response.data?.data?.orders) {
@@ -380,22 +370,17 @@ export default function OrderDetectDelivery() {
         )
         setOrders(transformedOrders)
       } else {
-        debugError("Failed to fetch orders:", response.data)
         setError(response.data?.message || "Failed to fetch orders")
-        toast.error("Failed to fetch orders")
         setOrders([])
       }
     } catch (error) {
-      debugError("Error fetching orders:", error)
       setError(error.response?.data?.message || "Failed to fetch orders")
-      toast.error(error.response?.data?.message || "Failed to fetch orders")
       setOrders([])
     } finally {
       if (!silent) setIsLoading(false)
     }
   }, [])
 
-  // Fetch orders from backend
   useEffect(() => {
     fetchOrders()
   }, [fetchOrders])
@@ -410,38 +395,21 @@ export default function OrderDetectDelivery() {
 
       const currentStatus = String(order?.status || "").trim()
       const previousStatus = nextMap.get(key)
-      const isPassedNow = currentStatus === "Delivery Boy Passed"
-      const wasPassedBefore = previousStatus === "Delivery Boy Passed"
-      const isTimedOutNow = currentStatus === "Delivery Request Timed Out"
-      const wasTimedOutBefore = previousStatus === "Delivery Request Timed Out"
-
-      if (isPassedNow && !wasPassedBefore) {
-        toast.error(
-          `Delivery boy passed order #${order?.orderId || key}. Please reassign.`,
-        )
+      if (currentStatus === "Delivery Boy Passed" && previousStatus !== "Delivery Boy Passed") {
+        toast.error(`Delivery boy passed order #${order?.orderId || key}. Please reassign.`)
       }
-      if (isTimedOutNow && !wasTimedOutBefore) {
-        toast.warning(
-          `Delivery request timed out for order #${order?.orderId || key}. Please reassign.`,
-        )
+      if (currentStatus === "Delivery Request Timed Out" && previousStatus !== "Delivery Request Timed Out") {
+        toast.warning(`Delivery request timed out for order #${order?.orderId || key}. Please reassign.`)
       }
-
       nextMap.set(key, currentStatus)
     }
-
     orderStatusRef.current = nextMap
   }, [orders])
 
   useEffect(() => {
-    const backendUrl = String(API_BASE_URL || "")
-      .replace(/\/api\/v1\/?$/i, "")
-      .replace(/\/api\/?$/i, "")
-      .replace(/\/$/, "")
+    const backendUrl = String(API_BASE_URL || "").replace(/\/api\/v1\/?$/i, "").replace(/\/api\/?$/i, "").replace(/\/$/, "")
     if (!backendUrl || !backendUrl.startsWith("http")) return undefined
-
-    const token =
-      localStorage.getItem("admin_accessToken") ||
-      localStorage.getItem("accessToken")
+    const token = localStorage.getItem("admin_accessToken") || localStorage.getItem("accessToken")
     if (!token) return undefined
 
     const socket = io(backendUrl, {
@@ -451,16 +419,8 @@ export default function OrderDetectDelivery() {
       reconnection: true,
     })
 
-    let lastRefreshAt = 0
-    const requestRefresh = () => {
-      const now = Date.now()
-      if (now - lastRefreshAt < 800) return
-      lastRefreshAt = now
-      fetchOrders({ silent: true })
-    }
-
+    const requestRefresh = () => fetchOrders({ silent: true })
     socket.on("connect", requestRefresh)
-    socket.on("reconnect", requestRefresh)
     socket.on("order_status_update", requestRefresh)
     socket.on("admin_order_status_updated", requestRefresh)
     socket.on("order_updated", requestRefresh)
@@ -468,66 +428,39 @@ export default function OrderDetectDelivery() {
     socket.on("order_deleted", requestRefresh)
 
     return () => {
-      socket.off("connect", requestRefresh)
-      socket.off("reconnect", requestRefresh)
-      socket.off("order_status_update", requestRefresh)
-      socket.off("admin_order_status_updated", requestRefresh)
-      socket.off("order_updated", requestRefresh)
-      socket.off("admin_new_order", requestRefresh)
-      socket.off("order_deleted", requestRefresh)
       socket.disconnect()
     }
   }, [fetchOrders])
 
-  // Keep action availability (like resend/reassign after timeout) fresh.
   useEffect(() => {
-    const id = setInterval(() => {
-      fetchOrders({ silent: true })
-    }, 3000)
+    const id = setInterval(() => fetchOrders({ silent: true }), 3000)
     return () => clearInterval(id)
   }, [fetchOrders])
 
   const {
-    searchQuery,
-    setSearchQuery,
-    isFilterOpen,
-    setIsFilterOpen,
-    isSettingsOpen,
-    setIsSettingsOpen,
-    isViewOrderOpen,
-    setIsViewOrderOpen,
-    selectedOrder,
-    filters,
-    setFilters,
-    filteredData,
-    activeFiltersCount,
-    handleApplyFilters,
-    handleResetFilters,
-    handleExport,
-    handleViewOrder,
-    handlePrintOrder,
-    toggleColumn,
+    searchQuery, setSearchQuery, isFilterOpen, setIsFilterOpen,
+    isSettingsOpen, setIsSettingsOpen, isViewOrderOpen, setIsViewOrderOpen,
+    selectedOrder, filters, setFilters, filteredData, activeFiltersCount,
+    handleApplyFilters, handleResetFilters, handleExport,
+    handleViewOrder, handlePrintOrder, toggleColumn,
   } = useGenericTableManagement(
     orders,
     "Order Detect Delivery",
     ["orderId", "userName", "userNumber", "restaurantName", "deliveryBoyName", "status"]
   )
 
-  // Statistics
   const stats = useMemo(() => {
     const total = orders.length
-    const ordered = filteredData.filter(o => o.status === "Ordered").length
-    const restaurantAccepted = filteredData.filter(o => o.status === "Restaurant Accepted" || o.status === "Accepted").length
     const rejected = filteredData.filter(o => o.status === "Rejected").length
     const readyForAssignment = filteredData.filter(o => o.status === "Ready for Assignment").length
-    const deliveryBoyAssigned = filteredData.filter(o => o.status === "Delivery Boy Assigned").length
-    const assignmentAccepted = filteredData.filter(o => o.status === "Assignment Accepted").length
-    const reachedPickup = filteredData.filter(o => o.status === "Delivery Boy Reached Pickup" || o.status === "Reached Pickup").length
-    const orderIdAccepted = filteredData.filter(o => o.status === "Order ID Accepted").length
-    const reachedDrop = filteredData.filter(o => o.status === "Reached Drop").length
+    const deliveryBoyAssigned = filteredData.filter(o => 
+      o.status === "Delivery Boy Assigned" || 
+      o.status === "Assignment Accepted" || 
+      o.status === "Order ID Accepted"
+    ).length
     const delivered = filteredData.filter(o => o.status === "Ordered Delivered").length
     
-    return { total, ordered, restaurantAccepted, rejected, readyForAssignment, deliveryBoyAssigned, assignmentAccepted, reachedPickup, orderIdAccepted, reachedDrop, delivered }
+    return { total, rejected, readyForAssignment, deliveryBoyAssigned, delivered }
   }, [filteredData, orders.length])
 
   const tableOrders = filteredData
@@ -547,23 +480,16 @@ export default function OrderDetectDelivery() {
   const handleAdminStatusChange = async (order, nextStatus) => {
     const orderId = String(order?.orderMongoId || "").trim()
     if (!orderId) return
-    if (!["picked_up", "delivered"].includes(String(nextStatus || "").toLowerCase())) return
-
     const loadingKey = `status:${orderId}`
     setActionLoadingKey(loadingKey)
     try {
       const response = await adminAPI.updateOrderStatus(orderId, { orderStatus: nextStatus })
-      if (!response?.data?.success) {
-        throw new Error(response?.data?.message || "Failed to update status")
+      if (response?.data?.success) {
+        toast.success(`Order marked as ${nextStatus}`)
+        fetchOrders({ silent: true })
       }
-      toast.success(
-        nextStatus === "picked_up"
-          ? `Order #${order.orderId} marked as Picked Up`
-          : `Order #${order.orderId} marked as Delivered`,
-      )
-      await fetchOrders({ silent: true })
-    } catch (statusError) {
-      toast.error(statusError?.response?.data?.message || statusError?.message || "Failed to update status")
+    } catch (error) {
+      toast.error("Failed to update status")
     } finally {
       setActionLoadingKey("")
     }
@@ -571,45 +497,15 @@ export default function OrderDetectDelivery() {
 
   const resetColumns = () => {
     setVisibleColumns({
-      si: true,
-      orderId: true,
-      userInfo: true,
-      restaurantName: true,
-      deliveryBoy: true,
-      status: true,
-      actions: true,
+      si: true, orderId: true, userInfo: true, restaurantName: true,
+      deliveryBoy: true, status: true, actions: true,
     })
   }
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="p-4 lg:p-6 bg-slate-50 min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-          <p className="text-slate-600 font-medium">Loading orders...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Error state
-  if (error && orders.length === 0) {
-    return (
-      <div className="p-4 lg:p-6 bg-slate-50 min-h-screen flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 max-w-md text-center">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <XCircle className="w-8 h-8 text-red-600" />
-          </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Error Loading Orders</h3>
-          <p className="text-sm text-slate-600 mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
+        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
       </div>
     )
   }
@@ -617,14 +513,10 @@ export default function OrderDetectDelivery() {
   return (
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       <OrdersTopbar 
-        title="Order Detect Delivery" 
-        count={orders.length} 
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        onExport={handleExport}
+        title="Order Detect Delivery" count={orders.length} 
+        searchQuery={searchQuery} setSearchQuery={setSearchQuery} onExport={handleExport}
       />
 
-      {/* Statistics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
           <div className="flex items-center justify-between">
@@ -637,28 +529,7 @@ export default function OrderDetectDelivery() {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500 mb-1">Ordered</p>
-              <p className="text-2xl font-bold" style={{ color: BRAND_THEME.colors.brand.primary }}>{stats.ordered}</p>
-            </div>
-            <div className="p-3 bg-brand-50 rounded-lg">
-              <Clock className="w-6 h-6" style={{ color: BRAND_THEME.colors.brand.primary }} />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500 mb-1">Restaurant Accepted</p>
-              <p className="text-2xl font-bold text-emerald-600">{stats.restaurantAccepted}</p>
-            </div>
-            <div className="p-3 bg-emerald-50 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-emerald-600" />
-            </div>
-          </div>
-        </div>
+
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
           <div className="flex items-center justify-between">
             <div>
@@ -695,50 +566,6 @@ export default function OrderDetectDelivery() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 mb-1">Assignment Accepted</p>
-              <p className="text-2xl font-bold text-emerald-600">{stats.assignmentAccepted}</p>
-            </div>
-            <div className="p-3 bg-emerald-50 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-emerald-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500 mb-1">Delivery Boy Reached Pickup</p>
-              <p className="text-2xl font-bold text-orange-600">{stats.reachedPickup}</p>
-            </div>
-            <div className="p-3 bg-orange-50 rounded-lg">
-              <Package className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500 mb-1">Order ID Accepted</p>
-              <p className="text-2xl font-bold text-indigo-600">{stats.orderIdAccepted}</p>
-            </div>
-            <div className="p-3 bg-indigo-50 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-indigo-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500 mb-1">Reached Drop</p>
-              <p className="text-2xl font-bold text-amber-600">{stats.reachedDrop}</p>
-            </div>
-            <div className="p-3 bg-amber-50 rounded-lg">
-              <Truck className="w-6 h-6 text-amber-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <div className="flex items-center justify-between">
-            <div>
               <p className="text-sm text-slate-500 mb-1">Delivered</p>
               <p className="text-2xl font-bold text-emerald-600">{stats.delivered}</p>
             </div>
@@ -750,45 +577,25 @@ export default function OrderDetectDelivery() {
       </div>
 
       <SettingsDialog
-        isOpen={isSettingsOpen}
-        onOpenChange={setIsSettingsOpen}
-        visibleColumns={visibleColumns}
-        toggleColumn={toggleColumn}
-        resetColumns={resetColumns}
+        isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen}
+        visibleColumns={visibleColumns} toggleColumn={toggleColumn} resetColumns={resetColumns}
         columnsConfig={{
-          si: "Serial Number",
-          orderId: "Order ID",
-          userInfo: "User Name & Number",
-          restaurantName: "Restaurant Name",
-          deliveryBoy: "Delivery Boy Name & Number",
-          status: "Status",
-          actions: "Actions",
+          si: "Serial Number", orderId: "Order ID", userInfo: "User Name & Number",
+          restaurantName: "Restaurant Name", deliveryBoy: "Delivery Boy Name & Number",
+          status: "Status", actions: "Actions",
         }}
       />
-      <ViewOrderDetectDeliveryDialog
-        isOpen={isViewOrderOpen}
-        onOpenChange={setIsViewOrderOpen}
-        order={selectedOrder}
-      />
+      <ViewOrderDetectDeliveryDialog isOpen={isViewOrderOpen} onOpenChange={setIsViewOrderOpen} order={selectedOrder} />
       <AssignDeliveryPartnerDialog
-        isOpen={isAssignDialogOpen}
-        onOpenChange={setIsAssignDialogOpen}
-        order={selectedOrderForAssignment}
-        onAssigned={() => fetchOrders({ silent: true })}
+        isOpen={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}
+        order={selectedOrderForAssignment} onAssigned={() => fetchOrders({ silent: true })}
       />
       <OrderDetectDeliveryTable 
-        orders={tableOrders} 
-        visibleColumns={visibleColumns}
-        onViewOrder={handleViewOrder}
-        onPrintOrder={handlePrintOrder}
-        onAssignOrder={handleOpenAssignDialog}
-        onResendOrder={handleResend}
-        onAdminStatusChange={handleAdminStatusChange}
-        actionLoadingKey={actionLoadingKey}
+        orders={tableOrders} visibleColumns={visibleColumns}
+        onViewOrder={handleViewOrder} onPrintOrder={handlePrintOrder}
+        onAssignOrder={handleOpenAssignDialog} onResendOrder={handleResend}
+        onAdminStatusChange={handleAdminStatusChange} actionLoadingKey={actionLoadingKey}
       />
     </div>
   )
 }
-
-
-
