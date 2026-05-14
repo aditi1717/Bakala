@@ -47,9 +47,7 @@ const isVegMenuItem = (item = {}) => {
 const readUnder250Filters = () => {
   if (typeof window === "undefined") {
     return {
-      selectedSort: null,
       activeCategory: null,
-      under30MinsFilter: false,
     }
   }
 
@@ -57,23 +55,17 @@ const readUnder250Filters = () => {
     const raw = window.localStorage.getItem(UNDER_250_FILTERS_STORAGE_KEY)
     if (!raw) {
       return {
-        selectedSort: null,
         activeCategory: null,
-        under30MinsFilter: false,
       }
     }
 
     const parsed = JSON.parse(raw)
     return {
-      selectedSort: typeof parsed?.selectedSort === "string" ? parsed.selectedSort : null,
       activeCategory: typeof parsed?.activeCategory === "string" ? parsed.activeCategory : null,
-      under30MinsFilter: parsed?.under30MinsFilter === true,
     }
   } catch {
     return {
-      selectedSort: null,
       activeCategory: null,
-      under30MinsFilter: false,
     }
   }
 }
@@ -563,12 +555,7 @@ export default function Under250() {
   }, [quantities, selectedItem, showItemDetail, selectedVariantId])
 
   useEffect(() => {
-    if (!showSortPopup) return
-    setDraftSelectedSort(selectedSort)
-  }, [showSortPopup, selectedSort])
-
-  useEffect(() => {
-    if (!showSortPopup && !showItemDetail && !showShareOptions) return
+    if (!showItemDetail && !showShareOptions) return
     if (typeof window === "undefined") return
 
     const bodyStyle = document.body.style
@@ -591,7 +578,7 @@ export default function Under250() {
       bodyStyle.width = originalWidth
       window.scrollTo(0, scrollLockYRef.current)
     }
-  }, [showSortPopup, showItemDetail, showShareOptions])
+  }, [showItemDetail, showShareOptions])
 
   const handleSearchFocus = useCallback(() => {
     setSearchValue("")
