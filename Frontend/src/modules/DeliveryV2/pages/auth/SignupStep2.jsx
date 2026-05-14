@@ -139,6 +139,50 @@ const fileToDataUrl = (file) =>
     reader.readAsDataURL(file)
   })
 
+const fileToPreviewDataUrl = (file, maxSize = 1280, quality = 0.8) =>
+  new Promise((resolve) => {
+    try {
+      const imageUrl = URL.createObjectURL(file)
+      const image = new Image()
+
+      image.onload = () => {
+        try {
+          const canvas = document.createElement("canvas")
+          let { width, height } = image
+          const largestEdge = Math.max(width, height)
+          if (largestEdge > maxSize) {
+            const ratio = maxSize / largestEdge
+            width = Math.round(width * ratio)
+            height = Math.round(height * ratio)
+          }
+          canvas.width = width
+          canvas.height = height
+          const context = canvas.getContext("2d")
+          context?.drawImage(image, 0, 0, width, height)
+          const outputType =
+            String(file.type || "").toLowerCase() === "image/png"
+              ? "image/png"
+              : "image/jpeg"
+          const previewDataUrl = canvas.toDataURL(outputType, quality)
+          URL.revokeObjectURL(imageUrl)
+          resolve(previewDataUrl)
+        } catch {
+          URL.revokeObjectURL(imageUrl)
+          resolve(null)
+        }
+      }
+
+      image.onerror = () => {
+        URL.revokeObjectURL(imageUrl)
+        resolve(null)
+      }
+
+      image.src = imageUrl
+    } catch {
+      resolve(null)
+    }
+  })
+
 const dataUrlToFile = (dataUrl, fileName = "document.jpg") => {
   if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) return null
   const parts = dataUrl.split(",")
@@ -371,13 +415,14 @@ export default function SignupStep2() {
     }
 
     try {
-      const dataUrl = await fileToDataUrl(file)
+      const compactPreviewDataUrl =
+        (await fileToPreviewDataUrl(file)) || (await fileToDataUrl(file))
       setDocuments((prev) => ({ ...prev, [docType]: file }))
       setUploadedDocs((prev) => ({
         ...prev,
         [docType]: {
-          dataUrl,
-          url: dataUrl,
+          dataUrl: compactPreviewDataUrl,
+          url: compactPreviewDataUrl,
           fileName: file.name,
           mimeType: file.type,
           size: file.size
