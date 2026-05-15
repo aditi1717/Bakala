@@ -1973,7 +1973,11 @@ export async function updateSupportTicket(id, body = {}) {
         set.adminResponse = body.adminResponse;
     }
     if (!Object.keys(set).length) return null;
-    const model = source === 'restaurant' ? FoodRestaurantSupportTicket : FoodSupportTicket;
+    let model;
+    if (source === 'restaurant') model = FoodRestaurantSupportTicket;
+    else if (source === 'delivery') model = DeliverySupportTicket;
+    else model = FoodSupportTicket;
+
     const updated = await model.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     // Notify ticket owner when admin updates ticket (status/response),
     // especially for resolved updates.
@@ -1995,11 +1999,19 @@ export async function updateSupportTicket(id, body = {}) {
                 }
             };
 
+            console.log(`[SupportTicket] Updated ticket found, deciding recipients for source: ${source}`);
             if (source === 'restaurant') {
                 addNotificationOwner('RESTAURANT', updated?.restaurantId);
+            } else if (source === 'delivery') {
+                addNotificationOwner('DELIVERY_PARTNER', updated?.deliveryPartnerId);
             } else {
                 addNotificationOwner('USER', updated?.userId);
+                // Also notify the restaurant if the user raised a ticket about a specific order/restaurant
+                if (updated?.restaurantId) {
+                    addNotificationOwner('RESTAURANT', updated?.restaurantId);
+                }
             }
+            console.log(`[SupportTicket] Notification owners identified: ${notificationOwners.length}`, notificationOwners);
 
             if (notificationOwners.length > 0) {
                 const ticketStatus = String(updated?.status || '').toLowerCase();
@@ -2026,71 +2038,94 @@ export async function updateSupportTicket(id, body = {}) {
                             ? `We have responded to your support ticket${issueSuffix}. ${responseText}`
                             : `Your support ticket${issueSuffix} has been updated.`;
 
-                const buildLink = (ownerType) =>
-                    ownerType === 'USER'
-                        ? '/food/user/notifications'
-                        : '/food/restaurant/notifications';
+                const buildLink = (ownerType) => {
+                    if (ownerType === 'RESTAURANT') return '/food/restaurant/notifications';
+                    if (ownerType === 'DELIVERY_PARTNER') return '/food/delivery/notifications';
+                    return '/food/notifications';
+                };
 
-                await createInboxNotifications({
-                    notifications: notificationOwners.map(({ ownerType, ownerId }) => ({
-                        ownerType,
-                        ownerId,
-                        title,
-                        message,
-                        link: buildLink(ownerType),
-                        category: 'support_ticket',
-                        source: 'SUPPORT_TICKET',
-                        metadata: {
-                            source: 'support_ticket',
-                            ticketId: String(updated?._id || ''),
-                            ticketShortId: shortTicketId,
-                            status: ticketStatus || null,
-                            issueType,
-                        },
-                    })),
-                });
-
-                await Promise.all(
-                    notificationOwners.map(({ ownerType, ownerId }) =>
-                        notifyOwnerSafely(
-                            { ownerType, ownerId },
-                            {
-                                title,
-                                body: message,
-                                dataOnly: true,
-                                skipHighlighter: true,
-                                data: {
-                                    type: 'support_ticket_update',
-                                    ticketId: String(updated?._id || ''),
-                                    ticketStatus: ticketStatus || '',
-                                    link: buildLink(ownerType),
-                                },
-                            },
-                        )
-                    )
-                );
-
-                for (const { ownerType, ownerId } of notificationOwners) {
-                    try {
-                        const io = getIO();
-                        const socketPayload = {
+                // 1. Create Inbox Notifications (Database)
+                try {
+                    console.log(`[SupportTicket] Creating inbox notifications for ${notificationOwners.length} owners`);
+                    await createInboxNotifications({
+                        notifications: notificationOwners.map(({ ownerType, ownerId }) => ({
+                            ownerType,
+                            ownerId,
                             title,
                             message,
                             link: buildLink(ownerType),
-                            targetType: ownerType,
-                            type: 'support_ticket_update',
-                            ticketId: String(updated?._id || ''),
-                            ticketStatus: ticketStatus || '',
-                            createdAt: new Date().toISOString(),
-                        };
-                        if (ownerType === 'USER') {
-                            io.to(rooms.user(ownerId)).emit('admin_notification', socketPayload);
-                        } else if (ownerType === 'RESTAURANT') {
-                            io.to(rooms.restaurant(ownerId)).emit('admin_notification', socketPayload);
+                            category: 'support_ticket',
+                            source: 'SUPPORT_TICKET',
+                            metadata: {
+                                source: 'support_ticket',
+                                ticketId: String(updated?._id || ''),
+                                ticketShortId: shortTicketId,
+                                status: ticketStatus || null,
+                                issueType,
+                            },
+                        })),
+                    });
+                    console.log('[SupportTicket] Inbox notifications created successfully');
+                } catch (inboxError) {
+                    console.error('[SupportTicket] Failed to create inbox notifications:', inboxError);
+                }
+
+                // 2. Send Push Notifications (Firebase)
+                await Promise.all(
+                    notificationOwners.map(async ({ ownerType, ownerId }) => {
+                        try {
+                            console.log(`[SupportTicket] Sending FCM to ${ownerType}:${ownerId}`);
+                            await notifyOwnerSafely(
+                                { ownerType, ownerId },
+                                {
+                                    title,
+                                    body: message,
+                                    skipHighlighter: true,
+                                    data: {
+                                        type: 'support_ticket_update',
+                                        ticketId: String(updated?._id || ''),
+                                        ticketStatus: ticketStatus || '',
+                                        link: buildLink(ownerType),
+                                    },
+                                },
+                            );
+                            console.log(`[SupportTicket] FCM sent to ${ownerType}:${ownerId}`);
+                        } catch (fcmError) {
+                            console.error(`[SupportTicket] Failed to send FCM to ${ownerType}:${ownerId}:`, fcmError);
                         }
-                    } catch (socketError) {
-                        console.error('Failed to emit support ticket notification:', socketError);
+                    })
+                );
+
+                // 3. Emit Real-time Events (Socket.IO)
+                const io = getIO();
+                if (io) {
+                    for (const { ownerType, ownerId } of notificationOwners) {
+                        try {
+                            const socketPayload = {
+                                title,
+                                message,
+                                link: buildLink(ownerType),
+                                targetType: ownerType,
+                                type: 'support_ticket_update',
+                                ticketId: String(updated?._id || ''),
+                                ticketStatus: ticketStatus || '',
+                                createdAt: new Date().toISOString(),
+                            };
+
+                            console.log(`[SupportTicket] Emitting socket to ${ownerType}:${ownerId}`);
+                            if (ownerType === 'USER') {
+                                io.to(rooms.user(ownerId)).emit('admin_notification', socketPayload);
+                            } else if (ownerType === 'RESTAURANT') {
+                                io.to(rooms.restaurant(ownerId)).emit('admin_notification', socketPayload);
+                            } else if (ownerType === 'DELIVERY_PARTNER') {
+                                io.to(rooms.delivery(ownerId)).emit('admin_notification', socketPayload);
+                            }
+                        } catch (socketError) {
+                            console.error(`[SupportTicket] Failed to emit socket to ${ownerType}:${ownerId}:`, socketError);
+                        }
                     }
+                } else {
+                    console.warn('[SupportTicket] Socket.IO instance not available');
                 }
             }
         } catch (e) {
@@ -4500,83 +4535,108 @@ export async function updateDeliverySupportTicket(id, body = {}) {
     const updated = ticket.toObject();
 
     try {
-        const ownerId = updated?.deliveryPartnerId ? String(updated.deliveryPartnerId) : '';
+        const ownerIdRaw = updated?.deliveryPartnerId || ticket?.deliveryPartnerId;
+        const ownerId = ownerIdRaw ? String(ownerIdRaw) : '';
+        console.log(`[SupportTicket:Delivery] Dispatching notification for ownerId: ${ownerId}`);
+
         if (ownerId && mongoose.Types.ObjectId.isValid(ownerId)) {
+            // Import services
             const { createInboxNotifications } = await import('../../../../core/notifications/notification.service.js');
             const { notifyOwnerSafely } = await import('../../../../core/notifications/firebase.service.js');
-            const { getIO, rooms } = await import('../../../../config/socket.js');
+            const socketConfig = await import('../../../../config/socket.js');
+            const getIO = socketConfig.getIO;
+            const rooms = socketConfig.rooms;
 
-            const ticketStatus = String(updated?.status || '').toLowerCase();
-            const subject = String(updated?.subject || updated?.category || 'support').trim();
-            const responseText = String(updated?.adminResponse || '').trim();
+            const ticketStatus = String(updated?.status || ticket?.status || '').toLowerCase();
+            const subject = String(updated?.subject || ticket?.subject || updated?.category || ticket?.category || 'support').trim();
+            const responseText = String(updated?.adminResponse || ticket?.adminResponse || '').trim();
             const subjectSuffix = subject ? ` about ${subject}` : '';
+
             const title =
                 ticketStatus === 'resolved' || ticketStatus === 'closed'
                     ? 'Support Ticket Resolved'
                     : responseText
                         ? 'Support Ticket Reply'
                         : 'Support Ticket Updated';
+
             const message =
                 ticketStatus === 'resolved' || ticketStatus === 'closed'
                     ? `Your support ticket${subjectSuffix} has been resolved.${responseText ? ` ${responseText}` : ''}`
                     : responseText
                         ? `We have responded to your support ticket${subjectSuffix}. ${responseText}`
                         : `Your support ticket${subjectSuffix} has been updated.`;
+
             const link = '/food/delivery/notifications';
+            const shortTicketId = String(updated?.ticketId || ticket?.ticketId || updated?._id || ticket?._id || '').slice(-6).toUpperCase();
 
-            await createInboxNotifications({
-                notifications: [{
-                    ownerType: 'DELIVERY_PARTNER',
-                    ownerId,
-                    title,
-                    message,
-                    link,
-                    category: 'support_ticket',
-                    source: 'SUPPORT_TICKET',
-                    metadata: {
-                        source: 'support_ticket',
-                        ticketId: String(updated?._id || ''),
-                        ticketShortId: String(updated?.ticketId || updated?._id || '').slice(-6).toUpperCase(),
-                        status: ticketStatus || null,
-                        issueType: subject,
-                    },
-                }],
-            });
+            const commonPayload = {
+                title,
+                message,
+                link,
+                source: 'SUPPORT_TICKET',
+                category: 'support_ticket',
+                metadata: {
+                    source: 'support_ticket',
+                    ticketId: String(updated?._id || ticket?._id || ''),
+                    ticketShortId: shortTicketId,
+                    status: ticketStatus || null,
+                    issueType: subject,
+                }
+            };
 
-            await notifyOwnerSafely(
-                { ownerType: 'DELIVERY_PARTNER', ownerId },
-                {
-                    title,
-                    body: message,
-                    dataOnly: true,
-                    skipHighlighter: true,
-                    data: {
-                        type: 'support_ticket_update',
-                        ticketId: String(updated?._id || ''),
-                        ticketStatus: ticketStatus || '',
-                        link,
-                    },
-                },
-            );
-
+            // 1. Inbox (Database)
             try {
-                const io = getIO();
-                io.to(rooms.delivery(ownerId)).emit('admin_notification', {
-                    title,
-                    message,
-                    link,
-                    targetType: 'DELIVERY_PARTNER',
-                    type: 'support_ticket_update',
-                    ticketId: String(updated?._id || ''),
-                    ticketStatus: ticketStatus || '',
-                    createdAt: new Date().toISOString(),
+                console.log(`[SupportTicket:Delivery] Creating inbox notification for ${ownerId}`);
+                await createInboxNotifications({
+                    notifications: [{
+                        ...commonPayload,
+                        ownerType: 'DELIVERY_PARTNER',
+                        ownerId,
+                    }],
                 });
+            } catch (inboxError) {
+                console.error('[SupportTicket:Delivery] Failed to create inbox notification:', inboxError);
+            }
+
+            // 2. FCM (Push)
+            try {
+                console.log(`[SupportTicket:Delivery] Sending FCM to ${ownerId}`);
+                await notifyOwnerSafely(
+                    { ownerType: 'DELIVERY_PARTNER', ownerId },
+                    {
+                        title,
+                        body: message,
+                        skipHighlighter: true,
+                        data: {
+                            ...commonPayload.metadata,
+                            type: 'support_ticket_update',
+                            link,
+                        },
+                    },
+                );
+            } catch (fcmError) {
+                console.error('[SupportTicket:Delivery] Failed to send FCM:', fcmError);
+            }
+
+            // 3. Socket.IO (Real-time)
+            try {
+                const io = getIO ? getIO() : null;
+                if (io && rooms?.delivery) {
+                    const socketPayload = {
+                        ...commonPayload,
+                        targetType: 'DELIVERY_PARTNER',
+                        type: 'support_ticket_update',
+                        timestamp: new Date().toISOString()
+                    };
+                    console.log(`[SupportTicket:Delivery] Emitting socket to room: ${rooms.delivery(ownerId)}`);
+                    io.to(rooms.delivery(ownerId)).emit('admin_notification', socketPayload);
+                }
             } catch (socketError) {
-                console.error('Failed to emit delivery support ticket notification:', socketError);
+                console.error('[SupportTicket:Delivery] Failed to emit socket event:', socketError);
             }
         }
-    } catch (error) {
-        console.error('Failed to notify delivery support ticket owner:', error);
+    } catch (e) {
+        console.error('[SupportTicket:Delivery] General notification failure:', e);
     }
 
     return updated;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Bell, Clock, Trash2, X } from "lucide-react";
+import { ArrowLeft, Bell, Clock, Trash2, X, MessageSquare, ChevronRight } from "lucide-react";
 import { deliveryAPI } from "@food/api";
 import {
   getDeliveryNotifications,
@@ -8,6 +8,7 @@ import {
   markDeliveryNotificationAsRead,
 } from "@food/utils/deliveryNotifications";
 import useNotificationInbox from "@food/hooks/useNotificationInbox";
+import { useDeliveryNotifications } from "@food/hooks/useDeliveryNotifications";
 
 const toTimeLabel = (value) => {
   const date = value ? new Date(value) : null;
@@ -33,6 +34,7 @@ const normalizeNotifications = (items = []) =>
 
 export default function NotificationsV2() {
   const navigate = useNavigate();
+  useDeliveryNotifications();
   const [showAll, setShowAll] = useState(false);
   const [notifications, setNotifications] = useState(() =>
     normalizeNotifications(getDeliveryNotifications())
@@ -123,6 +125,30 @@ export default function NotificationsV2() {
     window.dispatchEvent(new CustomEvent("deliveryNotificationsUpdated"));
   };
 
+  const [tickets, setTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        setTicketsLoading(true);
+        const response = await deliveryAPI.getSupportTickets();
+        if (response?.data?.success) {
+          const allTickets = response.data.data?.tickets || [];
+          const ongoing = allTickets.filter(t => 
+            ['open', 'in_progress'].includes(String(t.status || '').toLowerCase())
+          );
+          setTickets(ongoing);
+        }
+      } catch (err) {
+        console.error("Failed to fetch tickets:", err);
+      } finally {
+        setTicketsLoading(false);
+      }
+    };
+    fetchTickets();
+  }, []);
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <div className="px-4 pt-4 pb-3 flex items-center gap-3 border-b border-gray-200">
@@ -135,7 +161,7 @@ export default function NotificationsV2() {
         </button>
         <div className="flex items-center gap-2 flex-1">
           <Bell className="w-5 h-5 text-[#EB590E]" />
-          <h1 className="text-base font-semibold text-gray-900">Notifications</h1>
+          <h1 className="text-base font-semibold text-gray-900">Inbox & Support</h1>
           {unreadCount > 0 && (
             <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-[#EB590E] text-white text-[10px] font-semibold">
               {unreadCount}
@@ -154,53 +180,94 @@ export default function NotificationsV2() {
         )}
       </div>
 
-      <div className="flex-1 px-4 pt-4 pb-28">
-        {broadcastLoading ? (
-          <div className="text-center text-sm text-gray-600 py-12">Loading notifications...</div>
-        ) : mergedNotifications.length === 0 ? (
-          <div className="text-center text-sm text-gray-600 py-12">No notifications</div>
-        ) : (
-          <div className="space-y-2">
-            {visibleNotifications.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleMarkAsRead(item.id, item.source)}
-                className={`border rounded-lg p-3 flex items-start justify-between gap-3 cursor-pointer ${
-                  item.read ? "border-gray-200" : "border-orange-200 bg-orange-50/40"
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{item.title}</p>
-                  <p className="text-sm text-gray-700 mt-0.5">{item.message || "Delivery notification"}</p>
-                  <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    {toTimeLabel(item.createdAt)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleDismissOne(item.id, item.source);
-                  }}
-                  className="shrink-0 p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                  aria-label="Dismiss notification"
+      <div className="flex-1 px-4 pt-4 pb-28 space-y-6">
+        {/* Support Tickets Section */}
+        {tickets.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Ongoing Support</h2>
+            <div className="space-y-2">
+              {tickets.map((ticket) => (
+                <div
+                  key={ticket._id}
+                  onClick={() => navigate(`/food/delivery/help/tickets/${ticket._id}`)}
+                  className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex items-start gap-3 cursor-pointer hover:bg-blue-50 transition-colors"
                 >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-            {mergedNotifications.length > 5 && (
-              <button
-                type="button"
-                onClick={() => setShowAll((prev) => !prev)}
-                className="w-full rounded-lg border border-gray-200 py-2 text-sm font-medium text-[#EB590E] hover:bg-orange-50"
-              >
-                {showAll ? "Show less" : "View all"}
-              </button>
-            )}
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                    <MessageSquare className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-gray-900 truncate">{ticket.subject}</p>
+                      <span className="shrink-0 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-black uppercase tracking-tighter">
+                        {String(ticket.status || 'Open').replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">{ticket.description}</p>
+                    {ticket.adminResponse && (
+                      <p className="text-[10px] font-bold text-blue-700 mt-2 bg-white/50 p-2 rounded-lg border border-blue-50 italic">
+                        New reply from support team...
+                      </p>
+                    )}
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-blue-300 mt-1" />
+                </div>
+              ))}
+            </div>
           </div>
         )}
+
+        {/* Notifications Section */}
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Notifications</h2>
+          {broadcastLoading ? (
+            <div className="text-center text-sm text-gray-600 py-12">Loading notifications...</div>
+          ) : mergedNotifications.length === 0 ? (
+            <div className="text-center text-sm text-gray-600 py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+              No notifications yet
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {visibleNotifications.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => handleMarkAsRead(item.id, item.source)}
+                  className={`border rounded-lg p-3 flex items-start justify-between gap-3 cursor-pointer ${
+                    item.read ? "border-gray-200" : "border-orange-200 bg-orange-50/40"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                    <p className="text-sm text-gray-700 mt-0.5">{item.message || "Delivery notification"}</p>
+                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      {toTimeLabel(item.createdAt)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleDismissOne(item.id, item.source);
+                    }}
+                    className="shrink-0 p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    aria-label="Dismiss notification"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              {mergedNotifications.length > 5 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAll((prev) => !prev)}
+                  className="w-full rounded-lg border border-gray-200 py-2 text-sm font-medium text-[#EB590E] hover:bg-orange-50"
+                >
+                  {showAll ? "Show less" : "View all"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

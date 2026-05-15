@@ -16,15 +16,17 @@ const normalizeOwnerType = (role) => {
     const normalized = String(role || '').trim().toUpperCase();
     if (normalized === 'USER') return 'USER';
     if (normalized === 'RESTAURANT') return 'RESTAURANT';
-    if (normalized === 'DELIVERY_PARTNER') return 'DELIVERY_PARTNER';
+    if (normalized === 'DELIVERY_PARTNER' || normalized === 'DELIVERY' || normalized === 'PARTNER') return 'DELIVERY_PARTNER';
     return null;
 };
 
-const ensureObjectId = (value, fieldName) => {
-    if (!value || !mongoose.Types.ObjectId.isValid(String(value))) {
-        throw new ValidationError(`${fieldName} is invalid`);
+const ensureObjectId = (value, fieldName = 'ID') => {
+    if (!value) return null;
+    if (value instanceof mongoose.Types.ObjectId) return value;
+    if (mongoose.Types.ObjectId.isValid(String(value))) {
+        return new mongoose.Types.ObjectId(String(value));
     }
-    return new mongoose.Types.ObjectId(String(value));
+    throw new ValidationError(`${fieldName} is invalid`);
 };
 
 export const resolveNotificationOwnerFromRequest = (user = {}) => {
@@ -42,6 +44,7 @@ export const resolveNotificationOwnerFromRequest = (user = {}) => {
 };
 
 export const createInboxNotifications = async ({ notifications = [] } = {}) => {
+    console.log(`[Notification:Service] createInboxNotifications: Processing ${notifications?.length || 0} items`);
     const rows = Array.isArray(notifications)
         ? notifications.filter((item) => item?.ownerType && item?.ownerId && item?.title && item?.message)
         : [];
@@ -77,7 +80,10 @@ export const createInboxNotifications = async ({ notifications = [] } = {}) => {
                     ownerType: payload.ownerType,
                     ownerId: payload.ownerId,
                     source: payload.source,
-                    'metadata.ticketId': supportTicketId
+                    $or: [
+                        { 'metadata.ticketId': supportTicketId },
+                        { 'metadata.ticketId': mongoose.Types.ObjectId.isValid(supportTicketId) ? new mongoose.Types.ObjectId(supportTicketId) : supportTicketId }
+                    ]
                 }
                 : {
                     ownerType: payload.ownerType,
@@ -95,7 +101,8 @@ export const createInboxNotifications = async ({ notifications = [] } = {}) => {
         const update = {
             $set: {
                 ...payload,
-                ...readStateUpdate
+                ...readStateUpdate,
+                updatedAt: new Date()
             },
             $setOnInsert: {
                 ...insertReadState,
@@ -112,7 +119,9 @@ export const createInboxNotifications = async ({ notifications = [] } = {}) => {
         };
     });
 
-    await FoodNotification.bulkWrite(operations, { ordered: false });
+    console.log(`[Notification:Service] Bulk writing ${operations.length} notifications to food_notifications collection`);
+    const result = await FoodNotification.bulkWrite(operations, { ordered: false });
+    console.log(`[Notification:Service] Bulk write result: upserted=${result.nUpserted}, matched=${result.nMatched}, modified=${result.nModified}`);
 
     const ids = rows
         .map((item) => item.broadcastId)
@@ -137,6 +146,10 @@ export const getInboxNotifications = async ({ ownerType, ownerId, page = 1, limi
         dismissedAt: null
     };
 
+    console.log(`[Notification:Service] getInboxNotifications Filter: ${JSON.stringify(filter)}`);
+    const debugCountAll = await FoodNotification.countDocuments({ ownerType: normalizedOwnerType, ownerId: normalizedOwnerId });
+    console.log(`[Notification:Service] getInboxNotifications: Found ${debugCountAll} TOTAL (including dismissed) for this owner`);
+
     const [items, total, unreadCount] = await Promise.all([
         FoodNotification.find(filter)
             .sort({ updatedAt: -1, createdAt: -1 })
@@ -149,6 +162,56 @@ export const getInboxNotifications = async ({ ownerType, ownerId, page = 1, limi
             isRead: false
         })
     ]);
+
+    // 2. LAZY BACKFILL: Check for missed broadcasts (e.g. for newly created accounts)
+    // We do this if it's the first page to ensure they see recent global announcements.
+    if (page === 1) {
+        try {
+            const { BroadcastNotification } = await import('./models/notificationBroadcast.model.js');
+            
+            // Map our ownerType to broadcast targetType
+            const broadcastTargetType = normalizedOwnerType === 'DELIVERY_PARTNER' ? 'DELIVERY' : normalizedOwnerType;
+            
+            // Fetch recent broadcasts (last 30 days) that might apply
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            const applicableBroadcasts = await BroadcastNotification.find({
+                targetType: { $in: ['ALL', broadcastTargetType] },
+                createdAt: { $gte: thirtyDaysAgo }
+            }).limit(10).lean();
+
+            if (applicableBroadcasts.length > 0) {
+                const existingBroadcastIds = await FoodNotification.find({
+                    ownerType: normalizedOwnerType,
+                    ownerId: normalizedOwnerId,
+                    broadcastId: { $in: applicableBroadcasts.map(b => b._id) }
+                }).distinct('broadcastId');
+
+                const missing = applicableBroadcasts.filter(b => !existingBroadcastIds.some(id => String(id) === String(b._id)));
+                
+                if (missing.length > 0) {
+                    console.log(`[Notification:Service] Backfilling ${missing.length} missed broadcasts for ${normalizedOwnerType}:${normalizedOwnerId}`);
+                    await createInboxNotifications({
+                        notifications: missing.map(b => ({
+                            ownerType: normalizedOwnerType,
+                            ownerId: normalizedOwnerId,
+                            title: b.title,
+                            message: b.message,
+                            link: b.link,
+                            category: 'broadcast',
+                            broadcastId: b._id
+                        }))
+                    });
+                    
+                    // Re-fetch items if we added something (to ensure they appear in the result)
+                    return getInboxNotifications({ ownerType, ownerId, page, limit });
+                }
+            }
+        } catch (err) {
+            console.error('[Notification:Service] Failed to backfill broadcasts:', err);
+        }
+    }
+
+    console.log(`[Notification:Service] getInboxNotifications for ${normalizedOwnerType}:${normalizedOwnerId} found ${items.length} items. Total: ${total}`);
 
     return {
         items,

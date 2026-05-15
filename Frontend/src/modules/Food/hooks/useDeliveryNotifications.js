@@ -4,6 +4,7 @@ import { API_BASE_URL } from '@food/api/config';
 import { deliveryAPI } from '@food/api';
 import alertSound from '@food/assets/audio/alert.mp3';
 import originalSound from '@food/assets/audio/original.mp3';
+import { toast } from 'sonner';
 import { dispatchNotificationInboxRefresh } from '@food/hooks/useNotificationInbox';
 
 const shouldLogDeliverySocket = () => {
@@ -1007,7 +1008,11 @@ export const useDeliveryNotifications = () => {
     });
 
     socketRef.current.on('admin_notification', (payload) => {
-      debugLog('Admin broadcast received via socket', payload);
+      debugLog('? Admin notification received via socket:', payload);
+      toast.message(payload?.title || 'Support Update', {
+        description: payload?.message || 'New response from support.',
+        duration: 10000,
+      });
       dispatchNotificationInboxRefresh();
     });
 
@@ -1017,7 +1022,6 @@ export const useDeliveryNotifications = () => {
       if (socketRef.current && newToken) {
         debugLog('?? Auth changed, updating socket token');
         socketRef.current.auth.token = newToken;
-        // Only reconnect if not already connecting/connected or if token changed significantly
         if (!socketRef.current.connected) {
           socketRef.current.connect();
         }

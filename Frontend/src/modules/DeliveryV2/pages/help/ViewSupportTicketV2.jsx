@@ -9,12 +9,14 @@ import { toast } from 'sonner';
 import useDeliveryBackNavigation from '../../hooks/useDeliveryBackNavigation';
 import BRAND_THEME from '@/config/brandTheme';
 import { isModuleAuthenticated } from '@food/utils/auth';
+import { useDeliveryNotifications } from '@food/hooks/useDeliveryNotifications';
 
 /**
  * ViewSupportTicketV2 - Restored Old UI for Ticket Details.
  */
 export const ViewSupportTicketV2 = () => {
   const goBack = useDeliveryBackNavigation();
+  useDeliveryNotifications();
   const { ticketId } = useParams();
   const location = useLocation();
   const query = new URLSearchParams(location.search);

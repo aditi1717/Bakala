@@ -152,6 +152,14 @@ export const initSocket = async (server) => {
         }
 
         // Explicit join (used by existing restaurant client hook).
+        socket.on('join-user', (userId) => {
+            if (socket.user?.role !== 'USER') return;
+            if (String(socket.user?.userId) !== String(userId)) return;
+            const room = roomNames.user(userId);
+            socket.join(room);
+            socket.emit('user-room-joined', { room, userId: String(userId) });
+        });
+
         socket.on('join-restaurant', (restaurantId) => {
             if (socket.user?.role !== 'RESTAURANT') return;
             // Security: only join your own restaurant room.
