@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import LOGO_ASSET from "@/assets/Logo.png"
 import { Link } from "react-router-dom"
 import { ArrowLeft, Clock, MapPin, Heart, Star } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
@@ -207,7 +208,7 @@ export default function Restaurants() {
 
                         <div className="w-36 sm:w-44 md:w-56 lg:w-64 xl:w-72 flex-shrink-0 relative overflow-hidden group/image">
                           <img
-                            src={restaurant.image || "https://via.placeholder.com/400x300?text=Restaurant"}
+                            src={restaurant.image || LOGO_ASSET}
                             alt={restaurant.name}
                             className="w-full h-full object-cover"
                           />
