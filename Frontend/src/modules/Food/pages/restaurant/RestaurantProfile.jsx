@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
-  ArrowLeft, 
-  Save, 
-  Edit2, 
-  MapPin, 
-  User, 
-  Store, 
-  CreditCard, 
-  ShieldCheck, 
+import {
+  ArrowLeft,
+  Save,
+  Edit2,
+  MapPin,
+  User,
+  Store,
+  CreditCard,
+  ShieldCheck,
   Image as ImageIcon,
   Loader2,
   Upload,
@@ -29,12 +29,12 @@ import { restaurantAPI } from "@food/api"
 import { Button } from "@food/components/ui/button"
 import { Input } from "@food/components/ui/input"
 import { Label } from "@food/components/ui/label"
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@food/components/ui/select"
 import { toast } from "sonner"
 import BRAND_THEME from "@/config/brandTheme"
@@ -60,7 +60,7 @@ const RestaurantProfile = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [savingSection, setSavingSection] = useState(null)
-  
+
   const [basicInfo, setBasicInfo] = useState({
     name: "",
     pureVegRestaurant: false,
@@ -132,7 +132,7 @@ const RestaurantProfile = () => {
     try {
       const response = await restaurantAPI.getCurrentRestaurant()
       const data = response?.data?.data?.restaurant || response?.data?.restaurant
-      
+
       if (data) {
         // Map Basic Info
         setBasicInfo({
@@ -227,7 +227,7 @@ const RestaurantProfile = () => {
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/
       if (!panRegex.test(kycInfo.panNumber)) return toast.error("Invalid PAN format (e.g., ABCDE1234F)")
       if (!/^[a-zA-Z\s]*$/.test(kycInfo.nameOnPan)) return toast.error("Name on PAN should only contain letters")
-      
+
       if (kycInfo.gstRegistered) {
         const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
         if (!gstRegex.test(kycInfo.gstNumber)) return toast.error("Invalid GST number format")
@@ -254,7 +254,7 @@ const RestaurantProfile = () => {
     try {
       const formData = new FormData()
       let requestPayload = formData
-      
+
       if (section === 'basic') {
         formData.append("restaurantName", basicInfo.name)
         formData.append("pureVegRestaurant", String(basicInfo.pureVegRestaurant))
@@ -287,7 +287,7 @@ const RestaurantProfile = () => {
         formData.append("panNumber", kycInfo.panNumber)
         formData.append("nameOnPan", kycInfo.nameOnPan)
         if (isUploadableFile(kycInfo.panImage)) formData.append("panImage", kycInfo.panImage)
-        
+
         formData.append("gstRegistered", String(kycInfo.gstRegistered))
         if (kycInfo.gstRegistered) {
           formData.append("gstNumber", kycInfo.gstNumber)
@@ -358,28 +358,28 @@ const RestaurantProfile = () => {
       </div>
       <div className="flex items-center gap-2">
         {!isEditing ? (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onToggle} 
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggle}
             className="text-[#005128] hover:bg-[#e6f0eb] rounded-full px-4"
           >
             <Edit2 className="w-4 h-4 mr-2" /> Edit
           </Button>
         ) : (
           <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onToggle} 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggle}
               disabled={isSaving}
               className="text-slate-500 hover:bg-slate-100 rounded-full"
             >
               Cancel
             </Button>
-            <Button 
-              size="sm" 
-              onClick={onSave} 
+            <Button
+              size="sm"
+              onClick={onSave}
               disabled={isSaving}
               className="bg-[#005128] hover:bg-[#003d1e] text-white rounded-full px-5 shadow-lg shadow-green-900/20"
             >
@@ -400,13 +400,13 @@ const RestaurantProfile = () => {
           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] -mr-32 -mt-32"></div>
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
         </div>
-        
+
         {/* Refined Bottom Curve */}
         <div className="absolute bottom-0 left-0 right-0 h-6 bg-slate-50" style={{ clipPath: 'polygon(0 100%, 100% 100%, 100% 0, 0 100%)' }}></div>
-        
+
         <div className="max-w-5xl mx-auto relative z-10">
           <div className="flex items-center justify-between mb-4">
-            <button 
+            <button
               onClick={() => navigate('/food/restaurant/explore')}
               className="p-2 bg-white/10 backdrop-blur-xl hover:bg-white/20 rounded-xl transition-all group border border-white/20"
             >
@@ -417,7 +417,7 @@ const RestaurantProfile = () => {
               <span className="text-[9px] font-black uppercase tracking-wider text-white">Verified Partner</span>
             </div>
           </div>
-          
+
           <div className="flex flex-col md:flex-row items-center md:items-end gap-4 text-center md:text-left">
             <div className="relative group">
               <div className="w-20 h-20 md:w-24 md:h-24 rounded-[1.8rem] overflow-hidden border-4 border-white shadow-xl bg-slate-100">
@@ -453,7 +453,7 @@ const RestaurantProfile = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 mt-4 space-y-4">
-        
+
         {/* Quick Stats / Indicators - More Compact */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
@@ -462,11 +462,11 @@ const RestaurantProfile = () => {
             { label: 'Featured Dish', val: opsInfo.featuredDish || 'Not Set', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
             { label: 'GST Status', val: kycInfo.gstRegistered ? 'Active' : 'Unregistered', icon: ShieldCheck, color: 'text-orange-600', bg: 'bg-orange-50' },
           ].map((stat, i) => (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              key={i} 
+              key={i}
               className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2.5"
             >
               <div className={`p-2 rounded-lg ${stat.bg} ${stat.color}`}>
@@ -481,14 +481,14 @@ const RestaurantProfile = () => {
         </div>
 
         {/* Basic Information Section */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
         >
-          <SectionHeader 
-            icon={User} 
-            title="Basic Information" 
+          <SectionHeader
+            icon={User}
+            title="Basic Information"
             section="basic"
             isEditing={editStates.basic}
             onToggle={() => toggleEdit('basic')}
@@ -498,18 +498,18 @@ const RestaurantProfile = () => {
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-500 ml-1">Restaurant Name</Label>
-              <Input 
-                value={basicInfo.name} 
-                onChange={e => setBasicInfo({...basicInfo, name: e.target.value})}
+              <Input
+                value={basicInfo.name}
+                onChange={e => setBasicInfo({ ...basicInfo, name: e.target.value })}
                 disabled={!editStates.basic}
                 className="rounded-xl border-slate-200 focus:ring-[#005128] bg-slate-50/50"
               />
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-500 ml-1">Veg / Non-Veg</Label>
-              <Select 
-                value={String(basicInfo.pureVegRestaurant)} 
-                onValueChange={v => setBasicInfo({...basicInfo, pureVegRestaurant: v === 'true'})}
+              <Select
+                value={String(basicInfo.pureVegRestaurant)}
+                onValueChange={v => setBasicInfo({ ...basicInfo, pureVegRestaurant: v === 'true' })}
                 disabled={!editStates.basic}
               >
                 <SelectTrigger className="rounded-xl bg-slate-50/50">
@@ -525,9 +525,9 @@ const RestaurantProfile = () => {
               <Label className="text-xs font-bold text-slate-500 ml-1">Owner Name</Label>
               <div className="relative">
                 <User className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={basicInfo.ownerName} 
-                  onChange={e => setBasicInfo({...basicInfo, ownerName: e.target.value.replace(/[^a-zA-Z\s]/g, "")})}
+                <Input
+                  value={basicInfo.ownerName}
+                  onChange={e => setBasicInfo({ ...basicInfo, ownerName: e.target.value.replace(/[^a-zA-Z\s]/g, "") })}
                   disabled={!editStates.basic}
                   className="pl-10 rounded-xl bg-slate-50/50"
                   placeholder="Owner's Full Name"
@@ -538,9 +538,9 @@ const RestaurantProfile = () => {
               <Label className="text-xs font-bold text-slate-500 ml-1">Owner Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={basicInfo.ownerEmail} 
-                  onChange={e => setBasicInfo({...basicInfo, ownerEmail: e.target.value})}
+                <Input
+                  value={basicInfo.ownerEmail}
+                  onChange={e => setBasicInfo({ ...basicInfo, ownerEmail: e.target.value })}
                   disabled={!editStates.basic}
                   className="pl-10 rounded-xl bg-slate-50/50"
                 />
@@ -550,9 +550,9 @@ const RestaurantProfile = () => {
               <Label className="text-xs font-bold text-slate-500 ml-1">Owner Phone</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={basicInfo.ownerPhone} 
-                  onChange={e => setBasicInfo({...basicInfo, ownerPhone: e.target.value.replace(/\D/g, "").slice(0, 10)})}
+                <Input
+                  value={basicInfo.ownerPhone}
+                  onChange={e => setBasicInfo({ ...basicInfo, ownerPhone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
                   disabled={!editStates.basic}
                   className="pl-10 rounded-xl bg-slate-50/50"
                   placeholder="10-digit mobile number"
@@ -563,9 +563,9 @@ const RestaurantProfile = () => {
               <Label className="text-xs font-bold text-slate-500 ml-1">Secondary Contact</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={basicInfo.primaryContactNumber} 
-                  onChange={e => setBasicInfo({...basicInfo, primaryContactNumber: e.target.value.replace(/\D/g, "").slice(0, 10)})}
+                <Input
+                  value={basicInfo.primaryContactNumber}
+                  onChange={e => setBasicInfo({ ...basicInfo, primaryContactNumber: e.target.value.replace(/\D/g, "").slice(0, 10) })}
                   disabled={!editStates.basic}
                   className="pl-10 rounded-xl bg-slate-50/50"
                   placeholder="10-digit contact number"
@@ -576,14 +576,14 @@ const RestaurantProfile = () => {
         </motion.section>
 
         {/* Location & Address Section */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-3xl shadow-sm border border-slate-200"
         >
-          <SectionHeader 
-            icon={MapPin} 
-            title="Location & Address" 
+          <SectionHeader
+            icon={MapPin}
+            title="Location & Address"
             section="location"
             isEditing={editStates.location}
             onToggle={() => toggleEdit('location')}
@@ -594,9 +594,9 @@ const RestaurantProfile = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold text-slate-500 ml-1">Shop no. / building no.*</Label>
-                <Input 
-                  value={location.addressLine1} 
-                  onChange={e => setLocation({...location, addressLine1: e.target.value})}
+                <Input
+                  value={location.addressLine1}
+                  onChange={e => setLocation({ ...location, addressLine1: e.target.value })}
                   disabled={!editStates.location}
                   className="h-9 text-xs rounded-xl bg-slate-50/50"
                   placeholder="Shop no. / building no.*"
@@ -604,9 +604,9 @@ const RestaurantProfile = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold text-slate-500 ml-1">Floor / tower*</Label>
-                <Input 
-                  value={location.addressLine2} 
-                  onChange={e => setLocation({...location, addressLine2: e.target.value})}
+                <Input
+                  value={location.addressLine2}
+                  onChange={e => setLocation({ ...location, addressLine2: e.target.value })}
                   disabled={!editStates.location}
                   className="h-9 text-xs rounded-xl bg-slate-50/50"
                   placeholder="Floor / tower*"
@@ -614,9 +614,9 @@ const RestaurantProfile = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold text-slate-500 ml-1">Nearby landmark*</Label>
-                <Input 
-                  value={location.landmark} 
-                  onChange={e => setLocation({...location, landmark: e.target.value})}
+                <Input
+                  value={location.landmark}
+                  onChange={e => setLocation({ ...location, landmark: e.target.value })}
                   disabled={!editStates.location}
                   className="h-9 text-xs rounded-xl bg-slate-50/50"
                   placeholder="Nearby landmark*"
@@ -624,9 +624,9 @@ const RestaurantProfile = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold text-slate-500 ml-1">Area / Sector / Locality*</Label>
-                <Input 
-                  value={location.area} 
-                  onChange={e => setLocation({...location, area: e.target.value})}
+                <Input
+                  value={location.area}
+                  onChange={e => setLocation({ ...location, area: e.target.value })}
                   disabled={!editStates.location}
                   className="h-9 text-xs rounded-xl bg-slate-50/50"
                   placeholder="Area / Sector / Locality*"
@@ -634,9 +634,9 @@ const RestaurantProfile = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold text-slate-500 ml-1">City*</Label>
-                <Input 
-                  value={location.city} 
-                  onChange={e => setLocation({...location, city: e.target.value})}
+                <Input
+                  value={location.city}
+                  onChange={e => setLocation({ ...location, city: e.target.value })}
                   disabled={!editStates.location}
                   className="h-9 text-xs rounded-xl bg-slate-50/50"
                   placeholder="City*"
@@ -644,9 +644,9 @@ const RestaurantProfile = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold text-slate-500 ml-1">State*</Label>
-                <Input 
-                  value={location.state} 
-                  onChange={e => setLocation({...location, state: e.target.value})}
+                <Input
+                  value={location.state}
+                  onChange={e => setLocation({ ...location, state: e.target.value })}
                   disabled={!editStates.location}
                   className="h-9 text-xs rounded-xl bg-slate-50/50"
                   placeholder="State*"
@@ -654,9 +654,9 @@ const RestaurantProfile = () => {
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold text-slate-500 ml-1">Pincode*</Label>
-                <Input 
-                  value={location.pincode} 
-                  onChange={e => setLocation({...location, pincode: e.target.value.replace(/\D/g, "").slice(0, 6)})}
+                <Input
+                  value={location.pincode}
+                  onChange={e => setLocation({ ...location, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) })}
                   disabled={!editStates.location}
                   className="h-9 text-xs rounded-xl bg-slate-50/50"
                   placeholder="Pincode*"
@@ -667,14 +667,14 @@ const RestaurantProfile = () => {
         </motion.section>
 
         {/* Operations Section */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden"
         >
-          <SectionHeader 
-            icon={TrendingUp} 
-            title="Restaurant Operations" 
+          <SectionHeader
+            icon={TrendingUp}
+            title="Restaurant Operations"
             section="operations"
             isEditing={editStates.operations}
             onToggle={() => toggleEdit('operations')}
@@ -684,9 +684,9 @@ const RestaurantProfile = () => {
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2 md:col-span-2">
               <Label className="text-xs font-bold text-slate-500 ml-1">Cuisines (Comma Separated)</Label>
-              <Input 
-                value={opsInfo.cuisines.join(", ")} 
-                onChange={e => setOpsInfo({...opsInfo, cuisines: e.target.value.split(",").map(c => c.trim()).filter(Boolean)})}
+              <Input
+                value={opsInfo.cuisines.join(", ")}
+                onChange={e => setOpsInfo({ ...opsInfo, cuisines: e.target.value.split(",").map(c => c.trim()).filter(Boolean) })}
                 disabled={!editStates.operations}
                 className="rounded-xl bg-slate-50/50"
                 placeholder="North Indian, Chinese, Italian"
@@ -696,9 +696,9 @@ const RestaurantProfile = () => {
               <Label className="text-xs font-bold text-slate-500 ml-1">Avg Delivery Time</Label>
               <div className="relative">
                 <Clock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={opsInfo.estimatedDeliveryTime} 
-                  onChange={e => setOpsInfo({...opsInfo, estimatedDeliveryTime: e.target.value})}
+                <Input
+                  value={opsInfo.estimatedDeliveryTime}
+                  onChange={e => setOpsInfo({ ...opsInfo, estimatedDeliveryTime: e.target.value })}
                   disabled={!editStates.operations}
                   className="pl-10 rounded-xl bg-slate-50/50"
                   placeholder="e.g. 30-40 mins"
@@ -707,9 +707,9 @@ const RestaurantProfile = () => {
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-500 ml-1">Featured Dish</Label>
-              <Input 
-                value={opsInfo.featuredDish} 
-                onChange={e => setOpsInfo({...opsInfo, featuredDish: e.target.value})}
+              <Input
+                value={opsInfo.featuredDish}
+                onChange={e => setOpsInfo({ ...opsInfo, featuredDish: e.target.value })}
                 disabled={!editStates.operations}
                 className="rounded-xl bg-slate-50/50"
                 placeholder="e.g. Butter Chicken Special"
@@ -719,9 +719,9 @@ const RestaurantProfile = () => {
               <Label className="text-xs font-bold text-slate-500 ml-1">Special Offer / Promotion</Label>
               <div className="relative">
                 <Tag className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={opsInfo.offer} 
-                  onChange={e => setOpsInfo({...opsInfo, offer: e.target.value})}
+                <Input
+                  value={opsInfo.offer}
+                  onChange={e => setOpsInfo({ ...opsInfo, offer: e.target.value })}
                   disabled={!editStates.operations}
                   className="pl-10 rounded-xl bg-slate-50/50"
                   placeholder="e.g. 50% OFF on first order"
@@ -732,14 +732,14 @@ const RestaurantProfile = () => {
         </motion.section>
 
         {/* KYC & Legal Section */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden"
         >
-          <SectionHeader 
-            icon={ShieldCheck} 
-            title="KYC & Legal Details" 
+          <SectionHeader
+            icon={ShieldCheck}
+            title="KYC & Legal Details"
             section="kyc"
             isEditing={editStates.kyc}
             onToggle={() => toggleEdit('kyc')}
@@ -756,9 +756,9 @@ const RestaurantProfile = () => {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-bold text-slate-500 ml-1">PAN Number</Label>
-                    <Input 
-                      value={kycInfo.panNumber} 
-                      onChange={e => setKycInfo({...kycInfo, panNumber: e.target.value.toUpperCase().slice(0, 10)})}
+                    <Input
+                      value={kycInfo.panNumber}
+                      onChange={e => setKycInfo({ ...kycInfo, panNumber: e.target.value.toUpperCase().slice(0, 10) })}
                       disabled={!editStates.kyc}
                       className="rounded-xl bg-slate-50/50"
                       placeholder="ABCDE1234F"
@@ -766,9 +766,9 @@ const RestaurantProfile = () => {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold text-slate-500 ml-1">Name on PAN</Label>
-                    <Input 
-                      value={kycInfo.nameOnPan} 
-                      onChange={e => setKycInfo({...kycInfo, nameOnPan: e.target.value.replace(/[^a-zA-Z\s]/g, "")})}
+                    <Input
+                      value={kycInfo.nameOnPan}
+                      onChange={e => setKycInfo({ ...kycInfo, nameOnPan: e.target.value.replace(/[^a-zA-Z\s]/g, "") })}
                       disabled={!editStates.kyc}
                       className="rounded-xl bg-slate-50/50"
                       placeholder="Full Name as per PAN"
@@ -791,7 +791,7 @@ const RestaurantProfile = () => {
                     <label className="absolute inset-0 bg-[#005128]/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer text-white">
                       <Upload className="w-8 h-8 mb-2" />
                       <span className="text-sm font-bold">Replace Document</span>
-                      <input type="file" className="hidden" accept="image/*" onChange={e => setKycInfo({...kycInfo, panImage: e.target.files[0]})} />
+                      <input type="file" className="hidden" accept="image/*" onChange={e => setKycInfo({ ...kycInfo, panImage: e.target.files[0] })} />
                     </label>
                   )}
                 </div>
@@ -800,19 +800,19 @@ const RestaurantProfile = () => {
 
             {/* GST Details */}
             <div className="pt-8 border-t border-slate-100">
-               <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-6">
                 <h3 className="text-sm font-bold text-[#005128] flex items-center gap-2">
                   <div className="w-1.5 h-4 bg-[#005128] rounded-full" /> GST Information
                 </h3>
                 <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-full">
-                   <button 
-                    onClick={() => editStates.kyc && setKycInfo({...kycInfo, gstRegistered: false})}
+                  <button
+                    onClick={() => editStates.kyc && setKycInfo({ ...kycInfo, gstRegistered: false })}
                     className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${!kycInfo.gstRegistered ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
                   >
                     Unregistered
                   </button>
-                  <button 
-                    onClick={() => editStates.kyc && setKycInfo({...kycInfo, gstRegistered: true})}
+                  <button
+                    onClick={() => editStates.kyc && setKycInfo({ ...kycInfo, gstRegistered: true })}
                     className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${kycInfo.gstRegistered ? 'bg-[#005128] text-white shadow-sm' : 'text-slate-500'}`}
                   >
                     Registered
@@ -822,7 +822,7 @@ const RestaurantProfile = () => {
 
               <AnimatePresence>
                 {kycInfo.gstRegistered && (
-                  <motion.div 
+                  <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
@@ -831,9 +831,9 @@ const RestaurantProfile = () => {
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Label className="text-xs font-bold text-slate-500 ml-1">GST Number</Label>
-                        <Input 
-                          value={kycInfo.gstNumber} 
-                          onChange={e => setKycInfo({...kycInfo, gstNumber: e.target.value.toUpperCase().slice(0, 15)})}
+                        <Input
+                          value={kycInfo.gstNumber}
+                          onChange={e => setKycInfo({ ...kycInfo, gstNumber: e.target.value.toUpperCase().slice(0, 15) })}
                           onFocus={(e) => e.target.scrollIntoView({ behavior: "smooth", block: "center" })}
                           disabled={!editStates.kyc}
                           className="rounded-xl bg-white h-12 px-4 shadow-sm border-slate-200"
@@ -842,9 +842,9 @@ const RestaurantProfile = () => {
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs font-bold text-slate-500 ml-1">Legal Entity Name</Label>
-                        <Input 
-                          value={kycInfo.gstLegalName} 
-                          onChange={e => setKycInfo({...kycInfo, gstLegalName: e.target.value.replace(/[^a-zA-Z\s]/g, "")})}
+                        <Input
+                          value={kycInfo.gstLegalName}
+                          onChange={e => setKycInfo({ ...kycInfo, gstLegalName: e.target.value.replace(/[^a-zA-Z\s]/g, "") })}
                           onFocus={(e) => e.target.scrollIntoView({ behavior: "smooth", block: "center" })}
                           disabled={!editStates.kyc}
                           className="rounded-xl bg-white h-12 px-4 shadow-sm border-slate-200"
@@ -853,9 +853,9 @@ const RestaurantProfile = () => {
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs font-bold text-slate-500 ml-1">Registered Address</Label>
-                        <Input 
-                          value={kycInfo.gstAddress} 
-                          onChange={e => setKycInfo({...kycInfo, gstAddress: e.target.value})}
+                        <Input
+                          value={kycInfo.gstAddress}
+                          onChange={e => setKycInfo({ ...kycInfo, gstAddress: e.target.value })}
                           onFocus={(e) => e.target.scrollIntoView({ behavior: "smooth", block: "center" })}
                           disabled={!editStates.kyc}
                           className="rounded-xl bg-white h-12 px-4 shadow-sm border-slate-200"
@@ -877,7 +877,7 @@ const RestaurantProfile = () => {
                           <label className="absolute inset-0 bg-[#005128]/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer text-white">
                             <Upload className="w-8 h-8 mb-2" />
                             <span className="text-sm font-bold">Choose File</span>
-                            <input type="file" className="hidden" accept="image/*" onChange={e => setKycInfo({...kycInfo, gstImage: e.target.files[0]})} />
+                            <input type="file" className="hidden" accept="image/*" onChange={e => setKycInfo({ ...kycInfo, gstImage: e.target.files[0] })} />
                           </label>
                         )}
                       </div>
@@ -891,14 +891,14 @@ const RestaurantProfile = () => {
         </motion.section>
 
         {/* FSSAI Section */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden"
         >
-          <SectionHeader 
-            icon={ShieldCheck} 
-            title="FSSAI Details" 
+          <SectionHeader
+            icon={ShieldCheck}
+            title="FSSAI Details"
             section="fssai"
             isEditing={editStates.fssai}
             onToggle={() => toggleEdit('fssai')}
@@ -909,9 +909,9 @@ const RestaurantProfile = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-slate-500 ml-1">FSSAI License Number</Label>
-                <Input 
-                  value={kycInfo.fssaiNumber} 
-                  onChange={e => setKycInfo({...kycInfo, fssaiNumber: e.target.value.replace(/\D/g, "").slice(0, 14)})}
+                <Input
+                  value={kycInfo.fssaiNumber}
+                  onChange={e => setKycInfo({ ...kycInfo, fssaiNumber: e.target.value.replace(/\D/g, "").slice(0, 14) })}
                   disabled={!editStates.fssai}
                   className="rounded-xl bg-slate-50/50"
                   placeholder="14-digit license number"
@@ -919,10 +919,10 @@ const RestaurantProfile = () => {
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-slate-500 ml-1">License Expiry Date</Label>
-                <Input 
+                <Input
                   type="date"
-                  value={kycInfo.fssaiExpiry} 
-                  onChange={e => setKycInfo({...kycInfo, fssaiExpiry: e.target.value})}
+                  value={kycInfo.fssaiExpiry}
+                  onChange={e => setKycInfo({ ...kycInfo, fssaiExpiry: e.target.value })}
                   disabled={!editStates.fssai}
                   className="rounded-xl bg-slate-50/50"
                 />
@@ -943,7 +943,7 @@ const RestaurantProfile = () => {
                   <label className="absolute inset-0 bg-[#005128]/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer text-white">
                     <Upload className="w-8 h-8 mb-2" />
                     <span className="text-sm font-bold">Replace File</span>
-                    <input type="file" className="hidden" accept="image/*" onChange={e => setKycInfo({...kycInfo, fssaiImage: e.target.files[0]})} />
+                    <input type="file" className="hidden" accept="image/*" onChange={e => setKycInfo({ ...kycInfo, fssaiImage: e.target.files[0] })} />
                   </label>
                 )}
               </div>
@@ -952,14 +952,14 @@ const RestaurantProfile = () => {
         </motion.section>
 
         {/* Bank Details Section */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden"
         >
-          <SectionHeader 
-            icon={CreditCard} 
-            title="Bank Settlement Details" 
+          <SectionHeader
+            icon={CreditCard}
+            title="Bank Settlement Details"
             section="bank"
             isEditing={editStates.bank}
             onToggle={() => toggleEdit('bank')}
@@ -969,9 +969,9 @@ const RestaurantProfile = () => {
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-500 ml-1">Account Number</Label>
-              <Input 
-                value={bankInfo.accountNumber} 
-                onChange={e => setBankInfo({...bankInfo, accountNumber: e.target.value.replace(/\D/g, "")})}
+              <Input
+                value={bankInfo.accountNumber}
+                onChange={e => setBankInfo({ ...bankInfo, accountNumber: e.target.value.replace(/\D/g, "") })}
                 maxLength={15}
                 disabled={!editStates.bank}
                 className="rounded-xl bg-slate-50/50 font-mono tracking-wider"
@@ -980,9 +980,9 @@ const RestaurantProfile = () => {
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-500 ml-1">IFSC Code</Label>
-              <Input 
-                value={bankInfo.ifscCode} 
-                onChange={e => setBankInfo({...bankInfo, ifscCode: e.target.value.toUpperCase().slice(0, 11)})}
+              <Input
+                value={bankInfo.ifscCode}
+                onChange={e => setBankInfo({ ...bankInfo, ifscCode: e.target.value.toUpperCase().slice(0, 11) })}
                 disabled={!editStates.bank}
                 className="rounded-xl bg-slate-50/50 font-mono"
                 placeholder="ABCD0123456"
@@ -992,9 +992,9 @@ const RestaurantProfile = () => {
               <Label className="text-xs font-bold text-slate-500 ml-1">Account Holder Name</Label>
               <div className="relative">
                 <User className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={bankInfo.accountHolderName} 
-                  onChange={e => setBankInfo({...bankInfo, accountHolderName: e.target.value.replace(/[^a-zA-Z\s]/g, "")})}
+                <Input
+                  value={bankInfo.accountHolderName}
+                  onChange={e => setBankInfo({ ...bankInfo, accountHolderName: e.target.value.replace(/[^a-zA-Z\s]/g, "") })}
                   disabled={!editStates.bank}
                   className="pl-10 rounded-xl bg-slate-50/50"
                   placeholder="Full Name as per Bank Records"
@@ -1003,9 +1003,9 @@ const RestaurantProfile = () => {
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-500 ml-1">Account Type</Label>
-              <Select 
-                value={bankInfo.accountType} 
-                onValueChange={v => setBankInfo({...bankInfo, accountType: v})}
+              <Select
+                value={bankInfo.accountType}
+                onValueChange={v => setBankInfo({ ...bankInfo, accountType: v })}
                 disabled={!editStates.bank}
               >
                 <SelectTrigger className="rounded-xl bg-slate-50/50">
@@ -1021,14 +1021,14 @@ const RestaurantProfile = () => {
         </motion.section>
 
         {/* Gallery & Media Section */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden"
         >
-          <SectionHeader 
-            icon={ImageIcon} 
-            title="Photos & Menu Gallery" 
+          <SectionHeader
+            icon={ImageIcon}
+            title="Photos & Menu Gallery"
             section="images"
             isEditing={editStates.images}
             onToggle={() => toggleEdit('images')}
@@ -1049,7 +1049,7 @@ const RestaurantProfile = () => {
                   <label className="absolute inset-0 bg-[#005128]/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer text-white">
                     <Upload className="w-8 h-8 mb-2" />
                     <span className="text-xs font-bold">Update Photo</span>
-                    <input type="file" className="hidden" accept="image/*" onChange={e => setImageInfo({...imageInfo, profileImage: e.target.files[0]})} />
+                    <input type="file" className="hidden" accept="image/*" onChange={e => setImageInfo({ ...imageInfo, profileImage: e.target.files[0] })} />
                   </label>
                 )}
               </div>
@@ -1060,29 +1060,29 @@ const RestaurantProfile = () => {
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-bold text-slate-500 ml-1">Menu Card Images</Label>
                 {editStates.images && (
-                   <label className="flex items-center gap-2 px-4 py-2 bg-[#e6f0eb] text-[#005128] rounded-full text-xs font-bold cursor-pointer hover:bg-[#005128] hover:text-white transition-all">
+                  <label className="flex items-center gap-2 px-4 py-2 bg-[#e6f0eb] text-[#005128] rounded-full text-xs font-bold cursor-pointer hover:bg-[#005128] hover:text-white transition-all">
                     <Upload className="w-4 h-4" /> Add More
                     <input type="file" multiple className="hidden" accept="image/*" onChange={e => {
                       const files = Array.from(e.target.files)
-                      setImageInfo({...imageInfo, menuImages: [...imageInfo.menuImages, ...files]})
+                      setImageInfo({ ...imageInfo, menuImages: [...imageInfo.menuImages, ...files] })
                     }} />
                   </label>
                 )}
               </div>
-              
+
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {imageInfo.menuImages.length > 0 ? (
                   imageInfo.menuImages.map((img, idx) => (
-                    <motion.div 
-                      key={idx} 
+                    <motion.div
+                      key={idx}
                       initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className="relative aspect-[3/4] rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 group shadow-sm hover:shadow-md transition-all"
                     >
                       <img src={getPreviewUrl(img)} alt={`Menu ${idx + 1}`} className="w-full h-full object-cover" />
                       {editStates.images && (
-                        <button 
-                          onClick={() => setImageInfo({...imageInfo, menuImages: imageInfo.menuImages.filter((_, i) => i !== idx)})}
+                        <button
+                          onClick={() => setImageInfo({ ...imageInfo, menuImages: imageInfo.menuImages.filter((_, i) => i !== idx) })}
                           className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors"
                         >
                           <X className="w-3.5 h-3.5" />

@@ -178,7 +178,7 @@ export default function AddressSelectorPage({ formOnly = false }) {
     if (id) {
       await setDefaultAddress(id)
       persistSelectedLocation(buildLocationPayloadFromAddress(address))
-      try { localStorage.setItem("deliveryAddressMode", "saved") } catch {}
+      try { localStorage.setItem("deliveryAddressMode", "saved") } catch { }
       toast.success("Address selected")
       if (cartReturnPath) {
         navigate(cartReturnPath, { replace: true })
@@ -378,7 +378,7 @@ export default function AddressSelectorPage({ formOnly = false }) {
         const id = getAddressId(savedAddress)
         if (id) await setDefaultAddress(id)
         persistSelectedLocation(buildLocationPayloadFromAddress(savedAddress || payload))
-        try { localStorage.setItem("deliveryAddressMode", "saved") } catch {}
+        try { localStorage.setItem("deliveryAddressMode", "saved") } catch { }
         toast.success(editingAddressId ? "Address updated" : "Address saved")
         setEditingAddressId(null)
         if (formReturnPath) {
@@ -438,7 +438,7 @@ export default function AddressSelectorPage({ formOnly = false }) {
                 <Input
                   placeholder="Apartment, building, tower"
                   value={addressFormData.buildingName || ""}
-                  onChange={e => setAddressFormData({...addressFormData, buildingName: e.target.value})}
+                  onChange={e => setAddressFormData({ ...addressFormData, buildingName: e.target.value })}
                   onFocus={() => scrollFieldIntoView("buildingName")}
                   ref={(el) => { manualFieldRefs.current.buildingName = el }}
                   className="h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111111]"
@@ -450,7 +450,7 @@ export default function AddressSelectorPage({ formOnly = false }) {
                 <Input
                   placeholder="Floor 3, Flat 302"
                   value={addressFormData.floor || ""}
-                  onChange={e => setAddressFormData({...addressFormData, floor: e.target.value})}
+                  onChange={e => setAddressFormData({ ...addressFormData, floor: e.target.value })}
                   onFocus={() => scrollFieldIntoView("floor")}
                   ref={(el) => { manualFieldRefs.current.floor = el }}
                   className="h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111111]"
@@ -479,43 +479,43 @@ export default function AddressSelectorPage({ formOnly = false }) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">City</Label>
-                <Input 
-                  value={addressFormData.city} 
+                <Input
+                  value={addressFormData.city}
                   onChange={e => {
                     const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
-                    setAddressFormData({...addressFormData, city: val});
+                    setAddressFormData({ ...addressFormData, city: val });
                   }}
                   onFocus={() => scrollFieldIntoView("city")}
                   ref={(el) => { manualFieldRefs.current.city = el }}
                   className="h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111111]"
-                  required 
+                  required
                 />
               </div>
               <div>
                 <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">State</Label>
-                <Input 
-                  value={addressFormData.state} 
+                <Input
+                  value={addressFormData.state}
                   onChange={e => {
                     const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
-                    setAddressFormData({...addressFormData, state: val});
+                    setAddressFormData({ ...addressFormData, state: val });
                   }}
                   onFocus={() => scrollFieldIntoView("state")}
                   ref={(el) => { manualFieldRefs.current.state = el }}
                   className="h-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#111111]"
-                  required 
+                  required
                 />
               </div>
             </div>
 
             <div>
               <Label className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1 block">Pincode / ZIP</Label>
-              <Input 
-                placeholder="Pincode" 
-                value={addressFormData.zipCode || ""} 
+              <Input
+                placeholder="Pincode"
+                value={addressFormData.zipCode || ""}
                 onChange={e => {
                   const val = e.target.value.replace(/\D/g, "");
                   if (val.length <= 6) {
-                    setAddressFormData({...addressFormData, zipCode: val});
+                    setAddressFormData({ ...addressFormData, zipCode: val });
                   }
                 }}
                 maxLength={6}
@@ -528,20 +528,20 @@ export default function AddressSelectorPage({ formOnly = false }) {
             </div>
 
             <div>
-               <Label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 block">Save address as</Label>
-               <div className="flex gap-2">
-                 {["Home", "Work", "Other"].map(l => (
-                   <Button 
-                     key={l}
-                     variant={addressFormData.label === l ? "default" : "outline"}
-                     onClick={() => setAddressFormData({...addressFormData, label: l})}
-                     className="flex-1"
-                     style={addressFormData.label === l ? {backgroundColor: BRAND_THEME.tokens.cart.primaryText, color: 'white'} : {}}
-                   >
-                     {l}
-                   </Button>
-                 ))}
-               </div>
+              <Label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 block">Save address as</Label>
+              <div className="flex gap-2">
+                {["Home", "Work", "Other"].map(l => (
+                  <Button
+                    key={l}
+                    variant={addressFormData.label === l ? "default" : "outline"}
+                    onClick={() => setAddressFormData({ ...addressFormData, label: l })}
+                    className="flex-1"
+                    style={addressFormData.label === l ? { backgroundColor: BRAND_THEME.tokens.cart.primaryText, color: 'white' } : {}}
+                  >
+                    {l}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -550,9 +550,9 @@ export default function AddressSelectorPage({ formOnly = false }) {
           className="fixed left-0 right-0 p-4 bg-white dark:bg-[#1a1a1a] border-t dark:border-gray-800 transition-[bottom] duration-150"
           style={{ bottom: `${keyboardInset}px` }}
         >
-          <Button 
-            className="w-full h-12 text-white font-bold text-lg" 
-            style={{backgroundColor: BRAND_THEME.tokens.cart.primaryText}}
+          <Button
+            className="w-full h-12 text-white font-bold text-lg"
+            style={{ backgroundColor: BRAND_THEME.tokens.cart.primaryText }}
             onClick={handleAddressFormSubmit}
             disabled={loadingAddress}
           >

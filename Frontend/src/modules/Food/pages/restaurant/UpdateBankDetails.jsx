@@ -83,12 +83,23 @@ export default function UpdateBankDetails() {
     return Object.keys(nextErrors).length === 0
   }
 
+  const STORAGE_KEY = "restaurant_bank_details_draft"
+  const isInitialized = useRef(false)
+
   const loadProfile = async () => {
     try {
       setLoading(true)
       const response = await restaurantAPI.getCurrentRestaurant()
       const doc = response?.data?.data?.restaurant || response?.data?.restaurant || null
-      if (!doc) return
+      
+      // Load draft from localStorage
+      const draft = localStorage.getItem(STORAGE_KEY)
+      const parsedDraft = draft ? JSON.parse(draft) : null
+
+      if (!doc) {
+        if (parsedDraft) setForm(parsedDraft)
+        return
+      }
 
       const accountNumber = String(doc.accountNumber || "").replace(/\s|-/g, "")
       const upiQrImage =
@@ -96,25 +107,65 @@ export default function UpdateBankDetails() {
           ? doc.upiQrImage
           : String(doc.upiQrImage?.url || "")
 
-      setForm({
+      const serverData = {
         accountHolderName: String(doc.accountHolderName || ""),
         accountNumber,
         confirmAccountNumber: accountNumber,
         ifscCode: String(doc.ifscCode || "").toUpperCase(),
         upiId: String(doc.upiId || ""),
         upiQrImage,
-      })
+      }
+
+      // Merge: Prioritize draft for empty server fields, or server data for official fields
+      if (parsedDraft) {
+        setForm({
+          accountHolderName: serverData.accountHolderName || parsedDraft.accountHolderName || "",
+          accountNumber: serverData.accountNumber || parsedDraft.accountNumber || "",
+          confirmAccountNumber: serverData.confirmAccountNumber || parsedDraft.confirmAccountNumber || "",
+          ifscCode: serverData.ifscCode || parsedDraft.ifscCode || "",
+          upiId: serverData.upiId || parsedDraft.upiId || "",
+          upiQrImage: serverData.upiQrImage || parsedDraft.upiQrImage || "",
+        })
+      } else {
+        setForm(serverData)
+      }
+      
       setLastUpdated(doc.updatedAt || "")
     } catch (error) {
-      alert(error?.response?.data?.message || "Failed to load bank details")
+      console.error("Failed to load bank details:", error)
+      // Fallback to draft even on API error
+      const draft = localStorage.getItem(STORAGE_KEY)
+      if (draft) setForm(JSON.parse(draft))
     } finally {
       setLoading(false)
+      isInitialized.current = true
     }
   }
 
   useEffect(() => {
     loadProfile()
   }, [])
+
+  // Auto-scroll to active input on focus (especially helpful on mobile)
+  useEffect(() => {
+    const handleFocus = (e) => {
+      const el = e.target
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT") {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "center" })
+        }, 300)
+      }
+    }
+    window.addEventListener("focusin", handleFocus)
+    return () => window.removeEventListener("focusin", handleFocus)
+  }, [])
+
+  // Save draft to localStorage whenever form changes
+  useEffect(() => {
+    if (isInitialized.current) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(form))
+    }
+  }, [form])
 
   const handleQrUpload = async (file) => {
     if (!file) return
@@ -162,6 +213,7 @@ export default function UpdateBankDetails() {
     try {
       setSaving(true)
       await restaurantAPI.updateProfile(payload)
+      localStorage.removeItem(STORAGE_KEY)
       await loadProfile()
       setErrors({})
       alert("Bank details updated successfully")
@@ -173,10 +225,9 @@ export default function UpdateBankDetails() {
   }
 
   const inputClass = (key) =>
-    `w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 text-base transition-colors ${
-      errors[key]
-        ? "border-red-500 focus:ring-red-500 focus:border-red-500"
-        : "border-gray-300 focus:ring-brand-500 focus:border-transparent"
+    `w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 text-base transition-colors ${errors[key]
+      ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+      : "border-gray-300 focus:ring-brand-500 focus:border-transparent"
     }`
 
   return (
@@ -301,7 +352,7 @@ export default function UpdateBankDetails() {
                   </div>
                 )}
 
-                <div 
+                <div
                   onClick={handleQrClick}
                   className="inline-flex mt-3 items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium cursor-pointer hover:bg-gray-50"
                 >
@@ -338,7 +389,7 @@ export default function UpdateBankDetails() {
           </form>
         )}
       </div>
-      
+
       <ImageSourcePicker
         isOpen={isQrPickerOpen}
         onClose={() => setIsQrPickerOpen(false)}
