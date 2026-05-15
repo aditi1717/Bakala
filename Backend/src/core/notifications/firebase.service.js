@@ -446,9 +446,11 @@ export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, pla
                 await doc.save();
             }
         }
-        logger.info(
-            `FCM push sent to ${ownerType}:${ownerId} (${platform || 'all'}). Success=${response.successCount}, Failure=${response.failureCount}`
-        );
+        if (!payload?.silent) {
+            logger.info(
+                `FCM push sent to ${ownerType}:${ownerId} (${platform || 'all'}). Success=${response.successCount}, Failure=${response.failureCount}`
+            );
+        }
         return response;
     } catch (error) {
         logger.warn(`FCM push failed for ${ownerType}:${ownerId}: ${error.message}`);
@@ -457,23 +459,34 @@ export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, pla
 };
 
 export const sendNotificationToOwners = async (targets = [], payload = {}) => {
-    // 🔍 Tip #6: Deduplicate targets by ownerType:ownerId before sending
-    // This prevents duplicate notifications if the same person is listed twice (e.g. as USER and partner)
     const uniqueTargets = Array.isArray(targets) 
         ? [...new Map(targets.filter(t => t?.ownerType && t?.ownerId).map(t => [`${t.ownerType}:${t.ownerId}`, t])).values()]
         : [];
 
-    const results = [];
-    for (const target of uniqueTargets) {
-        results.push(
-            await sendNotificationToOwner({
+    if (!uniqueTargets.length) return [];
+
+    const isBroadcast = uniqueTargets.length > 5;
+    if (isBroadcast) {
+        logger.info(`FCM: Starting broadcast to ${uniqueTargets.length} recipients...`);
+    }
+
+    const results = await Promise.all(
+        uniqueTargets.map(target => 
+            sendNotificationToOwner({
                 ownerType: target.ownerType,
                 ownerId: target.ownerId,
                 platform: target.platform,
-                payload
+                payload: { ...payload, silent: isBroadcast }
             })
-        );
+        )
+    );
+
+    if (isBroadcast) {
+        const totalSuccess = results.reduce((acc, r) => acc + (r?.successCount || 0), 0);
+        const totalFailure = results.reduce((acc, r) => acc + (r?.failureCount || 0), 0);
+        logger.info(`FCM Broadcast Finished: Recipients=${uniqueTargets.length}, Success=${totalSuccess}, Failure=${totalFailure}`);
     }
+
     return results;
 };
 
