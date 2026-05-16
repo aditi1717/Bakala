@@ -9,7 +9,7 @@ const ROLE_STORAGE_KEYS = {
     seller: 'auth_seller',
     admin: 'auth_admin',
     delivery: 'auth_delivery',
-    restaurant: 'auth_restaurant'
+    restaurant: 'restaurant_accessToken'
 };
 
 const LEGACY_ROLE_STORAGE_KEYS = {
@@ -82,7 +82,7 @@ export const AuthProvider = ({ children }) => {
                     const response = await getWithDedupe(
                         getProfileEndpoint(currentRole),
                         {},
-                        { ttl: 5000 }
+                        { ttl: 5000, contextModule: currentRole }
                     );
                     setUser(extractProfilePayload(response));
                 } catch (error) {
@@ -149,7 +149,7 @@ export const AuthProvider = ({ children }) => {
     const refreshUser = async () => {
         if (token) {
             try {
-                const response = await axiosInstance.get(getProfileEndpoint(currentRole));
+                const response = await axiosInstance.get(getProfileEndpoint(currentRole), { contextModule: currentRole });
                 const payload = extractProfilePayload(response);
                 setUser(payload);
                 return payload;

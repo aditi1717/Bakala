@@ -98,13 +98,13 @@ axiosInstance.interceptors.response.use(
             }
             const path = window.location.pathname;
             const requestUrl = String(originalRequest?.url || '');
-            const currentModule = path.startsWith('/seller')
+            const currentModule = (path.startsWith('/seller') || path.includes('/seller/'))
                 ? 'seller'
-                : path.startsWith('/admin')
+                : (path.startsWith('/admin') || path.includes('/admin/'))
                     ? 'admin'
-                    : path.startsWith('/delivery')
+                    : (path.startsWith('/delivery') || path.includes('/delivery/'))
                         ? 'delivery'
-                        : (path.startsWith('/restaurant') || path.startsWith('/food/restaurant'))
+                        : (path.startsWith('/restaurant') || path.includes('/restaurant/'))
                             ? 'restaurant'
                             : 'customer';
             const requestModule = originalRequest.contextModule || (requestUrl.startsWith('/seller')
@@ -119,6 +119,12 @@ axiosInstance.interceptors.response.use(
                                 ? 'customer'
                                 : null);
 
+            // Avoid redirect loops if we are already on a login page
+            const loginPaths = ['/login', '/user/auth', '/food/restaurant/login', '/seller/auth', '/admin/auth', '/delivery/auth', '/welcome'];
+            if (loginPaths.some(lp => path.includes(lp))) {
+                return Promise.reject(error);
+            }
+
             // Prevent cross-module 401s from logging out the active session
             // (e.g. seller page accidentally calling an admin endpoint).
             if (requestModule && requestModule !== currentModule) {
@@ -126,11 +132,11 @@ axiosInstance.interceptors.response.use(
             }
 
             const moduleStorageKeys = {
-                seller: ['auth_seller', 'seller_accessToken', 'token'],
-                admin: ['auth_admin', 'admin_accessToken', 'token'],
-                delivery: ['auth_delivery', 'delivery_accessToken', 'token'],
-                restaurant: ['auth_restaurant', 'restaurant_accessToken', 'token'],
-                customer: ['auth_customer', 'user_accessToken', 'accessToken', 'token'],
+                seller: ['auth_seller', 'seller_accessToken', 'seller_refreshToken', 'seller_user', 'seller_authenticated', 'token'],
+                admin: ['auth_admin', 'admin_accessToken', 'admin_refreshToken', 'admin_user', 'admin_authenticated', 'token'],
+                delivery: ['auth_delivery', 'delivery_accessToken', 'delivery_refreshToken', 'delivery_user', 'delivery_authenticated', 'token'],
+                restaurant: ['auth_restaurant', 'restaurant_accessToken', 'restaurant_refreshToken', 'restaurant_user', 'restaurant_authenticated', 'token'],
+                customer: ['auth_customer', 'user_accessToken', 'user_refreshToken', 'user_user', 'user_authenticated', 'accessToken', 'token'],
             };
             const keysToClear = moduleStorageKeys[currentModule] || ['token'];
             keysToClear.forEach((key) => localStorage.removeItem(key));

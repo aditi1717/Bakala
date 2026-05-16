@@ -964,8 +964,8 @@ export const adminAPI = {
     return authService.verifyRestaurantOtp(phone, otp, fcmToken, platform);
   },
   getMe: () => authService.getMe("restaurant"),
-  /** Restaurant dashboard: fetch current restaurant profile (deduped + short-cached). */
-  getCurrentRestaurant: () => getRestaurantCurrentOnce(),
+  getCurrentRestaurant: () =>
+    apiClient.get("/food/restaurant/current", { contextModule: "restaurant" }),
   /** Finance dashboard for `hub-finance`. */
   getFinance: (params = {}) =>
     apiClient.get("/food/restaurant/finance", {
@@ -1622,43 +1622,7 @@ const getPublicRestaurantOutletTimingsOnce = (id, config = {}) => {
   );
 };
 
-const getCurrentRestaurant = () => {
-  return apiClient.get("/food/restaurant/current", { contextModule: "restaurant" });
-};
 
-/** Single in-flight + short cache for delivery /auth/me - one call per page load / refresh. */
-let deliveryMeInFlight = null;
-let deliveryMeCached = null;
-let deliveryMeCacheTime = 0;
-const DELIVERY_ME_CACHE_MS = 3000;
-
-const invalidateDeliveryMeCache = () => {
-  deliveryMeInFlight = null;
-  deliveryMeCached = null;
-  deliveryMeCacheTime = 0;
-};
-
-const getDeliveryMeOnce = () => {
-  const now = Date.now();
-  if (deliveryMeCached && now - deliveryMeCacheTime < DELIVERY_ME_CACHE_MS) {
-    return Promise.resolve(deliveryMeCached);
-  }
-  if (!deliveryMeInFlight) {
-    deliveryMeInFlight = authService
-      .getMe("delivery")
-      .then((res) => {
-        deliveryMeCached = res;
-        deliveryMeCacheTime = Date.now();
-        return res;
-      })
-      .finally(() => {
-        deliveryMeInFlight = null;
-      });
-  }
-  return deliveryMeInFlight;
-};
-
-/** Delivery API - OTP login + registration via new backend. */
 export const deliveryAPI = {
   sendOTP: (phone, _purpose = "login") => {
     if (!phone) return Promise.reject(new Error("Phone is required"));
@@ -1669,10 +1633,10 @@ export const deliveryAPI = {
       return Promise.reject(new Error("Phone and OTP are required"));
     return authService.verifyDeliveryOtp(phone, otp, fcmToken, platform);
   },
-  getMe: () => getDeliveryMeOnce(),
+  getMe: () => authService.getMe("delivery"),
   /** Get delivery profile (same as getMe under the hood; maps response to profile shape). */
   getProfile: () =>
-    getDeliveryMeOnce().then((res) => ({
+    authService.getMe("delivery").then((res) => ({
       ...res,
       data: {
         ...res.data,
