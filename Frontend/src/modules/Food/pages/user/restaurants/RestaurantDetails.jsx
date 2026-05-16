@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Component, useMemo } from "react"
-import LOGO_ASSET from "@/assets/Logo.png"
+import PLACEHOLDER_IMAGE from "@/assets/image-placeholder.jpeg"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
@@ -66,7 +66,7 @@ const debugError = (...args) => {}
 
 
 
-const FOOD_IMAGE_FALLBACK = LOGO_ASSET
+const FOOD_IMAGE_FALLBACK = PLACEHOLDER_IMAGE
 const RUPEE_SYMBOL = "\u20B9"
 const RESTAURANT_DETAILS_FILTERS_STORAGE_KEY = "food-restaurant-details-filters"
 const getNormalizedFoodType = (item = {}) =>
