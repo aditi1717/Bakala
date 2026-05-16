@@ -30,7 +30,8 @@ const extractProfilePayload = (response) => {
 
 const getProfileEndpoint = (role) => {
     if (role === 'seller') return '/seller/profile';
-    return '/auth/me';
+    if (role === 'restaurant') return '/food/restaurant/current';
+    return '/food/auth/me';
 };
 
 export const AuthProvider = ({ children }) => {

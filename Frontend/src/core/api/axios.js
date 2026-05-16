@@ -1,152 +1,140 @@
 import axios from 'axios';
+import { getBaseUrl } from './baseUrl';
+
+// Module Configuration - The Single Source of Truth for Role-Based Auth
+const MODULE_CONFIG = {
+    restaurant: {
+        prefixes: ['/food/restaurant', '/restaurant'],
+        storageKeys: ['restaurant_accessToken', 'auth_restaurant', 'restaurant_refreshToken', 'restaurant_user'],
+        loginPath: '/food/restaurant/login',
+        authHeader: 'Authorization',
+    },
+    seller: {
+        prefixes: ['/seller'],
+        storageKeys: ['auth_seller', 'seller_accessToken', 'seller_refreshToken', 'seller_user'],
+        loginPath: '/seller/auth',
+        authHeader: 'Authorization',
+    },
+    admin: {
+        prefixes: ['/admin'],
+        storageKeys: ['auth_admin', 'admin_accessToken', 'admin_refreshToken', 'admin_user'],
+        loginPath: '/admin/auth',
+        authHeader: 'Authorization',
+    },
+    delivery: {
+        prefixes: ['/delivery', '/food/delivery'],
+        storageKeys: ['auth_delivery', 'delivery_accessToken', 'delivery_refreshToken', 'delivery_user'],
+        loginPath: '/delivery/auth',
+        authHeader: 'Authorization',
+    },
+    customer: {
+        prefixes: ['/customer', '/cart', '/wishlist', '/checkout', '/user'],
+        storageKeys: ['auth_customer', 'user_accessToken', 'user_refreshToken', 'user_user', 'token'],
+        loginPath: '/login',
+        authHeader: 'Authorization',
+    }
+};
 
 const axiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1',
+    baseURL: getBaseUrl(),
     headers: {
         'Content-Type': 'application/json',
     },
+    timeout: 30000, // 30s timeout
 });
 
-const getCustomerToken = () =>
-    localStorage.getItem('auth_customer') ||
-    localStorage.getItem('user_accessToken') ||
-    localStorage.getItem('accessToken') ||
-    null;
+/**
+ * Helper to determine the active module based on URL, context, or page path.
+ */
+const resolveModule = (config) => {
+    const url = config.url || '';
+    const pagePath = window.location.pathname;
+    const contextModule = config.contextModule;
 
-// Request interceptor for API calls
+    // 1. Explicit Context (Highest Priority)
+    if (contextModule && MODULE_CONFIG[contextModule]) return contextModule;
+
+    // 2. URL Prefix detection
+    for (const [module, settings] of Object.entries(MODULE_CONFIG)) {
+        if (settings.prefixes.some(p => url.startsWith(p))) return module;
+    }
+
+    // 3. Page Path detection (Fallback for generic APIs like /auth/me or /products)
+    for (const [module, settings] of Object.entries(MODULE_CONFIG)) {
+        if (settings.prefixes.some(p => pagePath.startsWith(p) || pagePath.includes(p + '/'))) return module;
+    }
+
+    return 'customer'; // Default fallback
+};
+
+/**
+ * Helper to get the best available token for a module.
+ */
+const getModuleToken = (module) => {
+    const keys = MODULE_CONFIG[module]?.storageKeys || [];
+    for (const key of keys) {
+        const token = localStorage.getItem(key);
+        if (token) return token;
+    }
+    return null;
+};
+
+// Request Interceptor: Attach correct token based on module isolation rules
 axiosInstance.interceptors.request.use(
     (config) => {
-        let token = null;
-        const url = config.url;
-        const pagePath = window.location.pathname;
-        const contextModule = config.contextModule;
-
-        // 0. Priority: Explicit contextModule from the API call
-        if (contextModule === 'seller') {
-            token = localStorage.getItem('auth_seller');
-        } else if (contextModule === 'admin') {
-            token = localStorage.getItem('auth_admin');
-        } else if (contextModule === 'delivery') {
-            token = localStorage.getItem('auth_delivery');
-        } else if (contextModule === 'restaurant') {
-            token = localStorage.getItem('restaurant_accessToken') || localStorage.getItem('auth_restaurant');
-        } else if (contextModule === 'customer' || contextModule === 'user') {
-            token = getCustomerToken();
-        }
-
-        // 1. Fallback: If no explicit context, use page-based detection
-        if (!token) {
-            if (pagePath.startsWith('/seller')) {
-                token = localStorage.getItem('auth_seller');
-            } else if (pagePath.startsWith('/admin')) {
-                token = localStorage.getItem('auth_admin');
-            } else if (pagePath.startsWith('/delivery')) {
-                token = localStorage.getItem('auth_delivery');
-            } else if (pagePath.startsWith('/restaurant') || pagePath.startsWith('/food/restaurant')) {
-                token = localStorage.getItem('restaurant_accessToken') || localStorage.getItem('auth_restaurant');
-            } else if (pagePath.startsWith('/customer')) {
-                token = getCustomerToken();
-            }
-        }
-
-        // 2. Fallback to URL-based detection
-        if (!token) {
-            if (url.startsWith('/seller')) token = localStorage.getItem('auth_seller');
-            else if (url.startsWith('/admin')) token = localStorage.getItem('auth_admin');
-            else if (url.startsWith('/delivery')) token = localStorage.getItem('auth_delivery');
-            else if (url.startsWith('/restaurant') || url.startsWith('/food/restaurant')) token = localStorage.getItem('restaurant_accessToken') || localStorage.getItem('auth_restaurant');
-            else if (url.startsWith('/customer') || url.startsWith('/cart') || url.startsWith('/wishlist') || url.startsWith('/categories') || url.startsWith('/products')) {
-                token = getCustomerToken();
-            }
-        }
-
-        // 3. Final default: if we are on a general page and STILL no token, try customer token
-        if (!token && !pagePath.startsWith('/admin') && !pagePath.startsWith('/seller') && !pagePath.startsWith('/delivery') && !pagePath.startsWith('/restaurant') && !pagePath.startsWith('/food/restaurant')) {
-            token = getCustomerToken();
-        }
-
-        // 3. Last fallback: Check common 'token' key if implemented
-        if (!token) {
-            token = localStorage.getItem('token');
-        }
+        const module = resolveModule(config);
+        const token = getModuleToken(module);
 
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
+        // Track the identified module for error handling
+        config.identifiedModule = module;
         return config;
     },
-    (error) => {
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
-// Response interceptor for API calls
+// Response Interceptor: Handle auth failures with role precision
 axiosInstance.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        const status = error.response?.status;
+        const module = originalRequest?.identifiedModule || 'customer';
+        const config = MODULE_CONFIG[module];
+
+        // Handle 401 Unauthorized (Session Expired/Invalid)
+        if (status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
 
-            // Only reload when we had a token that's now invalid (expired/logged out elsewhere).
-            // If no token exists, skip reload to avoid infinite loop on public pages.
-            const hasToken = ['auth_seller', 'auth_admin', 'auth_delivery', 'auth_customer', 'user_accessToken', 'accessToken', 'token', 'restaurant_accessToken', 'auth_restaurant'].some(
-                (key) => localStorage.getItem(key)
-            );
-            if (!hasToken) {
-                return Promise.reject(error);
-            }
-            const path = window.location.pathname;
-            const requestUrl = String(originalRequest?.url || '');
-            const currentModule = (path.startsWith('/seller') || path.includes('/seller/'))
-                ? 'seller'
-                : (path.startsWith('/admin') || path.includes('/admin/'))
-                    ? 'admin'
-                    : (path.startsWith('/delivery') || path.includes('/delivery/'))
-                        ? 'delivery'
-                        : (path.startsWith('/restaurant') || path.includes('/restaurant/'))
-                            ? 'restaurant'
-                            : 'customer';
-            const requestModule = originalRequest.contextModule || (requestUrl.startsWith('/seller')
-                ? 'seller'
-                : requestUrl.startsWith('/admin')
-                    ? 'admin'
-                    : requestUrl.startsWith('/delivery')
-                        ? 'delivery'
-                        : (requestUrl.startsWith('/restaurant') || requestUrl.startsWith('/food/restaurant'))
-                            ? 'restaurant'
-                            : requestUrl.startsWith('/user') || requestUrl.startsWith('/customer') || requestUrl.startsWith('/auth')
-                                ? 'customer'
-                                : null);
-
-            // Avoid redirect loops if we are already on a login page
-            const loginPaths = ['/login', '/user/auth', '/food/restaurant/login', '/seller/auth', '/admin/auth', '/delivery/auth', '/welcome'];
-            if (loginPaths.some(lp => path.includes(lp))) {
+            // Avoid redirect loops on auth/login pages
+            const currentPath = window.location.pathname;
+            const isAuthPage = Object.values(MODULE_CONFIG).some(m => currentPath.includes(m.loginPath));
+            
+            if (isAuthPage) {
                 return Promise.reject(error);
             }
 
-            // Prevent cross-module 401s from logging out the active session
-            // (e.g. seller page accidentally calling an admin endpoint).
-            if (requestModule && requestModule !== currentModule) {
-                return Promise.reject(error);
+            // Clear ONLY the keys for the failing module to prevent cross-module logout
+            if (config) {
+                config.storageKeys.forEach(key => localStorage.removeItem(key));
+                
+                // Final safety: also clear generic 'token'
+                localStorage.removeItem('token');
+
+                // Redirect to the module-specific login page
+                window.location.href = config.loginPath;
             }
-
-            const moduleStorageKeys = {
-                seller: ['auth_seller', 'seller_accessToken', 'seller_refreshToken', 'seller_user', 'seller_authenticated', 'token'],
-                admin: ['auth_admin', 'admin_accessToken', 'admin_refreshToken', 'admin_user', 'admin_authenticated', 'token'],
-                delivery: ['auth_delivery', 'delivery_accessToken', 'delivery_refreshToken', 'delivery_user', 'delivery_authenticated', 'token'],
-                restaurant: ['auth_restaurant', 'restaurant_accessToken', 'restaurant_refreshToken', 'restaurant_user', 'restaurant_authenticated', 'token'],
-                customer: ['auth_customer', 'user_accessToken', 'user_refreshToken', 'user_user', 'user_authenticated', 'accessToken', 'token'],
-            };
-            const keysToClear = moduleStorageKeys[currentModule] || ['token'];
-            keysToClear.forEach((key) => localStorage.removeItem(key));
-
-            if (currentModule === 'seller') window.location.href = '/seller/auth';
-            else if (currentModule === 'admin') window.location.href = '/admin/auth';
-            else if (currentModule === 'delivery') window.location.href = '/delivery/auth';
-            else if (currentModule === 'restaurant') window.location.href = '/food/restaurant/login';
-            else window.location.href = '/login';
         }
+
+        // Handle 403 Forbidden (Right user, wrong permissions)
+        if (status === 403) {
+            console.error(`[Access Denied] User is authenticated but lacks permissions for module: ${module}`);
+            // Optionally redirect to a 403 page instead of logging out
+        }
+
         return Promise.reject(error);
     }
 );
