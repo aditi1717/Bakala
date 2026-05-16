@@ -163,70 +163,7 @@ export function logout(refreshToken, fcmToken = null, platform = "web") {
  */
 export function getMe(module = "user") {
   const m = String(module || "user");
-  // Deduplicate /me calls to avoid request storms (and accidental 429s)
-  // across multiple components mounting at once.
-  return getMeOnce(m);
-}
-
-// ---- /me in-flight + short cache (per module) ----
-const ME_CACHE_MS = 3000;
-const meCache = new Map(); // module -> { at, res }
-const meInFlight = new Map(); // module -> Promise
-
-function hasAccessToken(module) {
-  try {
-    return Boolean(localStorage.getItem(`${module}_accessToken`));
-  } catch {
-    return false;
-  }
-}
-
-// module -> { at, backoffUntil }
-const meBackoff = new Map();
-const BACKOFF_MS = 10000; // 10s wait on 429
-
-function getMeOnce(module) {
-  const now = Date.now();
-  
-  // 1. Check Backoff (e.g. from previous 429)
-  const backoff = meBackoff.get(module);
-  if (backoff && now < backoff) {
-    return Promise.reject(new Error("Rate limited. Retrying too soon."));
-  }
-
-  // 2. Check Cache
-  const cached = meCache.get(module);
-  if (cached && now - cached.at < ME_CACHE_MS) {
-    return Promise.resolve(cached.res);
-  }
-
-  // 3. Check Auth Status
-  if (!hasAccessToken(module)) {
-    return Promise.reject(new Error("Not authenticated"));
-  }
-
-  // 4. Return In-Flight Promise
-  const existing = meInFlight.get(module);
-  if (existing) return existing;
-
-  const p = apiClient
-    .get(AUTH.ME, { contextModule: module })
-    .then((res) => {
-      meCache.set(module, { at: Date.now(), res });
-      return res;
-    })
-    .catch((err) => {
-      if (err?.response?.status === 429) {
-        meBackoff.set(module, Date.now() + BACKOFF_MS);
-      }
-      throw err;
-    })
-    .finally(() => {
-      meInFlight.delete(module);
-    });
-
-  meInFlight.set(module, p);
-  return p;
+  return apiClient.get(AUTH.ME, { contextModule: m });
 }
 
 /**

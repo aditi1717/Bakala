@@ -19,20 +19,34 @@ axiosInstance.interceptors.request.use(
         let token = null;
         const url = config.url;
         const pagePath = window.location.pathname;
+        const contextModule = config.contextModule;
 
-        // Determination strategy: 
-        // 1. If we are on a module-specific page (e.g. /seller/dashboard), prioritize that module's token
-        // This is crucial for shared APIs like /products or /admin/categories
-        if (pagePath.startsWith('/seller')) {
+        // 0. Priority: Explicit contextModule from the API call
+        if (contextModule === 'seller') {
             token = localStorage.getItem('auth_seller');
-        } else if (pagePath.startsWith('/admin')) {
+        } else if (contextModule === 'admin') {
             token = localStorage.getItem('auth_admin');
-        } else if (pagePath.startsWith('/delivery')) {
+        } else if (contextModule === 'delivery') {
             token = localStorage.getItem('auth_delivery');
-        } else if (pagePath.startsWith('/restaurant') || pagePath.startsWith('/food/restaurant')) {
+        } else if (contextModule === 'restaurant') {
             token = localStorage.getItem('restaurant_accessToken') || localStorage.getItem('auth_restaurant');
-        } else if (pagePath.startsWith('/customer')) {
+        } else if (contextModule === 'customer' || contextModule === 'user') {
             token = getCustomerToken();
+        }
+
+        // 1. Fallback: If no explicit context, use page-based detection
+        if (!token) {
+            if (pagePath.startsWith('/seller')) {
+                token = localStorage.getItem('auth_seller');
+            } else if (pagePath.startsWith('/admin')) {
+                token = localStorage.getItem('auth_admin');
+            } else if (pagePath.startsWith('/delivery')) {
+                token = localStorage.getItem('auth_delivery');
+            } else if (pagePath.startsWith('/restaurant') || pagePath.startsWith('/food/restaurant')) {
+                token = localStorage.getItem('restaurant_accessToken') || localStorage.getItem('auth_restaurant');
+            } else if (pagePath.startsWith('/customer')) {
+                token = getCustomerToken();
+            }
         }
 
         // 2. Fallback to URL-based detection
@@ -93,7 +107,7 @@ axiosInstance.interceptors.response.use(
                         : (path.startsWith('/restaurant') || path.startsWith('/food/restaurant'))
                             ? 'restaurant'
                             : 'customer';
-            const requestModule = requestUrl.startsWith('/seller')
+            const requestModule = originalRequest.contextModule || (requestUrl.startsWith('/seller')
                 ? 'seller'
                 : requestUrl.startsWith('/admin')
                     ? 'admin'
@@ -103,7 +117,7 @@ axiosInstance.interceptors.response.use(
                             ? 'restaurant'
                             : requestUrl.startsWith('/user') || requestUrl.startsWith('/customer') || requestUrl.startsWith('/auth')
                                 ? 'customer'
-                                : null;
+                                : null);
 
             // Prevent cross-module 401s from logging out the active session
             // (e.g. seller page accidentally calling an admin endpoint).
