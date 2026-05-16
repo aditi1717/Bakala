@@ -29,6 +29,8 @@ axiosInstance.interceptors.request.use(
             token = localStorage.getItem('auth_admin');
         } else if (pagePath.startsWith('/delivery')) {
             token = localStorage.getItem('auth_delivery');
+        } else if (pagePath.startsWith('/restaurant') || pagePath.startsWith('/food/restaurant')) {
+            token = localStorage.getItem('restaurant_accessToken') || localStorage.getItem('auth_restaurant');
         } else if (pagePath.startsWith('/customer')) {
             token = getCustomerToken();
         }
@@ -38,13 +40,14 @@ axiosInstance.interceptors.request.use(
             if (url.startsWith('/seller')) token = localStorage.getItem('auth_seller');
             else if (url.startsWith('/admin')) token = localStorage.getItem('auth_admin');
             else if (url.startsWith('/delivery')) token = localStorage.getItem('auth_delivery');
+            else if (url.startsWith('/restaurant') || url.startsWith('/food/restaurant')) token = localStorage.getItem('restaurant_accessToken') || localStorage.getItem('auth_restaurant');
             else if (url.startsWith('/customer') || url.startsWith('/cart') || url.startsWith('/wishlist') || url.startsWith('/categories') || url.startsWith('/products')) {
                 token = getCustomerToken();
             }
         }
 
         // 3. Final default: if we are on a general page and STILL no token, try customer token
-        if (!token && !pagePath.startsWith('/admin') && !pagePath.startsWith('/seller') && !pagePath.startsWith('/delivery')) {
+        if (!token && !pagePath.startsWith('/admin') && !pagePath.startsWith('/seller') && !pagePath.startsWith('/delivery') && !pagePath.startsWith('/restaurant') && !pagePath.startsWith('/food/restaurant')) {
             token = getCustomerToken();
         }
 
@@ -73,7 +76,7 @@ axiosInstance.interceptors.response.use(
 
             // Only reload when we had a token that's now invalid (expired/logged out elsewhere).
             // If no token exists, skip reload to avoid infinite loop on public pages.
-            const hasToken = ['auth_seller', 'auth_admin', 'auth_delivery', 'auth_customer', 'user_accessToken', 'accessToken', 'token'].some(
+            const hasToken = ['auth_seller', 'auth_admin', 'auth_delivery', 'auth_customer', 'user_accessToken', 'accessToken', 'token', 'restaurant_accessToken', 'auth_restaurant'].some(
                 (key) => localStorage.getItem(key)
             );
             if (!hasToken) {
@@ -87,16 +90,20 @@ axiosInstance.interceptors.response.use(
                     ? 'admin'
                     : path.startsWith('/delivery')
                         ? 'delivery'
-                        : 'customer';
+                        : (path.startsWith('/restaurant') || path.startsWith('/food/restaurant'))
+                            ? 'restaurant'
+                            : 'customer';
             const requestModule = requestUrl.startsWith('/seller')
                 ? 'seller'
                 : requestUrl.startsWith('/admin')
                     ? 'admin'
                     : requestUrl.startsWith('/delivery')
                         ? 'delivery'
-                        : requestUrl.startsWith('/user') || requestUrl.startsWith('/customer') || requestUrl.startsWith('/auth')
-                            ? 'customer'
-                            : null;
+                        : (requestUrl.startsWith('/restaurant') || requestUrl.startsWith('/food/restaurant'))
+                            ? 'restaurant'
+                            : requestUrl.startsWith('/user') || requestUrl.startsWith('/customer') || requestUrl.startsWith('/auth')
+                                ? 'customer'
+                                : null;
 
             // Prevent cross-module 401s from logging out the active session
             // (e.g. seller page accidentally calling an admin endpoint).
@@ -108,6 +115,7 @@ axiosInstance.interceptors.response.use(
                 seller: ['auth_seller', 'seller_accessToken', 'token'],
                 admin: ['auth_admin', 'admin_accessToken', 'token'],
                 delivery: ['auth_delivery', 'delivery_accessToken', 'token'],
+                restaurant: ['auth_restaurant', 'restaurant_accessToken', 'token'],
                 customer: ['auth_customer', 'user_accessToken', 'accessToken', 'token'],
             };
             const keysToClear = moduleStorageKeys[currentModule] || ['token'];
@@ -116,6 +124,7 @@ axiosInstance.interceptors.response.use(
             if (currentModule === 'seller') window.location.href = '/seller/auth';
             else if (currentModule === 'admin') window.location.href = '/admin/auth';
             else if (currentModule === 'delivery') window.location.href = '/delivery/auth';
+            else if (currentModule === 'restaurant') window.location.href = '/food/restaurant/login';
             else window.location.href = '/login';
         }
         return Promise.reject(error);

@@ -8,14 +8,16 @@ const ROLE_STORAGE_KEYS = {
     customer: 'auth_customer',
     seller: 'auth_seller',
     admin: 'auth_admin',
-    delivery: 'auth_delivery'
+    delivery: 'auth_delivery',
+    restaurant: 'auth_restaurant'
 };
 
 const LEGACY_ROLE_STORAGE_KEYS = {
     customer: ['user_accessToken', 'accessToken'],
     seller: ['seller_accessToken', 'accessToken'],
     admin: ['admin_accessToken', 'accessToken'],
-    delivery: ['delivery_accessToken', 'accessToken']
+    delivery: ['delivery_accessToken', 'accessToken'],
+    restaurant: ['restaurant_accessToken', 'accessToken']
 };
 
 const extractProfilePayload = (response) => {
@@ -61,6 +63,7 @@ export const AuthProvider = ({ children }) => {
         seller: getSafeToken('seller'),
         admin: getSafeToken('admin'),
         delivery: getSafeToken('delivery'),
+        restaurant: getSafeToken('restaurant'),
     });
 
     const currentRole = getCurrentRoleFromUrl();
@@ -129,6 +132,7 @@ export const AuthProvider = ({ children }) => {
             seller: null,
             admin: null,
             delivery: null,
+            restaurant: null,
         });
 
         // Clear the current user profile from memory
