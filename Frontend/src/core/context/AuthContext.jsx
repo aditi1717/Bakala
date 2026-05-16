@@ -38,6 +38,7 @@ export const AuthProvider = ({ children }) => {
         if (path.startsWith('/seller')) return 'seller';
         if (path.startsWith('/admin')) return 'admin';
         if (path.startsWith('/delivery')) return 'delivery';
+        if (path.includes('/restaurant')) return 'restaurant';
         return 'customer';
     };
 

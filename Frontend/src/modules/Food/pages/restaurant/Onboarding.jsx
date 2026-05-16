@@ -395,6 +395,7 @@ export default function RestaurantOnboarding() {
       clearModuleAuth("restaurant")
       clearAuthData()
       localStorage.removeItem(ONBOARDING_STORAGE_KEY)
+      clearOnboardingFileCache() // Clear in-memory cache
       window.dispatchEvent(new Event("restaurantAuthChanged"))
       navigate("/food/restaurant/login", { replace: true })
     } catch (error) {

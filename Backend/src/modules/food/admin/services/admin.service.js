@@ -3052,12 +3052,21 @@ export async function updateRestaurantById(id, body = {}, adminScope = {}) {
     if (body.panImage !== undefined) doc.panImage = toStr(getUrl(body.panImage)) || undefined;
     if (body.gstImage !== undefined) doc.gstImage = toStr(getUrl(body.gstImage)) || undefined;
     if (body.fssaiImage !== undefined) doc.fssaiImage = toStr(getUrl(body.fssaiImage)) || undefined;
+    if (body.upiQrImage !== undefined) doc.upiQrImage = toStr(getUrl(body.upiQrImage)) || undefined;
 
     if (body.menuImages !== undefined) {
         if (Array.isArray(body.menuImages)) {
             doc.menuImages = body.menuImages.map(m => toStr(getUrl(m))).filter(Boolean);
         } else {
             doc.menuImages = [toStr(getUrl(body.menuImages))].filter(Boolean);
+        }
+    }
+
+    if (body.coverImages !== undefined) {
+        if (Array.isArray(body.coverImages)) {
+            doc.coverImages = body.coverImages.map(m => toStr(getUrl(m))).filter(Boolean);
+        } else {
+            doc.coverImages = [toStr(getUrl(body.coverImages))].filter(Boolean);
         }
     }
 

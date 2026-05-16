@@ -165,6 +165,14 @@ export function clearModuleAuth(module) {
   }
   // Also clear any sessionStorage data
   sessionStorage.removeItem(`${module}AuthData`);
+  sessionStorage.removeItem(`${module}_user`);
+  
+  // Notify components about the auth change
+  window.dispatchEvent(new Event(`${module}AuthChanged`));
+  // Cross-notify if restaurant/delivery to ensure UI like ProfileContext refreshes
+  if (module === "restaurant" || module === "delivery") {
+    window.dispatchEvent(new Event("userAuthChanged"));
+  }
 }
 
 /**
@@ -194,7 +202,17 @@ export function clearRestaurantSessionCache() {
   ];
 
   keys.forEach((key) => localStorage.removeItem(key));
+
+  // Clear onboarding file database to prevent image leaks between accounts
+  if (typeof indexedDB !== "undefined") {
+    try {
+      indexedDB.deleteDatabase("RestaurantOnboardingDB");
+    } catch (error) {
+      console.warn("Failed to clear RestaurantOnboardingDB:", error);
+    }
+  }
 }
+
 
 /**
  * Clear delivery-local cached onboarding/session data to avoid stale draft restore.
