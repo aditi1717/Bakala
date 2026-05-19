@@ -183,7 +183,7 @@ export default function Home() {
             merged.push(item);
           }
         });
-        return merged;
+        return sortRestaurantsByAvailability(merged, new Date(availabilityTick));
       });
 
       setRestaurantPage(nextPage);
@@ -198,6 +198,7 @@ export default function Home() {
     hasMoreRestaurants,
     loadingMoreRestaurants,
     loadingRestaurants,
+    availabilityTick,
     location?.latitude,
     location?.longitude,
     restaurantPage,

@@ -101,6 +101,32 @@ const getMatchedFoodLabel = (food, regex, fallbackTerm = '') => {
 
 const isVegFood = (food = {}) => String(food?.foodType || '').trim().toLowerCase() === 'veg';
 
+const getListingOrderValue = (restaurant = {}) => {
+    const value = Number(restaurant?.listingOrder);
+    return Number.isFinite(value) && value > 0 ? value : null;
+};
+
+const sortRestaurantsActiveFirst = (restaurants = []) => {
+    if (!Array.isArray(restaurants)) return [];
+
+    return [...restaurants].sort((left, right) => {
+        const leftInactive = left?.isAcceptingOrders === false ? 1 : 0;
+        const rightInactive = right?.isAcceptingOrders === false ? 1 : 0;
+        if (leftInactive !== rightInactive) return leftInactive - rightInactive;
+
+        const leftOrder = getListingOrderValue(left);
+        const rightOrder = getListingOrderValue(right);
+        const leftUnordered = leftOrder === null ? 1 : 0;
+        const rightUnordered = rightOrder === null ? 1 : 0;
+        if (leftUnordered !== rightUnordered) return leftUnordered - rightUnordered;
+        if (leftOrder !== null && rightOrder !== null && leftOrder !== rightOrder) {
+            return leftOrder - rightOrder;
+        }
+
+        return 0;
+    });
+};
+
 const attachOutletTimingsToRestaurants = async (restaurants = []) => {
     if (!Array.isArray(restaurants) || restaurants.length === 0) return restaurants;
 
@@ -334,7 +360,14 @@ export const searchUnified = async (query = {}, options = {}) => {
                 res.distanceScore = 999;
             }
         });
-        results.sort((a, b) => (a.distanceScore || 999) - (b.distanceScore || 999));
+        results.sort((a, b) => {
+            const leftInactive = a?.isAcceptingOrders === false ? 1 : 0;
+            const rightInactive = b?.isAcceptingOrders === false ? 1 : 0;
+            if (leftInactive !== rightInactive) return leftInactive - rightInactive;
+            return (a.distanceScore || 999) - (b.distanceScore || 999);
+        });
+    } else {
+        results = sortRestaurantsActiveFirst(results);
     }
 
     // ... (rest of logic up to result formation)

@@ -43,7 +43,7 @@ export default function BottomNavigation() {
       className={`md:hidden fixed bottom-0 left-0 right-0 ${navigation.surface} border-t ${navigation.border} z-50 shadow-lg`}
     >
       <div className="flex items-center justify-around h-auto px-2 sm:px-4">
-        {/* Delivery Tab */}
+        {/* Restaurants Tab */}
         <Link
           to="/food"
           className={`flex flex-1 flex-col items-center gap-1.5 px-2 sm:px-3 py-2 transition-all duration-200 relative ${isDelivery
@@ -53,7 +53,7 @@ export default function BottomNavigation() {
         >
           <Truck className={`h-5 w-5 ${isDelivery ? navigation.activeText : navigation.inactiveText}`} strokeWidth={2} />
           <span className={`text-xs sm:text-sm font-medium ${isDelivery ? `${navigation.activeText} font-semibold` : navigation.inactiveText}`}>
-            Delivery
+            Restaurants
           </span>
           {isDelivery && (
             <div className={`absolute top-0 left-0 right-0 h-0.5 ${navigation.indicator} rounded-b-full`} />

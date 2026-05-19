@@ -113,6 +113,193 @@ const timeToMinutes = (value) => {
     return h * 60 + m;
 };
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const getListingClock = (timezone = 'Asia/Kolkata') => {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        weekday: 'long',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: timezone
+    }).formatToParts(new Date());
+
+    const dayName = parts.find((part) => part.type === 'weekday')?.value || DAY_NAMES[new Date().getDay()];
+    const hour = parts.find((part) => part.type === 'hour')?.value || '00';
+    const minute = parts.find((part) => part.type === 'minute')?.value || '00';
+    const dayIndex = DAY_NAMES.indexOf(dayName);
+
+    return {
+        dayName,
+        previousDayName: DAY_NAMES[dayIndex <= 0 ? 6 : dayIndex - 1],
+        time: `${hour}:${minute}`
+    };
+};
+
+const buildOpenNowExpressionForSlots = (slotsExpression, nowTime, { previousDayOvernightOnly = false } = {}) => ({
+    $gt: [
+        {
+            $size: {
+                $filter: {
+                    input: { $ifNull: [slotsExpression, []] },
+                    as: 'slot',
+                    cond: {
+                        $let: {
+                            vars: {
+                                opening: { $ifNull: ['$$slot.openingTime', ''] },
+                                closing: { $ifNull: ['$$slot.closingTime', ''] }
+                            },
+                            in: {
+                                $and: [
+                                    { $ne: ['$$opening', ''] },
+                                    { $ne: ['$$closing', ''] },
+                                    ...(previousDayOvernightOnly ? [{ $gt: ['$$opening', '$$closing'] }] : []),
+                                    previousDayOvernightOnly
+                                        ? { $lte: [nowTime, '$$closing'] }
+                                        : {
+                                            $cond: [
+                                                { $lte: ['$$opening', '$$closing'] },
+                                                { $and: [{ $lte: ['$$opening', nowTime] }, { $lte: [nowTime, '$$closing'] }] },
+                                                { $or: [{ $lte: ['$$opening', nowTime] }, { $lte: [nowTime, '$$closing'] }] }
+                                            ]
+                                        }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        0
+    ]
+});
+
+const getTimingSortStages = () => {
+    const { dayName, previousDayName, time: nowTime } = getListingClock();
+
+    const todaySlotsExpression = {
+        $cond: [
+            { $gt: [{ $size: { $ifNull: ['$todayTiming.slots', []] } }, 0] },
+            '$todayTiming.slots',
+            {
+                $cond: [
+                    { $and: [{ $ne: [{ $ifNull: ['$todayTiming.openingTime', ''] }, ''] }, { $ne: [{ $ifNull: ['$todayTiming.closingTime', ''] }, ''] }] },
+                    [{ openingTime: '$todayTiming.openingTime', closingTime: '$todayTiming.closingTime' }],
+                    []
+                ]
+            }
+        ]
+    };
+
+    const previousSlotsExpression = {
+        $cond: [
+            { $gt: [{ $size: { $ifNull: ['$previousDayTiming.slots', []] } }, 0] },
+            '$previousDayTiming.slots',
+            {
+                $cond: [
+                    { $and: [{ $ne: [{ $ifNull: ['$previousDayTiming.openingTime', ''] }, ''] }, { $ne: [{ $ifNull: ['$previousDayTiming.closingTime', ''] }, ''] }] },
+                    [{ openingTime: '$previousDayTiming.openingTime', closingTime: '$previousDayTiming.closingTime' }],
+                    []
+                ]
+            }
+        ]
+    };
+
+    const fallbackRestaurantSlotsExpression = {
+        $cond: [
+            { $and: [{ $ne: [{ $ifNull: ['$openingTime', ''] }, ''] }, { $ne: [{ $ifNull: ['$closingTime', ''] }, ''] }] },
+            [{ openingTime: '$openingTime', closingTime: '$closingTime' }],
+            []
+        ]
+    };
+
+    const openDaysExcludeTodayExpression = {
+        $and: [
+            { $eq: ['$hasTodayTiming', false] },
+            { $gt: [{ $size: { $ifNull: ['$openDays', []] } }, 0] },
+            { $not: [{ $in: [dayName, { $ifNull: ['$openDays', []] }] }] }
+        ]
+    };
+
+    return [
+        {
+            $lookup: {
+                from: 'food_restaurant_outlet_timings',
+                localField: '_id',
+                foreignField: 'restaurantId',
+                as: 'outletTimingDocs'
+            }
+        },
+        { $addFields: { outletTimingDoc: { $first: '$outletTimingDocs' } } },
+        {
+            $addFields: {
+                todayTiming: {
+                    $first: {
+                        $filter: {
+                            input: { $ifNull: ['$outletTimingDoc.timings', []] },
+                            as: 'timing',
+                            cond: { $eq: ['$$timing.day', dayName] }
+                        }
+                    }
+                },
+                previousDayTiming: {
+                    $first: {
+                        $filter: {
+                            input: { $ifNull: ['$outletTimingDoc.timings', []] },
+                            as: 'timing',
+                            cond: { $eq: ['$$timing.day', previousDayName] }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            $addFields: {
+                hasTodayTiming: { $ne: ['$todayTiming', null] },
+                todayOpenByTiming: buildOpenNowExpressionForSlots(todaySlotsExpression, nowTime),
+                previousOvernightOpenByTiming: buildOpenNowExpressionForSlots(previousSlotsExpression, nowTime, { previousDayOvernightOnly: true }),
+                fallbackOpenByRestaurantTiming: buildOpenNowExpressionForSlots(fallbackRestaurantSlotsExpression, nowTime)
+            }
+        },
+        {
+            $addFields: {
+                isOpenNowForListing: {
+                    $cond: [
+                        { $eq: ['$isAcceptingOrders', false] },
+                        false,
+                        {
+                            $cond: [
+                                { $eq: ['$todayTiming.isOpen', false] },
+                                '$previousOvernightOpenByTiming',
+                                {
+                                    $cond: [
+                                        '$hasTodayTiming',
+                                        '$todayOpenByTiming',
+                                        {
+                                            $cond: [
+                                                openDaysExcludeTodayExpression,
+                                                false,
+                                                {
+                                                    $cond: [
+                                                        { $gt: [{ $size: fallbackRestaurantSlotsExpression }, 0] },
+                                                        '$fallbackOpenByRestaurantTiming',
+                                                        true
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        { $addFields: { isClosedForListing: { $cond: [{ $eq: ['$isOpenNowForListing', true] }, 0, 1] } } }
+    ];
+};
+
 const parseEstimatedDeliveryMinutes = (value) => {
     const raw = String(value || '').trim();
     if (!raw) return null;
@@ -1213,18 +1400,20 @@ export const listApprovedRestaurants = async (query = {}) => {
         };
 
         const sortStage = (() => {
-            if (sortBy === 'rating' || sortBy === 'rating-high') return { $sort: { rating: -1, distanceMeters: 1 } };
-            if (sortBy === 'rating-low') return { $sort: { rating: 1, distanceMeters: 1 } };
-            if (sortBy === 'price-low') return { $sort: { featuredPrice: 1, distanceMeters: 1 } };
-            if (sortBy === 'price-high') return { $sort: { featuredPrice: -1, distanceMeters: 1 } };
-            if (sortBy === 'newest') return { $sort: { createdAt: -1 } };
-            if (sortBy === 'deliveryTime') return { $sort: { estimatedDeliveryTimeMinutes: 1, distanceMeters: 1 } };
+            const activeFirst = { isClosedForListing: 1 };
+            if (sortBy === 'rating' || sortBy === 'rating-high') return { $sort: { ...activeFirst, rating: -1, distanceMeters: 1 } };
+            if (sortBy === 'rating-low') return { $sort: { ...activeFirst, rating: 1, distanceMeters: 1 } };
+            if (sortBy === 'price-low') return { $sort: { ...activeFirst, featuredPrice: 1, distanceMeters: 1 } };
+            if (sortBy === 'price-high') return { $sort: { ...activeFirst, featuredPrice: -1, distanceMeters: 1 } };
+            if (sortBy === 'newest') return { $sort: { ...activeFirst, createdAt: -1 } };
+            if (sortBy === 'deliveryTime') return { $sort: { ...activeFirst, estimatedDeliveryTimeMinutes: 1, distanceMeters: 1 } };
             // nearest (default)
-            return { $sort: { distanceMeters: 1 } };
+            return { $sort: { ...activeFirst, distanceMeters: 1 } };
         })();
 
         const basePipeline = [
             geoNear,
+            ...getTimingSortStages(),
             {
                 $addFields: {
                     distanceInKm: { $round: [{ $divide: ['$distanceMeters', 1000] }, 2] }
@@ -1250,45 +1439,39 @@ export const listApprovedRestaurants = async (query = {}) => {
 
     // Non-geo path: normal query + sort.
     const sort = (() => {
-        if (sortBy === 'rating' || sortBy === 'rating-high') return { rating: -1, createdAt: -1 };
-        if (sortBy === 'rating-low') return { rating: 1, createdAt: -1 };
-        if (sortBy === 'price-low') return { featuredPrice: 1, createdAt: -1 };
-        if (sortBy === 'price-high') return { featuredPrice: -1, createdAt: -1 };
-        if (sortBy === 'deliveryTime') return { estimatedDeliveryTimeMinutes: 1, createdAt: -1 };
+        const activeFirst = { isClosedForListing: 1 };
+        if (sortBy === 'rating' || sortBy === 'rating-high') return { ...activeFirst, rating: -1, createdAt: -1 };
+        if (sortBy === 'rating-low') return { ...activeFirst, rating: 1, createdAt: -1 };
+        if (sortBy === 'price-low') return { ...activeFirst, featuredPrice: 1, createdAt: -1 };
+        if (sortBy === 'price-high') return { ...activeFirst, featuredPrice: -1, createdAt: -1 };
+        if (sortBy === 'deliveryTime') return { ...activeFirst, estimatedDeliveryTimeMinutes: 1, createdAt: -1 };
         return { createdAt: -1 };
     })();
 
+    const defaultSort = {
+        isClosedForListing: 1,
+        hasListingOrder: -1,
+        listingOrderForSort: 1,
+        createdAt: -1
+    };
+
     const [restaurantsRaw, total] = await Promise.all([
-        sortBy
-            ? FoodRestaurant.find(filter)
-                .select(Object.keys(projection).join(' '))
-                .sort(sort)
-                .skip(skip)
-                .limit(limit)
-                .lean()
-            : FoodRestaurant.aggregate([
-                { $match: filter },
-                {
-                    $addFields: {
-                        isClosedForListing: { $cond: [{ $eq: ['$isAcceptingOrders', false] }, 1, 0] },
-                        hasListingOrder: { $cond: [{ $gt: ['$listingOrder', 0] }, 1, 0] },
-                        listingOrderForSort: {
-                            $cond: [{ $gt: ['$listingOrder', 0] }, '$listingOrder', 999999999]
-                        }
+        FoodRestaurant.aggregate([
+            { $match: filter },
+            ...getTimingSortStages(),
+            {
+                $addFields: {
+                    hasListingOrder: { $cond: [{ $gt: ['$listingOrder', 0] }, 1, 0] },
+                    listingOrderForSort: {
+                        $cond: [{ $gt: ['$listingOrder', 0] }, '$listingOrder', 999999999]
                     }
-                },
-                {
-                    $sort: {
-                        isClosedForListing: 1,
-                        hasListingOrder: -1,
-                        listingOrderForSort: 1,
-                        createdAt: -1
-                    }
-                },
-                { $project: projection },
-                { $skip: skip },
-                { $limit: limit }
-            ]),
+                }
+            },
+            { $sort: sortBy ? sort : defaultSort },
+            { $project: projection },
+            { $skip: skip },
+            { $limit: limit }
+        ]),
         FoodRestaurant.countDocuments(filter)
     ]);
 
