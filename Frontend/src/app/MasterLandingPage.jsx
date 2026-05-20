@@ -69,7 +69,7 @@ export default function MasterLandingPage() {
             <div className="w-11 h-11 bg-gradient-to-br from-orange-500 to-rose-500 rounded-xl flex items-center justify-center font-black text-2xl text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform">
               A
             </div>
-            <span className="text-2xl font-black tracking-tighter italic bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-700">APPZETO</span>
+            <span className="text-2xl font-black tracking-tighter italic bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-700">BAKALAA</span>
           </div>
           
           <button 

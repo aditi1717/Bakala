@@ -40,7 +40,7 @@ export async function getBusinessSettings(req, res, next) {
             // Create default settings if none exist
             settings = await FoodBusinessSettings.create({
                 companyName: 'Bakalaa',
-                email: 'admin@appzeto.com'
+                email: 'admin@bakalaa.com'
             });
         }
         return sendResponse(res, 200, 'Business settings fetched successfully', settings);

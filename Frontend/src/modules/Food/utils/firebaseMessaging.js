@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { userAPI, restaurantAPI, deliveryAPI, adminAPI } from "@food/api";
+import { userAPI, restaurantAPI, deliveryAPI } from "@food/api";
 import { initializeApp, getApp, getApps } from "firebase/app";
 import fallbackNotificationSound from "@food/assets/audio/alert.mp3";
 
@@ -488,34 +488,6 @@ async function saveTokenByModule(moduleName, token, platform = "web") {
 }
 
 async function canRegisterPushForModule(moduleName) {
-  if (moduleName === "restaurant") {
-    try {
-      const response = await restaurantAPI.getCurrentRestaurant();
-      const restaurant = response?.data?.data?.restaurant || response?.data?.restaurant;
-      return (
-        String(restaurant?.status || "").toLowerCase() === "approved" &&
-        restaurant?.isAcceptingOrders === true
-      );
-    } catch (error) {
-      pushDebugWarn(PUSH_DEBUG_PREFIX, "Restaurant push eligibility check failed", { error: error?.message || error });
-      return false;
-    }
-  }
-
-  if (moduleName === "delivery") {
-    try {
-      const response = await deliveryAPI.getMe();
-      const partner = response?.data?.data?.user || response?.data?.data?.deliveryPartner || response?.data?.user;
-      return (
-        String(partner?.status || "").toLowerCase() === "approved" &&
-        String(partner?.availabilityStatus || "").toLowerCase() === "online"
-      );
-    } catch (error) {
-      pushDebugWarn(PUSH_DEBUG_PREFIX, "Delivery push eligibility check failed", { error: error?.message || error });
-      return false;
-    }
-  }
-
   return true;
 }
 

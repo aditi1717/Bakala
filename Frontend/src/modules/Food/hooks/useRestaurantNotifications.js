@@ -597,10 +597,10 @@ export const useRestaurantNotifications = () => {
       let suggestedBackendUrl = null;
       
       // Common patterns:
-      // - If frontend is on foods.appzeto.com, backend might be api.foods.appzeto.com or foods.appzeto.com
-      if (frontendHost.includes('foods.appzeto.com')) {
-        suggestedBackendUrl = `${frontendProtocol}//api.foods.appzeto.com/api`;
-      } else if (frontendHost.includes('appzeto.com')) {
+      // - If frontend is on foods.bakalaa.com, backend might be api.foods.bakalaa.com or foods.bakalaa.com
+      if (frontendHost.includes('foods.bakalaa.com')) {
+        suggestedBackendUrl = `${frontendProtocol}//api.foods.bakalaa.com/api`;
+      } else if (frontendHost.includes('bakalaa.com')) {
         suggestedBackendUrl = `${frontendProtocol}//api.${frontendHost}/api`;
       }
       

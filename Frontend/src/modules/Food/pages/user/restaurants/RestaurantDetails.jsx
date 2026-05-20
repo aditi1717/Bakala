@@ -159,6 +159,24 @@ function RestaurantDetailsContent() {
   const [loadingMenuItems, setLoadingMenuItems] = useState(true)
   const [selectedMenuCategory, setSelectedMenuCategory] = useState("all")
 
+  const toggleMenuSection = (sectionKey) => {
+    setExpandedSections((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(sectionKey)) {
+        newSet.delete(sectionKey)
+      } else {
+        newSet.add(sectionKey)
+      }
+      return newSet
+    })
+  }
+
+  const handleMenuSectionKeyDown = (event, sectionKey) => {
+    if (event.key !== "Enter" && event.key !== " ") return
+    event.preventDefault()
+    toggleMenuSection(sectionKey)
+  }
+
   // Prevent background scrolling when any modal or sheet is open
   useEffect(() => {
     const isAnyModalOpen =
@@ -2566,23 +2584,23 @@ function RestaurantDetailsContent() {
                 <div key={sectionIndex} id={sectionId} className="space-y-1 scroll-mt-20">
                   {/* Section Header */}
                   {isRecommended && (
-                    <div className="flex items-center justify-between">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleMenuSection(originalIndex)}
+                      onKeyDown={(event) => handleMenuSectionKeyDown(event, originalIndex)}
+                      aria-expanded={isExpanded}
+                      className="flex items-center justify-between cursor-pointer select-none rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-gray-50 dark:hover:bg-gray-900"
+                    >
                       <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                         Recommended for you
                       </h2>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          setExpandedSections(prev => {
-                            const newSet = new Set(prev)
-                            if (newSet.has(originalIndex)) {
-                              newSet.delete(originalIndex)
-                            } else {
-                              newSet.add(originalIndex)
-                            }
-                            return newSet
-                          })
+                          toggleMenuSection(originalIndex)
                         }}
+                        aria-label={isExpanded ? "Collapse Recommended for you" : "Expand Recommended for you"}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
                       >
                         <ChevronDown
@@ -2593,7 +2611,14 @@ function RestaurantDetailsContent() {
                     </div>
                   )}
                   {!isRecommended && (
-                    <div className="flex items-center justify-between">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleMenuSection(originalIndex)}
+                      onKeyDown={(event) => handleMenuSectionKeyDown(event, originalIndex)}
+                      aria-expanded={isExpanded}
+                      className="flex items-center justify-between cursor-pointer select-none rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-gray-50 dark:hover:bg-gray-900"
+                    >
                       <div className="space-y-1">
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                           {(section?.name && typeof section.name === 'string' && section.name.trim())
@@ -2603,7 +2628,10 @@ function RestaurantDetailsContent() {
                               : "Unnamed Section"}
                         </h2>
                         {section.subtitle && (
-                          <button className="text-sm text-brand-600 dark:text-brand-400 underline">
+                          <button
+                            onClick={(event) => event.stopPropagation()}
+                            className="text-sm text-brand-600 dark:text-brand-400 underline"
+                          >
                             {section.subtitle}
                           </button>
                         )}
@@ -2611,16 +2639,9 @@ function RestaurantDetailsContent() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          setExpandedSections(prev => {
-                            const newSet = new Set(prev)
-                            if (newSet.has(originalIndex)) {
-                              newSet.delete(originalIndex)
-                            } else {
-                              newSet.add(originalIndex)
-                            }
-                            return newSet
-                          })
+                          toggleMenuSection(originalIndex)
                         }}
+                        aria-label={isExpanded ? "Collapse section" : "Expand section"}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
                       >
                         <ChevronDown
@@ -2702,23 +2723,23 @@ function RestaurantDetailsContent() {
                         return (
                           <div key={subIndex} className="space-y-4">
                             {/* Subsection Header */}
-                            <div className="flex items-center justify-between">
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => toggleMenuSection(subsectionKey)}
+                              onKeyDown={(event) => handleMenuSectionKeyDown(event, subsectionKey)}
+                              aria-expanded={isSubsectionExpanded}
+                              className="flex items-center justify-between cursor-pointer select-none rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-gray-50 dark:hover:bg-gray-900"
+                            >
                               <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                                 {subsection?.name || subsection?.title || "Subsection"}
                               </h3>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setExpandedSections(prev => {
-                                    const newSet = new Set(prev)
-                                    if (newSet.has(subsectionKey)) {
-                                      newSet.delete(subsectionKey)
-                                    } else {
-                                      newSet.add(subsectionKey)
-                                    }
-                                    return newSet
-                                  })
+                                  toggleMenuSection(subsectionKey)
                                 }}
+                                aria-label={isSubsectionExpanded ? "Collapse subsection" : "Expand subsection"}
                                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
                               >
                                 <ChevronDown

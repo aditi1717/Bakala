@@ -290,15 +290,6 @@ export const upsertFirebaseDeviceToken = async ({ ownerType, ownerId, token, pla
         throw new Error('Owner profile not found.');
     }
 
-    if (
-        (sanitizeString(ownerType).toUpperCase() === 'RESTAURANT' ||
-            sanitizeString(ownerType).toUpperCase() === 'DELIVERY_PARTNER') &&
-        !isOwnerEligibleForOrderService(ownerType, doc)
-    ) {
-        console.log(`[FCM-DEBUG] upsert skipped: ${ownerType}:${ownerId} is not approved + online/accepting orders`);
-        return { success: true, skipped: true, reason: 'owner_not_eligible_for_order_service' };
-    }
-
     const field = getTokenFieldForPlatform(normalizedPlatform);
     const existingTokens = Array.isArray(doc[field]) ? doc[field] : [];
     console.log(`[FCM-DEBUG] upsert - Current tokens in DB count: ${existingTokens.length}`);

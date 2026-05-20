@@ -1307,7 +1307,7 @@ export async function createOrder(userId, dto) {
         : orderType === "quick"
           ? `Your quick order #${orderId} has been placed successfully.`
           : `Your order #${orderId} from ${restaurant.restaurantName || "the restaurant"} has been placed successfully.`,
-      image: "https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png",
+      image: "https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png",
       data: {
         type: isAwaitingOnlinePayment
           ? "order_created_pending_payment"
@@ -1406,7 +1406,7 @@ export async function verifyPayment(userId, dto) {
   await notifyOwnersSafely([{ ownerType: "USER", ownerId: userId }], {
     title: "Payment Successful! ✅",
     body: `We have received your payment of ₹${order.payment.amountDue} for Order #${order.orderId}.`,
-    image: "https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png",
+    image: "https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png",
     data: {
       type: "payment_success",
       orderId: String(order.orderId),
@@ -1646,7 +1646,7 @@ export async function cancelOrder(orderId, userId, reason) {
     {
       title: "Order Cancelled ❌",
       body: `Order #${order.orderId} has been cancelled successfully.${refundDetail}`,
-      image: "https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png",
+      image: "https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png",
       data: {
         type: "order_cancelled",
         orderId: String(order.orderId),
@@ -1983,7 +1983,7 @@ export async function updateOrderStatusRestaurant(
       {
         title: title,
         body: body,
-        image: "https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png",
+        image: "https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png",
         data: {
           type: "order_status_update",
           orderId: order.orderId,
@@ -2216,7 +2216,7 @@ export async function updateOrderStatusAdmin(
   await notifyOwnersSafely(notifyList, {
     title,
     body,
-    image: "https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png",
+    image: "https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png",
     data: {
       type: "order_status_update",
       orderId: order.orderId,
@@ -2647,7 +2647,7 @@ export async function confirmReachedPickupDelivery(orderId, deliveryPartnerId) {
       {
         title: "Rider Arrived! 🛵",
         body: `${partner?.name || "The delivery partner"} has arrived at your restaurant to pick up Order #${order.orderId}.`,
-        image: "https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png",
+        image: "https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png",
         data: {
           type: "rider_arrived",
           orderId: String(order.orderId),

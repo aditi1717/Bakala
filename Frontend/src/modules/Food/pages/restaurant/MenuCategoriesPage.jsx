@@ -237,7 +237,7 @@ export default function MenuCategoriesPage() {
       }
 
       if (selectedImageFile) {
-        const uploadRes = await uploadAPI.uploadMedia(selectedImageFile, { folder: "appzeto/categories" })
+        const uploadRes = await uploadAPI.uploadMedia(selectedImageFile, { folder: "bakalaa/categories" })
         const payload = uploadRes?.data?.data || uploadRes?.data
         imageUrl = payload?.url || imageUrl
       }

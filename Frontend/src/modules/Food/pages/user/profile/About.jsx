@@ -88,7 +88,7 @@ export default function About() {
     )
   }
 
-  const displayAppName = (aboutData.appName || companyName || "About").replace(/appzeto/gi, "Bakalaa")
+  const displayAppName = (aboutData.appName || companyName || "About").replace(/bakalaa/gi, "Bakalaa")
   const normalizeLogo = () => {
     const candidate = logoUrl || aboutData.logo?.url || aboutData.logo
     if (candidate && typeof candidate === "string" && candidate.trim().startsWith("http")) {

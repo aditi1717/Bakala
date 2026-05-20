@@ -1384,7 +1384,7 @@ export default function DeliveryHomeV2({ tab = 'orders' }) {
                 onClick={() => navigate('/food/delivery/profile')}
                 className="w-10 h-10 rounded-full border border-gray-200 overflow-hidden bg-gray-50 cursor-pointer active:bg-gray-100 transition-colors shrink-0"
               >
-                <img src={profileImage || "https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png"} alt="Profile" className="w-full h-full object-cover" />
+                <img src={profileImage || "https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png"} alt="Profile" className="w-full h-full object-cover" />
               </div>
               {currentTab !== 'pocket' && currentTab !== 'profile' && (
                 <button

@@ -3641,7 +3641,7 @@ export async function approveRestaurantAddon(addonId) {
                 {
                     title: 'Addon Approved! âœ…',
                     body: `Your addon "${updated.published?.name || 'New Addon'}" has been approved and is now live.`,
-                    image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                    image: 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                     data: {
                         type: 'addon_approved',
                         addonId: String(updated._id),
@@ -3684,7 +3684,7 @@ export async function rejectRestaurantAddon(addonId, reason) {
                 {
                     title: 'Addon Rejected âŒ',
                     body: `Your addon request for "${updated.draft?.name || 'New Addon'}" was rejected. Reason: ${rejectionReason}`,
-                    image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                    image: 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                     data: {
                         type: 'addon_rejected',
                         addonId: String(updated._id),
@@ -4057,7 +4057,7 @@ export async function approveRestaurant(id) {
                 {
                     title: 'Congratulations!',
                     body: `Your restaurant "${updated.restaurantName}" has been approved. You can now start receiving orders!`,
-                    image: updated.profileImage || 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                    image: updated.profileImage || 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                     data: {
                         type: 'restaurant_approved',
                         restaurantId: String(updated._id)
@@ -4094,7 +4094,7 @@ export async function rejectRestaurant(id, reason) {
                 {
                     title: 'Update on Registration ðŸ“‹',
                     body: `Your restaurant registration for "${updated.restaurantName}" has been rejected. Reason: ${reason || 'Incomplete documents'}.`,
-                    image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                    image: 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                     data: {
                         type: 'restaurant_rejected',
                         restaurantId: String(updated._id),
@@ -4207,7 +4207,7 @@ export async function createAdminOffer(body) {
                 {
                     title: 'New Campaign Invitation! ðŸ“¢',
                     body: `You have been invited to join a new campaign: "${doc.couponCode}". Check it out now!`,
-                    image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                    image: 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                     data: {
                         type: 'campaign_invitation',
                         offerId: String(doc._id),
@@ -4793,7 +4793,7 @@ export async function addDeliveryPartnerBonus(body, adminUser) {
             {
                 title: 'Bonus Credited! ðŸŽŠ',
                 body: `You have received a bonus of \u20B9${body.amount}. ${body.reference || 'Great job!'}`,
-                image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                image: 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                 data: {
                     type: 'bonus_credited',
                     amount: String(body.amount),
@@ -5151,7 +5151,7 @@ export async function creditEarningAddonHistory(historyId, notes) {
             {
                 title: 'Incentive Credited! ðŸŽ¯',
                 body: `Your incentive for "${doc.offerId?.title || 'Earning Addon'}" has been approved and moved to your pocket.`,
-                image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                image: 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                 data: {
                     type: 'incentive_credited',
                     historyId: String(doc._id),
@@ -5183,7 +5183,7 @@ export async function cancelEarningAddonHistory(historyId, reason) {
             {
                 title: 'Incentive Update ðŸ“‹',
                 body: `Your incentive request for "${doc.offerId?.title || 'Earning Addon'}" was not approved. Reason: ${doc.cancelReason || 'Ineligible'}`,
-                image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                image: 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                 data: {
                     type: 'incentive_rejected',
                     historyId: String(doc._id),
@@ -5358,7 +5358,7 @@ export async function approveDeliveryPartner(id) {
             {
                 title: 'Welcome Aboard!',
                 body: `Your delivery partner application has been approved. You can now go online and start earning!`,
-                image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                image: 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                 data: {
                     type: 'onboarding_approved',
                     partnerId: String(partner._id)
@@ -5439,7 +5439,7 @@ export async function rejectDeliveryPartner(id, reason) {
                 {
                     title: 'Onboarding Update ðŸ“‹',
                     body: `Your application to join as a delivery partner was rejected. Reason: ${reason || 'Incomplete documents'}.`,
-                    image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                    image: 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                     data: {
                         type: 'onboarding_rejected',
                         partnerId: String(updated._id),
