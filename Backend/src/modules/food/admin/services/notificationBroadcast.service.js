@@ -201,6 +201,7 @@ const runBroadcastSideEffectsInBackground = ({ resolvedTargets = [], title, mess
 
     Promise.resolve()
         .then(async () => {
+            console.log(`[FCM Broadcast DB] Creating inbox notifications for ${resolvedTargets.length} targets.`);
             await createInboxNotifications({
                 notifications: resolvedTargets.map((target) =>
                     buildNotificationPayload({
@@ -212,8 +213,10 @@ const runBroadcastSideEffectsInBackground = ({ resolvedTargets = [], title, mess
                     })
                 )
             });
+            console.log(`[FCM Broadcast DB] Inbox notifications created successfully.`);
 
-            await notifyOwnersSafely(
+            console.log(`[FCM Broadcast Push] Dispatching push notifications via notifyOwnersSafely to ${resolvedTargets.length} targets.`);
+            const pushResult = await notifyOwnersSafely(
                 resolvedTargets.map((target) => ({
                     ownerType: target.ownerType,
                     ownerId: target.ownerId
@@ -228,6 +231,7 @@ const runBroadcastSideEffectsInBackground = ({ resolvedTargets = [], title, mess
                     }
                 }
             );
+            console.log(`[FCM Broadcast Push] Push dispatch completed. Result:`, JSON.stringify(pushResult, null, 2));
         })
         .catch((error) => {
             console.error('Broadcast notification side effects failed:', error?.message || error);
@@ -245,6 +249,7 @@ const paginationMeta = ({ page = 1, limit = 10 } = {}) => {
 };
 
 export const createBroadcastNotification = async ({ body = {}, adminId } = {}) => {
+    console.log('[FCM Broadcast Create] Request received', { body, adminId });
     const title = normalizeText(body?.title, 'title');
     const message = normalizeText(body?.message, 'message');
     const link = normalizeText(body?.link, 'link', false);
@@ -255,6 +260,7 @@ export const createBroadcastNotification = async ({ body = {}, adminId } = {}) =
         targets: body?.targets
     });
 
+    console.log('[FCM Broadcast Create] Resolved targets:', resolvedTargets.map(t => `${t.ownerType}:${t.ownerId}`));
     if (!resolvedTargets.length) {
         throw new ValidationError(`No recipients found for ${targetType.toLowerCase()} broadcast`);
     }
@@ -277,6 +283,7 @@ export const createBroadcastNotification = async ({ body = {}, adminId } = {}) =
         targetCount: resolvedTargets.length
     });
 
+    console.log(`[FCM Broadcast Create] DB Broadcast record created: ${broadcast._id}. Emitting real-time updates and running side effects.`);
     emitRealtimeNotifications(resolvedTargets, broadcast);
     runBroadcastSideEffectsInBackground({
         resolvedTargets,

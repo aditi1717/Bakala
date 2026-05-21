@@ -950,6 +950,26 @@ export const adminAPI = {
   /** Store Orders (admin view of delivery boy purchases) */
   getStoreOrders: (params = {}) =>
     apiClient.get('/food/admin/store/orders', { params, contextModule: 'admin' }),
+  saveFcmToken: (token, platform = "web") => {
+    if (!token) return Promise.reject(new Error("FCM token is required"));
+    const path =
+      platform === "mobile" ? "/fcm-tokens/mobile/save" : "/fcm-tokens/save";
+    return apiClient.post(
+      path,
+      { token: String(token), platform },
+      { contextModule: "admin" },
+    );
+  },
+  removeFcmToken: (token, platform = "web") => {
+    if (!token) return Promise.reject(new Error("FCM token is required"));
+    return apiClient.delete(
+      `/fcm-tokens/remove/${encodeURIComponent(String(token))}`,
+      {
+        data: { token: String(token), platform },
+        contextModule: "admin",
+      },
+    );
+  },
 };
 
   /** Restaurant API - OTP login via new backend; no email/password. */
