@@ -22,6 +22,7 @@ import {
   ShoppingCart,
   MapPin,
   Share2,
+  BellRing,
 } from "lucide-react";
 
 import AnimatedPage from "@food/components/user/AnimatedPage";
@@ -81,6 +82,32 @@ export default function Profile() {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isSendingTestPush, setIsSendingTestPush] = useState(false);
+
+  const handleTestPushNotification = async () => {
+    if (isSendingTestPush) return;
+    setIsSendingTestPush(true);
+    try {
+      // Send test notifications to both mobile and web
+      const resMobile = await userAPI.testFcmNotification({ platform: "mobile" });
+      const resWeb = await userAPI.testFcmNotification({ platform: "web" });
+      
+      const successMobile = resMobile?.data?.data?.successCount > 0;
+      const successWeb = resWeb?.data?.data?.successCount > 0;
+
+      if (successMobile || successWeb) {
+        toast.success(`Test push sent! (Mobile: ${resMobile?.data?.data?.successCount || 0}, Web: ${resWeb?.data?.data?.successCount || 0})`);
+      } else {
+        const errMsg = resMobile?.data?.data?.results?.[0]?.error || resWeb?.data?.data?.results?.[0]?.error || "No active FCM tokens found in DB for your account.";
+        toast.error(`Push failed: ${errMsg}`);
+      }
+    } catch (error) {
+      toast.error("Failed to send test push notification.");
+      console.error(error);
+    } finally {
+      setIsSendingTestPush(false);
+    }
+  };
 
   // Trigger web push registration when profile mounts to ensure FCM token is saved
   useEffect(() => {
@@ -855,6 +882,35 @@ export default function Profile() {
                 </Card>
               </motion.div>
             </Link>
+
+            <motion.div
+              whileHover={{ x: 2 }}
+              transition={{ duration: 0.2, type: "spring", stiffness: 300 }}>
+              <Card
+                className={`${optionCardClass} ${isSendingTestPush ? "opacity-50 cursor-wait" : ""}`}
+                onClick={handleTestPushNotification}>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      className={iconWrapClass}
+                      whileHover={{ scale: 1.03 }}
+                      transition={{ duration: 0.3 }}>
+                      <BellRing
+                        className={`h-5 w-5 text-gray-700 dark:text-gray-300 ${isSendingTestPush ? "animate-bounce text-brand-500" : ""}`}
+                      />
+                    </motion.div>
+                    <span className={rowLabelClass}>
+                      {isSendingTestPush ? "Sending test push..." : "Test Push Notification"}
+                    </span>
+                  </div>
+                  <motion.div
+                    whileHover={{ x: 2 }}
+                    transition={{ duration: 0.2 }}>
+                    <ChevronRight className={chevronClass} />
+                  </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
             <motion.div
               whileHover={{ x: 2 }}

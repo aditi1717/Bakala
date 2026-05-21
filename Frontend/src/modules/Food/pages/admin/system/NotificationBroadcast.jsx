@@ -17,6 +17,7 @@ const getRows = (response) => {
     payload?.items ||
     payload?.restaurants ||
     payload?.partners ||
+    payload?.deliveryPartners ||
     payload?.customers ||
     payload?.users ||
     payload?.data ||
