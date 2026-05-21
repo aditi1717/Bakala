@@ -92,6 +92,8 @@ export default function LandingPageManagement() {
   const [selectedRestaurantIds, setSelectedRestaurantIds] = useState([])
   const [restaurantSearchQuery, setRestaurantSearchQuery] = useState("")
   const [linkingRestaurants, setLinkingRestaurants] = useState(false)
+  const [bannerSearchQueries, setBannerSearchQueries] = useState({})
+  const [openDropdownBannerId, setOpenDropdownBannerId] = useState(null)
 
   // Helper function to filter out token-related errors
   const setErrorSafely = (errorMessage) => {
@@ -367,6 +369,30 @@ export default function LandingPageManagement() {
       }
     } catch (err) {
       setErrorSafely(err.response?.data?.message || 'Failed to save banner URL.')
+    } finally {
+      setBannerLinkSavingId(null)
+    }
+  }
+
+  const handleSelectRestaurantForBanner = async (bannerId, restaurantId) => {
+    try {
+      setBannerLinkSavingId(bannerId)
+      setError(null)
+      setSuccess(null)
+      const response = await api.patch(
+        `/food/hero-banners/${bannerId}/link-restaurants`,
+        { restaurantIds: restaurantId ? [restaurantId] : [] },
+        getAuthConfig()
+      )
+      if (response.data.success) {
+        setSuccess('Linked restaurant updated successfully!')
+        await fetchBanners()
+        setOpenDropdownBannerId(null)
+        setBannerSearchQueries(prev => ({ ...prev, [bannerId]: '' }))
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (err) {
+      setErrorSafely(err.response?.data?.message || 'Failed to update linked restaurant.')
     } finally {
       setBannerLinkSavingId(null)
     }
@@ -1387,8 +1413,8 @@ export default function LandingPageManagement() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {banners.map((banner, index) => (
-                    <div key={banner._id} className="border border-slate-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                      <div className="relative aspect-video bg-slate-100">
+                    <div key={banner._id} className="border border-slate-200 rounded-lg hover:shadow-md transition-shadow relative bg-white">
+                      <div className="relative aspect-video bg-slate-100 rounded-t-lg overflow-hidden">
                         <img src={banner.imageUrl} alt={`Hero Banner ${index + 1}`} className="w-full h-full object-cover" />
                         <div className="absolute top-2 right-2">
                           <span className={`px-2 py-1 rounded text-xs font-medium ${banner.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
@@ -1400,26 +1426,124 @@ export default function LandingPageManagement() {
                         </div>
                       </div>
                       <div className="p-4 bg-white">
-                        <div className="mb-3">
-                          <Label htmlFor={`banner-link-${banner._id}`} className="text-xs text-slate-600">Redirect URL</Label>
-                          <div className="mt-1 flex gap-2">
-                            <Input
-                              id={`banner-link-${banner._id}`}
-                              type="text"
-                              value={bannerLinkEdits[banner._id] ?? (banner.ctaLink || '')}
-                              onChange={(e) => setBannerLinkEdits(prev => ({ ...prev, [banner._id]: e.target.value }))}
-                              placeholder="https://example.com or /food/user/offers"
-                              className="h-9 text-sm"
-                            />
-                            <Button
-                              type="button"
-                              onClick={() => handleBannerLinkSave(banner._id)}
-                              disabled={bannerLinkSavingId === banner._id}
-                              className="h-9 px-3"
-                            >
-                              {bannerLinkSavingId === banner._id ? 'Saving...' : 'Save'}
-                            </Button>
-                          </div>
+                        <div className="mb-3 relative">
+                          <Label className="text-xs text-slate-600 font-medium">Link Restaurant</Label>
+                          {(() => {
+                            const currentRestaurant = banner.linkedRestaurants?.[0];
+                            const query = bannerSearchQueries[banner._id] ?? '';
+                            const isDropdownOpen = openDropdownBannerId === banner._id;
+                            
+                            // Filter restaurants by query
+                            const matches = allRestaurants.filter(r => {
+                              const name = r.name || r.restaurantName || '';
+                              return name.toLowerCase().includes(query.toLowerCase()) || 
+                                     r.restaurantId?.toLowerCase().includes(query.toLowerCase());
+                            }).slice(0, 150);
+                            
+                            return (
+                              <div className="mt-1">
+                                <div className="relative flex items-center">
+                                  <Search className="absolute left-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+                                  <Input
+                                    type="text"
+                                    placeholder={currentRestaurant?.name || "Search and select restaurant..."}
+                                    value={query}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setBannerSearchQueries(prev => ({ ...prev, [banner._id]: val }));
+                                      setOpenDropdownBannerId(banner._id);
+                                    }}
+                                    onFocus={() => {
+                                      setOpenDropdownBannerId(banner._id);
+                                      if (!bannerSearchQueries[banner._id]) {
+                                        setBannerSearchQueries(prev => ({ ...prev, [banner._id]: '' }));
+                                      }
+                                    }}
+                                    className="pl-8 pr-8 h-9 text-sm w-full bg-white border-slate-300 focus:border-brand-500 focus:ring-brand-500"
+                                  />
+                                  {currentRestaurant && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSelectRestaurantForBanner(banner._id, null)}
+                                      className="absolute right-2.5 p-0.5 hover:bg-slate-100 rounded-full"
+                                      title="Clear linked restaurant"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-slate-400 hover:text-red-500" />
+                                    </button>
+                                  )}
+                                </div>
+                                
+                                {isDropdownOpen && (
+                                  <>
+                                    <div 
+                                      className="fixed inset-0 z-40" 
+                                      onClick={() => setOpenDropdownBannerId(null)} 
+                                    />
+                                    <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto z-50 divide-y divide-slate-100">
+                                      {/* No Link Option */}
+                                      <div
+                                        onClick={() => {
+                                          handleSelectRestaurantForBanner(banner._id, null);
+                                        }}
+                                        className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 cursor-pointer text-xs transition-colors border-b border-slate-100 text-slate-700 hover:text-red-600 font-medium"
+                                      >
+                                        <div className="w-6 h-6 rounded-md bg-red-50 text-red-600 shrink-0 flex items-center justify-center">
+                                          <Trash2 className="w-3 h-3 text-red-600" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-semibold text-red-600">No Restaurant Link (Clear)</div>
+                                          <div className="text-[9px] text-slate-400">Do not link any restaurant</div>
+                                        </div>
+                                      </div>
+
+                                      {matches.length === 0 ? (
+                                        <div className="px-3 py-2.5 text-xs text-slate-500 text-center">
+                                          No restaurants found
+                                        </div>
+                                      ) : (
+                                        matches.map((restaurant) => {
+                                          const profileImageUrl = restaurant.profileImage?.url || restaurant.profileImage || null;
+                                          const isSelected = currentRestaurant?._id === restaurant._id;
+                                          return (
+                                            <div
+                                              key={restaurant._id}
+                                              onClick={() => {
+                                                handleSelectRestaurantForBanner(banner._id, restaurant._id);
+                                              }}
+                                              className={`flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 cursor-pointer text-xs transition-colors ${
+                                                isSelected ? 'bg-brand-50 font-medium text-brand-900' : 'text-slate-700'
+                                              }`}
+                                            >
+                                              <div className="w-6 h-6 rounded-md overflow-hidden bg-slate-100 shrink-0 flex items-center justify-center">
+                                                {profileImageUrl ? (
+                                                  <img
+                                                    src={profileImageUrl}
+                                                    alt={restaurant.name}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                      e.target.style.display = 'none';
+                                                      e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                  />
+                                                ) : null}
+                                                <div className={`w-full h-full bg-brand-500 items-center justify-center text-white font-bold text-[10px] ${profileImageUrl ? 'hidden' : 'flex'}`}>
+                                                  {restaurant.name?.charAt(0)?.toUpperCase() || 'R'}
+                                                </div>
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <div className="truncate font-semibold">{restaurant.name}</div>
+                                                <div className="text-[10px] text-slate-400 truncate">ID: {restaurant.restaurantId || restaurant._id}</div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-1">

@@ -21,7 +21,14 @@ export const getPublicHeroBannersController = async (req, res, next) => {
             const { linkedRestaurantIds, ...rest } = b;
             return {
                 ...rest,
-                linkedRestaurants: Array.isArray(linkedRestaurantIds) ? linkedRestaurantIds : [],
+                linkedRestaurants: Array.isArray(linkedRestaurantIds)
+                    ? linkedRestaurantIds.map((r) => ({
+                          ...r,
+                          id: r._id,
+                          name: r.restaurantName || r.name || '',
+                          slug: r.slug || (r.restaurantName ? String(r.restaurantName).trim().toLowerCase().replace(/\s+/g, '-') : r._id)
+                      }))
+                    : [],
                 imageUrl: b.imageUrl
             };
         });

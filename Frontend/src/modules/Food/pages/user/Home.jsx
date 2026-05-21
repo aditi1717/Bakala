@@ -389,6 +389,12 @@ export default function Home() {
     if (!heroBanners.length) return null;
 
     const onBannerClick = (banner) => {
+      if (banner.linkedRestaurants?.[0]) {
+        const r = banner.linkedRestaurants[0];
+        const slugOrId = r.slug || r.id || r._id;
+        navigate(`/food/restaurants/${slugOrId}`);
+        return;
+      }
       const targetUrl = typeof banner?.ctaLink === "string" ? banner.ctaLink.trim() : "";
       if (targetUrl) {
         if (targetUrl.startsWith("/")) {
@@ -399,9 +405,6 @@ export default function Home() {
           window.location.assign(targetUrl);
           return;
         }
-      }
-      if (banner.linkedRestaurants?.[0]) {
-        navigate(`/food/restaurants/${banner.linkedRestaurants[0].slug || banner.linkedRestaurants[0].id || banner.linkedRestaurants[0]._id}`);
       }
     };
 

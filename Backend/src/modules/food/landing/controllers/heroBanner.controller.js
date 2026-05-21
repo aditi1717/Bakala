@@ -4,7 +4,8 @@ import {
     deleteHeroBanner,
     updateHeroBannerOrder,
     toggleHeroBannerStatus,
-    updateHeroBannerCtaLink
+    updateHeroBannerCtaLink,
+    updateHeroBannerLinkedRestaurants
 } from '../services/heroBanner.service.js';
 import { sendResponse } from '../../../../utils/response.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
@@ -13,7 +14,19 @@ export const listHeroBannersController = async (req, res, next) => {
     try {
         const data = await listHeroBanners();
         // Wrap in { banners } to match LandingPageManagement.jsx expectations
-        return sendResponse(res, 200, 'Hero banners fetched successfully', { banners: data });
+        const mappedData = (data || []).map(b => {
+            const { linkedRestaurantIds, ...rest } = b;
+            return {
+                ...rest,
+                linkedRestaurantIds: Array.isArray(linkedRestaurantIds) ? linkedRestaurantIds.map(r => r._id || r) : [],
+                linkedRestaurants: Array.isArray(linkedRestaurantIds) ? linkedRestaurantIds.map(r => ({
+                    ...r,
+                    id: r._id,
+                    name: r.restaurantName || r.name || ''
+                })) : []
+            };
+        });
+        return sendResponse(res, 200, 'Hero banners fetched successfully', { banners: mappedData });
     } catch (error) {
         next(error);
     }
@@ -92,4 +105,31 @@ export const updateHeroBannerCtaLinkController = async (req, res, next) => {
         next(error);
     }
 };
+
+export const updateHeroBannerLinkedRestaurantsController = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { restaurantIds } = req.body;
+        if (!id) {
+            throw new ValidationError('Banner id is required');
+        }
+        const updated = await updateHeroBannerLinkedRestaurants(id, restaurantIds || []);
+        
+        // Map response same as list for frontend
+        const mapped = updated ? {
+            ...updated,
+            linkedRestaurantIds: Array.isArray(updated.linkedRestaurantIds) ? updated.linkedRestaurantIds.map(r => r._id || r) : [],
+            linkedRestaurants: Array.isArray(updated.linkedRestaurantIds) ? updated.linkedRestaurantIds.map(r => ({
+                ...r,
+                id: r._id,
+                name: r.restaurantName || r.name || ''
+            })) : []
+        } : null;
+        
+        return sendResponse(res, 200, 'Hero banner linked restaurants updated', mapped);
+    } catch (error) {
+        next(error);
+    }
+};
+
 
