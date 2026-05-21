@@ -383,7 +383,7 @@ export const sendPushNotification = async (tokens, payload = {}) => {
     return { successCount, failureCount, results };
 };
 
-export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, platform } = {}) => {
+export const sendNotificationToOwnerInternal = async ({ ownerType, ownerId, payload, platform, ownerDoc } = {}) => {
     // 💡 Clone the payload to avoid side-effects (e.g. adding multiple prefixes to the same object during broadcasting)
     const enrichedPayload = { ...payload };
 
@@ -406,13 +406,13 @@ export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, pla
     }
 
     const model = getOwnerModel(ownerType);
-    const ownerDoc = model ? await model.findById(ownerId).lean() : null;
-    if (isOrderServicePayload(enrichedPayload) && !isOwnerEligibleForOrderService(ownerType, ownerDoc)) {
+    const resolvedDoc = ownerDoc || (model ? await model.findById(ownerId).lean() : null);
+    if (isOrderServicePayload(enrichedPayload) && !isOwnerEligibleForOrderService(ownerType, resolvedDoc)) {
         logger.info(`FCM order-service push skipped for ${ownerType}:${ownerId} because owner is not approved + online/accepting orders`);
         return { successCount: 0, failureCount: 0, results: [], skipped: true };
     }
 
-    const tokens = readTokensFromDoc(ownerDoc, platform);
+    const tokens = readTokensFromDoc(resolvedDoc, platform);
     if (!tokens.length) {
         return { successCount: 0, failureCount: 0, results: [] };
     }
@@ -449,6 +449,10 @@ export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, pla
     }
 };
 
+export const sendNotificationToOwner = async ({ ownerType, ownerId, payload, platform } = {}) => {
+    return sendNotificationToOwnerInternal({ ownerType, ownerId, payload, platform });
+};
+
 export const sendNotificationToOwners = async (targets = [], payload = {}) => {
     const uniqueTargets = Array.isArray(targets) 
         ? [...new Map(targets.filter(t => t?.ownerType && t?.ownerId).map(t => [`${t.ownerType}:${t.ownerId}`, t])).values()]
@@ -461,7 +465,59 @@ export const sendNotificationToOwners = async (targets = [], payload = {}) => {
         logger.info(`FCM: Starting broadcast to ${uniqueTargets.length} recipients...`);
     }
 
-    const results = await Promise.all(
+    // --- Bulk Fetch Owners to prevent connection/session pool exhaustion ---
+    const targetsByType = {};
+    for (const target of uniqueTargets) {
+        const type = String(target.ownerType || '').toUpperCase();
+        if (!targetsByType[type]) {
+            targetsByType[type] = [];
+        }
+        targetsByType[type].push(target.ownerId);
+    }
+
+    const docMapByType = {};
+    try {
+        await Promise.all(
+            Object.entries(targetsByType).map(async ([ownerType, ids]) => {
+                const model = getOwnerModel(ownerType);
+                if (!model) return;
+                const docs = await model.find({ _id: { $in: ids } }).lean();
+                const map = {};
+                for (const doc of docs) {
+                    map[String(doc._id)] = doc;
+                }
+                docMapByType[ownerType] = map;
+            })
+        );
+    } catch (e) {
+        logger.error(`FCM bulk fetch owners failed: ${e.message}`);
+    }
+    // -----------------------------------------------------------------------
+
+    // Chunk sends to FCM API to maintain stability and prevent timeouts
+    const CHUNK_SIZE = 100;
+    const results = [];
+
+    for (let i = 0; i < uniqueTargets.length; i += CHUNK_SIZE) {
+        const chunk = uniqueTargets.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(
+            chunk.map(async (target) => {
+                const type = String(target.ownerType || '').toUpperCase();
+                const ownerDoc = docMapByType[type]?.[String(target.ownerId)] || null;
+
+                return sendNotificationToOwnerInternal({
+                    ownerType: target.ownerType,
+                    ownerId: target.ownerId,
+                    platform: target.platform,
+                    payload: { ...payload, silent: isBroadcast },
+                    ownerDoc
+                });
+            })
+        );
+        results.push(...chunkResults);
+    }
+
+    const dummyResults = /* await Promise.all(
         uniqueTargets.map(target => 
             sendNotificationToOwner({
                 ownerType: target.ownerType,
@@ -470,7 +526,7 @@ export const sendNotificationToOwners = async (targets = [], payload = {}) => {
                 payload: { ...payload, silent: isBroadcast }
             })
         )
-    );
+    */ [];
 
     if (isBroadcast) {
         const totalSuccess = results.reduce((acc, r) => acc + (r?.successCount || 0), 0);

@@ -4,7 +4,7 @@ importScripts("https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-com
 
 const sanitize = (value) => String(value || "").trim().replace(/^['"]|['"]$/g, "");
 const PUSH_DEBUG_PREFIX = "[push-sw]";
-const pushDebugLog = () => {};
+const pushDebugLog = (prefix, message, data = {}) => console.log(`${prefix} ${message}`, data);
 const getNotificationKey = (payload) =>
   payload?.data?.notificationId ||
   payload?.data?.messageId ||
@@ -75,13 +75,27 @@ async function hasVisibleClientForTarget(payload = {}) {
 }
 
 async function loadFirebaseWebConfig() {
+  try {
+    const cache = await caches.open("firebase-config-cache");
+    const cachedResponse = await cache.match("/firebase-web-config.json");
+    if (cachedResponse) {
+      const json = await cachedResponse.json();
+      if (json && json.apiKey && json.projectId && json.appId && json.messagingSenderId) {
+        pushDebugLog(PUSH_DEBUG_PREFIX, "Loaded Firebase web config from local cache");
+        return json;
+      }
+    }
+  } catch (e) {
+    // Ignore cache read errors
+  }
+
   const candidates = [
     "/firebase-web-config.json",
     "/api/v1/food/public/env",
   ];
   for (const url of candidates) {
     try {
-      const response = await fetch(url, { cache: "no-store" });
+      const response = await fetch(url);
       if (!response.ok) continue;
       const json = await response.json();
       const data = url.endsWith(".json") ? (json || {}) : ((json && json.data) || {});
@@ -96,7 +110,13 @@ async function loadFirebaseWebConfig() {
       };
 
       if (config.apiKey && config.projectId && config.appId && config.messagingSenderId) {
-        pushDebugLog(PUSH_DEBUG_PREFIX, "Loaded Firebase web config");
+        pushDebugLog(PUSH_DEBUG_PREFIX, "Loaded Firebase web config from network");
+        try {
+          const cache = await caches.open("firebase-config-cache");
+          await cache.put("/firebase-web-config.json", new Response(JSON.stringify(config)));
+        } catch (e) {
+          // Ignore cache write errors
+        }
         return config;
       }
     } catch {
