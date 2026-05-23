@@ -1369,12 +1369,21 @@ export async function processRefund(req, res, next) {
         const order = await mongoose.model('FoodOrder').findById(orderId).lean();
         
         if (order && order.userId) {
+            const safeRefundAmount = Number(
+                updated?.payment?.refund?.amount ??
+                refundAmount ??
+                order?.payment?.refund?.amount ??
+                order?.pricing?.total ??
+                order?.totalAmount ??
+                order?.total ??
+                0
+            ) || 0;
             const { notifyOwnersSafely } = await import('../../../../core/notifications/firebase.service.js');
             await notifyOwnersSafely(
                 [{ ownerType: 'USER', ownerId: order.userId }],
                 {
                     title: 'Refund Processed! 💸',
-                    body: `Your refund of ₹${refundAmount || order.totalAmount || order.total || 0} for Order #${order.orderId} has been processed successfully.`,
+                    body: `Your refund of ₹${safeRefundAmount} for Order #${order.orderId} has been processed successfully.`,
                     image: 'https://i.ibb.co/3m2Yh7r/Bakalaa-Brand-Image.png',
                     data: {
                         type: 'refund_processed',
