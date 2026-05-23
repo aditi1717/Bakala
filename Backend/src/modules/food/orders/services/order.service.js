@@ -2384,7 +2384,9 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId, deliveryTi
 
   // Guard: only dispatchable after restaurant accepted.
   if (
-    !["preparing", "ready_for_pickup", "picked_up"].includes(order.orderStatus)
+    !["confirmed", "preparing", "ready", "ready_for_pickup", "picked_up"].includes(
+      String(order.orderStatus || "").toLowerCase(),
+    )
   ) {
     throw new ValidationError("Order not ready for delivery assignment");
   }
@@ -3492,12 +3494,6 @@ export async function assignDeliveryPartnerAdmin(
     .lean();
   if (!partner || partner.status !== "approved")
     throw new ValidationError("Delivery partner not available");
-  const partnerZoneId = partner.zoneId ? String(partner.zoneId) : "";
-  const orderZoneId = order.zoneId ? String(order.zoneId) : "";
-  if (partnerZoneId && orderZoneId && partnerZoneId !== orderZoneId) {
-    throw new ValidationError("Delivery partner does not belong to this order zone");
-  }
-
   const previousDeliveryPartnerId =
     order.dispatch?.deliveryPartnerId?._id?.toString?.() ||
     order.dispatch?.deliveryPartnerId?.toString?.() ||

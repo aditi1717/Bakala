@@ -435,19 +435,37 @@ export default function OrdersTable({
                                                 order.payment?.method === "online"));
                         
                         const isWalletPayment = order.paymentType === "Wallet" || paymentMethod === "wallet";
-                        
                         return isCancelled && (isOnlinePayment || isWalletPayment);
                       })() && (
                         <>
-                          {order.refundStatus === 'processed' || order.refundStatus === 'initiated' ? (
+                          {(() => {
+                            const paymentMethod = order.payment?.method || order.paymentMethod;
+                            const isWalletPayment = order.paymentType === "Wallet" || paymentMethod === "wallet";
+                            const normalizedRefundStatus = String(order.refundStatus || "").toLowerCase();
+                            const normalizedPaymentStatus = String(order.paymentStatus || "").toLowerCase();
+                            const isRefundedAlready =
+                              normalizedRefundStatus === "processed" ||
+                              normalizedPaymentStatus.includes("refunded");
+                            const isRefundInitiated =
+                              normalizedRefundStatus === "initiated" ||
+                              normalizedRefundStatus === "pending";
+
+                            return isRefundedAlready || isRefundInitiated;
+                          })() ? (
                             <span className={`px-3 py-1.5 rounded-md text-xs font-medium ${
-                              order.paymentType === "Wallet" || order.payment?.method === "wallet"
-                                ? "bg-purple-100 text-purple-700"
-                                : "bg-emerald-100 text-emerald-700"
+                              (String(order.refundStatus || "").toLowerCase() === "initiated" ||
+                                String(order.refundStatus || "").toLowerCase() === "pending")
+                                ? "bg-amber-100 text-amber-700"
+                                : order.paymentType === "Wallet" || order.payment?.method === "wallet"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : "bg-emerald-100 text-emerald-700"
                             }`}>
-                              {order.paymentType === "Wallet" || order.payment?.method === "wallet" 
-                                ? "Wallet Refunded" 
-                                : "Refunded"}
+                              {(String(order.refundStatus || "").toLowerCase() === "initiated" ||
+                                String(order.refundStatus || "").toLowerCase() === "pending")
+                                ? "Refund Initiated"
+                                : order.paymentType === "Wallet" || order.payment?.method === "wallet"
+                                  ? "Wallet Refunded"
+                                  : "Refunded"}
                             </span>
                           ) : onRefund ? (
                             <button 

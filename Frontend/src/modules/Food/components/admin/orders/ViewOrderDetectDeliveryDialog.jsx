@@ -1,4 +1,8 @@
-import { X, Clock, CheckCircle, XCircle, User, Phone, Package, MapPin } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { X, Clock, CheckCircle, XCircle, User, Phone, Package, MapPin, Loader2 } from "lucide-react"
+import { formatOrderAddressWithLabels } from "@food/utils/orderAddressFormatter"
+import { adminAPI } from "@food/api"
+import { toast } from "sonner"
 
 const getStatusColor = (status) => {
   const colors = {
@@ -22,10 +26,139 @@ const getStatusIcon = (status) => {
   return Clock
 }
 
-export default function ViewOrderDetectDeliveryDialog({ isOpen, onOpenChange, order }) {
+export default function ViewOrderDetectDeliveryDialog({
+  isOpen,
+  onOpenChange,
+  order,
+  onAcceptOrder,
+  onRejectOrder,
+  onAdminStatusChange,
+  actionLoadingKey,
+  onRefresh,
+}) {
   if (!isOpen || !order) return null
 
   const StatusIcon = getStatusIcon(order.status)
+  const sourceOrder = order.originalOrder || order
+  const rawAddress =
+    sourceOrder.deliveryAddress ||
+    sourceOrder.address ||
+    sourceOrder.customerAddress ||
+    null
+  const formattedAddress = rawAddress
+    ? formatOrderAddressWithLabels(rawAddress)
+    : "Address not available"
+  const userAddress = formattedAddress === "Address not available" ? "N/A" : formattedAddress
+  const rawStatus = String(order?.rawOrderStatus || "").toLowerCase()
+  const dispatchStatus = String(order?.dispatchStatus || "").toLowerCase()
+  const isCompletedOrCancelled =
+    rawStatus === "delivered" ||
+    rawStatus === "completed" ||
+    rawStatus === "rejected" ||
+    rawStatus === "cancelled" ||
+    rawStatus === "cancelled_by_user" ||
+    rawStatus === "cancelled_by_restaurant" ||
+    rawStatus === "cancelled_by_admin"
+  const isRejectedOrCancelled =
+    rawStatus === "rejected" ||
+    rawStatus === "cancelled" ||
+    rawStatus === "cancelled_by_user" ||
+    rawStatus === "cancelled_by_restaurant" ||
+    rawStatus === "cancelled_by_admin"
+  const isCreated = rawStatus === "created" || rawStatus === "pending"
+  const canAssign = !isCompletedOrCancelled && !isCreated && dispatchStatus !== "accepted"
+  const canAdvanceStatus =
+    dispatchStatus === "accepted" &&
+    !isCompletedOrCancelled &&
+    rawStatus !== "delivered" &&
+    rawStatus !== "completed"
+  const nextAdminStatus =
+    rawStatus === "picked_up" ||
+    rawStatus === "out_for_delivery" ||
+    rawStatus === "reached_drop" ||
+    rawStatus === "at_drop" ||
+    rawStatus === "at_delivery"
+      ? "delivered"
+      : canAdvanceStatus
+        ? "picked_up"
+        : ""
+  const nextAdminStatusLabel =
+    nextAdminStatus === "picked_up" ? "Picked Up" : nextAdminStatus === "delivered" ? "Delivered" : ""
+  const isAcceptLoading = actionLoadingKey === `accept:${order.orderMongoId}`
+  const isRejectLoading = actionLoadingKey === `reject:${order.orderMongoId}`
+  const isAssignLoading = actionLoadingKey === `assign:${order.orderMongoId}`
+  const isAdvanceLoading = actionLoadingKey === `status:${order.orderMongoId}`
+  const [deliveryPartners, setDeliveryPartners] = useState([])
+  const [isLoadingPartners, setIsLoadingPartners] = useState(false)
+  const [selectedPartnerId, setSelectedPartnerId] = useState("")
+  const [isAssigningInline, setIsAssigningInline] = useState(false)
+  const rejectionReason =
+    String(
+      sourceOrder?.cancellationReason ||
+      sourceOrder?.rejectReason ||
+      sourceOrder?.reason ||
+      "",
+    ).trim() || "No reason provided"
+  const showAccept = isCreated && typeof onAcceptOrder === "function"
+  const showReject = isCreated && typeof onRejectOrder === "function"
+  const showAssign = canAssign
+  const showAdvance = Boolean(nextAdminStatus) && typeof onAdminStatusChange === "function"
+  const hasActionButtons = showAccept || showReject || showAssign || showAdvance
+
+  const onlinePartners = useMemo(() => {
+    return (deliveryPartners || []).filter((partner) => {
+      const state = String(partner?.availabilityStatus || "").toLowerCase()
+      if (state === "online") return true
+      if (state === "offline") return false
+      if (partner?.availability?.isOnline === true) return true
+      if (partner?.availability?.isOnline === false) return false
+      return Boolean(partner?.isOnline)
+    })
+  }, [deliveryPartners])
+
+  useEffect(() => {
+    if (!isOpen || !showAssign) return
+    let ignore = false
+    const loadPartners = async () => {
+      try {
+        setIsLoadingPartners(true)
+        const response = await adminAPI.getDeliveryPartners({
+          page: 1,
+          limit: 1000,
+          includeAvailability: true,
+        })
+        if (ignore) return
+        const partners = response?.data?.data?.deliveryPartners || []
+        setDeliveryPartners(partners)
+      } catch (error) {
+        if (!ignore) {
+          toast.error(error?.response?.data?.message || "Failed to load delivery partners")
+          setDeliveryPartners([])
+        }
+      } finally {
+        if (!ignore) setIsLoadingPartners(false)
+      }
+    }
+    loadPartners()
+    return () => {
+      ignore = true
+    }
+  }, [isOpen, showAssign])
+
+  const handleInlineAssign = async () => {
+    if (!order?.orderMongoId || !selectedPartnerId) return
+    try {
+      setIsAssigningInline(true)
+      await adminAPI.assignDeliveryPartner(order.orderMongoId, selectedPartnerId)
+      toast.success("Delivery request sent. Waiting for delivery boy acceptance")
+      setSelectedPartnerId("")
+      onRefresh?.()
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to assign delivery partner")
+    } finally {
+      setIsAssigningInline(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -71,6 +204,12 @@ export default function ViewOrderDetectDeliveryDialog({ isOpen, onOpenChange, or
                   <p className="text-sm font-medium text-slate-900 flex items-center gap-1.5">
                     <Phone className="w-3.5 h-3.5" />
                     {order.userNumber}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Address</p>
+                  <p className="text-sm font-medium text-slate-900 whitespace-pre-line break-words">
+                    {userAddress}
                   </p>
                 </div>
               </div>
@@ -122,7 +261,90 @@ export default function ViewOrderDetectDeliveryDialog({ isOpen, onOpenChange, or
               <StatusIcon className="w-4 h-4" />
               <span className="font-semibold">{order.status}</span>
             </div>
+            {isRejectedOrCancelled && (
+              <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
+                <p className="text-xs font-semibold text-rose-700">Rejection Reason</p>
+                <p className="text-sm text-rose-800">{rejectionReason}</p>
+              </div>
+            )}
           </div>
+
+          {/* Actions */}
+          {hasActionButtons && (
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Actions</h3>
+            <div className="flex flex-wrap gap-2">
+              {showAccept && (
+                <button
+                  type="button"
+                  onClick={() => onAcceptOrder(order)}
+                  disabled={isAcceptLoading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isAcceptLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {isAcceptLoading ? "Accepting..." : "Accept Order"}
+                </button>
+              )}
+              {showReject && (
+                <button
+                  type="button"
+                  onClick={() => onRejectOrder(order)}
+                  disabled={isRejectLoading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isRejectLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {isRejectLoading ? "Rejecting..." : "Reject Order"}
+                </button>
+              )}
+              {showAdvance && (
+                <button
+                  type="button"
+                  onClick={() => onAdminStatusChange(order, nextAdminStatus)}
+                  disabled={isAdvanceLoading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isAdvanceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {isAdvanceLoading ? "Updating..." : `Mark ${nextAdminStatusLabel}`}
+                </button>
+              )}
+            </div>
+            {showAssign && (
+              <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/40 p-3">
+                {isLoadingPartners ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading online delivery partners...
+                  </div>
+                ) : onlinePartners.length === 0 ? (
+                  <p className="text-sm text-slate-600">No online delivery partners found.</p>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={selectedPartnerId}
+                      onChange={(e) => setSelectedPartnerId(e.target.value)}
+                      className="min-w-[260px] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                    >
+                      <option value="">Select online delivery boy</option>
+                      {onlinePartners.map((partner) => (
+                        <option key={partner._id} value={String(partner._id)}>
+                          {partner?.name || "Unnamed"} - {partner?.phone || "N/A"}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleInlineAssign}
+                      disabled={!selectedPartnerId || isAssigningInline}
+                      className="rounded-md bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isAssigningInline ? "Assigning..." : "Assign"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          )}
 
           {/* Status History Timeline */}
           <div>

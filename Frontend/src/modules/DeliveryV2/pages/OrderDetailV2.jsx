@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { deliveryAPI } from '@food/api';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
+import { useDeliveryNotifications } from '@/modules/Food/hooks/useDeliveryNotifications';
 import {
   ArrowLeft,
   Clock3,
@@ -50,6 +51,25 @@ const getOrderIdentity = (orderLike) =>
     orderLike?.id ||
     '',
   ).trim();
+
+const getComparableOrderIds = (orderLike) => {
+  const candidates = [
+    orderLike?.orderMongoId,
+    orderLike?._id,
+    orderLike?.orderId,
+    orderLike?.id,
+    orderLike?.displayOrderId,
+    orderLike?.orderCode,
+    orderLike?.orderNumber,
+  ];
+
+  const ids = new Set();
+  candidates.forEach((value) => {
+    const normalized = String(value ?? '').trim();
+    if (normalized) ids.add(normalized);
+  });
+  return ids;
+};
 
 const isMongoObjectId = (value) => /^[a-f0-9]{24}$/i.test(String(value || '').trim());
 
@@ -383,6 +403,15 @@ const getItemVariantLabel = (item = {}) => {
   return parts.join(' | ');
 };
 
+const getItemDescription = (item = {}) =>
+  pickFirstText(
+    item?.description,
+    item?.desc,
+    item?.foodDescription,
+    item?.notes,
+    item?.specialInstructions,
+  );
+
 const getItemQuantity = (item = {}) => Math.max(1, Number(item?.quantity || item?.qty || 1));
 
 const getItemUnitPrice = (item = {}) =>
@@ -460,6 +489,7 @@ const OrderDetailV2 = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const { setActiveOrder, updateTripStatus, clearActiveOrder } = useDeliveryStore();
+  const { orderStatusUpdate, clearOrderStatusUpdate } = useDeliveryNotifications();
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -538,6 +568,57 @@ const OrderDetailV2 = () => {
 
     return () => window.clearInterval(poller);
   }, [fetchOrderDetails]);
+
+  useEffect(() => {
+    if (!orderStatusUpdate) return;
+
+    const routeIds = getComparableOrderIds({ orderId });
+    const currentIds = getComparableOrderIds(order || {});
+    const eventIds = getComparableOrderIds(orderStatusUpdate || {});
+    const isSameOrder = [...eventIds].some((id) => routeIds.has(id) || currentIds.has(id));
+
+    if (!isSameOrder) return;
+
+    setOrder((prev) => {
+      const merged = hydrateDeliveryOrder(
+        {
+          ...(prev || {}),
+          ...(orderStatusUpdate || {}),
+          status:
+            orderStatusUpdate?.status ||
+            orderStatusUpdate?.orderStatus ||
+            prev?.status ||
+            prev?.orderStatus,
+          orderStatus:
+            orderStatusUpdate?.orderStatus ||
+            orderStatusUpdate?.status ||
+            prev?.orderStatus ||
+            prev?.status,
+          deliveryState: {
+            ...(prev?.deliveryState || {}),
+            ...(orderStatusUpdate?.deliveryState || {}),
+          },
+          dispatch: {
+            ...(prev?.dispatch || {}),
+            ...(orderStatusUpdate?.dispatch || {}),
+          },
+        },
+        String(orderId || '').trim(),
+      );
+
+      const nextStatus = String(merged?.status || merged?.orderStatus || '').toLowerCase();
+      if (['cancelled', 'delivered', 'completed'].includes(nextStatus)) {
+        clearActiveOrder();
+      } else {
+        syncStoreWithOrder(merged);
+      }
+
+      return merged;
+    });
+
+    clearOrderStatusUpdate();
+    void fetchOrderDetails(true);
+  }, [clearActiveOrder, clearOrderStatusUpdate, fetchOrderDetails, order, orderId, orderStatusUpdate, syncStoreWithOrder]);
 
   const currentStatus = useMemo(() => {
     const rawStatus = String(order?.status || order?.orderStatus || '').toLowerCase();
@@ -1041,6 +1122,8 @@ const OrderDetailV2 = () => {
                       <tr>
                         <th className="w-20 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Qty</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Item</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Description</th>
+                        <th className="w-36 px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Price</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1048,6 +1131,9 @@ const OrderDetailV2 = () => {
                         const itemName = pickFirstText(item?.name, item?.foodName, item?.title, `Item ${index + 1}`);
                         const qty = getItemQuantity(item);
                         const variantLabel = getItemVariantLabel(item);
+                        const itemDescription = getItemDescription(item);
+                        const unitPrice = getItemUnitPrice(item);
+                        const lineTotal = getItemLineTotal(item);
 
                         return (
                           <tr key={`${itemName}-${index}`} className="align-top">
@@ -1057,6 +1143,15 @@ const OrderDetailV2 = () => {
                                 {itemName}
                                 {variantLabel ? <span className="text-slate-600"> ({variantLabel})</span> : null}
                               </p>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <p className="break-words text-slate-700">
+                                {itemDescription || '--'}
+                              </p>
+                            </td>
+                            <td className="px-3 py-2.5 text-right">
+                              <p className="font-semibold text-slate-900">{formatMoney(lineTotal)}</p>
+                              <p className="text-xs text-slate-500">{formatMoney(unitPrice)} each</p>
                             </td>
                           </tr>
                         );

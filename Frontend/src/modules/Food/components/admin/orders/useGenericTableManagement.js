@@ -241,6 +241,7 @@ export function useGenericTableManagement(data, title, searchFields = []) {
     isViewOrderOpen,
     setIsViewOrderOpen,
     selectedOrder,
+    setSelectedOrder,
     filters,
     setFilters,
     visibleColumns,

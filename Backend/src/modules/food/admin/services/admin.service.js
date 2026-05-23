@@ -38,6 +38,8 @@ import { FoodDeliveryWithdrawal } from '../../delivery/models/foodDeliveryWithdr
 import { FoodDeliveryWallet } from '../../delivery/models/deliveryWallet.model.js';
 import { FoodDeliveryCashDeposit } from '../../delivery/models/foodDeliveryCashDeposit.model.js';
 import { FoodPayoutSettlement } from '../models/foodPayoutSettlement.model.js';
+import { initiateRazorpayRefund } from '../../orders/helpers/razorpay.helper.js';
+import { refundWalletBalance } from '../../user/services/userWallet.service.js';
 import {
     backfillLegacyCategoryWorkflow,
     categoryAllowsFoodType,
@@ -7696,6 +7698,138 @@ export async function updateStoreOrderStatus(orderId, body = {}) {
     }
 
     return updated;
+}
+
+export async function processRefund(orderId, refundAmount) {
+    if (!orderId || !mongoose.Types.ObjectId.isValid(orderId)) {
+        throw new ValidationError('Invalid order id');
+    }
+
+    const order = await FoodOrder.findById(orderId);
+    if (!order) {
+        throw new ValidationError('Order not found');
+    }
+
+    const paymentMethod = String(order?.payment?.method || '').toLowerCase();
+    const paymentStatus = String(order?.payment?.status || '').toLowerCase();
+    const existingRefundStatus = String(order?.payment?.refund?.status || 'none').toLowerCase();
+    const computedTotal = Number(order?.pricing?.total || order?.totalAmount || order?.total || 0);
+
+    if (!Number.isFinite(computedTotal) || computedTotal <= 0) {
+        throw new ValidationError('Refund amount cannot be determined for this order');
+    }
+
+    const requestedAmount = Number(refundAmount);
+    const effectiveRefundAmount = Number.isFinite(requestedAmount) && requestedAmount > 0
+        ? requestedAmount
+        : computedTotal;
+
+    if (effectiveRefundAmount > computedTotal) {
+        throw new ValidationError(`Refund amount cannot exceed order total ₹${computedTotal}`);
+    }
+
+    if (paymentStatus === 'refunded' || existingRefundStatus === 'processed') {
+        return order;
+    }
+
+    if (!order.payment) order.payment = {};
+    if (!order.payment.refund) {
+        order.payment.refund = {
+            status: 'none',
+            amount: 0,
+            refundId: '',
+            processedAt: null
+        };
+    }
+
+    if (paymentMethod === 'wallet') {
+        if (order?.userId) {
+            await refundWalletBalance(
+                order.userId,
+                effectiveRefundAmount,
+                `Wallet refund for order ${order.orderId || String(order._id)}`,
+                {
+                    orderId: String(order.orderId || ''),
+                    orderMongoId: String(order._id),
+                    source: 'admin_manual_refund'
+                }
+            );
+        }
+
+        order.payment.status = 'refunded';
+        order.payment.refund.status = 'processed';
+        order.payment.refund.amount = effectiveRefundAmount;
+        order.payment.refund.refundId = `wallet_refund_${Date.now()}`;
+        order.payment.refund.processedAt = new Date();
+        await order.save();
+        return order;
+    }
+
+    if (paymentMethod !== 'razorpay' && paymentMethod !== 'razorpay_qr') {
+        throw new ValidationError('Refund is supported only for wallet/online paid orders');
+    }
+
+    if (!['paid', 'captured', 'authorized', 'refunded'].includes(paymentStatus)) {
+        throw new ValidationError(`Online payment is not completed yet (status: ${paymentStatus || 'unknown'})`);
+    }
+
+    const tx = await FoodTransaction.findOne({ orderId: order._id })
+        .select('payment gateway status')
+        .lean();
+
+    const razorpayPaymentId =
+        order?.payment?.razorpay?.paymentId ||
+        order?.payment?.paymentId ||
+        tx?.payment?.razorpay?.paymentId ||
+        tx?.gateway?.razorpayPaymentId ||
+        '';
+
+    if (!razorpayPaymentId) {
+        throw new ValidationError('Razorpay payment id not found for this order');
+    }
+
+    const refundResult = await initiateRazorpayRefund(razorpayPaymentId, effectiveRefundAmount);
+    if (!refundResult?.success) {
+        const message = String(refundResult?.error || '');
+        const txStatus = String(tx?.status || '').trim().toLowerCase();
+        const alreadyRefunded =
+            message.toLowerCase().includes('fully refunded already') ||
+            message.toLowerCase().includes('already refunded');
+
+        // Idempotent success: gateway/transaction already indicates refunded.
+        if (alreadyRefunded || txStatus === 'refunded') {
+            order.payment.status = 'refunded';
+            order.payment.refund.status = 'processed';
+            order.payment.refund.amount = effectiveRefundAmount;
+            if (!order.payment.refund.processedAt) {
+                order.payment.refund.processedAt = new Date();
+            }
+            await order.save();
+            return order;
+        }
+
+        order.payment.refund.status = 'failed';
+        order.payment.refund.amount = effectiveRefundAmount;
+        order.payment.refund.processedAt = new Date();
+        await order.save();
+        const txStatusRaw = String(tx?.status || '').trim();
+        const safeMessage = refundResult?.error || 'Refund could not be processed';
+        throw new ValidationError(
+            txStatusRaw ? `${safeMessage} | transactionStatus: ${txStatusRaw}` : safeMessage
+        );
+    }
+
+    const rawRefundStatus = String(refundResult?.status || '').toLowerCase();
+    const isProcessed = rawRefundStatus === 'processed' || rawRefundStatus === 'paid';
+
+    order.payment.status = isProcessed ? 'refunded' : order.payment.status;
+    order.payment.refund.status = isProcessed ? 'processed' : 'pending';
+    order.payment.refund.amount = effectiveRefundAmount;
+    order.payment.refund.refundId = String(refundResult?.refundId || '');
+    order.payment.refund.processedAt = new Date();
+    await order.save();
+
+    return order;
 }
 
 export async function deleteDeliveryPartner(id) {

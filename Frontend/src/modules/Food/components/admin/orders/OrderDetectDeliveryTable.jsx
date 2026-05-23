@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
-import { Eye, Printer, Phone, User, Send, RefreshCw, Loader2 } from "lucide-react"
+import { Eye, Printer, Phone, User } from "lucide-react"
 
 const getStatusColor = (status) => {
   const colors = {
@@ -23,10 +23,6 @@ export default function OrderDetectDeliveryTable({
   visibleColumns,
   onViewOrder,
   onPrintOrder,
-  onAssignOrder,
-  onResendOrder,
-  onAdminStatusChange,
-  actionLoadingKey,
 }) {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
@@ -41,32 +37,6 @@ export default function OrderDetectDeliveryTable({
     const end = start + itemsPerPage
     return orders.slice(start, end)
   }, [orders, currentPage])
-
-  const getNextAdminStatus = (order) => {
-    const rawStatus = String(order?.rawOrderStatus || "").toLowerCase()
-    const dispatchStatus = String(order?.dispatchStatus || "").toLowerCase()
-    const isCancelled =
-      rawStatus === "cancelled" ||
-      rawStatus === "cancelled_by_user" ||
-      rawStatus === "cancelled_by_restaurant" ||
-      rawStatus === "cancelled_by_admin"
-
-    if (dispatchStatus !== "accepted" || isCancelled) return ""
-    if (rawStatus === "delivered" || rawStatus === "completed") return ""
-    if (
-      rawStatus === "picked_up" ||
-      rawStatus === "out_for_delivery" ||
-      rawStatus === "reached_drop" ||
-      rawStatus === "at_drop" ||
-      rawStatus === "at_delivery"
-    ) {
-      return "delivered"
-    }
-    return "picked_up"
-  }
-
-  const getNextAdminStatusLabel = (status) =>
-    status === "picked_up" ? "Picked Up" : status === "delivered" ? "Delivered" : ""
 
   if (orders.length === 0) {
     return (
@@ -200,27 +170,10 @@ export default function OrderDetectDeliveryTable({
                 )}
                 {visibleColumns.status && (
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                         {order.status}
                       </span>
-                      {(() => {
-                        const nextStatus = getNextAdminStatus(order)
-                        if (!nextStatus || typeof onAdminStatusChange !== "function") return null
-                        const isUpdating = actionLoadingKey === `status:${order.orderMongoId}`
-                        return (
-                          <button
-                            type="button"
-                            onClick={() => onAdminStatusChange(order, nextStatus)}
-                            disabled={isUpdating}
-                            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            title={`Mark as ${getNextAdminStatusLabel(nextStatus)}`}
-                          >
-                            {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                            {isUpdating ? "Updating..." : `Mark ${getNextAdminStatusLabel(nextStatus)}`}
-                          </button>
-                        )
-                      })()}
                     </div>
                   </td>
                 )}
@@ -234,23 +187,6 @@ export default function OrderDetectDeliveryTable({
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      {(() => {
-                        const rawStatus = String(order?.rawOrderStatus || "").toLowerCase()
-                        const isCompleted = rawStatus === "delivered" || rawStatus === "completed" || rawStatus === "rejected" || rawStatus === "cancelled" || rawStatus === "cancelled_by_user" || rawStatus === "cancelled_by_restaurant" || rawStatus === "cancelled_by_admin"
-                        
-                        // Hide assign button completely for completed orders
-                        if (isCompleted) return null
-                        
-                        return (
-                          <button
-                            onClick={() => onAssignOrder(order)}
-                            className="p-1.5 rounded text-violet-600 hover:bg-violet-50 transition-colors"
-                            title={order.deliveryBoyName ? "Reassign Delivery Partner" : "Assign Delivery Partner"}
-                          >
-                            <Send className="w-4 h-4" />
-                          </button>
-                        )
-                      })()}
                       <button 
                         onClick={() => onPrintOrder(order)}
                         className="p-1.5 rounded text-brand-600 hover:bg-brand-50 transition-colors"

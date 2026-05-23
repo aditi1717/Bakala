@@ -107,10 +107,25 @@ export async function initiateRazorpayRefund(paymentId, amount) {
         };
     } catch (err) {
         // Log locally but pass the error to the service to handle status update
-        console.error(`Razorpay Refund API Failure [PaymentId: ${paymentId}]:`, err?.message || err);
+        const errorCode = err?.error?.code || err?.code || '';
+        const errorDescription = err?.error?.description || err?.description || '';
+        const errorReason = err?.error?.reason || '';
+        const errorMessage = err?.message || 'Razorpay refund API error';
+        const rawDetails = (() => {
+            try {
+                const raw = err?.error || err;
+                return raw ? JSON.stringify(raw) : '';
+            } catch {
+                return '';
+            }
+        })();
+        const composedMessage = [errorMessage, errorCode, errorDescription, errorReason, rawDetails]
+            .filter(Boolean)
+            .join(' | ');
+        console.error(`Razorpay Refund API Failure [PaymentId: ${paymentId}]:`, composedMessage);
         return {
             success: false,
-            error: err?.message || 'Razorpay refund API error',
+            error: composedMessage || 'Razorpay refund API error',
             status: 'failed'
         };
     }

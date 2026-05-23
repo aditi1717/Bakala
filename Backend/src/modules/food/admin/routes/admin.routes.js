@@ -246,6 +246,7 @@ router.delete('/delivery/:id', adminController.deleteDeliveryPartner);
 router.get('/orders', orderController.listOrdersAdminController);
 router.get('/orders/:orderId', orderController.getOrderByIdAdminController);
 router.patch('/orders/:orderId/status', orderController.updateOrderStatusAdminController);
+router.post('/orders/:orderId/refund', adminController.processRefund);
 router.post('/orders/:orderId/assign-delivery', orderController.assignDeliveryPartnerController);
 router.post('/orders/:orderId/resend-delivery-notification', orderController.resendAssignedDeliveryNotificationAdminController);
 router.delete('/orders/:orderId', orderController.deleteOrderAdminController);

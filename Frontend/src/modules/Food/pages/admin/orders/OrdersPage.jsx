@@ -951,12 +951,14 @@ export default function OrdersPage({ statusKey = "all" }) {
 
   // Process refund with amount
   const processRefund = async (order, refundAmount = null) => {
-    // Try using MongoDB _id first (more reliable for route matching), then fallback to orderId string
-    // Backend accepts either MongoDB ObjectId (24 chars) or orderId string
-    // Using MongoDB _id is more reliable for route matching (no dashes/special chars)
-    const orderIdToUse = order.id || order._id || order.orderId
+    // Try Mongo id first, then fallback to display orderId for backends that resolve by orderId string.
+    const primaryOrderId = order.id || order._id || order.orderId
+    const fallbackOrderId =
+      order.orderId && String(order.orderId) !== String(primaryOrderId)
+        ? order.orderId
+        : null
     
-    if (!orderIdToUse) {
+    if (!primaryOrderId) {
       debugError('? No orderId found in order object:', order)
       toast.error('Order ID not found. Please refresh the page and try again.')
       return
@@ -965,38 +967,68 @@ export default function OrdersPage({ statusKey = "all" }) {
     debugLog('?? Order details for refund:', {
       orderIdString: order.orderId,
       mongoId: order.id,
-      orderIdToUse,
-      willUse: order.orderId ? 'orderId string' : 'MongoDB _id',
+      orderIdToUse: primaryOrderId,
+      fallbackOrderId,
+      willUse: order.orderId ? 'MongoDB _id (with fallback)' : 'orderId string',
       refundAmount
     })
 
     try {
-      setProcessingRefund(orderIdToUse)
+      setProcessingRefund(primaryOrderId)
       
-      debugLog('?? Processing refund for order:', {
+      debugLog('?? Processing refund for order (primary attempt):', {
         orderId: order.orderId,
         id: order.id,
         _id: order._id,
-        orderIdToUse,
+        orderIdToUse: primaryOrderId,
         refundAmount,
-        url: `/api/admin/orders/${orderIdToUse}/refund`
+        url: `/api/admin/orders/${primaryOrderId}/refund`
       })
       
       // Include refundAmount in request body if provided (ensure it's a number)
       const requestData = refundAmount !== null ? { refundAmount: parseFloat(refundAmount) } : {}
       debugLog('?? Request data being sent:', requestData)
-      const response = await adminAPI.processRefund(orderIdToUse, requestData)
+      let response
+      try {
+        response = await adminAPI.processRefund(primaryOrderId, requestData)
+      } catch (primaryError) {
+        const isNotFound = primaryError?.response?.status === 404
+        if (isNotFound && fallbackOrderId) {
+          debugLog('Primary refund lookup failed with 404, retrying using orderId string', {
+            primaryOrderId,
+            fallbackOrderId,
+          })
+          response = await adminAPI.processRefund(fallbackOrderId, requestData)
+        } else {
+          throw primaryError
+        }
+      }
       
       if (response.data?.success) {
         const isWalletPayment = order.paymentType === "Wallet" || order.payment?.method === "wallet";
+        const apiRefundStatus = String(
+          response?.data?.data?.payment?.refund?.status ||
+          response?.data?.data?.refund?.status ||
+          ""
+        ).toLowerCase();
+        const apiPaymentStatus = String(
+          response?.data?.data?.payment?.status || ""
+        ).toLowerCase();
         toast.success(response.data?.message || (isWalletPayment 
           ? `Wallet refund of \u20B9${refundAmount || order.totalAmount} processed successfully for order ${order.orderId}`
           : `Refund initiated successfully for order ${order.orderId}`))
-        // Update the order in the local state immediately to show "Refunded" status
+        const nextRefundStatus =
+          apiRefundStatus === "processed" || apiPaymentStatus === "refunded"
+            ? "processed"
+            : apiRefundStatus === "pending"
+              ? "initiated"
+              : isWalletPayment
+                ? "processed"
+                : "initiated";
         setOrders(prevOrders => 
           prevOrders.map(o => 
             (o.id === order.id || o.orderId === order.orderId)
-              ? { ...o, refundStatus: 'processed' } // Wallet refunds are instant, so mark as processed
+              ? { ...o, refundStatus: nextRefundStatus }
               : o
           )
         )
@@ -1013,11 +1045,12 @@ export default function OrdersPage({ statusKey = "all" }) {
         message: error.message,
         status: error.response?.status,
         statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: error.config?.url,
-        baseURL: error.config?.baseURL,
-        fullURL: error.config?.baseURL + error.config?.url,
-        orderId: orderIdToUse,
+          data: error.response?.data,
+          url: error.config?.url,
+          baseURL: error.config?.baseURL,
+          fullURL: error.config?.baseURL + error.config?.url,
+        orderId: primaryOrderId,
+        fallbackOrderId,
         refundAmount: refundAmount,
         order: {
           id: order.id,
@@ -1034,7 +1067,7 @@ export default function OrdersPage({ statusKey = "all" }) {
       if (error.response) {
         // Server responded with error
         if (error.response.status === 404) {
-          errorMessage = `Order not found (ID: ${orderIdToUse}). Please check if the order exists.`
+          errorMessage = `Order not found (ID: ${primaryOrderId}). Please check if the order exists.`
         } else if (error.response.status === 400) {
           errorMessage = error.response.data?.message || "Invalid request. Please check the refund amount."
         } else if (error.response.status === 500) {
@@ -1123,8 +1156,8 @@ export default function OrdersPage({ statusKey = "all" }) {
         onPrintOrder={handlePrintOrder}
         onRefund={handleRefund}
         onDeleteOrder={statusKey === "all" ? handleDeleteOrder : undefined}
-        onAcceptOrder={statusKey === "all" || statusKey === "pending" ? handleAcceptOrder : undefined}
-        onRejectOrder={statusKey === "all" || statusKey === "pending" ? handleRejectOrder : undefined}
+        onAcceptOrder={undefined}
+        onRejectOrder={undefined}
         actionLoading={processingAction}
         deletingOrderId={deletingOrderId}
       />

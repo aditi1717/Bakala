@@ -8,7 +8,6 @@ import BRAND_THEME from "@/config/brandTheme"
 import OrdersTopbar from "@food/components/admin/orders/OrdersTopbar"
 import OrderDetectDeliveryTable from "@food/components/admin/orders/OrderDetectDeliveryTable"
 import ViewOrderDetectDeliveryDialog from "@food/components/admin/orders/ViewOrderDetectDeliveryDialog"
-import AssignDeliveryPartnerDialog from "@food/components/admin/orders/AssignDeliveryPartnerDialog"
 import SettingsDialog from "@food/components/admin/orders/SettingsDialog"
 import { useGenericTableManagement } from "@food/components/admin/orders/useGenericTableManagement"
 
@@ -338,6 +337,24 @@ const transformOrder = (order, index) => {
   }
 }
 
+const patchOrderFromSocketPayload = (orderRow, payload, index) => {
+  const nextStatus = String(payload?.orderStatus || payload?.status || "").trim()
+  if (!nextStatus) return orderRow
+
+  const baseOriginal = orderRow?.originalOrder || {}
+  const patchedOriginal = {
+    ...baseOriginal,
+    orderStatus: nextStatus,
+    status: nextStatus,
+    cancellationReason: payload?.cancellationReason ?? baseOriginal?.cancellationReason ?? "",
+    cancelledBy: payload?.cancelledBy ?? baseOriginal?.cancelledBy ?? null,
+    cancelledAt: payload?.cancelledAt ?? baseOriginal?.cancelledAt ?? null,
+    updatedAt: payload?.updatedAt || new Date().toISOString(),
+  }
+
+  return transformOrder(patchedOriginal, index)
+}
+
 export default function OrderDetectDelivery() {
   const [visibleColumns, setVisibleColumns] = useState({
     si: true,
@@ -352,8 +369,6 @@ export default function OrderDetectDelivery() {
   const [orders, setOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
-  const [selectedOrderForAssignment, setSelectedOrderForAssignment] = useState(null)
   const [actionLoadingKey, setActionLoadingKey] = useState("")
   const orderStatusRef = useRef(new Map())
 
@@ -406,6 +421,18 @@ export default function OrderDetectDelivery() {
     orderStatusRef.current = nextMap
   }, [orders])
 
+  const {
+    searchQuery, setSearchQuery, isFilterOpen, setIsFilterOpen,
+    isSettingsOpen, setIsSettingsOpen, isViewOrderOpen, setIsViewOrderOpen,
+    selectedOrder, setSelectedOrder, filters, setFilters, filteredData, activeFiltersCount,
+    handleApplyFilters, handleResetFilters, handleExport,
+    handleViewOrder, handlePrintOrder, toggleColumn,
+  } = useGenericTableManagement(
+    orders,
+    "Order Detect Delivery",
+    ["orderId", "userName", "userNumber", "restaurantName", "deliveryBoyName", "status"]
+  )
+
   useEffect(() => {
     const backendUrl = String(API_BASE_URL || "").replace(/\/api\/v1\/?$/i, "").replace(/\/api\/?$/i, "").replace(/\/$/, "")
     if (!backendUrl || !backendUrl.startsWith("http")) return undefined
@@ -420,34 +447,70 @@ export default function OrderDetectDelivery() {
     })
 
     const requestRefresh = () => fetchOrders({ silent: true })
+    const handleRealtimeOrderUpdate = (payload = {}) => {
+      const payloadOrderMongoId = normalizeId(payload?.orderMongoId || payload?._id || payload?.id)
+      const payloadOrderId = normalizeId(payload?.orderId || payload?.order_id)
+
+      if (!payloadOrderMongoId && !payloadOrderId) {
+        requestRefresh()
+        return
+      }
+
+      setOrders((prev) =>
+        (prev || []).map((orderRow, index) => {
+          const rowMongoId = normalizeId(orderRow?.orderMongoId || orderRow?.originalOrder?._id)
+          const rowOrderId = normalizeId(orderRow?.orderId || orderRow?.originalOrder?.orderId)
+          const isMatch =
+            (payloadOrderMongoId && rowMongoId && payloadOrderMongoId === rowMongoId) ||
+            (payloadOrderId && rowOrderId && payloadOrderId === rowOrderId)
+          return isMatch ? patchOrderFromSocketPayload(orderRow, payload, index) : orderRow
+        })
+      )
+
+      setSelectedOrder((prevSelected) => {
+        if (!prevSelected) return prevSelected
+        const selectedMongoId = normalizeId(prevSelected?.orderMongoId || prevSelected?.originalOrder?._id)
+        const selectedOrderId = normalizeId(prevSelected?.orderId || prevSelected?.originalOrder?.orderId)
+        const isSelectedMatch =
+          (payloadOrderMongoId && selectedMongoId && payloadOrderMongoId === selectedMongoId) ||
+          (payloadOrderId && selectedOrderId && payloadOrderId === selectedOrderId)
+        if (!isSelectedMatch) return prevSelected
+        return patchOrderFromSocketPayload(prevSelected, payload, prevSelected?.sl ? prevSelected.sl - 1 : 0)
+      })
+
+      requestRefresh()
+    }
     socket.on("connect", requestRefresh)
-    socket.on("order_status_update", requestRefresh)
-    socket.on("admin_order_status_updated", requestRefresh)
-    socket.on("order_updated", requestRefresh)
+    socket.on("order_status_update", handleRealtimeOrderUpdate)
+    socket.on("admin_order_status_updated", handleRealtimeOrderUpdate)
+    socket.on("order_updated", handleRealtimeOrderUpdate)
     socket.on("admin_new_order", requestRefresh)
     socket.on("order_deleted", requestRefresh)
 
     return () => {
       socket.disconnect()
     }
-  }, [fetchOrders])
+  }, [fetchOrders, setSelectedOrder])
+
+  useEffect(() => {
+    if (!isViewOrderOpen || !selectedOrder) return
+    const selectedMongoId = normalizeId(selectedOrder?.orderMongoId || selectedOrder?.originalOrder?._id)
+    const selectedOrderId = normalizeId(selectedOrder?.orderId || selectedOrder?.originalOrder?.orderId)
+    const liveOrder = (orders || []).find((o) => {
+      const mongoId = normalizeId(o?.orderMongoId || o?.originalOrder?._id)
+      const orderId = normalizeId(o?.orderId || o?.originalOrder?.orderId)
+      return (
+        (selectedMongoId && mongoId && selectedMongoId === mongoId) ||
+        (selectedOrderId && orderId && selectedOrderId === orderId)
+      )
+    })
+    if (liveOrder) setSelectedOrder(liveOrder)
+  }, [isViewOrderOpen, selectedOrder, orders, setSelectedOrder])
 
   useEffect(() => {
     const id = setInterval(() => fetchOrders({ silent: true }), 3000)
     return () => clearInterval(id)
   }, [fetchOrders])
-
-  const {
-    searchQuery, setSearchQuery, isFilterOpen, setIsFilterOpen,
-    isSettingsOpen, setIsSettingsOpen, isViewOrderOpen, setIsViewOrderOpen,
-    selectedOrder, filters, setFilters, filteredData, activeFiltersCount,
-    handleApplyFilters, handleResetFilters, handleExport,
-    handleViewOrder, handlePrintOrder, toggleColumn,
-  } = useGenericTableManagement(
-    orders,
-    "Order Detect Delivery",
-    ["orderId", "userName", "userNumber", "restaurantName", "deliveryBoyName", "status"]
-  )
 
   const stats = useMemo(() => {
     const total = orders.length
@@ -465,18 +528,6 @@ export default function OrderDetectDelivery() {
 
   const tableOrders = filteredData
 
-  const handleOpenAssignDialog = (order) => {
-    setSelectedOrderForAssignment(order)
-    setIsAssignDialogOpen(true)
-  }
-
-  const handleResend = async (order) => {
-    if (!order?.orderMongoId) return
-    setSelectedOrderForAssignment(order)
-    setIsAssignDialogOpen(true)
-    toast.info("Reassign delivery partner for this order")
-  }
-
   const handleAdminStatusChange = async (order, nextStatus) => {
     const orderId = String(order?.orderMongoId || "").trim()
     if (!orderId) return
@@ -490,6 +541,46 @@ export default function OrderDetectDelivery() {
       }
     } catch (error) {
       toast.error("Failed to update status")
+    } finally {
+      setActionLoadingKey("")
+    }
+  }
+
+  const handleAcceptOrder = async (order) => {
+    const orderId = String(order?.orderMongoId || "").trim()
+    if (!orderId) return
+    const loadingKey = `accept:${orderId}`
+    setActionLoadingKey(loadingKey)
+    try {
+      const response = await adminAPI.updateOrderStatus(orderId, { orderStatus: "confirmed" })
+      if (response?.data?.success) {
+        toast.success("Order accepted")
+        fetchOrders({ silent: true })
+      }
+    } catch (error) {
+      toast.error("Failed to accept order")
+    } finally {
+      setActionLoadingKey("")
+    }
+  }
+
+  const handleRejectOrder = async (order) => {
+    const orderId = String(order?.orderMongoId || "").trim()
+    if (!orderId) return
+    const reason = window.prompt("Enter rejection reason (optional):", "") || ""
+    const loadingKey = `reject:${orderId}`
+    setActionLoadingKey(loadingKey)
+    try {
+      const response = await adminAPI.updateOrderStatus(orderId, {
+        orderStatus: "cancelled_by_admin",
+        reason,
+      })
+      if (response?.data?.success) {
+        toast.success("Order rejected")
+        fetchOrders({ silent: true })
+      }
+    } catch (error) {
+      toast.error("Failed to reject order")
     } finally {
       setActionLoadingKey("")
     }
@@ -585,16 +676,19 @@ export default function OrderDetectDelivery() {
           status: "Status", actions: "Actions",
         }}
       />
-      <ViewOrderDetectDeliveryDialog isOpen={isViewOrderOpen} onOpenChange={setIsViewOrderOpen} order={selectedOrder} />
-      <AssignDeliveryPartnerDialog
-        isOpen={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}
-        order={selectedOrderForAssignment} onAssigned={() => fetchOrders({ silent: true })}
+      <ViewOrderDetectDeliveryDialog
+        isOpen={isViewOrderOpen}
+        onOpenChange={setIsViewOrderOpen}
+        order={selectedOrder}
+        onAcceptOrder={handleAcceptOrder}
+        onRejectOrder={handleRejectOrder}
+        onAdminStatusChange={handleAdminStatusChange}
+        actionLoadingKey={actionLoadingKey}
+        onRefresh={() => fetchOrders({ silent: true })}
       />
       <OrderDetectDeliveryTable 
         orders={tableOrders} visibleColumns={visibleColumns}
         onViewOrder={handleViewOrder} onPrintOrder={handlePrintOrder}
-        onAssignOrder={handleOpenAssignDialog} onResendOrder={handleResend}
-        onAdminStatusChange={handleAdminStatusChange} actionLoadingKey={actionLoadingKey}
       />
     </div>
   )
