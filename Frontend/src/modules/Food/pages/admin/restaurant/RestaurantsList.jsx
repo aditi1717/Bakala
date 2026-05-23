@@ -1684,28 +1684,16 @@ export default function RestaurantsList() {
                     <div>
                       <label className="block text-xs text-slate-500 mb-1">Pure Veg</label>
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setDetailsForm((prev) => ({ ...prev, pureVegRestaurant: true }))}
-                          className={`px-3 py-1.5 text-xs rounded-full border ${
+                        <span
+                          className={`inline-flex items-center px-3 py-1.5 text-xs rounded-full border font-semibold ${
                             detailsForm.pureVegRestaurant === true
-                              ? "bg-green-600 text-white border-green-600"
-                              : "bg-white text-slate-700 border-slate-300"
+                              ? "bg-green-50 text-green-700 border-green-200"
+                              : "bg-slate-50 text-slate-700 border-slate-200"
                           }`}
                         >
-                          Yes
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDetailsForm((prev) => ({ ...prev, pureVegRestaurant: false }))}
-                          className={`px-3 py-1.5 text-xs rounded-full border ${
-                            detailsForm.pureVegRestaurant === false
-                              ? "bg-slate-900 text-white border-slate-900"
-                              : "bg-white text-slate-700 border-slate-300"
-                          }`}
-                        >
-                          No
-                        </button>
+                          {detailsForm.pureVegRestaurant === true ? "Veg" : "Non-Veg"}
+                        </span>
+                        <span className="text-[11px] text-slate-400">Read only</span>
                       </div>
                     </div>
                     <div>

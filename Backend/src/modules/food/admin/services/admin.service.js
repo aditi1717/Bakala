@@ -3784,18 +3784,26 @@ const resolveAdminFoodCategory = async ({ categoryId, categoryName, foodType, pu
         throw new ValidationError('Category is required');
     }
 
+    let resolvedFoodType = foodType === 'Veg' ? 'Veg' : 'Non-Veg';
+
     if (categoryDoc?.foodTypeScope) {
         if (pureVegRestaurant && String(categoryDoc.foodTypeScope || '') !== 'Veg') {
             throw new ValidationError('Pure veg restaurants can only use veg categories');
         }
-        if (!categoryAllowsFoodType(categoryDoc.foodTypeScope, foodType)) {
+        if (String(categoryDoc.foodTypeScope) === 'Veg') {
+            resolvedFoodType = 'Veg';
+        } else if (String(categoryDoc.foodTypeScope) === 'Non-Veg') {
+            resolvedFoodType = 'Non-Veg';
+        }
+        if (!categoryAllowsFoodType(categoryDoc.foodTypeScope, resolvedFoodType)) {
             throw new ValidationError(`This ${categoryDoc.foodTypeScope} category cannot accept ${foodType} food`);
         }
     }
 
     return {
         categoryId: resolvedCategoryId,
-        categoryName: resolvedCategoryName
+        categoryName: resolvedCategoryName,
+        foodType: resolvedFoodType
     };
 };
 
@@ -3863,20 +3871,20 @@ export async function createFood(body) {
     }
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) throw new ValidationError('Food name is required');
-    const foodType = body.foodType === 'Veg' ? 'Veg' : 'Non-Veg';
-    if (restaurant.pureVegRestaurant === true && foodType !== 'Veg') {
-        throw new ValidationError('Pure veg restaurants can only use veg foods');
-    }
+    const inputFoodType = body.foodType === 'Veg' ? 'Veg' : 'Non-Veg';
     const { price, variants } = getAdminFoodCreatePricing(body);
 
     let categoryName = typeof body.categoryName === 'string' ? body.categoryName.trim() : '';
     if (!categoryName && typeof body.category === 'string') categoryName = body.category.trim();
-    const { categoryId, categoryName: resolvedCategoryName } = await resolveAdminFoodCategory({
+    const { categoryId, categoryName: resolvedCategoryName, foodType } = await resolveAdminFoodCategory({
         categoryId: body.categoryId,
         categoryName,
-        foodType,
+        foodType: inputFoodType,
         pureVegRestaurant: restaurant.pureVegRestaurant === true
     });
+    if (restaurant.pureVegRestaurant === true && foodType !== 'Veg') {
+        throw new ValidationError('Pure veg restaurants can only use veg foods');
+    }
 
     const doc = new FoodItem({
         restaurantId,
@@ -3908,10 +3916,7 @@ export async function updateFood(id, body) {
     }
     if (body.name !== undefined) doc.name = String(body.name || '').trim();
     if (body.description !== undefined) doc.description = String(body.description || '').trim();
-    const targetFoodType = body.foodType !== undefined ? (body.foodType === 'Veg' ? 'Veg' : 'Non-Veg') : (doc.foodType === 'Veg' ? 'Veg' : 'Non-Veg');
-    if (restaurant.pureVegRestaurant === true && targetFoodType !== 'Veg') {
-        throw new ValidationError('Pure veg restaurants can only use veg foods');
-    }
+    let targetFoodType = body.foodType !== undefined ? (body.foodType === 'Veg' ? 'Veg' : 'Non-Veg') : (doc.foodType === 'Veg' ? 'Veg' : 'Non-Veg');
     const pricingUpdate = getAdminFoodUpdatedPricing(doc.toObject(), body);
     if (pricingUpdate.price !== undefined) doc.price = pricingUpdate.price;
     if (pricingUpdate.variants !== undefined) doc.variants = pricingUpdate.variants;
@@ -3923,7 +3928,7 @@ export async function updateFood(id, body) {
         const nextCategoryName = body.categoryName !== undefined
             ? String(body.categoryName || '').trim()
             : (body.category !== undefined ? String(body.category || '').trim() : doc.categoryName);
-        const { categoryId, categoryName } = await resolveAdminFoodCategory({
+        const { categoryId, categoryName, foodType } = await resolveAdminFoodCategory({
             categoryId: body.categoryId !== undefined ? body.categoryId : doc.categoryId,
             categoryName: nextCategoryName,
             foodType: targetFoodType,
@@ -3931,6 +3936,13 @@ export async function updateFood(id, body) {
         });
         doc.categoryId = categoryId;
         doc.categoryName = categoryName;
+        targetFoodType = foodType;
+    }
+    if (restaurant.pureVegRestaurant === true && targetFoodType !== 'Veg') {
+        throw new ValidationError('Pure veg restaurants can only use veg foods');
+    }
+    if (body.foodType !== undefined || body.categoryId !== undefined || body.categoryName !== undefined || body.category !== undefined) {
+        doc.foodType = targetFoodType;
     }
     await doc.save();
     return doc.toObject();

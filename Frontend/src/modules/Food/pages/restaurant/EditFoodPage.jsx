@@ -313,6 +313,18 @@ export default function EditFoodPage() {
     ]
   })()
 
+  const selectedCategoryMeta = categoryOptions.find(
+    (category) => String(category?.id || "").trim() === String(formData.category || "").trim(),
+  )
+  const resolvedFoodType =
+    selectedCategoryMeta?.foodTypeScope === "Veg"
+      ? "Veg"
+      : selectedCategoryMeta?.foodTypeScope === "Non-Veg"
+      ? "Non-Veg"
+      : formData.foodType === "Veg"
+      ? "Veg"
+      : "Non-Veg"
+
   const handleImageUpload = (field, file) => {
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -375,6 +387,7 @@ export default function EditFoodPage() {
     // Prepare food data for saving
     const foodDataToSave = {
       ...formData,
+      foodType: resolvedFoodType,
       price: hasVariations ? undefined : parsedBasePrice,
       variations: normalizedVariations.map((variation) => ({
         ...(variation.id && !variation.id.startsWith("variant-") ? { _id: variation.id } : {}),
@@ -401,15 +414,6 @@ export default function EditFoodPage() {
       toast.error("Please select a valid category from the dropdown")
       // COMMENTED OUT: Restaurant can't create categories anymore
       // navigate("/restaurant/menu-categories")
-      return
-    }
-
-    if (
-      matchedCategory?.foodTypeScope &&
-      matchedCategory.foodTypeScope !== "Both" &&
-      matchedCategory.foodTypeScope !== foodDataToSave.foodType
-    ) {
-      toast.error(`This ${matchedCategory.foodTypeScope} category cannot accept ${foodDataToSave.foodType} food`)
       return
     }
 
@@ -574,19 +578,6 @@ export default function EditFoodPage() {
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Food Type
-                  </label>
-                  <select
-                    value={formData.foodType}
-                    onChange={(e) => handleInputChange("foodType", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff8100] focus:border-transparent outline-none"
-                  >
-                    <option value="Veg">Veg</option>
-                    <option value="Non-Veg">Non-Veg</option>
-                  </select>
-                </div>
               </div>
             </CardContent>
           </Card>

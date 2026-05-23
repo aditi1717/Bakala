@@ -345,7 +345,7 @@ const RestaurantProfile = () => {
     )
   }
 
-  const SectionHeader = ({ icon: Icon, title, section, isEditing, onToggle, onSave, isSaving }) => (
+  const SectionHeader = ({ icon: Icon, title, section, isEditing, onToggle, onSave, isSaving, showActions = true }) => (
     <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10">
       <div className="flex items-center gap-2.5">
         <div className={`p-1.5 rounded-lg ${isEditing ? 'bg-[#005128] text-white' : 'bg-[#e6f0eb] text-[#005128]'}`}>
@@ -356,38 +356,40 @@ const RestaurantProfile = () => {
           <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{isEditing ? 'Editing Mode' : 'View Only'}</p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {!isEditing ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggle}
-            className="text-[#005128] hover:bg-[#e6f0eb] rounded-full px-4"
-          >
-            <Edit2 className="w-4 h-4 mr-2" /> Edit
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2">
+      {showActions && (
+        <div className="flex items-center gap-2">
+          {!isEditing ? (
             <Button
               variant="ghost"
               size="sm"
               onClick={onToggle}
-              disabled={isSaving}
-              className="text-slate-500 hover:bg-slate-100 rounded-full"
+              className="text-[#005128] hover:bg-[#e6f0eb] rounded-full px-4"
             >
-              Cancel
+              <Edit2 className="w-4 h-4 mr-2" /> Edit
             </Button>
-            <Button
-              size="sm"
-              onClick={onSave}
-              disabled={isSaving}
-              className="bg-[#005128] hover:bg-[#003d1e] text-white rounded-full px-5 shadow-lg shadow-green-900/20"
-            >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-2" /> Save</>}
-            </Button>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggle}
+                disabled={isSaving}
+                className="text-slate-500 hover:bg-slate-100 rounded-full"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={onSave}
+                disabled={isSaving}
+                className="bg-[#005128] hover:bg-[#003d1e] text-white rounded-full px-5 shadow-lg shadow-green-900/20"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4 mr-2" /> Save</>}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 
@@ -494,6 +496,7 @@ const RestaurantProfile = () => {
             onToggle={() => toggleEdit('basic')}
             onSave={() => handleSaveSection('basic')}
             isSaving={savingSection === 'basic'}
+            showActions={false}
           />
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
@@ -501,25 +504,9 @@ const RestaurantProfile = () => {
               <Input
                 value={basicInfo.name}
                 onChange={e => setBasicInfo({ ...basicInfo, name: e.target.value })}
-                disabled={!editStates.basic}
+                disabled
                 className="rounded-xl border-slate-200 focus:ring-[#005128] bg-slate-50/50"
               />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 ml-1">Veg / Non-Veg</Label>
-              <Select
-                value={String(basicInfo.pureVegRestaurant)}
-                onValueChange={v => setBasicInfo({ ...basicInfo, pureVegRestaurant: v === 'true' })}
-                disabled={!editStates.basic}
-              >
-                <SelectTrigger className="rounded-xl bg-slate-50/50">
-                  <SelectValue placeholder="Select Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Pure Veg Restaurant</SelectItem>
-                  <SelectItem value="false">Non-Veg / Both</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-500 ml-1">Owner Name</Label>
@@ -528,7 +515,7 @@ const RestaurantProfile = () => {
                 <Input
                   value={basicInfo.ownerName}
                   onChange={e => setBasicInfo({ ...basicInfo, ownerName: e.target.value.replace(/[^a-zA-Z\s]/g, "") })}
-                  disabled={!editStates.basic}
+                  disabled
                   className="pl-10 rounded-xl bg-slate-50/50"
                   placeholder="Owner's Full Name"
                 />
@@ -541,7 +528,7 @@ const RestaurantProfile = () => {
                 <Input
                   value={basicInfo.ownerEmail}
                   onChange={e => setBasicInfo({ ...basicInfo, ownerEmail: e.target.value })}
-                  disabled={!editStates.basic}
+                  disabled
                   className="pl-10 rounded-xl bg-slate-50/50"
                 />
               </div>
@@ -553,7 +540,7 @@ const RestaurantProfile = () => {
                 <Input
                   value={basicInfo.ownerPhone}
                   onChange={e => setBasicInfo({ ...basicInfo, ownerPhone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
-                  disabled={!editStates.basic}
+                  disabled
                   className="pl-10 rounded-xl bg-slate-50/50"
                   placeholder="10-digit mobile number"
                 />
@@ -566,7 +553,7 @@ const RestaurantProfile = () => {
                 <Input
                   value={basicInfo.primaryContactNumber}
                   onChange={e => setBasicInfo({ ...basicInfo, primaryContactNumber: e.target.value.replace(/\D/g, "").slice(0, 10) })}
-                  disabled={!editStates.basic}
+                  disabled
                   className="pl-10 rounded-xl bg-slate-50/50"
                   placeholder="10-digit contact number"
                 />

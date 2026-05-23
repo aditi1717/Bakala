@@ -9,7 +9,13 @@ const normalizeEntityId = (value) => {
   if (!value) return ""
   if (typeof value === "string") return value.trim()
   if (typeof value === "object") {
-    return String(value?._id || value?.id || value?.restaurantId || "").trim()
+    const nestedId = value?._id || value?.id || value?.restaurantId
+    if (nestedId) return String(nestedId).trim()
+    if (typeof value?.toString === "function") {
+      const asString = String(value.toString()).trim()
+      if (asString && asString !== "[object Object]") return asString
+    }
+    return ""
   }
   return String(value).trim()
 }
@@ -122,6 +128,10 @@ const FoodFormDialog = ({
   // Filter and sort categories client-side (Matches legacy behavior exactly)
   const categoryOptions = useMemo(() => {
     const selectedResId = normalizeEntityId(foodForm.restaurantId)
+    const selectedRestaurantMeta = restaurantOptions.find(
+      (restaurant) => String(restaurant?.id || "") === String(selectedResId || ""),
+    )
+    const isPureVegRestaurant = selectedRestaurantMeta?.pureVegRestaurant === true
     
     return allCategories
       .map((c) => {
@@ -149,11 +159,16 @@ const FoodFormDialog = ({
           name: String(c.name || "").trim(),
           isGlobal: isGlobal,
           normalizedRestaurantId: ownerRestaurantId,
+          foodTypeScope: String(c?.foodTypeScope || "Both"),
         }
       })
       .filter((c) => {
         if (!selectedResId) return c.isGlobal
-        return c.isGlobal || c.normalizedRestaurantId === selectedResId
+        const matchesRestaurant = c.isGlobal || c.normalizedRestaurantId === selectedResId
+        if (!matchesRestaurant) return false
+        // For pure veg restaurants, hide Non-Veg categories (global or own).
+        if (isPureVegRestaurant && c.foodTypeScope === "Non-Veg") return false
+        return true
       })
       .sort((a, b) => {
         const aIsOwn = a.normalizedRestaurantId === selectedResId
@@ -164,7 +179,20 @@ const FoodFormDialog = ({
         if (!a.isGlobal && b.isGlobal) return 1
         return a.name.localeCompare(b.name)
       })
-  }, [allCategories, foodForm.restaurantId])
+  }, [allCategories, foodForm.restaurantId, restaurantOptions])
+
+  const selectedCategoryMeta = useMemo(
+    () => categoryOptions.find((c) => c.id === String(foodForm.categoryId || "")) || null,
+    [categoryOptions, foodForm.categoryId]
+  )
+  useEffect(() => {
+    if (!selectedCategoryMeta) return
+    if (selectedCategoryMeta.foodTypeScope === "Veg" && foodForm.foodType !== "Veg") {
+      setFoodForm((prev) => ({ ...prev, foodType: "Veg" }))
+    } else if (selectedCategoryMeta.foodTypeScope === "Non-Veg" && foodForm.foodType !== "Non-Veg") {
+      setFoodForm((prev) => ({ ...prev, foodType: "Non-Veg" }))
+    }
+  }, [selectedCategoryMeta, foodForm.foodType])
 
   const handleVariantChange = (variantId, field, value) => {
     setFoodForm((prev) => ({
@@ -253,7 +281,14 @@ const FoodFormDialog = ({
         })),
         description: foodForm.description.trim(),
         image: imageUrl,
-        foodType: foodForm.foodType === "Veg" ? "Veg" : "Non-Veg",
+        foodType:
+          selectedCategoryMeta?.foodTypeScope === "Veg"
+            ? "Veg"
+            : selectedCategoryMeta?.foodTypeScope === "Non-Veg"
+            ? "Non-Veg"
+            : foodForm.foodType === "Veg"
+            ? "Veg"
+            : "Non-Veg",
         isAvailable: foodForm.isAvailable !== false,
         preparationTime: String(foodForm.preparationTime || "").trim(),
       }
@@ -334,7 +369,17 @@ const FoodFormDialog = ({
                           key={c.id}
                           type="button"
                           onClick={() => {
-                            setFoodForm((prev) => ({ ...prev, categoryId: c.id, categoryName: c.name }))
+                            setFoodForm((prev) => ({
+                              ...prev,
+                              categoryId: c.id,
+                              categoryName: c.name,
+                              foodType:
+                                c.foodTypeScope === "Veg"
+                                  ? "Veg"
+                                  : c.foodTypeScope === "Non-Veg"
+                                  ? "Non-Veg"
+                                  : prev.foodType,
+                            }))
                             setCategoryPopoverOpen(false)
                           }}
                           className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-slate-100 ${
@@ -376,17 +421,6 @@ const FoodFormDialog = ({
                 disabled={foodForm.variants.length > 0}
                 className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Food Type</label>
-              <select
-                value={foodForm.foodType}
-                onChange={(e) => setFoodForm((prev) => ({ ...prev, foodType: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white"
-              >
-                <option value="Veg">Veg</option>
-                <option value="Non-Veg">Non-Veg</option>
-              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Preparation Time</label>

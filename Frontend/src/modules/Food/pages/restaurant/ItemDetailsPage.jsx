@@ -100,6 +100,7 @@ export default function ItemDetailsPage() {
   const [isTagsPopupOpen, setIsTagsPopupOpen] = useState(false)
   const [categories, setCategories] = useState([])
   const [loadingCategories, setLoadingCategories] = useState(true)
+  const [isPureVegRestaurant, setIsPureVegRestaurant] = useState(false)
   const [loadingItem, setLoadingItem] = useState(false)
   const [keyboardInset, setKeyboardInset] = useState(0)
 
@@ -236,6 +237,23 @@ export default function ItemDetailsPage() {
     fetchItemData()
   }, [id, isNewItem, location.state, defaultCategory])
 
+  useEffect(() => {
+    let mounted = true
+    const fetchRestaurantProfile = async () => {
+      try {
+        const response = await restaurantAPI.getCurrentRestaurant()
+        const restaurant = response?.data?.data?.restaurant || response?.data?.restaurant || null
+        if (!mounted) return
+        setIsPureVegRestaurant(restaurant?.pureVegRestaurant === true)
+      } catch (_) {
+        if (!mounted) return
+        setIsPureVegRestaurant(false)
+      }
+    }
+    fetchRestaurantProfile()
+    return () => { mounted = false }
+  }, [])
+
   // Fetch categories from restaurant-specific API
   useEffect(() => {
     const fetchCategories = async () => {
@@ -253,6 +271,7 @@ export default function ItemDetailsPage() {
             name: String(cat?.name || "").trim(),
             foodTypeScope: cat?.foodTypeScope || "Both",
           }))
+          .filter((cat) => !(isPureVegRestaurant && cat.foodTypeScope === "Non-Veg"))
           .filter((cat) => cat.id && cat.name)
 
         debugLog('Formatted restaurant categories:', formattedCategories)
@@ -276,7 +295,7 @@ export default function ItemDetailsPage() {
     }
 
     fetchCategories()
-  }, [category, defaultCategory, defaultCategoryId, isNewItem, selectedCategoryId])
+  }, [category, defaultCategory, defaultCategoryId, isNewItem, selectedCategoryId, isPureVegRestaurant])
 
   // Keep focused form fields visible above mobile keyboard
   useEffect(() => {
@@ -606,15 +625,12 @@ export default function ItemDetailsPage() {
         return
       }
 
-      if (
-        matchedCategory?.foodTypeScope &&
-        matchedCategory.foodTypeScope !== "Both" &&
-        matchedCategory.foodTypeScope !== foodType
-      ) {
-        toast.error(`This ${matchedCategory.foodTypeScope} category cannot accept ${foodType} food`)
-        setUploadingImages(false)
-        return
-      }
+      const resolvedFoodType =
+        matchedCategory?.foodTypeScope === "Veg"
+          ? "Veg"
+          : matchedCategory?.foodTypeScope === "Non-Veg"
+          ? "Non-Veg"
+          : (foodType === "Veg" ? "Veg" : "Non-Veg")
 
       const normalizedVariants = variants
         .map((variant) => ({
@@ -659,7 +675,7 @@ export default function ItemDetailsPage() {
           price: hasVariants ? undefined : parsedBasePrice,
           variants: variantPayload,
           image: allImageUrls.length > 0 ? allImageUrls[0] : "",
-          foodType: foodType,
+          foodType: resolvedFoodType,
           isAvailable: isInStock,
           preparationTime: preparationTime || "",
           categoryId: categoryId || undefined,
@@ -681,7 +697,7 @@ export default function ItemDetailsPage() {
           price: hasVariants ? undefined : parsedBasePrice,
           variants: variantPayload,
           image: allImageUrls.length > 0 ? allImageUrls[0] : "",
-          foodType: foodType,
+          foodType: resolvedFoodType,
           isAvailable: isInStock,
           preparationTime: preparationTime || "",
           categoryId: categoryId || undefined,
@@ -997,29 +1013,6 @@ export default function ItemDetailsPage() {
               <span className="text-xs text-gray-500">
                 {descriptionLength} / {maxDescriptionLength}
               </span>
-            </div>
-            {/* Dietary Options */}
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => setFoodType("Veg")}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${foodType === "Veg"
-                  ? "border-green-600 border-2 text-green-600"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
-                {foodType === "Veg" && <Check className="w-4 h-4" />}
-                <span>Veg</span>
-              </button>
-              <button
-                onClick={() => setFoodType("Non-Veg")}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${foodType === "Non-Veg"
-                  ? "border-red-600 border-2 text-red-600"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
-                {foodType === "Non-Veg" && <Check className="w-4 h-4" />}
-                <span>Non-Veg</span>
-              </button>
             </div>
           </div>
 

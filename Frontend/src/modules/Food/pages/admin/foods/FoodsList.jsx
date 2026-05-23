@@ -13,7 +13,14 @@ const normalizeEntityId = (value) => {
   if (!value) return ""
   if (typeof value === "string") return value.trim()
   if (typeof value === "object") {
-    return String(value?._id || value?.id || value?.restaurantId || "").trim()
+    const nestedId = value?._id || value?.id || value?.restaurantId
+    if (nestedId) return String(nestedId).trim()
+    // Supports raw Mongo ObjectId-like values passed directly by API responses.
+    if (typeof value?.toString === "function") {
+      const asString = String(value.toString()).trim()
+      if (asString && asString !== "[object Object]") return asString
+    }
+    return ""
   }
   return String(value).trim()
 }
@@ -57,89 +64,121 @@ export default function FoodsList() {
     return `${url}${url.includes("?") ? "&" : "?"}v=${imageVersion}`
   }
 
-  const fetchAllFoods = useCallback(async () => {
+  const mapFoodsForTable = useCallback((list = []) => {
+    return Array.isArray(list)
+      ? list.map((f) => ({
+          id: String(f.id || f._id || ""),
+          _id: f._id || f.id,
+          name: f.name || "Unnamed Item",
+          image: f.image || "https://via.placeholder.com/40",
+          status: f.isAvailable !== false && String(f.approvalStatus || "").toLowerCase() !== "rejected",
+          restaurantId: normalizeEntityId(f.restaurantId),
+          restaurantName: f.restaurantName || "Unknown Restaurant",
+          categoryId: String(f.categoryId || ""),
+          categoryName: f.categoryName || "",
+          price: getFoodDisplayPrice(f),
+          variants: getFoodVariants(f),
+          foodType: f.foodType || "Non-Veg",
+          approvalStatus: f.approvalStatus || "approved",
+          description: f.description || "",
+          preparationTime: f.preparationTime || "",
+          isAvailable: f.isAvailable !== false,
+          createdAt: f.createdAt,
+          updatedAt: f.updatedAt,
+        }))
+      : []
+  }, [])
+
+  const fetchRestaurantsForFilter = useCallback(async () => {
+    const [activeRestaurantsResponse, inactiveRestaurantsResponse] = await Promise.all([
+      adminAPI.getRestaurants({ limit: 1000 }),
+      adminAPI.getRestaurants({ limit: 1000, status: "inactive" }),
+    ])
+
+    const activeRestaurants = activeRestaurantsResponse?.data?.data?.restaurants ||
+      activeRestaurantsResponse?.data?.restaurants ||
+      []
+    const inactiveRestaurants = inactiveRestaurantsResponse?.data?.data?.restaurants ||
+      inactiveRestaurantsResponse?.data?.restaurants ||
+      []
+
+    const restaurantsMap = new Map()
+    ;[...activeRestaurants, ...inactiveRestaurants].forEach((restaurant) => {
+      const restaurantId = String(restaurant?._id || restaurant?.id || "")
+      if (!restaurantId) return
+      if (!restaurantsMap.has(restaurantId)) {
+        restaurantsMap.set(restaurantId, restaurant)
+      }
+    })
+    const restaurants = Array.from(restaurantsMap.values())
+    setRestaurantsForFilter(
+      restaurants
+        .map((restaurant) => ({
+          id: String(restaurant?._id || restaurant?.id || ""),
+          name: restaurant?.name || restaurant?.restaurantName || "Unknown Restaurant",
+          pureVegRestaurant: restaurant?.pureVegRestaurant === true,
+        }))
+        .filter((restaurant) => restaurant.id)
+        .sort((a, b) => a.name.localeCompare(b.name))
+    )
+    return restaurants
+  }, [])
+
+  const fetchFoodsForSelection = useCallback(async (restaurantId = "all") => {
     try {
       setLoading(true)
-
-      const [activeRestaurantsResponse, inactiveRestaurantsResponse] = await Promise.all([
-        adminAPI.getRestaurants({ limit: 1000 }),
-        adminAPI.getRestaurants({ limit: 1000, status: "inactive" }),
-      ])
-
-      const activeRestaurants = activeRestaurantsResponse?.data?.data?.restaurants ||
-        activeRestaurantsResponse?.data?.restaurants ||
-        []
-      const inactiveRestaurants = inactiveRestaurantsResponse?.data?.data?.restaurants ||
-        inactiveRestaurantsResponse?.data?.restaurants ||
-        []
-
-      const restaurantsMap = new Map()
-      ;[...activeRestaurants, ...inactiveRestaurants].forEach((restaurant) => {
-        const restaurantId = String(restaurant?._id || restaurant?.id || "")
-        if (!restaurantId) return
-        if (!restaurantsMap.has(restaurantId)) {
-          restaurantsMap.set(restaurantId, restaurant)
+      const pageSizeForApi = 1000
+      const list = []
+      let page = 1
+      while (true) {
+        const params = { limit: pageSizeForApi, page }
+        if (restaurantId && restaurantId !== "all") {
+          params.restaurantId = restaurantId
         }
-      })
-      const restaurants = Array.from(restaurantsMap.values())
-      setRestaurantsForFilter(
-        restaurants
-          .map((restaurant) => ({
-            id: String(restaurant?._id || restaurant?.id || ""),
-            name: restaurant?.name || restaurant?.restaurantName || "Unknown Restaurant",
-          }))
-          .filter((restaurant) => restaurant.id)
-          .sort((a, b) => a.name.localeCompare(b.name))
-      )
-
-      if (restaurants.length === 0) {
-        setFoods([])
-        return
+        const foodsRes = await adminAPI.getFoods(params)
+        const chunk = foodsRes?.data?.data?.foods || []
+        if (!Array.isArray(chunk) || chunk.length === 0) break
+        list.push(...chunk)
+        if (chunk.length < pageSizeForApi) break
+        page += 1
+        if (page > 30) break
       }
-
-      const foodsRes = await adminAPI.getFoods({ limit: 1000 })
-      const list = foodsRes?.data?.data?.foods || []
       const approvedOnly = Array.isArray(list)
         ? list.filter((f) => String(f?.approvalStatus || "").toLowerCase() === "approved")
         : []
-      setFoods(
-        Array.isArray(approvedOnly)
-          ? approvedOnly.map((f) => ({
-              id: String(f.id || f._id || ""),
-              _id: f._id || f.id,
-              name: f.name || "Unnamed Item",
-              image: f.image || "https://via.placeholder.com/40",
-              status: f.isAvailable !== false && String(f.approvalStatus || "").toLowerCase() !== "rejected",
-              restaurantId: normalizeEntityId(f.restaurantId),
-              restaurantName: f.restaurantName || "Unknown Restaurant",
-              categoryId: String(f.categoryId || ""),
-              categoryName: f.categoryName || "",
-              price: getFoodDisplayPrice(f),
-              variants: getFoodVariants(f),
-              foodType: f.foodType || "Non-Veg",
-              approvalStatus: f.approvalStatus || "approved",
-              description: f.description || "",
-              preparationTime: f.preparationTime || "",
-              isAvailable: f.isAvailable !== false,
-              createdAt: f.createdAt,
-              updatedAt: f.updatedAt,
-            }))
-          : []
-      )
+      setFoods(mapFoodsForTable(approvedOnly))
       setImageVersion(Date.now())
     } catch (error) {
       debugError("Error fetching foods:", error)
       toast.error("Failed to load foods")
       setFoods([])
-      setRestaurantsForFilter([])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [mapFoodsForTable])
 
   useEffect(() => {
-    fetchAllFoods()
-  }, [fetchAllFoods])
+    const init = async () => {
+      try {
+        const restaurants = await fetchRestaurantsForFilter()
+        if (!Array.isArray(restaurants) || restaurants.length === 0) {
+          setFoods([])
+          return
+        }
+        await fetchFoodsForSelection(selectedRestaurant)
+      } catch (error) {
+        debugError("Error initializing food list:", error)
+        toast.error("Failed to load foods")
+        setFoods([])
+        setRestaurantsForFilter([])
+      }
+    }
+    init()
+  }, [fetchRestaurantsForFilter, fetchFoodsForSelection])
+
+  useEffect(() => {
+    fetchFoodsForSelection(selectedRestaurant)
+  }, [selectedRestaurant, fetchFoodsForSelection])
 
   const [searchParams] = useSearchParams()
   const productIdFromUrl = searchParams.get("productId")
@@ -186,12 +225,9 @@ export default function FoodsList() {
         food.categoryName?.toLowerCase().includes(query)
       )
     }
-    if (selectedRestaurant !== "all") {
-      result = result.filter((food) => String(food.restaurantId) === selectedRestaurant)
-    }
     result.sort((a, b) => getItemCreatedMs(b) - getItemCreatedMs(a))
     return result
-  }, [foods, searchQuery, selectedRestaurant])
+  }, [foods, searchQuery])
 
   const totalPages = useMemo(() => {
     if (filteredFoods.length === 0) return 1
@@ -527,7 +563,7 @@ export default function FoodsList() {
         editingFood={editingFood}
         restaurantOptions={restaurantsForFilter}
         initialRestaurantId={selectedRestaurant !== "all" ? selectedRestaurant : ""}
-        onSuccess={fetchAllFoods}
+        onSuccess={() => fetchFoodsForSelection(selectedRestaurant)}
       />
     </div>
   )

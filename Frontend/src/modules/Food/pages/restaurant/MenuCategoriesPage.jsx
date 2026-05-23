@@ -116,6 +116,7 @@ export default function MenuCategoriesPage() {
   const [selectedImageFile, setSelectedImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [isPureVegRestaurant, setIsPureVegRestaurant] = useState(false)
 
   const loadCategories = async () => {
     try {
@@ -138,6 +139,23 @@ export default function MenuCategoriesPage() {
     loadCategories()
   }, [])
 
+  useEffect(() => {
+    let mounted = true
+    const loadRestaurantProfile = async () => {
+      try {
+        const response = await restaurantAPI.getCurrentRestaurant()
+        const restaurant = response?.data?.data?.restaurant || response?.data?.restaurant || null
+        if (!mounted) return
+        setIsPureVegRestaurant(restaurant?.pureVegRestaurant === true)
+      } catch (_) {
+        if (!mounted) return
+        setIsPureVegRestaurant(false)
+      }
+    }
+    loadRestaurantProfile()
+    return () => { mounted = false }
+  }, [])
+
   const resetModal = () => {
     setIsModalOpen(false)
     setEditingCategory(null)
@@ -149,7 +167,10 @@ export default function MenuCategoriesPage() {
 
   const handleAddNew = () => {
     setEditingCategory(null)
-    setFormData(defaultFormData)
+    setFormData({
+      ...defaultFormData,
+      foodTypeScope: isPureVegRestaurant ? "Veg" : defaultFormData.foodTypeScope,
+    })
     setSelectedImageFile(null)
     setImagePreview(null)
     setIsModalOpen(true)
@@ -164,7 +185,7 @@ export default function MenuCategoriesPage() {
       type: category?.type || "",
       image: category?.image || "",
       isActive: isCategoryEnabled(category),
-      foodTypeScope: category?.foodTypeScope || "Veg",
+      foodTypeScope: isPureVegRestaurant ? "Veg" : (category?.foodTypeScope || "Veg"),
       visibilityStartHour: start.hour,
       visibilityStartMinute: start.minute,
       visibilityStartMeridiem: start.meridiem,
@@ -255,7 +276,7 @@ export default function MenuCategoriesPage() {
         image: imageUrl || undefined,
         isActive: nextIsActive,
         status: nextIsActive,
-        foodTypeScope: formData.foodTypeScope || "Veg",
+        foodTypeScope: isPureVegRestaurant ? "Veg" : (formData.foodTypeScope || "Veg"),
         visibilityStartTime: startTime24,
         visibilityEndTime: endTime24,
       }
@@ -478,10 +499,11 @@ export default function MenuCategoriesPage() {
                       value={formData.foodTypeScope}
                       onChange={(event) => setFormData((prev) => ({ ...prev, foodTypeScope: event.target.value }))}
                       className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-slate-900"
+                      disabled={isPureVegRestaurant}
                     >
                       <option value="Veg">Veg</option>
-                      <option value="Non-Veg">Non-Veg</option>
-                      <option value="Both">Both</option>
+                      {!isPureVegRestaurant && <option value="Non-Veg">Non-Veg</option>}
+                      {!isPureVegRestaurant && <option value="Both">Both</option>}
                     </select>
                   </div>
 
