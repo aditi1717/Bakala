@@ -198,6 +198,14 @@ const getOrderEventDate = (orderLike) =>
   orderLike?.date ||
   null;
 
+const isCancelledStatus = (value) => String(value || '').toLowerCase().startsWith('cancelled');
+const isAdminCancelledStatus = (value) => String(value || '').toLowerCase() === 'cancelled_by_admin';
+const isCancelledByAdmin = (orderLike) => {
+  const rawStatus = String(orderLike?.status || orderLike?.orderStatus || '').toLowerCase();
+  const cancelledBy = String(orderLike?.cancelledBy || '').toLowerCase();
+  return rawStatus === 'cancelled_by_admin' || (rawStatus === 'cancelled' && cancelledBy === 'admin');
+};
+
 const getCustomerMeta = (order) => {
   const userObj = order?.user || order?.userId || order?.customer || order?.customerId || {};
   const deliveryAddress = order?.deliveryAddress || order?.address || {};
@@ -519,10 +527,10 @@ const OrderDetailV2 = () => {
     setOrder(hydratedOrder);
     setDeliveryTime(Number(hydratedOrder?.estimatedDeliveryTime || hydratedOrder?.initialEstimatedDeliveryTime || 30) || 30);
     const status = String(hydratedOrder?.status || hydratedOrder?.orderStatus || '').toLowerCase();
-    if (!['cancelled', 'delivered', 'completed'].includes(status) || getDispatchStatus(hydratedOrder) === 'accepted') {
+    if ((!isCancelledStatus(status) && !['delivered', 'completed'].includes(status)) || getDispatchStatus(hydratedOrder) === 'accepted') {
       syncStoreWithOrder(hydratedOrder);
     }
-    if (['delivered', 'completed', 'cancelled'].includes(status)) {
+    if (['delivered', 'completed'].includes(status) || isCancelledStatus(status)) {
       clearActiveOrder();
     }
     return hydratedOrder;
@@ -607,7 +615,7 @@ const OrderDetailV2 = () => {
       );
 
       const nextStatus = String(merged?.status || merged?.orderStatus || '').toLowerCase();
-      if (['cancelled', 'delivered', 'completed'].includes(nextStatus)) {
+      if (['delivered', 'completed'].includes(nextStatus) || isCancelledStatus(nextStatus)) {
         clearActiveOrder();
       } else {
         syncStoreWithOrder(merged);
@@ -625,7 +633,8 @@ const OrderDetailV2 = () => {
     const phase = String(order?.deliveryState?.currentPhase || '').toLowerCase();
     const dispatchStatus = getDispatchStatus(order);
 
-    if (rawStatus === 'cancelled') return { label: 'Cancelled', tone: 'rose' };
+    if (isCancelledByAdmin(order)) return { label: 'Cancelled by Admin', tone: 'rose' };
+    if (isCancelledStatus(rawStatus)) return { label: 'Cancelled', tone: 'rose' };
     if (['delivered', 'completed'].includes(rawStatus)) return { label: 'Delivered', tone: 'emerald' };
     if (phase === 'at_drop' || rawStatus === 'reached_drop') return { label: 'Reached customer', tone: 'blue' };
     if (['picked_up', 'delivering'].includes(rawStatus)) return { label: 'Picked', tone: 'blue' };
@@ -704,7 +713,13 @@ const OrderDetailV2 = () => {
   const dispatchStatus = getDispatchStatus(order);
   const rawStatus = String(order?.status || order?.orderStatus || '').toLowerCase();
   const phase = String(order?.deliveryState?.currentPhase || '').toLowerCase();
-  const isClosedOrder = ['cancelled', 'delivered', 'completed'].includes(rawStatus);
+  const isClosedOrder = ['delivered', 'completed'].includes(rawStatus) || isCancelledStatus(rawStatus);
+  const cancellationReason = pickFirstText(
+    order?.cancellationReason,
+    order?.cancelReason,
+    order?.reason,
+    order?.rejectReason,
+  );
   const hasReachedPickup =
     phase === 'at_pickup' ||
     ['reached_pickup', 'picked_up', 'delivering', 'reached_drop', 'delivered', 'completed'].includes(rawStatus);
@@ -899,6 +914,12 @@ const OrderDetailV2 = () => {
             </div>
             <StatusPill tone={currentStatus.tone}>{currentStatus.label}</StatusPill>
           </div>
+          {isCancelledByAdmin(order) && (
+            <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-rose-700">Cancellation Reason</p>
+              <p className="mt-1 text-xs font-medium text-rose-800">{cancellationReason || 'No reason provided'}</p>
+            </div>
+          )}
 
           <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
             <div className="rounded-xl bg-slate-50 p-2.5">

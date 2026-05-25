@@ -413,7 +413,14 @@ function OrdersTabV2({
 
   const HistoryCard = ({ order }) => {
     const rawStatus = String(order?.status || '').toLowerCase();
-    const statusLabel = rawStatus === 'cancelled' ? 'Cancelled' : 'Delivered';
+    const rawOrderStatus = String(order?.rawOrderStatus || order?.orderStatus || '').toLowerCase();
+    const cancelledBy = String(order?.cancelledBy || '').toLowerCase();
+    const isAdminCancelled =
+      rawOrderStatus === 'cancelled_by_admin' ||
+      (rawStatus === 'cancelled' && cancelledBy === 'admin');
+    const statusLabel = rawStatus === 'cancelled'
+      ? (isAdminCancelled ? 'Cancelled by Admin' : 'Cancelled')
+      : 'Delivered';
     const toneClass = rawStatus === 'cancelled'
       ? 'border-amber-100 bg-amber-50 text-amber-700'
       : 'border-emerald-100 bg-emerald-50 text-emerald-700';

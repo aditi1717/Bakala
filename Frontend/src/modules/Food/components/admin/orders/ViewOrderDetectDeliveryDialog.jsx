@@ -100,7 +100,7 @@ export default function ViewOrderDetectDeliveryDialog({
       "",
     ).trim() || "No reason provided"
   const showAccept = isCreated && typeof onAcceptOrder === "function"
-  const showReject = isCreated && typeof onRejectOrder === "function"
+  const showReject = !isCompletedOrCancelled && typeof onRejectOrder === "function"
   const showAssign = canAssign
   const showAdvance = Boolean(nextAdminStatus) && typeof onAdminStatusChange === "function"
   const hasActionButtons = showAccept || showReject || showAssign || showAdvance
@@ -293,7 +293,7 @@ export default function ViewOrderDetectDeliveryDialog({
                   className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isRejectLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  {isRejectLoading ? "Rejecting..." : "Reject Order"}
+                  {isRejectLoading ? "Cancelling..." : "Cancel Order"}
                 </button>
               )}
               {showAdvance && (
