@@ -7,6 +7,7 @@ import {
   Ticket,
   ChevronRight,
   LogOut,
+  Trash2,
   Loader2,
   Star,
   ShieldAlert,
@@ -23,6 +24,8 @@ export const ProfileV2 = () => {
   const [loading, setLoading] = useState(true)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [logoutSubmitting, setLogoutSubmitting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
   // Fetch profile data
   useEffect(() => {
@@ -54,6 +57,23 @@ export const ProfileV2 = () => {
     toast.success("Logged out successfully")
     navigate("/food/delivery/login", { replace: true })
     setLogoutSubmitting(false)
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteSubmitting) return
+    try {
+      setDeleteSubmitting(true)
+      await deliveryAPI.deleteAccount()
+      clearModuleAuth("delivery")
+      localStorage.removeItem("app:isOnline")
+      toast.success("Account deleted successfully")
+      navigate("/food/delivery/login", { replace: true })
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to delete account")
+    } finally {
+      setDeleteSubmitting(false)
+      setShowDeleteConfirm(false)
+    }
   }
 
   if (loading) {
@@ -148,6 +168,17 @@ export const ProfileV2 = () => {
             </div>
 
             <div 
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-3.5 border-b border-gray-50 flex items-center justify-between cursor-pointer active:bg-red-50 hover:bg-red-50/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                 <Trash2 className="w-4 h-4 text-red-500" />
+                 <span className="text-sm font-medium text-red-600">Delete account</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-red-300" />
+            </div>
+
+            <div 
               onClick={() => setShowLogoutConfirm(true)}
               className="px-4 py-4 flex items-center justify-between cursor-pointer active:bg-red-50 hover:bg-red-50/50 transition-colors"
             >
@@ -192,6 +223,45 @@ export const ProfileV2 = () => {
                 >
                   {logoutSubmitting && <Loader2 className="w-3 h-3 animate-spin" />}
                   {logoutSubmitting ? "Logging out..." : "Log out"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center px-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+              onClick={() => setShowDeleteConfirm(false)}
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full max-w-sm bg-white rounded-2xl p-5 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-base font-bold text-gray-900 mb-1.5">Delete Account</h3>
+              <p className="text-sm text-gray-500 mb-6 font-medium">
+                This action will deactivate your delivery account and log you out. This cannot be undone.
+              </p>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm active:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2 active:bg-red-700"
+                >
+                  {deleteSubmitting && <Loader2 className="w-3 h-3 animate-spin" />}
+                  {deleteSubmitting ? "Deleting..." : "Delete"}
                 </button>
               </div>
             </motion.div>

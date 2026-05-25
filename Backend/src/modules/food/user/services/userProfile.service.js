@@ -1,6 +1,7 @@
 import { FoodUser } from '../../../../core/users/user.model.js';
 import { AuthError, ValidationError } from '../../../../core/auth/errors.js';
 import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
+import { FoodRefreshToken } from '../../../../core/refreshTokens/refreshToken.model.js';
 
 const parseIsoDateOrNull = (value) => {
     if (value === undefined) return undefined;
@@ -54,5 +55,17 @@ export const uploadCurrentUserProfileImage = async (userId, file) => {
     user.profileImage = String(url || '').trim();
     await user.save();
     return { profileImage: user.profileImage, user: user.toObject() };
+};
+
+export const deleteCurrentUserAccount = async (userId) => {
+    const user = await FoodUser.findById(userId);
+    if (!user) throw new AuthError('Profile not found');
+
+    await Promise.all([
+        FoodUser.deleteOne({ _id: user._id }),
+        FoodRefreshToken.deleteMany({ userId: user._id })
+    ]);
+
+    return { deleted: true };
 };
 

@@ -1431,6 +1431,10 @@ export const adminAPI = {
     const fcmToken = typeof localStorage !== "undefined" ? localStorage.getItem("fcm_web_registered_token_restaurant") : null;
     return authService.logout(token, fcmToken, "web");
   },
+  deleteAccount: () =>
+    apiClient.delete("/food/restaurant/account", {
+      contextModule: "restaurant",
+    }),
   /** Backend has no email/password login; use phone OTP only. */
   login: (_email, _password) =>
     Promise.reject(new Error("Please use phone number and OTP to sign in.")),
@@ -1841,6 +1845,10 @@ export const deliveryAPI = {
       { status: isOnline ? "online" : "offline" },
       { contextModule: "delivery" },
     ),
+  deleteAccount: () =>
+    apiClient.delete("/food/delivery/account", {
+      contextModule: "delivery",
+    }),
   /** Orders */
   getOrders: (() => {
     // Collapse duplicate list fetches triggered by multiple effects + StrictMode.
@@ -2177,6 +2185,11 @@ export const userAPI = {
       contextModule: "user",
     });
   },
+  /** DELETE /food/user/account (Bearer USER) */
+  deleteAccount: () =>
+    apiClient.delete("/food/user/account", {
+      contextModule: "user",
+    }),
   /** GET /food/user/wallet (Bearer USER). Deduped + short-cached. */
   getWallet: (() => {
     let inFlight = null;

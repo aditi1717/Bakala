@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { registerDeliveryPartner, updateDeliveryPartnerProfile, updateDeliveryPartnerBankDetails, listSupportTicketsByPartner, listSupportTicketsByPhone, createSupportTicket, createSupportTicketForPendingPartner, getSupportTicketByIdAndPartner, getSupportTicketByIdAndPhone, updateDeliveryPartnerDetails, updateDeliveryPartnerProfilePhotoBase64, updateDeliveryAvailability, getDeliveryPartnerWallet, getDeliveryPartnerEarnings, getDeliveryPartnerTripHistory, getDeliveryPocketDetails, getActiveEarningAddonsForPartner, getDeliveryPartnerOrderQueue, getDeliveryPartnerReviews } from '../services/delivery.service.js';
+import { registerDeliveryPartner, updateDeliveryPartnerProfile, updateDeliveryPartnerBankDetails, listSupportTicketsByPartner, listSupportTicketsByPhone, createSupportTicket, createSupportTicketForPendingPartner, getSupportTicketByIdAndPartner, getSupportTicketByIdAndPhone, updateDeliveryPartnerDetails, updateDeliveryPartnerProfilePhotoBase64, updateDeliveryAvailability, deleteOwnDeliveryPartnerAccount, getDeliveryPartnerWallet, getDeliveryPartnerEarnings, getDeliveryPartnerTripHistory, getDeliveryPocketDetails, getActiveEarningAddonsForPartner, getDeliveryPartnerOrderQueue, getDeliveryPartnerReviews } from '../services/delivery.service.js';
 import { createDeliveryCashDepositOrder, getDeliveryPartnerWalletEnhanced, requestDeliveryWithdrawal, verifyDeliveryCashDepositPayment } from '../services/deliveryFinance.service.js';
 import { getDeliveryCashLimitSettings, getDeliveryEmergencyHelp } from '../../admin/services/admin.service.js';
 import { DeliveryBonusTransaction } from '../../admin/models/deliveryBonusTransaction.model.js';
@@ -134,6 +134,16 @@ export const updateAvailabilityController = async (req, res, next) => {
         const userId = req.user?.userId;
         const data = await updateDeliveryAvailability(userId, req.body || {});
         return sendResponse(res, 200, 'Availability updated successfully', data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const deleteOwnDeliveryAccountController = async (req, res, next) => {
+    try {
+        const userId = req.user?.userId;
+        const data = await deleteOwnDeliveryPartnerAccount(userId);
+        return sendResponse(res, 200, 'Account deleted successfully', data);
     } catch (error) {
         next(error);
     }

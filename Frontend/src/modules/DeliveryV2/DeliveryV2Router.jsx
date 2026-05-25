@@ -27,6 +27,9 @@ import { ProfileDetailsV2 } from './pages/profile/ProfileDetailsV2';
 import TermsAndConditionsV2 from './pages/TermsAndConditionsV2';
 import PrivacyPolicyV2 from './pages/PrivacyPolicyV2';
 import NotificationsV2 from './pages/NotificationsV2';
+const PublicPrivacyPage = lazy(() => import("@food/pages/public/PublicLegalPages").then((m) => ({ default: m.PublicPrivacyPage })))
+const PublicTermsPage = lazy(() => import("@food/pages/public/PublicLegalPages").then((m) => ({ default: m.PublicTermsPage })))
+const PublicSupportPage = lazy(() => import("@food/pages/public/PublicLegalPages").then((m) => ({ default: m.PublicSupportPage })))
 
 
 
@@ -43,6 +46,9 @@ const DeliveryV2Router = () => {
         <Route path="signup/documents" element={<SignupStep2 />} />
         <Route path="terms" element={<TermsAndConditionsV2 />} />
         <Route path="privacy" element={<PrivacyPolicyV2 />} />
+        <Route path="terms-and-conditions" element={<PublicTermsPage />} />
+        <Route path="privacy-policy" element={<PublicPrivacyPage />} />
+        <Route path="support" element={<PublicSupportPage />} />
 
         {/* Protected Core Routes */}
         <Route path="/" element={<Navigate to="/food/delivery/orders" replace />} />

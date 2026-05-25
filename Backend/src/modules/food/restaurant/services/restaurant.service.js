@@ -9,6 +9,7 @@ import { FoodCategory } from '../../admin/models/category.model.js';
 import { getFoodDisplayPrice, serializeFoodVariants } from '../../admin/services/foodVariant.service.js';
 import { isCategoryVisibleNow } from '../../shared/categoryWorkflow.js';
 import { FoodRestaurantOutletTimings } from '../models/outletTimings.model.js';
+import { FoodRefreshToken } from '../../../../core/refreshTokens/refreshToken.model.js';
 
 const normalizeName = (value) =>
     String(value || '')
@@ -662,6 +663,24 @@ export const getCurrentRestaurantProfile = async (restaurantId) => {
         )
         .lean();
     return toRestaurantProfile(doc);
+};
+
+export const deleteOwnRestaurantAccount = async (restaurantId) => {
+    if (!restaurantId) {
+        throw new ValidationError('Invalid restaurant id');
+    }
+
+    const doc = await FoodRestaurant.findById(restaurantId);
+    if (!doc) {
+        throw new ValidationError('Restaurant not found');
+    }
+
+    await Promise.all([
+        FoodRestaurant.deleteOne({ _id: doc._id }),
+        FoodRefreshToken.deleteMany({ userId: doc._id })
+    ]);
+
+    return { deleted: true };
 };
 
 export const updateRestaurantAcceptingOrders = async (restaurantId, isAcceptingOrders) => {

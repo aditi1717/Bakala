@@ -66,6 +66,9 @@ const OTP = lazy(() => import("@food/pages/restaurant/auth/OTP"))
 const Signup = lazy(() => import("@food/pages/restaurant/auth/Signup"))
 const ForgotPassword = lazy(() => import("@food/pages/restaurant/auth/ForgotPassword"))
 const VerificationPending = lazy(() => import("@food/pages/restaurant/auth/VerificationPending"))
+const PublicPrivacyPage = lazy(() => import("@food/pages/public/PublicLegalPages").then((m) => ({ default: m.PublicPrivacyPage })))
+const PublicTermsPage = lazy(() => import("@food/pages/public/PublicLegalPages").then((m) => ({ default: m.PublicTermsPage })))
+const PublicSupportPage = lazy(() => import("@food/pages/public/PublicLegalPages").then((m) => ({ default: m.PublicSupportPage })))
 
 export default function RestaurantRouter() {
   return (
@@ -110,6 +113,9 @@ export default function RestaurantRouter() {
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><RushHour /></ProtectedRoute>} path="rush-hour" />
         <Route path="privacy" element={<PrivacyPolicyPage />} />
         <Route path="terms" element={<TermsAndConditionsPage />} />
+        <Route path="privacy-policy" element={<PublicPrivacyPage />} />
+        <Route path="terms-and-conditions" element={<PublicTermsPage />} />
+        <Route path="support" element={<PublicSupportPage />} />
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><RestaurantConfigPage /></ProtectedRoute>} path="config" />
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><RestaurantCategoriesPage /></ProtectedRoute>} path="categories" />
         <Route element={<ProtectedRoute requiredRole="restaurant" loginPath="/food/restaurant/login"><MenuCategoriesPage /></ProtectedRoute>} path="menu-categories" />

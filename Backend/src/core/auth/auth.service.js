@@ -59,8 +59,8 @@ export const verifyUserOtpAndLogin = async (
   
   // Ensure user exists and mark as verified on successful OTP.
   // Check if user is new or hasn't provided a name yet
-  const needsNamePrompt = !userDoc || !userDoc.name || String(userDoc.name).trim() === "" || String(userDoc.name).toLowerCase() === "null";
-  const isNewUser = needsNamePrompt;
+  let needsNamePrompt = !userDoc || !userDoc.name || String(userDoc.name).trim() === "" || String(userDoc.name).toLowerCase() === "null";
+  let isNewUser = needsNamePrompt;
   const trimmedName = typeof name === "string" ? name.trim() : "";
 
   if (!userDoc) {
@@ -71,6 +71,14 @@ export const verifyUserOtpAndLogin = async (
     });
   } else {
     let needsSave = false;
+    // Account deletion in this app deactivates the user (soft delete).
+    // On OTP success with same phone, allow re-entry by reactivating.
+    if (userDoc.isActive === false) {
+      userDoc.isActive = true;
+      needsSave = true;
+      needsNamePrompt = !userDoc.name || String(userDoc.name).trim() === "" || String(userDoc.name).toLowerCase() === "null";
+      isNewUser = needsNamePrompt;
+    }
     if (!userDoc.isVerified) {
       userDoc.isVerified = true;
       needsSave = true;
@@ -80,13 +88,6 @@ export const verifyUserOtpAndLogin = async (
       needsSave = true;
     }
     if (needsSave) await userDoc.save();
-  }
-
-  // Block login for deactivated users
-  if (userDoc.isActive === false) {
-    throw new AuthError(
-      "Your account has been deactivated. Please contact support.",
-    );
   }
 
   // Update FCM token if provided
@@ -286,8 +287,24 @@ export const verifyRestaurantOtpAndLogin = async (phone, otp, fcmToken, platform
     };
   }
 
+  const restaurantStatus = String(restaurant.status || "").toLowerCase();
+  const restaurantRejectedBySelfDelete =
+    restaurantStatus === "rejected" &&
+    String(restaurant.rejectionReason || "").toLowerCase() ===
+      "account deleted by user";
+  if (restaurantRejectedBySelfDelete) {
+    await Promise.all([
+      FoodRefreshToken.deleteMany({ userId: restaurant._id }),
+      FoodRestaurant.deleteOne({ _id: restaurant._id }),
+    ]);
+    return {
+      needsRegistration: true,
+      phone,
+    };
+  }
+
   const canRegisterRestaurantPush =
-    String(restaurant.status || "").toLowerCase() === "approved" &&
+    restaurantStatus === "approved" &&
     restaurant.isAcceptingOrders === true;
 
   // Update FCM token only when restaurant is approved and accepting orders.
@@ -312,7 +329,7 @@ export const verifyRestaurantOtpAndLogin = async (phone, otp, fcmToken, platform
   }
 
   // If restaurant approval status is used, only allow login for approved restaurants.
-  if (restaurant.status && restaurant.status !== "approved") {
+  if (restaurant.status && restaurantStatus !== "approved") {
     throw new AuthError(
       restaurant.status === "pending"
         ? "Your restaurant registration is pending approval."
@@ -376,8 +393,21 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
     return { needsRegistration: true, phone };
   }
 
+  const deliveryStatus = String(deliveryPartner.status || "").toLowerCase();
+  const deliveryRejectedBySelfDelete =
+    deliveryStatus === "rejected" &&
+    String(deliveryPartner.rejectionReason || "").toLowerCase() ===
+      "account deleted by user";
+  if (deliveryRejectedBySelfDelete) {
+    await Promise.all([
+      FoodRefreshToken.deleteMany({ userId: deliveryPartner._id }),
+      FoodDeliveryPartner.deleteOne({ _id: deliveryPartner._id }),
+    ]);
+    return { needsRegistration: true, phone };
+  }
+
   const canRegisterDeliveryPush =
-    String(deliveryPartner.status || "").toLowerCase() === "approved" &&
+    deliveryStatus === "approved" &&
     String(deliveryPartner.availabilityStatus || "").toLowerCase() === "online";
 
   // Update FCM token only when delivery partner is approved and online.
@@ -401,8 +431,8 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
     }
   }
 
-  if (deliveryPartner.status && deliveryPartner.status !== "approved") {
-    const isRejected = deliveryPartner.status === "rejected";
+  if (deliveryPartner.status && deliveryStatus !== "approved") {
+    const isRejected = deliveryStatus === "rejected";
     return {
       pendingApproval: true,
       isRejected,

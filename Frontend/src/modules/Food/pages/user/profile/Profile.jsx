@@ -22,7 +22,7 @@ import {
   ShoppingCart,
   MapPin,
   Share2,
-  BellRing,
+  Trash2,
 } from "lucide-react";
 
 import AnimatedPage from "@food/components/user/AnimatedPage";
@@ -81,33 +81,9 @@ export default function Profile() {
   const [vegModeOpen, setVegModeOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isSendingTestPush, setIsSendingTestPush] = useState(false);
-
-  const handleTestPushNotification = async () => {
-    if (isSendingTestPush) return;
-    setIsSendingTestPush(true);
-    try {
-      // Send test notifications to both mobile and web
-      const resMobile = await userAPI.testFcmNotification({ platform: "mobile" });
-      const resWeb = await userAPI.testFcmNotification({ platform: "web" });
-      
-      const successMobile = resMobile?.data?.data?.successCount > 0;
-      const successWeb = resWeb?.data?.data?.successCount > 0;
-
-      if (successMobile || successWeb) {
-        toast.success(`Test push sent! (Mobile: ${resMobile?.data?.data?.successCount || 0}, Web: ${resWeb?.data?.data?.successCount || 0})`);
-      } else {
-        const errMsg = resMobile?.data?.data?.results?.[0]?.error || resWeb?.data?.data?.results?.[0]?.error || "No active FCM tokens found in DB for your account.";
-        toast.error(`Push failed: ${errMsg}`);
-      }
-    } catch (error) {
-      toast.error("Failed to send test push notification.");
-      console.error(error);
-    } finally {
-      setIsSendingTestPush(false);
-    }
-  };
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Trigger web push registration when profile mounts to ensure FCM token is saved
   useEffect(() => {
@@ -419,6 +395,43 @@ export default function Profile() {
   const handleLogoutClick = () => {
     if (isLoggingOut) return;
     setLogoutConfirmOpen(true);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (isDeletingAccount) return;
+    setIsDeletingAccount(true);
+
+    try {
+      await userAPI.deleteAccount();
+
+      try {
+        const { signOut } = await import("firebase/auth");
+        if (firebaseAuth) {
+          const currentUser = firebaseAuth.currentUser;
+          if (currentUser) {
+            await signOut(firebaseAuth);
+          }
+        }
+      } catch (firebaseError) {
+        debugWarn("Firebase logout failed after delete, continuing with cleanup:", firebaseError);
+      }
+
+      clearModuleAuth("user");
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("user_authenticated");
+      clearUserSession();
+      localStorage.removeItem("user");
+      localStorage.removeItem("cart");
+      USER_SESSION_PREFERENCE_KEYS.forEach((key) => localStorage.removeItem(key));
+      window.dispatchEvent(new Event("userAuthChanged"));
+
+      toast.success("Account deleted successfully");
+      navigate("/food/user/auth/login", { replace: true });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to delete account");
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   return (
@@ -887,20 +900,20 @@ export default function Profile() {
               whileHover={{ x: 2 }}
               transition={{ duration: 0.2, type: "spring", stiffness: 300 }}>
               <Card
-                className={`${optionCardClass} ${isSendingTestPush ? "opacity-50 cursor-wait" : ""}`}
-                onClick={handleTestPushNotification}>
+                className={`${optionCardClass} disabled:opacity-50 disabled:cursor-not-allowed`}
+                onClick={handleLogoutClick}>
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <motion.div
                       className={iconWrapClass}
                       whileHover={{ scale: 1.03 }}
                       transition={{ duration: 0.3 }}>
-                      <BellRing
-                        className={`h-5 w-5 text-gray-700 dark:text-gray-300 ${isSendingTestPush ? "animate-bounce text-brand-500" : ""}`}
+                      <Power
+                        className={`h-5 w-5 text-gray-700 dark:text-gray-300 ${isLoggingOut ? "animate-pulse" : ""}`}
                       />
                     </motion.div>
                     <span className={rowLabelClass}>
-                      {isSendingTestPush ? "Sending test push..." : "Test Push Notification"}
+                      {isLoggingOut ? "Logging out..." : "Log out"}
                     </span>
                   </div>
                   <motion.div
@@ -917,19 +930,21 @@ export default function Profile() {
               transition={{ duration: 0.2, type: "spring", stiffness: 300 }}>
               <Card
                 className={`${optionCardClass} disabled:opacity-50 disabled:cursor-not-allowed`}
-                onClick={handleLogoutClick}>
+                onClick={() => {
+                  if (!isDeletingAccount) setDeleteConfirmOpen(true);
+                }}>
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <motion.div
                       className={iconWrapClass}
                       whileHover={{ scale: 1.03 }}
                       transition={{ duration: 0.3 }}>
-                      <Power
-                        className={`h-5 w-5 text-gray-700 dark:text-gray-300 ${isLoggingOut ? "animate-pulse" : ""}`}
+                      <Trash2
+                        className={`h-5 w-5 text-red-600 ${isDeletingAccount ? "animate-pulse" : ""}`}
                       />
                     </motion.div>
                     <span className={rowLabelClass}>
-                      {isLoggingOut ? "Logging out..." : "Log out"}
+                      {isDeletingAccount ? "Deleting account..." : "Delete account"}
                     </span>
                   </div>
                   <motion.div
@@ -1043,6 +1058,41 @@ export default function Profile() {
                 disabled={isLoggingOut}
               >
                 Yes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#1a1a1a] p-5 shadow-2xl border border-gray-200 dark:border-gray-800">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Delete account?
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              This will permanently deactivate your account and log you out.
+            </p>
+            <div className="mt-5 flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 rounded-xl"
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={isDeletingAccount}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className={`flex-1 rounded-xl ${BRAND_THEME.tokens.profile.destructiveButton}`}
+                onClick={async () => {
+                  setDeleteConfirmOpen(false);
+                  await handleDeleteAccount();
+                }}
+                disabled={isDeletingAccount}
+              >
+                {isDeletingAccount ? "Deleting..." : "Delete"}
               </Button>
             </div>
           </div>
