@@ -4,6 +4,7 @@ import {
     listRestaurantsUnderPrice,
     getApprovedRestaurantByIdOrSlug,
     getCurrentRestaurantProfile,
+    deleteOwnRestaurantAccount,
     updateRestaurantProfile,
     updateRestaurantAcceptingOrders,
     uploadRestaurantProfileImage,
@@ -61,6 +62,16 @@ export const getCurrentRestaurantController = async (req, res, next) => {
         const restaurantId = req.user?.userId;
         const restaurant = await getCurrentRestaurantProfile(restaurantId);
         return sendResponse(res, 200, 'Restaurant fetched successfully', { restaurant });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const deleteOwnRestaurantAccountController = async (req, res, next) => {
+    try {
+        const restaurantId = req.user?.userId;
+        const data = await deleteOwnRestaurantAccount(restaurantId);
+        return sendResponse(res, 200, 'Account deleted successfully', data);
     } catch (error) {
         next(error);
     }

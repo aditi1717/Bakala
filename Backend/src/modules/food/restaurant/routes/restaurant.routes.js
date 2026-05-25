@@ -7,6 +7,7 @@ import {
     getApprovedRestaurantController,
     listPublicOffersController,
     getCurrentRestaurantController,
+    deleteOwnRestaurantAccountController,
     updateRestaurantProfileController,
     updateRestaurantAcceptingOrdersController,
     uploadRestaurantProfileImageController,
@@ -87,6 +88,7 @@ router.get('/categories/public', cacheResponse(600, 'categories'), listCategorie
 
 // Restaurant dashboard/profile (Bearer token + RESTAURANT role)
 router.get('/current', authMiddleware, requireRestaurant, getCurrentRestaurantController);
+router.delete('/account', authMiddleware, requireRestaurant, deleteOwnRestaurantAccountController);
 router.patch('/profile', authMiddleware, requireRestaurant, uploadFields, async (req, res, next) => {
     // Invalidate caches when profile is updated
     await invalidateCache('restaurants:*');

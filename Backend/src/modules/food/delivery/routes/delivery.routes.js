@@ -3,7 +3,7 @@ import { upload } from '../../../../middleware/upload.js';
 import { authMiddleware, optionalAuthMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import * as orderController from '../../orders/controllers/order.controller.js';
-import { registerDeliveryPartnerController, updateDeliveryPartnerProfileController, updateDeliveryPartnerBankDetailsController, listSupportTicketsController, createSupportTicketController, createPendingSupportTicketController, getSupportTicketByIdController, updateDeliveryPartnerDetailsController, updateDeliveryPartnerProfilePhotoBase64Controller, updateAvailabilityController, getWalletController, createWithdrawalRequestController, createCashDepositOrderController, verifyCashDepositPaymentController, getEarningsController, getTripHistoryController, getPocketDetailsController, getEmergencyHelpController, getCashLimitController, getDeliveryReferralStatsController, getActiveEarningAddonsController, getStoreProductsDelivery, getStoreProductByIdDelivery, createStoreOrderDelivery, verifyStoreOrderDelivery, getMyStoreOrders, getStoreOrderByIdDelivery, getOrderQueueController, getReviewsController } from '../controllers/delivery.controller.js';
+import { registerDeliveryPartnerController, updateDeliveryPartnerProfileController, updateDeliveryPartnerBankDetailsController, listSupportTicketsController, createSupportTicketController, createPendingSupportTicketController, getSupportTicketByIdController, updateDeliveryPartnerDetailsController, updateDeliveryPartnerProfilePhotoBase64Controller, updateAvailabilityController, deleteOwnDeliveryAccountController, getWalletController, createWithdrawalRequestController, createCashDepositOrderController, verifyCashDepositPaymentController, getEarningsController, getTripHistoryController, getPocketDetailsController, getEmergencyHelpController, getCashLimitController, getDeliveryReferralStatsController, getActiveEarningAddonsController, getStoreProductsDelivery, getStoreProductByIdDelivery, createStoreOrderDelivery, verifyStoreOrderDelivery, getMyStoreOrders, getStoreOrderByIdDelivery, getOrderQueueController, getReviewsController } from '../controllers/delivery.controller.js';
 
 const router = express.Router();
 
@@ -28,6 +28,7 @@ router.post('/profile/photo-base64', authMiddleware, requireRoles('DELIVERY_PART
 router.patch('/profile/bank-details', authMiddleware, requireRoles('DELIVERY_PARTNER'), uploadFields, updateDeliveryPartnerBankDetailsController);
 
 router.patch('/availability', authMiddleware, requireRoles('DELIVERY_PARTNER'), updateAvailabilityController);
+router.delete('/account', authMiddleware, requireRoles('DELIVERY_PARTNER'), deleteOwnDeliveryAccountController);
 
 router.get('/support-tickets', optionalAuthMiddleware, listSupportTicketsController);
 router.post('/support-tickets', optionalAuthMiddleware, createSupportTicketController);

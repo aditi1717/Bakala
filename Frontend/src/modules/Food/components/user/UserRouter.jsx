@@ -59,6 +59,9 @@ const ReportSafetyEmergency = lazy(() => import("@food/pages/user/profile/Report
 const Accessibility = lazy(() => import("@food/pages/user/profile/Accessibility"))
 const Logout = lazy(() => import("@food/pages/user/profile/Logout"))
 const ReferEarn = lazy(() => import("@food/pages/user/profile/ReferEarn"))
+const PublicPrivacyPage = lazy(() => import("@food/pages/public/PublicLegalPages").then((m) => ({ default: m.PublicPrivacyPage })))
+const PublicTermsPage = lazy(() => import("@food/pages/public/PublicLegalPages").then((m) => ({ default: m.PublicTermsPage })))
+const PublicSupportPage = lazy(() => import("@food/pages/public/PublicLegalPages").then((m) => ({ default: m.PublicSupportPage })))
 
 // Auth
 const SignIn = lazy(() => import("@food/pages/user/auth/SignIn"))
@@ -271,6 +274,9 @@ export default function UserRouter() {
           <Route path="profile/shipping" element={<Shipping />} />
           <Route path="profile/cancellation" element={<Cancellation />} />
           <Route path="profile/delivery-safety" element={<DeliveryPartnerSafety />} />
+          <Route path="privacy-policy" element={<PublicPrivacyPage />} />
+          <Route path="terms-and-conditions" element={<PublicTermsPage />} />
+          <Route path="support" element={<PublicSupportPage />} />
 
           {/* Auth - User login is centralized at /user/auth/login */}
           <Route path="auth/login" element={<Navigate to="/user/auth/login" replace />} />

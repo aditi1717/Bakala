@@ -10,6 +10,7 @@ import { emitAdminSupportTicketCreated } from '../../shared/supportTicketAdminNo
 import { uploadImageBuffer } from '../../../../services/cloudinary.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
+import { FoodRefreshToken } from '../../../../core/refreshTokens/refreshToken.model.js';
 
 const PAYABLE_DELIVERY_STATUSES = ['delivered'];
 
@@ -625,6 +626,20 @@ export const updateDeliveryAvailability = async (userId, payload) => {
     partner.availabilityStatus = validStatus;
     await partner.save();
     return { availabilityStatus: partner.availabilityStatus };
+};
+
+export const deleteOwnDeliveryPartnerAccount = async (userId) => {
+    const partner = await FoodDeliveryPartner.findById(userId);
+    if (!partner) {
+        throw new ValidationError('Delivery partner not found');
+    }
+
+    await Promise.all([
+        FoodDeliveryPartner.deleteOne({ _id: partner._id }),
+        FoodRefreshToken.deleteMany({ userId: partner._id })
+    ]);
+
+    return { deleted: true };
 };
 
 // ----- Delivery partner wallet (Pocket / requests page) -----
