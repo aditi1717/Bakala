@@ -1137,8 +1137,9 @@ const OrderDetailV2 = () => {
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
               <h3 className="text-sm font-semibold text-slate-900">Order Details</h3>
               {orderItems.length > 0 ? (
-                <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
-                  <table className="w-full text-sm">
+                <div className="mt-3 rounded-xl border border-slate-200">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[620px] w-full text-sm">
                     <thead className="bg-slate-50">
                       <tr>
                         <th className="w-20 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Qty</th>
@@ -1178,7 +1179,8 @@ const OrderDetailV2 = () => {
                         );
                       })}
                     </tbody>
-                  </table>
+                    </table>
+                  </div>
                 </div>
               ) : (
                 <p className="mt-2 text-sm text-slate-500">Item details not available.</p>

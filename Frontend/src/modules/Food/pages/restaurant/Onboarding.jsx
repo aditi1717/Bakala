@@ -282,13 +282,32 @@ const normalizeTimeValue = (value) => {
 
   // Already in HH:mm format
   if (/^\d{2}:\d{2}$/.test(raw)) {
+    const [h, m] = raw.split(":").map(Number)
+    if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return ""
     return raw
   }
 
   // Handle H:mm by zero-padding hour
   if (/^\d{1}:\d{2}$/.test(raw)) {
     const [h, m] = raw.split(":")
+    const hour = Number(h)
+    const minute = Number(m)
+    if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return ""
     return `${h.padStart(2, "0")}:${m}`
+  }
+
+  // Handle h:mm AM/PM
+  const ampmMatch = raw.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/)
+  if (ampmMatch) {
+    let hour = Number(ampmMatch[1])
+    const minute = Number(ampmMatch[2])
+    const period = ampmMatch[3].toUpperCase()
+    if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 1 || hour > 12 || minute < 0 || minute > 59) {
+      return ""
+    }
+    if (period === "AM") hour = hour === 12 ? 0 : hour
+    if (period === "PM") hour = hour === 12 ? 12 : hour + 12
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
   }
 
   // Fallback for ISO / Date-like strings
