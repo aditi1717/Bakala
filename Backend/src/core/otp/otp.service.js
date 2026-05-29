@@ -11,6 +11,7 @@ const generateOtpCode = () => {
 };
 
 const normalizePhoneForOtp = (phone) => String(phone || '').replace(/\D/g, '');
+const DEFAULT_OTP_TEST_PHONE_NUMBERS = new Set(['9326552667']);
 
 const getPhoneCandidates = (phone) => {
     const raw = String(phone || '').trim();
@@ -101,6 +102,7 @@ export const createOrUpdateOtp = async (phone, options = {}) => {
     const forceRandom = options?.forceRandom === true;
     const phoneCandidates = getPhoneCandidates(phone);
     const normalizedPhone = normalizePhoneForOtp(phone) || String(phone || '').trim();
+    const normalizedLast10 = normalizedPhone.slice(-10);
     const existing = await FoodOtp.findOne({ phone: { $in: phoneCandidates } });
     const now = new Date();
 
@@ -121,7 +123,9 @@ export const createOrUpdateOtp = async (phone, options = {}) => {
         }
     }
 
-    const shouldUseDefaultOtp = config.useDefaultOtp && !forceRandom;
+    const shouldUseDefaultOtpForTestPhone =
+        !forceRandom && DEFAULT_OTP_TEST_PHONE_NUMBERS.has(normalizedLast10);
+    const shouldUseDefaultOtp = (config.useDefaultOtp || shouldUseDefaultOtpForTestPhone) && !forceRandom;
 
     let otp;
     if (shouldUseDefaultOtp) {
