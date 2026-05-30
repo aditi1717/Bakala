@@ -427,6 +427,12 @@ export const adminAPI = {
       {},
       { contextModule: "admin" },
     ),
+  toggleCategoryHomepage: (id) =>
+    apiClient.patch(
+      `/food/admin/categories/${id}/toggle-homepage`,
+      {},
+      { contextModule: "admin" },
+    ),
   /** Get single restaurant by id (full details for View Details modal). */
   getRestaurantById: (id) =>
     apiClient.get(`/food/admin/restaurants/${id}`, { contextModule: "admin" }),

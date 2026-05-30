@@ -1,4 +1,4 @@
-﻿import { useState, useCallback, useEffect, useRef, startTransition, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef, startTransition, useMemo } from "react";
 import { publicGetOnce, restaurantAPI, adminAPI } from "@food/api";
 import { API_BASE_URL } from "@food/api/config";
 import { sortRestaurantsByAvailability } from "@food/utils/sortRestaurantsByAvailability";
@@ -97,7 +97,7 @@ export const useFoodHomeData = ({ location, vegMode, listingType = "restaurant" 
           publicGetOnce("/food/hero-banners/public").catch(() => ({ data: { data: [] } })),
           publicGetOnce("/food/explore-icons/public").catch(() => ({ data: { data: [] } })),
           publicGetOnce("/food/landing/settings/public").catch(() => ({ data: { data: {} } })),
-          adminAPI.getPublicCategories({}).catch(() => ({ data: { data: { categories: [] } } }))
+          adminAPI.getPublicCategories({ showOnHomepage: true }).catch(() => ({ data: { data: { categories: [] } } }))
         ]);
 
         if (cancelled) return;

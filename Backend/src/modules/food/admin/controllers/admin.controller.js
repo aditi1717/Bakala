@@ -514,6 +514,22 @@ export async function toggleCategoryStatus(req, res, next) {
     }
 }
 
+export async function toggleCategoryHomepage(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: 'Invalid category id' });
+        }
+        const updated = await adminService.toggleCategoryHomepage(id);
+        if (!updated) {
+            return res.status(404).json({ success: false, message: 'Category not found' });
+        }
+        res.status(200).json({ success: true, message: 'Category homepage status updated successfully', data: { category: updated } });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function approveCategory(req, res, next) {
     try {
         const { id } = req.params;

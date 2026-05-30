@@ -12,6 +12,7 @@ import {
     serializeCategoryForResponse,
     toObjectId
 } from '../../shared/categoryWorkflow.js';
+import { invalidateCache } from '../../../../middleware/cache.js';
 
 const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const APPROVED_CATEGORY_FILTER = [
@@ -95,8 +96,8 @@ export async function listRestaurantCategories(restaurantId, query = {}) {
         .limit(limit)
         .select(
             compact
-                ? 'name image type foodTypeScope approvalStatus rejectionReason restaurantId createdByRestaurantId isActive sortOrder visibilityStartTime visibilityEndTime requestedAt approvedAt rejectedAt globalizedAt'
-                : 'name image type foodTypeScope approvalStatus rejectionReason restaurantId createdByRestaurantId isActive sortOrder visibilityStartTime visibilityEndTime requestedAt approvedAt rejectedAt globalizedAt createdAt updatedAt'
+                ? 'name image type foodTypeScope approvalStatus rejectionReason restaurantId createdByRestaurantId isActive sortOrder visibilityStartTime visibilityEndTime showOnHomepage requestedAt approvedAt rejectedAt globalizedAt'
+                : 'name image type foodTypeScope approvalStatus rejectionReason restaurantId createdByRestaurantId isActive sortOrder visibilityStartTime visibilityEndTime showOnHomepage requestedAt approvedAt rejectedAt globalizedAt createdAt updatedAt'
         );
 
     const [list, total] = await Promise.all([
@@ -153,13 +154,17 @@ export async function listPublicCategories(query = {}) {
         $and: [{ $or: GLOBAL_CATEGORY_FILTER }, { $or: APPROVED_CATEGORY_FILTER }]
     };
 
+    if (query.showOnHomepage === 'true' || query.showOnHomepage === true) {
+        filter.showOnHomepage = true;
+    }
+
     if (search) {
         const term = escapeRegex(search.slice(0, 80));
         filter.$and.push({ name: { $regex: term, $options: 'i' } });
     }
     const list = await FoodCategory.find(filter)
         .sort({ sortOrder: 1, createdAt: -1 })
-        .select('name image type foodTypeScope sortOrder visibilityStartTime visibilityEndTime createdAt updatedAt')
+        .select('name image type foodTypeScope sortOrder visibilityStartTime visibilityEndTime showOnHomepage createdAt updatedAt')
         .lean();
 
     await backfillLegacyCategoryWorkflow(list);
@@ -209,6 +214,7 @@ export async function createRestaurantCategory(restaurantId, body = {}) {
         requestedAt: new Date()
     });
     await doc.save();
+    await invalidateCache('categories:*');
     return doc.toObject();
 }
 
@@ -281,6 +287,7 @@ export async function updateRestaurantCategory(restaurantId, id, body = {}) {
     }
 
     await doc.save();
+    await invalidateCache('categories:*');
     return doc.toObject();
 }
 
@@ -299,5 +306,8 @@ export async function deleteRestaurantCategory(restaurantId, id) {
     }
 
     const deleted = await FoodCategory.findOneAndDelete({ _id: id, restaurantId: context.restaurantId }).lean();
+    if (deleted) {
+        await invalidateCache('categories:*');
+    }
     return deleted ? { id } : null;
 }

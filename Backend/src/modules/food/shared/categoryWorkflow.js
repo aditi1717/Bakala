@@ -228,6 +228,7 @@ export const serializeCategoryForResponse = (category = {}, options = {}) => {
         type: category.type || '',
         status: category.isActive !== false,
         isActive: category.isActive !== false,
+        showOnHomepage: category.showOnHomepage === true,
         isApproved: approvalStatus === 'approved',
         approvalStatus,
         foodTypeScope: normalizeCategoryFoodTypeScope(category.foodTypeScope, 'Both'),

@@ -39,7 +39,8 @@ const upsertSchema = z.object({
         .string()
         .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'visibilityEndTime must be in HH:mm format')
         .or(z.literal(''))
-        .optional()
+        .optional(),
+    showOnHomepage: z.boolean().optional()
 });
 
 const rejectSchema = z.object({

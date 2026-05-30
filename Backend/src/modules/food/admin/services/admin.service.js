@@ -56,6 +56,7 @@ import {
     serializeFoodVariants
 } from './foodVariant.service.js';
 import { normalizeAdminPermissions } from '../constants/adminPermissions.js';
+import { invalidateCache } from '../../../../middleware/cache.js';
 
 const parseBooleanLike = (value, fieldName) => {
     if (typeof value === 'boolean') return value;
@@ -3373,9 +3374,11 @@ export async function createCategory(body) {
         approvedAt: new Date(),
         rejectionReason: '',
         restaurantId: undefined,
-        createdByRestaurantId: undefined
+        createdByRestaurantId: undefined,
+        showOnHomepage: body.showOnHomepage === true
     });
     await doc.save();
+    await invalidateCache('categories:*');
     return doc.toObject();
 }
 
@@ -3393,6 +3396,7 @@ export async function approveCategory(id) {
     doc.rejectedAt = undefined;
     doc.rejectionReason = '';
     await doc.save();
+    await invalidateCache('categories:*');
     return doc.toObject();
 }
 
@@ -3413,6 +3417,7 @@ export async function rejectCategory(id, reason) {
     doc.rejectedAt = new Date();
     doc.approvedAt = undefined;
     await doc.save();
+    await invalidateCache('categories:*');
     return doc.toObject();
 }
 
@@ -3436,6 +3441,7 @@ export async function makeCategoryGlobal(id) {
     doc.globalizedAt = new Date();
     doc.approvedAt = doc.approvedAt || new Date();
     await doc.save();
+    await invalidateCache('categories:*');
     return doc.toObject();
 }
 
@@ -3470,10 +3476,14 @@ export async function updateCategory(id, body) {
     if (body.visibilityEndTime !== undefined) {
         doc.visibilityEndTime = normalizeCategoryVisibilityTime(body.visibilityEndTime);
     }
+    if (body.showOnHomepage !== undefined) {
+        doc.showOnHomepage = body.showOnHomepage === true;
+    }
     if (!doc.createdByRestaurantId && doc.restaurantId) {
         doc.createdByRestaurantId = doc.restaurantId;
     }
     await doc.save();
+    await invalidateCache('categories:*');
     return doc.toObject();
 }
 
@@ -3484,6 +3494,9 @@ export async function deleteCategory(id) {
         throw new ValidationError('Cannot delete category while it has items');
     }
     const deleted = await FoodCategory.findByIdAndDelete(id).lean();
+    if (deleted) {
+        await invalidateCache('categories:*');
+    }
     return deleted ? { id } : null;
 }
 
@@ -3496,6 +3509,27 @@ export async function toggleCategoryStatus(id) {
         doc.createdByRestaurantId = doc.restaurantId;
     }
     await doc.save();
+    await invalidateCache('categories:*');
+    return doc.toObject();
+}
+
+export async function toggleCategoryHomepage(id) {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+    const doc = await FoodCategory.findById(id);
+    if (!doc) return null;
+
+    // Ensure we only toggle global categories (no restaurantId)
+    const isGlobal = !doc.restaurantId;
+    if (!isGlobal) {
+        throw new ValidationError('Homepage visibility can only be toggled for global categories');
+    }
+
+    doc.showOnHomepage = !doc.showOnHomepage;
+    if (!doc.createdByRestaurantId && doc.restaurantId) {
+        doc.createdByRestaurantId = doc.restaurantId;
+    }
+    await doc.save();
+    await invalidateCache('categories:*');
     return doc.toObject();
 }
 

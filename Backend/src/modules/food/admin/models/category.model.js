@@ -33,7 +33,8 @@ const foodCategorySchema = new mongoose.Schema(
          * - If both set and start > end => overnight window (e.g. 22:00 to 02:00)
          */
         visibilityStartTime: { type: String, trim: true, default: '' },
-        visibilityEndTime: { type: String, trim: true, default: '' }
+        visibilityEndTime: { type: String, trim: true, default: '' },
+        showOnHomepage: { type: Boolean, default: false, index: true }
     },
     {
         collection: 'food_categories',

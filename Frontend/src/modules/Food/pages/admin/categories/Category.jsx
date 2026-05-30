@@ -23,6 +23,7 @@ const defaultFormData = {
   name: "",
   image: "",
   status: true,
+  showOnHomepage: false,
   type: "",
   foodTypeScope: "Both",
   visibilityStartHour: "",
@@ -206,6 +207,7 @@ export default function Category() {
       name: category?.name || "",
       image: category?.image || "",
       status: isCategoryEnabled(category),
+      showOnHomepage: category?.showOnHomepage === true,
       type: category?.type || "",
       foodTypeScope: category?.foodTypeScope || "Both",
       ...(() => {
@@ -257,6 +259,18 @@ export default function Category() {
       }
     } catch (error) {
       toast.error(error?.response?.data?.message || "Failed to update category status")
+    }
+  }
+
+  const handleToggleHomepage = async (id) => {
+    try {
+      const response = await adminAPI.toggleCategoryHomepage(String(id))
+      if (response?.data?.success) {
+        toast.success("Category homepage status updated successfully")
+        fetchCategories()
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to update category homepage status")
     }
   }
 
@@ -396,6 +410,7 @@ export default function Category() {
         name: String(formData.name || "").trim(),
         type: String(formData.type || "").trim(),
         status: Boolean(formData.status),
+        showOnHomepage: Boolean(formData.showOnHomepage),
         image: imageUrl || undefined,
         foodTypeScope: formData.foodTypeScope,
         visibilityStartTime: startTime24,
@@ -516,11 +531,12 @@ export default function Category() {
           <table className="min-w-full table-fixed">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                <th className="w-[25%] px-5 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Category</th>
-                <th className="w-[17%] px-4 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Owner</th>
-                <th className="w-[10%] px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-600">Diet</th>
-                <th className="w-[10%] px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-600">Status</th>
-                <th className="w-[13%] px-4 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Approval</th>
+                <th className="w-[23%] px-5 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Category</th>
+                <th className="w-[15%] px-4 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Owner</th>
+                <th className="w-[8%] px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-600">Diet</th>
+                <th className="w-[8%] px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-600">Status</th>
+                <th className="w-[11%] px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-600">Homepage</th>
+                <th className="w-[15%] px-4 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">Approval</th>
                 <th className="w-[20%] px-5 py-4 text-right text-[11px] font-bold uppercase tracking-wider text-slate-600">Actions</th>
               </tr>
             </thead>
@@ -596,6 +612,19 @@ export default function Category() {
                         >
                           <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isCategoryEnabled(category) ? "translate-x-6" : "translate-x-1"}`} />
                         </button>
+                      </td>
+                      <td className="px-4 py-5 text-center">
+                        {isGlobal ? (
+                          <button
+                            onClick={() => handleToggleHomepage(category.id)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full ${category?.showOnHomepage ? "bg-emerald-600" : "bg-slate-300"}`}
+                            title={category?.showOnHomepage ? "Hide from Homepage" : "Show on Homepage"}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${category?.showOnHomepage ? "translate-x-6" : "translate-x-1"}`} />
+                          </button>
+                        ) : (
+                          <span className="text-sm font-medium text-slate-400">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-5">
                         <div className="space-y-2">
@@ -837,15 +866,29 @@ export default function Category() {
                           </div>
                         </div>
 
-                        <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={formData.status}
-                            onChange={(event) => setFormData((prev) => ({ ...prev, status: event.target.checked }))}
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                          Active Status
-                        </label>
+                        <div className="flex flex-col gap-3">
+                          <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={formData.status}
+                              onChange={(event) => setFormData((prev) => ({ ...prev, status: event.target.checked }))}
+                              className="h-4 w-4 rounded border-slate-300"
+                            />
+                            Active Status
+                          </label>
+
+                          {(!editingCategory || resolveIsGlobal(editingCategory)) && (
+                            <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={formData.showOnHomepage}
+                                onChange={(event) => setFormData((prev) => ({ ...prev, showOnHomepage: event.target.checked }))}
+                                className="h-4 w-4 rounded border-slate-300"
+                              />
+                              Show on Homepage
+                            </label>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-3 border-t bg-white px-6 py-4">
