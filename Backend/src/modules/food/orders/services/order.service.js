@@ -1286,14 +1286,18 @@ export async function createOrder(userId, dto) {
 
   // Realtime + push notifications.
   try {
-    // Emit to the restaurant first so dashboard alerts are not delayed by push providers.
-    const restaurantNotificationPromise =
-      orderType === "food" ? notifyRestaurantNewOrder(order) : Promise.resolve();
-
     // Notify customer. For online payments, order is created but awaits payment confirmation.
     const isAwaitingOnlinePayment =
       String(order.payment?.method || "").toLowerCase() === "razorpay" &&
       String(order.payment?.status || "").toLowerCase() !== "paid";
+
+    // Emit to the restaurant first so dashboard alerts are not delayed by push providers.
+    // Skip if awaiting online payment.
+    const restaurantNotificationPromise =
+      orderType === "food" && !isAwaitingOnlinePayment
+        ? notifyRestaurantNewOrder(order)
+        : Promise.resolve();
+        
     const userNotificationPromise = notifyOwnersSafely([{ ownerType: "USER", ownerId: userId }], {
       title: isAwaitingOnlinePayment
         ? "Complete Payment to Confirm Order"
@@ -1435,7 +1439,14 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 // ----- User: list, get, cancel -----
 export async function listOrdersUser(userId, query) {
   const { page, limit, skip } = buildPaginationOptions(query);
-  const filter = { userId: new mongoose.Types.ObjectId(userId) };
+  const filter = {
+    userId: new mongoose.Types.ObjectId(userId),
+    $or: [
+      { "payment.method": { $in: ["cash", "wallet"] } },
+      { "payment.status": { $in: ["paid", "authorized", "captured", "settled", "refunded"] } },
+      { orderStatus: { $in: ["cancelled_by_user", "cancelled_by_restaurant", "cancelled_by_user_unavailable", "cancelled_by_admin"] } }
+    ]
+  };
   const [docs, total] = await Promise.all([
     FoodOrder.find(filter)
       .populate(
