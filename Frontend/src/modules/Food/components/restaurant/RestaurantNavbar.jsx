@@ -262,36 +262,22 @@ export default function RestaurantNavbar({
     }
   }, [restaurantData, propLocation])
 
-  // Load manual online/offline toggle (accepting orders) and listen for changes.
+  // Keep accepting-orders state in sync across restaurant screens.
   useEffect(() => {
-    const updateAcceptingOrders = () => {
-      try {
-        const savedStatus = localStorage.getItem('restaurant_online_status')
-        if (savedStatus !== null) {
-          const isOnline = JSON.parse(savedStatus)
-          setIsAcceptingOrdersState(Boolean(isOnline))
-        } else {
-          setIsAcceptingOrdersState(Boolean(restaurantData?.isAcceptingOrders))
-        }
-      } catch (error) {
-        debugError("Error loading restaurant status:", error)
-        setIsAcceptingOrdersState(Boolean(restaurantData?.isAcceptingOrders))
-      }
-    }
-
-    updateAcceptingOrders()
-
     const handleStatusChange = (event) => {
-      const isOnline = event.detail?.isOnline || false
-      setIsAcceptingOrdersState(Boolean(isOnline))
+      const isOnline = Boolean(event.detail?.isOnline)
+      setIsAcceptingOrdersState(isOnline)
+      setRestaurantData((prev) => (prev ? { ...prev, isAcceptingOrders: isOnline } : prev))
     }
 
     window.addEventListener('restaurantStatusChanged', handleStatusChange)
+    window.addEventListener('restaurantOnlineStatusChanged', handleStatusChange)
     
     return () => {
       window.removeEventListener('restaurantStatusChanged', handleStatusChange)
+      window.removeEventListener('restaurantOnlineStatusChanged', handleStatusChange)
     }
-  }, [restaurantData])
+  }, [])
 
   // Recompute badge status every minute using outlet timings.
   useEffect(() => {

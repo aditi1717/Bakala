@@ -21,14 +21,14 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
-const RESTAURANT_ONLINE_STATUS_KEY = "restaurant_online_status"
-
-const persistRestaurantOnlineStatus = (isOnline) => {
-  try {
-    localStorage.setItem(RESTAURANT_ONLINE_STATUS_KEY, JSON.stringify(Boolean(isOnline)))
-  } catch (error) {
-    debugError("Error persisting restaurant online status:", error)
-  }
+const syncRestaurantOnlineStatus = (isOnline) => {
+  const nextValue = Boolean(isOnline)
+  window.dispatchEvent(new CustomEvent('restaurantStatusChanged', {
+    detail: { isOnline: nextValue }
+  }))
+  window.dispatchEvent(new CustomEvent('restaurantOnlineStatusChanged', {
+    detail: { isOnline: nextValue }
+  }))
 }
 
 const parseTimeToMinutes = (timeValue) => {
@@ -88,6 +88,7 @@ export default function RestaurantStatus() {
   const [deliveryStatus, setDeliveryStatus] = useState(false)
   const [restaurantData, setRestaurantData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [savingStatus, setSavingStatus] = useState(false)
   const [currentDateTime, setCurrentDateTime] = useState(new Date())
   const [isWithinTimings, setIsWithinTimings] = useState(null) // null = not calculated yet
   const [showOutletClosedDialog, setShowOutletClosedDialog] = useState(false)
@@ -113,13 +114,15 @@ export default function RestaurantStatus() {
         const data = response?.data?.data?.restaurant || response?.data?.restaurant
         if (data) {
           setRestaurantData(data)
+          const nextStatus = Boolean(data?.isAcceptingOrders)
+          setDeliveryStatus(nextStatus)
+          syncRestaurantOnlineStatus(nextStatus)
         }
       } catch (error) {
         // Only log error if it's not a network/timeout error (backend might be down/slow)
         if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
           debugError("Error fetching restaurant data:", error)
         }
-        // Continue with default values if fetch fails
       } finally {
         setLoading(false)
       }
@@ -224,62 +227,10 @@ export default function RestaurantStatus() {
   // We don't automatically set it based on timings anymore
   // The isWithinTimings is only used to show warning messages
 
-  // Load delivery status from backend
-  useEffect(() => {
-    const loadDeliveryStatus = async () => {
-      try {
-        const response = await restaurantAPI.getCurrentRestaurant()
-        const restaurant = response?.data?.data?.restaurant || response?.data?.restaurant
-        if (restaurant?.isAcceptingOrders !== undefined) {
-          setDeliveryStatus(restaurant.isAcceptingOrders)
-          try {
-            localStorage.setItem('restaurant_online_status', JSON.stringify(Boolean(restaurant.isAcceptingOrders)))
-          } catch {}
-          persistRestaurantOnlineStatus(restaurant.isAcceptingOrders)
-          // Dispatch event to update navbar
-          window.dispatchEvent(new CustomEvent('restaurantStatusChanged', { 
-            detail: { isOnline: restaurant.isAcceptingOrders } 
-          }))
-          window.dispatchEvent(new CustomEvent('restaurantOnlineStatusChanged', { 
-            detail: { isOnline: restaurant.isAcceptingOrders } 
-          }))
-        } else {
-          setDeliveryStatus(false)
-          try {
-            localStorage.setItem('restaurant_online_status', JSON.stringify(false))
-          } catch {}
-          persistRestaurantOnlineStatus(false)
-          window.dispatchEvent(new CustomEvent('restaurantStatusChanged', { 
-            detail: { isOnline: false } 
-          }))
-          window.dispatchEvent(new CustomEvent('restaurantOnlineStatusChanged', { 
-            detail: { isOnline: false } 
-          }))
-        }
-      } catch (error) {
-        // Only log error if it's not a network/timeout error (backend might be down/slow)
-        if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-          debugError("Error loading delivery status:", error)
-        }
-        setDeliveryStatus(false)
-        try {
-          localStorage.setItem('restaurant_online_status', JSON.stringify(false))
-        } catch {}
-        persistRestaurantOnlineStatus(false)
-        window.dispatchEvent(new CustomEvent('restaurantStatusChanged', { 
-          detail: { isOnline: false } 
-        }))
-        window.dispatchEvent(new CustomEvent('restaurantOnlineStatusChanged', { 
-          detail: { isOnline: false } 
-        }))
-      }
-    }
-
-    loadDeliveryStatus()
-  }, [])
-
   // Handle delivery status change
   const handleDeliveryStatusChange = async (checked) => {
+    if (savingStatus) return
+
     // If day is closed in outlet timings, don't allow turning on
     if (checked && isDayClosed) {
       setShowOutletClosedDialog(true)
@@ -291,37 +242,26 @@ export default function RestaurantStatus() {
       setShowOutsideTimingsDialog(true)
       return
     }
-    
-    try {
-      // Update backend
-      try {
-        await restaurantAPI.updateAcceptingOrders(checked)
-        debugLog('? Delivery status updated in backend:', checked)
-        setDeliveryStatus(checked)
-        persistRestaurantOnlineStatus(checked)
-      } catch (apiError) {
-        debugError('Error updating delivery status in backend:', apiError)
-        // Keep prior local toggle if backend fails.
-        persistRestaurantOnlineStatus(deliveryStatus)
-        return
-      }
-      
-      try {
-        localStorage.setItem('restaurant_online_status', JSON.stringify(Boolean(checked)))
-      } catch {}
 
-      // Dispatch custom event for navbar to listen
-      window.dispatchEvent(new CustomEvent('restaurantStatusChanged', { 
-        detail: { isOnline: checked } 
-      }))
-      window.dispatchEvent(new CustomEvent('restaurantOnlineStatusChanged', { 
-        detail: { isOnline: checked } 
-      }))
-      if (checked) {
+    const nextStatus = Boolean(checked)
+    setDeliveryStatus(nextStatus)
+    setRestaurantData((prev) => (
+      prev ? { ...prev, isAcceptingOrders: nextStatus } : prev
+    ))
+    syncRestaurantOnlineStatus(nextStatus)
+
+    try {
+      setSavingStatus(true)
+      await restaurantAPI.updateAcceptingOrders(nextStatus)
+      debugLog('? Delivery status updated in backend:', nextStatus)
+
+      if (nextStatus) {
         void registerWebPushForCurrentModule(window.location.pathname)
       }
     } catch (error) {
       debugError("Error saving delivery status:", error)
+    } finally {
+      setSavingStatus(false)
     }
   }
 
@@ -470,6 +410,7 @@ export default function RestaurantStatus() {
             <Switch
               checked={deliveryStatus}
               onCheckedChange={handleDeliveryStatusChange}
+              disabled={savingStatus}
               className="ml-4 data-[state=unchecked]:bg-gray-300 data-[state=checked]:bg-green-600"
             />
           </div>

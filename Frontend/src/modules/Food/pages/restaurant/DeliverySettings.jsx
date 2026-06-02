@@ -12,10 +12,6 @@ const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
 
-
-const DELIVERY_STATUS_KEY = "restaurant_delivery_status"
-const RESTAURANT_ONLINE_STATUS_KEY = "restaurant_online_status"
-
 export default function DeliverySettings() {
   const navigate = useNavigate()
   const goBack = useRestaurantBackNavigation()
@@ -49,14 +45,10 @@ export default function DeliverySettings() {
 
   const syncStatusLocally = (status) => {
     const value = Boolean(status)
-    try {
-      localStorage.setItem(DELIVERY_STATUS_KEY, JSON.stringify(value))
-      localStorage.setItem(RESTAURANT_ONLINE_STATUS_KEY, JSON.stringify(value))
-    } catch (error) {
-      debugError("Error saving delivery status locally:", error)
-    }
-
     window.dispatchEvent(new CustomEvent("restaurantStatusChanged", {
+      detail: { isOnline: value }
+    }))
+    window.dispatchEvent(new CustomEvent("restaurantOnlineStatusChanged", {
       detail: { isOnline: value }
     }))
   }
@@ -78,13 +70,6 @@ export default function DeliverySettings() {
           syncStatusLocally(nextStatus)
         }
       } catch (error) {
-        try {
-          const savedStatus = localStorage.getItem(DELIVERY_STATUS_KEY)
-          if (!cancelled && savedStatus !== null) {
-            setDeliveryStatus(JSON.parse(savedStatus))
-          }
-        } catch (_) {}
-
         if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
           debugError("Error loading delivery status:", error)
         }
@@ -95,21 +80,6 @@ export default function DeliverySettings() {
 
     return () => {
       cancelled = true
-    }
-  }, [])
-
-  // Keep backward-compatible local key in sync if another screen updates it.
-  useEffect(() => {
-    try {
-      const savedStatus = localStorage.getItem(DELIVERY_STATUS_KEY)
-      if (savedStatus !== null) {
-        setDeliveryStatus(JSON.parse(savedStatus))
-      }
-    } catch (error) {
-      // Only log error if it's not a network/timeout error (backend might be down/slow)
-      if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-        debugError("Error loading delivery status:", error)
-      }
     }
   }, [])
 
@@ -168,16 +138,17 @@ export default function DeliverySettings() {
   }
 
   const saveDeliveryStatusToBackend = async (status) => {
-    const previousStatus = deliveryStatus
     const nextStatus = Boolean(status)
 
     try {
+      setDeliveryStatus(nextStatus)
+      syncStatusLocally(nextStatus)
       setSavingStatus(true)
       await restaurantAPI.updateAcceptingOrders(nextStatus)
-      saveDeliveryStatus(nextStatus)
+      showToast(nextStatus
+        ? "Delivery is now ON - You're receiving orders"
+        : "Delivery is now OFF - Not receiving orders")
     } catch (error) {
-      setDeliveryStatus(previousStatus)
-      syncStatusLocally(previousStatus)
       debugError("Error updating delivery status:", error)
       showToast(error?.response?.data?.message || "Error updating delivery status")
       return
