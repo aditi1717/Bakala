@@ -38,29 +38,31 @@ export const handleRazorpayWebhook = async (req, res) => {
             const paymentObj = payload.payment.entity;
             const rzOrderId = paymentObj.order_id;
             const rzPaymentId = paymentObj.id;
+            const paymentCapturedStatus = String(paymentObj.status || 'captured').toLowerCase();
 
-            // Atomic update to mark as paid if not already
-            const order = await FoodOrder.findOneAndUpdate(
-                { 
-                    "payment.razorpay.orderId": rzOrderId, 
-                    "payment.status": { $ne: 'paid' } 
-                },
-                { 
-                    $set: { 
-                        "payment.status": 'paid', 
-                        "payment.razorpay.paymentId": rzPaymentId 
-                    } 
-                },
-                { new: true }
-            );
+            const order = await FoodOrder.findOne({ "payment.razorpay.orderId": rzOrderId });
 
             if (order) {
-                // ✅ UPDATED: Wrapped in try-catch to prevent secondary failures from breaking the webhook response
+                let needsSave = false;
+                if (order.payment?.status !== 'paid') {
+                    order.payment.status = 'paid';
+                    needsSave = true;
+                }
+                if (order.payment?.razorpay?.paymentId !== rzPaymentId) {
+                    order.payment.razorpay.paymentId = rzPaymentId;
+                    needsSave = true;
+                }
+                if (needsSave) {
+                    await order.save();
+                }
+
                 try {
                     await foodTransactionService.updateTransactionStatus(order._id, 'captured', {
                         status: 'captured',
+                        paymentStatus: 'paid',
+                        razorpayOrderId: rzOrderId,
                         razorpayPaymentId: rzPaymentId,
-                        note: 'Payment status synced via Webhook (payment.captured)'
+                        note: `Payment status synced via Webhook (payment.captured:${paymentCapturedStatus})`
                     });
                 } catch (ledgerErr) {
                     logger.error(`Webhook Ledger Error (Order ${order.orderId}): ${ledgerErr.message}`);
@@ -100,6 +102,16 @@ export const handleRazorpayWebhook = async (req, res) => {
             );
 
             if (order) {
+                try {
+                    await foodTransactionService.updateTransactionStatus(order._id, 'refunded', {
+                        status: 'refunded',
+                        paymentStatus: 'refunded',
+                        razorpayPaymentId: rzPaymentId,
+                        note: `Refund synced via Webhook (refund.processed:${rzRefundId})`
+                    });
+                } catch (ledgerErr) {
+                    logger.error(`Webhook Refund Ledger Error (Order ${order.orderId}): ${ledgerErr.message}`);
+                }
                 logger.info(`Webhook [refund.processed]: Synced Order ${order.orderId} (Refunded)`);
                 try {
                     const title = 'Refund Processed Successful';

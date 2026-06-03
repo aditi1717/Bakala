@@ -1363,8 +1363,19 @@ export async function verifyPayment(userId, dto) {
     userId: new mongoose.Types.ObjectId(userId),
   });
   if (!order) throw new NotFoundError("Order not found");
-  if (order.payment.status === "paid")
+  if (order.payment.status === "paid") {
+    await foodTransactionService.updateTransactionStatus(order._id, 'captured', {
+      status: 'captured',
+      paymentStatus: 'paid',
+      razorpayOrderId: dto.razorpayOrderId,
+      razorpayPaymentId: dto.razorpayPaymentId,
+      razorpaySignature: dto.razorpaySignature,
+      note: 'Payment re-synced from verifyPayment on already-paid order',
+      recordedByRole: "USER",
+      recordedById: new mongoose.Types.ObjectId(userId)
+    });
     return { order: order.toObject(), payment: order.payment };
+  }
 
   const valid = verifyPaymentSignature(
     dto.razorpayOrderId,
@@ -1395,6 +1406,8 @@ export async function verifyPayment(userId, dto) {
 
   await foodTransactionService.updateTransactionStatus(order._id, 'captured', {
     status: 'captured',
+    paymentStatus: 'paid',
+    razorpayOrderId: dto.razorpayOrderId,
     razorpayPaymentId: dto.razorpayPaymentId,
     razorpaySignature: dto.razorpaySignature,
     recordedByRole: "USER",

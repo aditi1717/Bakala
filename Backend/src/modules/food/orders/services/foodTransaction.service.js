@@ -199,8 +199,22 @@ export async function updateTransactionStatus(orderId, kind, details = {}) {
     if (!transaction) return null;
 
     if (details.status) transaction.status = details.status;
+    if (details.paymentStatus) transaction.payment.status = details.paymentStatus;
+    if (!details.paymentStatus && details.status === 'captured') {
+        transaction.payment.status = 'paid';
+    }
+    if (!details.paymentStatus && details.status === 'refunded') {
+        transaction.payment.status = 'refunded';
+    }
+    if (!details.paymentStatus && details.status === 'failed') {
+        transaction.payment.status = 'failed';
+    }
     if (details.razorpayPaymentId) transaction.gateway.razorpayPaymentId = details.razorpayPaymentId;
     if (details.razorpaySignature) transaction.gateway.razorpaySignature = details.razorpaySignature;
+    if (details.razorpayOrderId) transaction.gateway.razorpayOrderId = details.razorpayOrderId;
+    if (details.razorpayPaymentId) transaction.payment.razorpay.paymentId = details.razorpayPaymentId;
+    if (details.razorpaySignature) transaction.payment.razorpay.signature = details.razorpaySignature;
+    if (details.razorpayOrderId) transaction.payment.razorpay.orderId = details.razorpayOrderId;
     
     transaction.history.push({
         kind,
