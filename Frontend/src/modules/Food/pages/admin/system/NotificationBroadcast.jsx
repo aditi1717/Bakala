@@ -330,7 +330,7 @@ export default function NotificationBroadcast() {
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">History</h2>
-            <p className="text-sm text-slate-500">Latest sent broadcasts and their targets.</p>
+            <p className="text-sm text-slate-500">Broadcasts are now live-only and are not stored in the database.</p>
           </div>
         </div>
 
@@ -340,7 +340,7 @@ export default function NotificationBroadcast() {
             Loading history...
           </div>
         ) : history.length === 0 ? (
-          <div className="py-10 text-sm text-slate-500">No broadcast notifications found.</div>
+          <div className="py-10 text-sm text-slate-500">No saved broadcast history. New broadcasts are delivered live only.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">

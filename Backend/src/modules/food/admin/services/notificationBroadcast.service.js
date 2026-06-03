@@ -1,11 +1,8 @@
 import mongoose from 'mongoose';
-import { ValidationError, NotFoundError } from '../../../../core/auth/errors.js';
+import { ValidationError } from '../../../../core/auth/errors.js';
 import { FoodUser } from '../../../../core/users/user.model.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
-import { BroadcastNotification } from '../../../../core/notifications/models/notificationBroadcast.model.js';
-import { FoodNotification } from '../../../../core/notifications/models/notification.model.js';
-import { createInboxNotifications } from '../../../../core/notifications/notification.service.js';
 import { notifyOwnersSafely } from '../../../../core/notifications/firebase.service.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 
@@ -15,12 +12,6 @@ const TARGET_TYPE_MAP = {
     RESTAURANT: 'RESTAURANT',
     DELIVERY: 'DELIVERY',
     CUSTOM: 'CUSTOM'
-};
-
-const OWNER_LABEL_MAP = {
-    USER: 'Users',
-    RESTAURANT: 'Restaurants',
-    DELIVERY_PARTNER: 'Delivery Partners'
 };
 
 const toObjectId = (value, fieldName) => {
@@ -47,25 +38,19 @@ const normalizeTargetType = (value) => {
     return normalized;
 };
 
-const ownerModelMap = {
-    USER: FoodUser,
-    RESTAURANT: FoodRestaurant,
-    DELIVERY_PARTNER: FoodDeliveryPartner
-};
-
 const buildUserLabel = (doc) => ({
     label: String(doc?.name || doc?.phone || 'User').trim(),
-    subLabel: [doc?.phone, doc?.email].filter(Boolean).join(' • ')
+    subLabel: [doc?.phone, doc?.email].filter(Boolean).join(' â€¢ ')
 });
 
 const buildRestaurantLabel = (doc) => ({
     label: String(doc?.restaurantName || doc?.ownerName || 'Restaurant').trim(),
-    subLabel: [doc?.ownerPhone, doc?.ownerEmail].filter(Boolean).join(' • ')
+    subLabel: [doc?.ownerPhone, doc?.ownerEmail].filter(Boolean).join(' â€¢ ')
 });
 
 const buildDeliveryLabel = (doc) => ({
     label: String(doc?.name || doc?.phone || 'Delivery Partner').trim(),
-    subLabel: [doc?.phone, doc?.email].filter(Boolean).join(' • ')
+    subLabel: [doc?.phone, doc?.email].filter(Boolean).join(' â€¢ ')
 });
 
 const modelConfigMap = {
@@ -152,21 +137,6 @@ const resolveTargets = async ({ targetType, targetIds = [], targets = [] } = {})
     throw new ValidationError('Unsupported targetType');
 };
 
-const buildNotificationPayload = ({ title, message, link, broadcastId, target }) => ({
-    ownerType: target.ownerType,
-    ownerId: target.ownerId,
-    title,
-    message,
-    link,
-    category: 'broadcast',
-    broadcastId,
-    metadata: {
-        broadcastId: String(broadcastId),
-        ownerLabel: target.label || '',
-        ownerSubLabel: target.subLabel || ''
-    }
-});
-
 const emitRealtimeNotifications = (targets = [], broadcast) => {
     const io = getIO();
     if (!io) return;
@@ -201,21 +171,7 @@ const runBroadcastSideEffectsInBackground = ({ resolvedTargets = [], title, mess
 
     Promise.resolve()
         .then(async () => {
-            console.log(`[FCM Broadcast DB] Creating inbox notifications for ${resolvedTargets.length} targets.`);
-            await createInboxNotifications({
-                notifications: resolvedTargets.map((target) =>
-                    buildNotificationPayload({
-                        title,
-                        message,
-                        link,
-                        broadcastId,
-                        target
-                    })
-                )
-            });
-            console.log(`[FCM Broadcast DB] Inbox notifications created successfully.`);
-
-            console.log(`[FCM Broadcast Push] Dispatching push notifications via notifyOwnersSafely to ${resolvedTargets.length} targets.`);
+            console.log(`[FCM Broadcast Push] Dispatching live broadcast to ${resolvedTargets.length} targets.`);
             const pushResult = await notifyOwnersSafely(
                 resolvedTargets.map((target) => ({
                     ownerType: target.ownerType,
@@ -260,18 +216,16 @@ export const createBroadcastNotification = async ({ body = {}, adminId } = {}) =
         targets: body?.targets
     });
 
-    console.log('[FCM Broadcast Create] Resolved targets:', resolvedTargets.map(t => `${t.ownerType}:${t.ownerId}`));
+    console.log('[FCM Broadcast Create] Resolved targets:', resolvedTargets.map((target) => `${target.ownerType}:${target.ownerId}`));
     if (!resolvedTargets.length) {
         throw new ValidationError(`No recipients found for ${targetType.toLowerCase()} broadcast`);
     }
 
-    const targetIds = resolvedTargets.map((target) => toObjectId(target.ownerId, 'targetId'));
-
-    const broadcast = await BroadcastNotification.create({
+    const broadcast = {
+        _id: new mongoose.Types.ObjectId(),
         title,
         message,
         targetType,
-        targetIds: targetType === 'CUSTOM' ? targetIds : [],
         targets: resolvedTargets.map((target) => ({
             ownerType: target.ownerType,
             ownerId: toObjectId(target.ownerId, 'ownerId'),
@@ -280,10 +234,11 @@ export const createBroadcastNotification = async ({ body = {}, adminId } = {}) =
         })),
         link,
         createdBy: toObjectId(adminId, 'createdBy'),
-        targetCount: resolvedTargets.length
-    });
+        targetCount: resolvedTargets.length,
+        createdAt: new Date()
+    };
 
-    console.log(`[FCM Broadcast Create] DB Broadcast record created: ${broadcast._id}. Emitting real-time updates and running side effects.`);
+    console.log(`[FCM Broadcast Create] Live-only broadcast prepared: ${broadcast._id}. Emitting real-time updates and running side effects.`);
     emitRealtimeNotifications(resolvedTargets, broadcast);
     runBroadcastSideEffectsInBackground({
         resolvedTargets,
@@ -300,47 +255,24 @@ export const createBroadcastNotification = async ({ body = {}, adminId } = {}) =
 };
 
 export const getBroadcastNotifications = async ({ page = 1, limit = 10 } = {}) => {
-    const { skip, ...meta } = paginationMeta({ page, limit });
-
-    const [items, total] = await Promise.all([
-        BroadcastNotification.find({})
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(meta.limit)
-            .populate('createdBy', 'name email')
-            .lean(),
-        BroadcastNotification.countDocuments({})
-    ]);
+    const { ...meta } = paginationMeta({ page, limit });
 
     return {
-        items: items.map((item) => ({
-            ...item,
-            targetLabel:
-                item.targetType === 'CUSTOM'
-                    ? `${Number(item.targetCount || item.targets?.length || 0)} selected recipients`
-                    : OWNER_LABEL_MAP[item.targetType] || item.targetType
-        })),
+        items: [],
         pagination: {
             page: meta.page,
             limit: meta.limit,
-            total,
-            totalPages: Math.max(1, Math.ceil(total / meta.limit))
-        }
+            total: 0,
+            totalPages: 1
+        },
+        liveOnly: true
     };
 };
 
 export const deleteBroadcastNotification = async (broadcastId) => {
-    const normalizedId = toObjectId(broadcastId, 'broadcastId');
-    const broadcast = await BroadcastNotification.findByIdAndDelete(normalizedId).lean();
-
-    if (!broadcast) {
-        throw new NotFoundError('Broadcast notification not found');
-    }
-
-    const result = await FoodNotification.deleteMany({ broadcastId: normalizedId });
-
     return {
-        broadcast,
-        deletedInboxCount: Number(result?.deletedCount || 0)
+        broadcastId: broadcastId ? String(broadcastId) : '',
+        deletedInboxCount: 0,
+        liveOnly: true
     };
 };
