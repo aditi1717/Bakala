@@ -570,61 +570,86 @@ function showForegroundNotification(payload = {}) {
     );
   })();
 
+  const isNativeWebView = isFlutterWebView();
+  const nativeNotificationPromise = isNativeWebView
+    ? triggerWebViewNativeNotification(payload)
+    : Promise.resolve(false);
+
   playPushSound(payload);
 
   // Force system notification even when the tab is in focus
-  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-    try {
-      pushDebugLog(PUSH_DEBUG_PREFIX, "Showing browser notification from page", {
-        title,
-        body,
-        image,
-        notificationKey,
-      });
-      // Use service worker to show native system notification to ensure it bypasses focus checks
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration().then(registration => {
-          if (registration) {
-            registration.showNotification(title, {
-              body,
-              icon: "/favicon.ico",
-              image,
-              tag: notificationKey || undefined,
-              data: payload?.data || {},
-              requireInteraction: true,
-              vibrate: [200, 100, 200, 100, 300]
+  Promise.resolve(nativeNotificationPromise)
+    .then((usedNativeNotification) => {
+      if (usedNativeNotification) {
+        pushDebugLog(PUSH_DEBUG_PREFIX, "Skipping page notification because native WebView handled it", {
+          notificationKey,
+        });
+        return;
+      }
+
+      if (typeof Notification === "undefined" || Notification.permission !== "granted") {
+        return;
+      }
+
+      try {
+        pushDebugLog(PUSH_DEBUG_PREFIX, "Showing browser notification from page", {
+          title,
+          body,
+          image,
+          notificationKey,
+        });
+        // Use service worker to show native system notification to ensure it bypasses focus checks
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker
+            .getRegistration()
+            .then((registration) => {
+              if (registration) {
+                registration.showNotification(title, {
+                  body,
+                  icon: "/favicon.ico",
+                  image,
+                  tag: notificationKey || undefined,
+                  data: payload?.data || {},
+                  requireInteraction: true,
+                  vibrate: [200, 100, 200, 100, 300],
+                });
+              } else {
+                new Notification(title, {
+                  body,
+                  icon: "/favicon.ico",
+                  image,
+                  tag: notificationKey || undefined,
+                  requireInteraction: true,
+                });
+              }
+            })
+            .catch(() => {
+              new Notification(title, {
+                body,
+                icon: "/favicon.ico",
+                image,
+                tag: notificationKey || undefined,
+              });
             });
-          } else {
-            new Notification(title, {
-              body,
-              icon: "/favicon.ico",
-              image,
-              tag: notificationKey || undefined,
-              requireInteraction: true
-            });
-          }
-        }).catch(() => {
+        } else {
           new Notification(title, {
             body,
             icon: "/favicon.ico",
             image,
             tag: notificationKey || undefined,
           });
-        });
-      } else {
-        new Notification(title, {
-          body,
-          icon: "/favicon.ico",
-          image,
-          tag: notificationKey || undefined,
+        }
+      } catch (error) {
+        pushDebugWarn(PUSH_DEBUG_PREFIX, "Browser notification creation failed", {
+          error: error?.message || error,
         });
       }
-    } catch (error) {
-      pushDebugWarn(PUSH_DEBUG_PREFIX, "Browser notification creation failed", {
+    })
+    .catch((error) => {
+      pushDebugWarn(PUSH_DEBUG_PREFIX, "Native notification detection failed before page notification", {
         error: error?.message || error,
       });
-    }
-  }
+    });
 
   // In-app toasts: do not show them for delivery or restaurant modules.
   // These modules have their own dedicated UI (dashboards/modals) for real-time updates.
