@@ -25,6 +25,10 @@ const DEFAULT_MAINTENANCE_MODES = {
   },
 };
 
+const DEFAULT_NOTIFICATION_CONTROLS = {
+  useNativePushOnlyInApps: true,
+};
+
 function validateEmail(emailValue) {
   const email = String(emailValue || "").trim().toLowerCase();
   if (!email) return "Email is required";
@@ -88,6 +92,7 @@ export default function BusinessSetup() {
     pincode: "",
     region: "",
     maintenanceModes: DEFAULT_MAINTENANCE_MODES,
+    notificationControls: DEFAULT_NOTIFICATION_CONTROLS,
   });
 
   // Fetch business settings on mount
@@ -128,6 +133,12 @@ export default function BusinessSetup() {
               paragraph: settings?.maintenanceModes?.restaurantApp?.paragraph || DEFAULT_MAINTENANCE_MODES.restaurantApp.paragraph,
             },
           },
+          notificationControls: {
+            useNativePushOnlyInApps:
+              settings?.notificationControls?.useNativePushOnlyInApps !== undefined
+                ? Boolean(settings.notificationControls.useNativePushOnlyInApps)
+                : DEFAULT_NOTIFICATION_CONTROLS.useNativePushOnlyInApps,
+          },
         });
 
         // Set logo and favicon previews if they exist
@@ -162,6 +173,16 @@ export default function BusinessSetup() {
           ...((prev.maintenanceModes || DEFAULT_MAINTENANCE_MODES)[targetApp] || {}),
           [field]: value,
         },
+      },
+    }));
+  };
+
+  const handleNotificationControlChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      notificationControls: {
+        ...(prev.notificationControls || DEFAULT_NOTIFICATION_CONTROLS),
+        [field]: value,
       },
     }));
   };
@@ -245,6 +266,11 @@ export default function BusinessSetup() {
             heading: String(formData?.maintenanceModes?.restaurantApp?.heading || "").trim(),
             paragraph: String(formData?.maintenanceModes?.restaurantApp?.paragraph || "").trim(),
           },
+        },
+        notificationControls: {
+          useNativePushOnlyInApps: Boolean(
+            formData?.notificationControls?.useNativePushOnlyInApps
+          ),
         },
       };
 
@@ -458,6 +484,43 @@ export default function BusinessSetup() {
                   }}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                 />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="max-w-2xl">
+                  <h4 className="text-sm font-semibold text-slate-900">
+                    Use native push only in apps
+                  </h4>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Recommended. When enabled, Android/iOS apps rely only on the native app notification and the WebView page will not show a second copy of the same push.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleNotificationControlChange(
+                      "useNativePushOnlyInApps",
+                      !formData?.notificationControls?.useNativePushOnlyInApps
+                    )
+                  }
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    formData?.notificationControls?.useNativePushOnlyInApps
+                      ? "bg-brand-600"
+                      : "bg-slate-300"
+                  }`}
+                  aria-pressed={formData?.notificationControls?.useNativePushOnlyInApps}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                      formData?.notificationControls?.useNativePushOnlyInApps
+                        ? "translate-x-5"
+                        : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
 

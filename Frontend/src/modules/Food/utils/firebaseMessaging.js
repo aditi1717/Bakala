@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { userAPI, restaurantAPI, deliveryAPI, adminAPI } from "@food/api";
 import { initializeApp, getApp, getApps } from "firebase/app";
+import { getCachedSettings } from "@food/utils/businessSettings";
 import fallbackNotificationSound from "@food/assets/audio/alert.mp3";
 
 const pushNotificationSoundPath = "/zomato_sms.mp3";
@@ -77,6 +78,16 @@ function isSecureContextForPush() {
 
 function sanitize(value) {
   return String(value || "").trim().replace(/^['"]|['"]$/g, "");
+}
+
+function shouldUseNativePushOnlyInApps() {
+  try {
+    const settings = getCachedSettings();
+    const configuredValue = settings?.notificationControls?.useNativePushOnlyInApps;
+    return configuredValue !== undefined ? Boolean(configuredValue) : true;
+  } catch {
+    return true;
+  }
 }
 
 function getNotificationKey(payload = {}) {
@@ -532,6 +543,13 @@ function showForegroundNotification(payload = {}) {
   const notificationKey = getNotificationKey(payload);
   pushDebugLog(PUSH_DEBUG_PREFIX, "showForegroundNotification received", { notificationKey, payload });
   if (wasRecentlyHandled(notificationKey)) {
+    return;
+  }
+
+  if (isFlutterWebView() && shouldUseNativePushOnlyInApps()) {
+    pushDebugLog(PUSH_DEBUG_PREFIX, "Skipping WebView page-side notification because native push only mode is enabled", {
+      notificationKey,
+    });
     return;
   }
 
