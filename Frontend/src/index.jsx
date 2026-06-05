@@ -2,6 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './app/App.jsx'
 import { isModuleAuthenticated } from './modules/Food/utils/auth.js'
+import {
+  applyRestoredAuthState,
+  restoreNativeAuthState,
+} from './modules/Food/utils/nativeAuthBridge.js'
 import './shared/styles/global.css'
 
 const NATIVE_LAST_ROUTE_KEY = 'native_last_route'
@@ -71,6 +75,22 @@ function bootstrapNativeHashRoute() {
   window.history.replaceState(null, '', `#${targetPath}${search}`)
 }
 
+async function hydrateNativeUserAuth() {
+  if (!isNativeLikeShell() || typeof window === 'undefined') return
+
+  const hasLocalUserToken = Boolean(localStorage.getItem('user_accessToken'))
+  if (hasLocalUserToken) return
+
+  try {
+    const restoredAuth = await restoreNativeAuthState('user')
+    if (!restoredAuth?.accessToken) return
+    applyRestoredAuthState('user', restoredAuth)
+  } catch (error) {
+    console.warn('Failed to restore native user auth state:', error)
+  }
+}
+
+await hydrateNativeUserAuth()
 bootstrapNativeHashRoute()
 
 // ─── Suppress known non-critical errors ──────────────────────────────────────

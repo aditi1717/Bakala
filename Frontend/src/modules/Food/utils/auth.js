@@ -1,3 +1,8 @@
+import {
+  clearNativeAuthState,
+  persistNativeAuthState,
+} from "./nativeAuthBridge.js";
+
 /**
  * JWT Token Utilities
  * Decode and extract information from JWT tokens
@@ -172,6 +177,10 @@ export function clearModuleAuth(module) {
   // Cross-notify if restaurant/delivery to ensure UI like ProfileContext refreshes
   if (module === "restaurant" || module === "delivery") {
     window.dispatchEvent(new Event("userAuthChanged"));
+  }
+
+  if (module === "user") {
+    Promise.resolve(clearNativeAuthState(module)).catch(() => {});
   }
 }
 
@@ -357,6 +366,17 @@ export function setAuthData(module, token, user, refreshToken = null) {
     }
 
     console.log(`[setAuthData] Successfully stored auth data for ${module}`);
+
+    if (module === "user") {
+      Promise.resolve(
+        persistNativeAuthState(module, {
+          accessToken: token,
+          refreshToken,
+          authenticated: true,
+          user,
+        })
+      ).catch(() => {});
+    }
   } catch (error) {
     // If quota exceeded, try to clear some space
     if (error.name === 'QuotaExceededError' || error.code === 22) {

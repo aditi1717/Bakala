@@ -7,6 +7,10 @@
  */
 
 import axios from "axios";
+import {
+  clearNativeAuthState,
+  persistNativeAuthState,
+} from "@food/utils/nativeAuthBridge";
 
 // Prefer explicit env. If not set, use same-origin (works with a Vite proxy).
 // This avoids hardcoding ports like 5000 that may conflict with local setups.
@@ -111,6 +115,10 @@ function clearModuleAuth(module) {
       localStorage.removeItem("accessToken");
     }
   } catch (_) {}
+
+  if (module === "user") {
+    Promise.resolve(clearNativeAuthState(module)).catch(() => {});
+  }
 }
 
 let isRefreshing = false;
@@ -198,6 +206,23 @@ apiClient.interceptors.response.use(
       if (newAccessToken) {
         try {
           localStorage.setItem(`${module}_accessToken`, newAccessToken);
+          if (module === "user") {
+            Promise.resolve(
+              persistNativeAuthState(module, {
+                accessToken: newAccessToken,
+                refreshToken,
+                authenticated: true,
+                user: (() => {
+                  try {
+                    const rawUser = localStorage.getItem(`${module}_user`);
+                    return rawUser ? JSON.parse(rawUser) : null;
+                  } catch {
+                    return null;
+                  }
+                })(),
+              })
+            ).catch(() => {});
+          }
           // Dispatch a custom event specifically for the module that refreshed
           window.dispatchEvent(new CustomEvent("authRefreshed", { 
             detail: { module, token: newAccessToken } 
