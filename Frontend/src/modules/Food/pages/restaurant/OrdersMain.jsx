@@ -1764,7 +1764,9 @@ export default function OrdersMain() {
           const targetOrders = response.data.data.orders.filter((order) => {
             if (hasOrderBeenShown(order)) return false;
 
-            const statusLower = String(order.status || "").toLowerCase();
+            const statusLower = String(
+              order.orderStatus || order.status || "",
+            ).toLowerCase();
             const isPendingReview = statusLower === "created";
 
             if (isPendingReview) return true;
@@ -1790,7 +1792,7 @@ export default function OrdersMain() {
               items: orderToPopup.items || [],
               total: orderToPopup.pricing?.total || 0,
               customerAddress: orderToPopup.address,
-              status: orderToPopup.status,
+              status: orderToPopup.orderStatus || orderToPopup.status,
               createdAt: orderToPopup.createdAt,
               scheduledAt: orderToPopup.scheduledAt,
               estimatedDeliveryTime: orderToPopup.estimatedDeliveryTime || 30,

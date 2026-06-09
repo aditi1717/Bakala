@@ -1530,7 +1530,9 @@ export async function getOrderById(
   if (restaurantId) {
     const noResponseMap = await buildNoResponseMetaMap([order?._id]);
     return sanitizeOrderForExternal(
-      withNoResponseMeta(sanitizeDispatchForClient(order), noResponseMap),
+      normalizeOrderForClient(
+        withNoResponseMeta(sanitizeDispatchForClient(order), noResponseMap),
+      ),
     );
   }
 
@@ -1848,7 +1850,11 @@ export async function listOrdersRestaurant(restaurantId, query) {
     FoodOrder.countDocuments(filter),
   ]);
   const noResponseMap = await buildNoResponseMetaMap(docs.map((d) => d?._id));
-  const docsWithMeta = docs.map((doc) => withNoResponseMeta(doc, noResponseMap));
+  const docsWithMeta = docs.map((doc) =>
+    normalizeOrderForClient(
+      withNoResponseMeta(sanitizeDispatchForClient(doc), noResponseMap),
+    ),
+  );
   return buildPaginatedResult({ docs: docsWithMeta, total, page, limit });
 }
 
