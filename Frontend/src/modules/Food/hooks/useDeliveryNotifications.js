@@ -1009,10 +1009,15 @@ export const useDeliveryNotifications = () => {
 
     socketRef.current.on('admin_notification', (payload) => {
       debugLog('? Admin notification received via socket:', payload);
-      toast.message(payload?.title || 'Support Update', {
-        description: payload?.message || 'New response from support.',
-        duration: 10000,
-      });
+      const isAdminBroadcast =
+        String(payload?.type || '').toLowerCase() === 'admin_broadcast' ||
+        Boolean(payload?.broadcastId);
+      if (!isAdminBroadcast) {
+        toast.message(payload?.title || 'Support Update', {
+          description: payload?.message || 'New response from support.',
+          duration: 10000,
+        });
+      }
       dispatchNotificationInboxRefresh();
     });
 

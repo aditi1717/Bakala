@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
+  BellRing,
   ChevronRight,
   Tag,
   User,
@@ -84,6 +85,7 @@ export default function Profile() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isSendingTestPush, setIsSendingTestPush] = useState(false);
 
   // Trigger web push registration when profile mounts to ensure FCM token is saved
   useEffect(() => {
@@ -431,6 +433,32 @@ export default function Profile() {
       toast.error(error?.response?.data?.message || "Failed to delete account");
     } finally {
       setIsDeletingAccount(false);
+    }
+  };
+
+  const handleTestPushNotification = async () => {
+    if (isSendingTestPush) return;
+
+    setIsSendingTestPush(true);
+
+    try {
+      await registerWebPushForCurrentModule();
+
+      const platform =
+        typeof window !== "undefined" && window.flutter_inappwebview
+          ? "mobile"
+          : "web";
+
+      await userAPI.testFcmNotification({ platform });
+      toast.success("Test push sent. Check for the FCM notification now.");
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to send test push notification",
+      );
+    } finally {
+      setIsSendingTestPush(false);
     }
   };
 
@@ -868,6 +896,37 @@ export default function Profile() {
                 </Card>
               </motion.div>
             </Link>
+
+            <motion.div
+              whileHover={{ x: 2 }}
+              transition={{ duration: 0.2, type: "spring", stiffness: 300 }}>
+              <Card
+                className={`${optionCardClass} ${isSendingTestPush ? "opacity-70" : ""}`}
+                onClick={handleTestPushNotification}>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      className={iconWrapClass}
+                      whileHover={{ scale: 1.03 }}
+                      transition={{ duration: 0.3 }}>
+                      <BellRing
+                        className={`h-5 w-5 text-gray-700 dark:text-gray-300 ${isSendingTestPush ? "animate-pulse" : ""}`}
+                      />
+                    </motion.div>
+                    <span className={rowLabelClass}>
+                      {isSendingTestPush
+                        ? "Sending test push..."
+                        : "Test push notification"}
+                    </span>
+                  </div>
+                  <motion.div
+                    whileHover={{ x: 2 }}
+                    transition={{ duration: 0.2 }}>
+                    <ChevronRight className={chevronClass} />
+                  </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
             <Link to="/food/user/profile/report-safety-emergency" className="block">
               <motion.div

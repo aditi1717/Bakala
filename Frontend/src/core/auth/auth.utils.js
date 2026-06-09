@@ -95,6 +95,12 @@ export function getModuleRefreshToken(module) {
   return localStorage.getItem(`${module}_refreshToken`);
 }
 
+function hasUsableRefreshToken(module) {
+  const refreshToken = getModuleRefreshToken(module);
+  if (!refreshToken) return false;
+  return !isTokenExpired(refreshToken);
+}
+
 /**
  * Get current user's role from a specific module's token
  * @param {string} module - Module name (admin, restaurant, delivery, user)
@@ -135,14 +141,11 @@ export function getCurrentUserRole(module = null) {
  */
 export function isModuleAuthenticated(module) {
   const token = getModuleToken(module);
-  if (!token) return false;
-  
-  if (isTokenExpired(token)) {
-    clearModuleAuth(module);
-    return false;
+  if (token && !isTokenExpired(token)) {
+    return true;
   }
-  
-  return true;
+
+  return hasUsableRefreshToken(module);
 }
 
 /**

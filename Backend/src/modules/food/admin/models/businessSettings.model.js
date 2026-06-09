@@ -36,6 +36,9 @@ const businessSettingsSchema = new mongoose.Schema(
                 heading: { type: String, default: 'Restaurant Panel is Temporarily Closed' },
                 paragraph: { type: String, default: 'Maintenance is in progress. Please come back soon.' }
             }
+        },
+        notificationControls: {
+            useNativePushOnlyInApps: { type: Boolean, default: true }
         }
     },
     { timestamps: true }

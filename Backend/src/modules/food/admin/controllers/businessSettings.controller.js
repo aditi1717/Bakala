@@ -33,6 +33,15 @@ const normalizeMaintenanceModes = (raw = {}, previous = {}) => ({
     restaurantApp: sanitizeMaintenanceNode(raw?.restaurantApp ?? previous?.restaurantApp, DEFAULT_MAINTENANCE_CONTENT.restaurantApp)
 });
 
+const normalizeNotificationControls = (raw = {}, previous = {}) => ({
+    useNativePushOnlyInApps:
+        raw?.useNativePushOnlyInApps !== undefined
+            ? Boolean(raw.useNativePushOnlyInApps)
+            : previous?.useNativePushOnlyInApps !== undefined
+                ? Boolean(previous.useNativePushOnlyInApps)
+                : true
+});
+
 export async function getBusinessSettings(req, res, next) {
     try {
         let settings = await FoodBusinessSettings.findOne().lean();
@@ -40,7 +49,10 @@ export async function getBusinessSettings(req, res, next) {
             // Create default settings if none exist
             settings = await FoodBusinessSettings.create({
                 companyName: 'Bakalaa',
-                email: 'admin@bakalaa.com'
+                email: 'admin@bakalaa.com',
+                notificationControls: {
+                    useNativePushOnlyInApps: true
+                }
             });
         }
         return sendResponse(res, 200, 'Business settings fetched successfully', settings);
@@ -63,7 +75,8 @@ export async function updateBusinessSettings(req, res, next) {
             region,
             logoUrl,
             faviconUrl,
-            maintenanceModes
+            maintenanceModes,
+            notificationControls
         } = data;
 
         // Validation
@@ -119,6 +132,12 @@ export async function updateBusinessSettings(req, res, next) {
             settings.maintenanceModes = normalizeMaintenanceModes(
                 maintenanceModes,
                 settings.maintenanceModes || {}
+            );
+        }
+        if (notificationControls !== undefined) {
+            settings.notificationControls = normalizeNotificationControls(
+                notificationControls,
+                settings.notificationControls || {}
             );
         }
 

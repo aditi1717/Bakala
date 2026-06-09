@@ -100,6 +100,12 @@ export function getModuleRefreshToken(module) {
   return localStorage.getItem(`${module}_refreshToken`);
 }
 
+function hasUsableRefreshToken(module) {
+  const refreshToken = getModuleRefreshToken(module);
+  if (!refreshToken) return false;
+  return !isTokenExpired(refreshToken);
+}
+
 /**
  * Get current user's role from a specific module's storage/token
  * @param {string} module - Module name (admin, restaurant, delivery, user)
@@ -143,7 +149,13 @@ export function getCurrentUser(module) {
  */
 export function isModuleAuthenticated(module) {
   const token = getModuleToken(module);
-  return !!token && !isTokenExpired(token);
+  if (token && !isTokenExpired(token)) {
+    return true;
+  }
+
+  // Keep the session alive through route guards while axios performs
+  // the real refresh-token exchange on the next protected API request.
+  return hasUsableRefreshToken(module);
 }
 
 /**

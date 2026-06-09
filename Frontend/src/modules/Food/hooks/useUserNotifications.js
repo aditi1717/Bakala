@@ -205,10 +205,15 @@ export const useUserNotifications = () => {
     });
 
     socketRef.current.on('admin_notification', (payload) => {
-      toast.message(payload?.title || 'Notification', {
-        description: payload?.message || 'New notification received.',
-        duration: 8000,
-      });
+      const isAdminBroadcast =
+        String(payload?.type || '').toLowerCase() === 'admin_broadcast' ||
+        Boolean(payload?.broadcastId);
+      if (!isAdminBroadcast) {
+        toast.message(payload?.title || 'Notification', {
+          description: payload?.message || 'New notification received.',
+          duration: 8000,
+        });
+      }
       storeUserAdminNotification(payload);
       dispatchNotificationInboxRefresh();
     });

@@ -147,6 +147,8 @@ const emitRealtimeNotifications = (targets = [], broadcast) => {
 
         const payload = {
             id: String(broadcast._id),
+            type: 'admin_broadcast',
+            broadcastId: String(broadcast._id),
             title: broadcast.title,
             message: broadcast.message,
             link: broadcast.link || '',
