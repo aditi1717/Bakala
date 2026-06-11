@@ -704,7 +704,7 @@ function showForegroundNotification(payload = {}) {
 
   // In-app toasts: do not show them for delivery or restaurant modules.
   // These modules have their own dedicated UI (dashboards/modals) for real-time updates.
-  const currentModule = normalizeModuleFromPath();
+  // Note: currentModule is already declared above in the sound-filter block.
   if (
     currentModule !== "delivery" &&
     currentModule !== "restaurant" &&
