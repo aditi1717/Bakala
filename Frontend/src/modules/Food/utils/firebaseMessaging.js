@@ -593,7 +593,40 @@ function showForegroundNotification(payload = {}) {
     ? triggerWebViewNativeNotification(payload)
     : Promise.resolve(false);
 
-  playPushSound(payload);
+  // ── Per-module sound rules ────────────────────────────────────────────────
+  // • Restaurant : ring ONLY when a brand-new order arrives (new_order).
+  // • Admin      : ring ONLY when a brand-new order arrives (new_order).
+  //                All other admin alerts (ready-for-assignment, rider timed
+  //                out, etc.) are handled visually — no extra ring needed.
+  // • Delivery   : NEVER ring via FCM push. The delivery app shows a
+  //                full-screen request modal driven by the socket; an extra
+  //                ring here causes the double-ring the user reported.
+  // • User       : keep default behaviour (ring for relevant events).
+  const notifType = String(payload?.data?.type || "").toLowerCase();
+  const currentModule = normalizeModuleFromPath();
+
+  const shouldPlaySound = (() => {
+    // Delivery module → always silent (socket UI handles it)
+    if (currentModule === "delivery") return false;
+
+    // Restaurant and Admin → only ring for a brand-new order
+    if (currentModule === "restaurant" || currentModule === "admin") {
+      return notifType === "new_order";
+    }
+
+    // User module → ring for everything except pure status updates
+    const USER_SILENT_TYPES = new Set([
+      "order_status_update",
+      "delivery_accepted",
+      "rider_arrived",
+      "order_completed",
+    ]);
+    return !USER_SILENT_TYPES.has(notifType);
+  })();
+
+  if (shouldPlaySound) {
+    playPushSound(payload);
+  }
 
   // Force system notification even when the tab is in focus
   Promise.resolve(nativeNotificationPromise)
